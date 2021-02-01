@@ -27,6 +27,8 @@ import android.os.CancellationSignal;
 import android.text.TextUtils;
 import android.util.Log;
 
+import androidx.annotation.WorkerThread;
+
 import com.android.app.search.ResultType;
 import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsSectionDecorator;
@@ -46,9 +48,10 @@ public class SearchServicePipeline implements SearchPipeline {
     private static final int SUPPORTED_RESULT_TYPES =
             ResultType.APPLICATION | ResultType.SHORTCUT | ResultType.PLAY | ResultType.PEOPLE
                     | ResultType.SETTING;
+
+    private static final boolean DEBUG = true;
     private static final int REQUEST_TIMEOUT = 200;
     private static final String TAG = "SearchServicePipeline";
-
 
     private final Context mContext;
     private final SearchSession mSession;
@@ -63,16 +66,22 @@ public class SearchServicePipeline implements SearchPipeline {
         SearchUiManager manager = context.getSystemService(SearchUiManager.class);
         mSession = manager.createSearchSession(
                 new SearchContext(SUPPORTED_RESULT_TYPES, REQUEST_TIMEOUT, null));
+        SearchSessionTracker.getInstance(context).setSearchSession(mSession);
     }
 
+    @WorkerThread
     @Override
     public void query(String input, Consumer<ArrayList<AllAppsGridAdapter.AdapterItem>> callback,
             CancellationSignal cancellationSignal) {
         mCanceled = false;
         Query query = new Query(input, System.currentTimeMillis(), null);
-        mSession.query(query, UI_HELPER_EXECUTOR, items -> {
+        mSession.query(query, UI_HELPER_EXECUTOR, targets -> {
             if (!mCanceled) {
-                callback.accept(this.onResult(items));
+                if (DEBUG) {
+                    printSearchTargets(input, targets);
+                }
+                SearchSessionTracker.getInstance(mContext).setQuery(query);
+                callback.accept(this.onResult(targets));
             }
             Log.w(TAG, "Ignoring results due to cancel signal");
         });
@@ -109,6 +118,13 @@ public class SearchServicePipeline implements SearchPipeline {
             }
         }
         return new ArrayList<>(adapterMap.values());
+    }
+
+    private void printSearchTargets(String query, List<SearchTarget> results) {
+        Log.d(TAG, " query=" + query + " size=" + results.size());
+        for (SearchTarget s : results) {
+            Log.d(TAG, "layoutType=" + s.getLayoutType() + " resultType=" + s.getResultType());
+        }
     }
 
     /**

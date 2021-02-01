@@ -721,11 +721,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
 
     @UiThread
     public void onGestureStarted(boolean isLikelyToStartNewTask) {
-        // Temporarily disable this until we have a view that we can use
-        // InteractionJankMonitorWrapper.begin(mRecentsView,
-        //         InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
-        // InteractionJankMonitorWrapper.begin(mRecentsView,
-        //         InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+        if (mRecentsView != null) {
+            InteractionJankMonitorWrapper.begin(mRecentsView,
+                    InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
+            InteractionJankMonitorWrapper.begin(mRecentsView,
+                    InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+        }
         notifyGestureStartedAsync();
         setIsLikelyToStartNewTask(isLikelyToStartNewTask, false /* animate */);
         mStateCallback.setStateOnUiThread(STATE_GESTURE_STARTED);
@@ -970,6 +971,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
                 }
                 duration = Math.max(duration, mRecentsView.getScroller().getDuration());
             }
+            if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+                mRecentsView.getRunningTaskView().setIsClickableAsLiveTile(false);
+            }
         }
 
         // Let RecentsView handle the scrolling to the task, which we launch in startNewTask()
@@ -1058,6 +1062,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
         if (mGestureState.getEndTarget().isLauncher) {
             ActivityManagerWrapper.getInstance().registerTaskStackListener(
                     mActivityRestartListener);
+
+            mActivityInterface.onAnimateToLauncher(mGestureState.getEndTarget(), duration);
         }
 
         if (mGestureState.getEndTarget() == HOME) {
@@ -1447,6 +1453,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
     private void finishCurrentTransitionToRecents() {
         if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
             mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED);
+            final TaskView runningTaskView = mRecentsView.getRunningTaskView();
+            if (runningTaskView != null) {
+                runningTaskView.setIsClickableAsLiveTile(true);
+            }
         } else if (!hasTargets() || mRecentsAnimationController == null) {
             // If there are no targets or the animation not started, then there is nothing to finish
             mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED);

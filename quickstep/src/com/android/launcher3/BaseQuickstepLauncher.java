@@ -19,6 +19,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
 import static com.android.launcher3.AbstractFloatingView.TYPE_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherState.FLAG_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.util.DisplayController.DisplayHolder.CHANGE_SIZE;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
@@ -29,7 +30,10 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.view.LayoutInflater;
 import android.view.View;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.WellbeingModel;
@@ -39,7 +43,11 @@ import com.android.launcher3.proxy.StartActivityParams;
 import com.android.launcher3.statehandlers.BackButtonAlphaHandler;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
+import com.android.launcher3.taskbar.TaskbarContainerView;
+import com.android.launcher3.taskbar.TaskbarController;
+import com.android.launcher3.taskbar.TaskbarStateHandler;
 import com.android.launcher3.uioverrides.RecentsViewStateController;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SysUINavigationMode;
@@ -53,7 +61,6 @@ import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.ActivityOptionsCompat;
-import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.stream.Stream;
@@ -75,6 +82,9 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     private OverviewActionsView mActionsView;
 
+    private @Nullable TaskbarController mTaskbarController;
+    private final TaskbarStateHandler mTaskbarStateHandler = new TaskbarStateHandler(this);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -86,6 +96,11 @@ public abstract class BaseQuickstepLauncher extends Launcher
     @Override
     public void onDestroy() {
         SysUINavigationMode.INSTANCE.get(this).removeModeChangeListener(this);
+
+        if (mTaskbarController != null) {
+            mTaskbarController.cleanup();
+        }
+
         super.onDestroy();
     }
 
@@ -190,6 +205,29 @@ public abstract class BaseQuickstepLauncher extends Launcher
         mActionsView = findViewById(R.id.overview_actions_view);
         ((RecentsView) getOverviewPanel()).init(mActionsView);
         mActionsView.updateVerticalMargin(SysUINavigationMode.getMode(this));
+
+        addTaskbarIfNecessary();
+    }
+
+    @Override
+    public void onDisplayInfoChanged(DisplayController.Info info, int flags) {
+        super.onDisplayInfoChanged(info, flags);
+        if ((flags & CHANGE_SIZE) != 0) {
+            addTaskbarIfNecessary();
+        }
+    }
+
+    private void addTaskbarIfNecessary() {
+        if (mTaskbarController != null) {
+            mTaskbarController.cleanup();
+            mTaskbarController = null;
+        }
+        if (FeatureFlags.ENABLE_TASKBAR.get() && mDeviceProfile.isTablet) {
+            TaskbarContainerView taskbarContainer = (TaskbarContainerView) LayoutInflater.from(this)
+                    .inflate(R.layout.taskbar, null, false);
+            mTaskbarController = new TaskbarController(this, taskbarContainer);
+            mTaskbarController.init();
+        }
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -209,11 +247,21 @@ public abstract class BaseQuickstepLauncher extends Launcher
                 getWorkspace(),
                 getDepthController(),
                 new RecentsViewStateController(this),
-                new BackButtonAlphaHandler(this)};
+                new BackButtonAlphaHandler(this),
+                getTaskbarStateHandler(),
+        };
     }
 
     public DepthController getDepthController() {
         return mDepthController;
+    }
+
+    public @Nullable TaskbarController getTaskbarController() {
+        return mTaskbarController;
+    }
+
+    public TaskbarStateHandler getTaskbarStateHandler() {
+        return mTaskbarStateHandler;
     }
 
     @Override
@@ -258,6 +306,12 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
         if ((changeBits & ACTIVITY_STATE_STARTED) != 0) {
             mDepthController.setActivityStarted(isStarted());
+        }
+
+        if ((changeBits & ACTIVITY_STATE_RESUMED) != 0) {
+            if (mTaskbarController != null) {
+                mTaskbarController.onLauncherResumedOrPaused(hasBeenResumed());
+            }
         }
 
         super.onActivityFlagsChanged(changeBits);

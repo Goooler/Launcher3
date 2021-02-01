@@ -17,8 +17,8 @@
 package com.android.launcher3.search;
 
 import android.app.search.SearchTarget;
-
-import com.android.systemui.plugins.shared.SearchTargetLegacy;
+import android.app.search.SearchTargetEvent;
+import android.content.Context;
 
 import java.util.List;
 
@@ -28,22 +28,19 @@ import java.util.List;
 public interface SearchTargetHandler {
 
     /**
-     * Update view using values from {@link SearchTargetLegacy}
+     * Update view using values from {@link SearchTarget}
      */
-    default void applySearchTarget(SearchTargetLegacy searchTarget) {
-    }
-
+    default void apply(SearchTarget parentTarget, List<SearchTarget> children) { }
 
     /**
-     * Update view using values from {@link SearchTargetLegacy}
+     * Handle IME quick select event. returns whether event was handled.
      */
-    default void applySearchTarget(SearchTarget parentTarget, List<SearchTarget> children) {
+    default boolean quickSelect() {
+        return false;
     }
 
-    /**
-     * Handles selection of SearchTarget
-     */
-    default void handleSelection(int eventType) {
+    default void notifyEvent(Context context, String id, int eventType) {
+        SearchTargetEvent.Builder builder = new SearchTargetEvent.Builder(id, eventType);
+        SearchSessionTracker.getInstance(context).notifyEvent(builder.build());
     }
-
 }
