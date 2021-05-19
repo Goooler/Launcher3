@@ -335,16 +335,13 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     public void setOverlayEnabled(boolean overlayEnabled) {
         if (mOverlayEnabled != overlayEnabled) {
             mOverlayEnabled = overlayEnabled;
-            updateOverlay();
-        }
-    }
 
-    private void updateOverlay() {
-        if (mOverlayEnabled) {
-            getTaskOverlay().initOverlay(mTask, mThumbnailData, mPreviewPositionHelper.mMatrix,
-                    mPreviewPositionHelper.mIsOrientationChanged);
-        } else {
-            getTaskOverlay().reset();
+            if (mOverlayEnabled) {
+                getTaskOverlay().initOverlay(mTask, mThumbnailData, mPreviewPositionHelper.mMatrix,
+                        mPreviewPositionHelper.mIsOrientationChanged);
+            } else {
+                getTaskOverlay().reset();
+            }
         }
     }
 
@@ -379,10 +376,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         }
         getTaskView().updateCurrentFullscreenParams(mPreviewPositionHelper);
         invalidate();
-
-        // Update can be called from {@link #onSizeChanged} during layout, post handling of overlay
-        // as overlay could modify the views in the overlay as a side effect of its update.
-        post(this::updateOverlay);
     }
 
     @Override
@@ -418,7 +411,9 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
      */
     public static class PreviewPositionHelper {
 
-        // Contains the portion of the thumbnail that is clipped when fullscreen progress = 0.
+        private static final RectF EMPTY_RECT_F = new RectF();
+
+        // Contains the portion of the thumbnail that is unclipped when fullscreen progress = 1.
         private final RectF mClippedInsets = new RectF();
         private final Matrix mMatrix = new Matrix();
         private boolean mIsOrientationChanged;
@@ -623,15 +618,17 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                     break;
             }
             mClippedInsets.offsetTo(newLeftInset * scale, newTopInset * scale);
-            mMatrix.postTranslate(translateX - mClippedInsets.left,
-                    translateY - mClippedInsets.top);
+            mMatrix.postTranslate(translateX, translateY);
+            if (TaskView.FULL_THUMBNAIL) {
+                mMatrix.postTranslate(-mClippedInsets.left, -mClippedInsets.top);
+            }
         }
 
         /**
          * Insets to used for clipping the thumbnail (in case it is drawing outside its own space)
          */
         public RectF getInsetsToDrawInFullscreen() {
-            return mClippedInsets;
+            return TaskView.FULL_THUMBNAIL ? mClippedInsets : EMPTY_RECT_F;
         }
     }
 }
