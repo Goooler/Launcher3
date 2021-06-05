@@ -45,6 +45,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_EXIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONRESUME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONSTOP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_RECONFIGURED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_ACTIVITY_PAUSED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_DRAG_AND_DROP;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_LOADER_RUNNING;
@@ -682,6 +683,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 completeAddAppWidget(appWidgetId, info, null, null);
                 break;
             case REQUEST_RECONFIGURE_APPWIDGET:
+                mStatsLogManager.logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
                 completeRestoreAppWidget(appWidgetId, LauncherAppWidgetInfo.RESTORE_COMPLETED);
                 break;
             case REQUEST_BIND_PENDING_APPWIDGET: {
@@ -2807,13 +2809,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      */
     public float[] getNormalOverviewScaleAndOffset() {
         return new float[] {NO_SCALE, NO_OFFSET};
-    }
-
-    /**
-     * @see LauncherState#getTaskbarScale(Launcher)
-     */
-    public float getNormalTaskbarScale() {
-        return 1f;
     }
 
     public static Launcher getLauncher(Context context) {
