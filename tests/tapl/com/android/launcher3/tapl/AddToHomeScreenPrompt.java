@@ -22,6 +22,8 @@ import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.UiObject2;
 
+import com.android.launcher3.testing.TestProtocol;
+
 import java.util.regex.Pattern;
 
 public class AddToHomeScreenPrompt {
@@ -42,10 +44,19 @@ public class AddToHomeScreenPrompt {
 
     public void addAutomatically() {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
-            mLauncher.clickObject(
-                    mLauncher.waitForObjectInContainer(
-                            mWidgetCell.getParent().getParent().getParent().getParent(),
-                            By.text(ADD_AUTOMATICALLY)));
+            if (mLauncher.getNavigationModel()
+                    != LauncherInstrumentation.NavigationModel.THREE_BUTTON) {
+                if (!mLauncher.isLauncher3()) {
+                    mLauncher.expectEvent(
+                            TestProtocol.SEQUENCE_TIS,
+                            LauncherInstrumentation.EVENT_TOUCH_DOWN_TIS);
+                    mLauncher.expectEvent(
+                            TestProtocol.SEQUENCE_TIS, LauncherInstrumentation.EVENT_TOUCH_UP_TIS);
+                }
+            }
+            mLauncher.waitForObjectInContainer(
+                    mWidgetCell.getParent().getParent().getParent().getParent(),
+                    By.text(ADD_AUTOMATICALLY)).click();
             mLauncher.waitUntilLauncherObjectGone(getSelector());
         }
     }
