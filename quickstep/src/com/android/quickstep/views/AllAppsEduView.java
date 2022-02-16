@@ -35,7 +35,6 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
-import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.AbstractFloatingView;
@@ -59,7 +58,6 @@ public class AllAppsEduView extends AbstractFloatingView {
     private Launcher mLauncher;
     private AllAppsEduTouchController mTouchController;
 
-    @Nullable
     private AnimatorSet mAnimation;
 
     private GradientDrawable mCircle;

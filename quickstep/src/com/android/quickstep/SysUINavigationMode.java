@@ -32,6 +32,7 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.util.MainThreadInitializedObject;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -77,6 +78,8 @@ public class SysUINavigationMode {
 
     private final List<NavigationModeChangeListener> mChangeListeners =
             new CopyOnWriteArrayList<>();
+    private final List<OneHandedModeChangeListener> mOneHandedOverlayChangeListeners =
+            new ArrayList<>();
 
     public SysUINavigationMode(Context context) {
         mContext = context;
@@ -123,6 +126,7 @@ public class SysUINavigationMode {
         }
         if (mNavBarLargerGesturalHeight != newLargerGesturalHeight) {
             mNavBarLargerGesturalHeight = newLargerGesturalHeight;
+            dispatchOneHandedOverlayChange();
         }
     }
 
@@ -154,6 +158,12 @@ public class SysUINavigationMode {
         }
     }
 
+    private void dispatchOneHandedOverlayChange() {
+        for (OneHandedModeChangeListener listener : mOneHandedOverlayChangeListeners) {
+            listener.onOneHandedModeChanged(mNavBarLargerGesturalHeight);
+        }
+    }
+
     public Mode addModeChangeListener(NavigationModeChangeListener listener) {
         mChangeListeners.add(listener);
         return mMode;
@@ -161,6 +171,15 @@ public class SysUINavigationMode {
 
     public void removeModeChangeListener(NavigationModeChangeListener listener) {
         mChangeListeners.remove(listener);
+    }
+
+    public int addOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
+        mOneHandedOverlayChangeListeners.add(listener);
+        return mNavBarLargerGesturalHeight;
+    }
+
+    public void removeOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
+        mOneHandedOverlayChangeListeners.remove(listener);
     }
 
     public Mode getMode() {

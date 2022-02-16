@@ -18,12 +18,9 @@ package com.android.launcher3.pm;
 import static com.android.launcher3.pm.InstallSessionHelper.getUserHandle;
 import static com.android.launcher3.pm.PackageInstallInfo.STATUS_FAILED;
 import static com.android.launcher3.pm.PackageInstallInfo.STATUS_INSTALLED;
-import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
-import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionInfo;
-import android.os.Build;
 import android.os.UserHandle;
 import android.util.SparseArray;
 
@@ -31,53 +28,35 @@ import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.util.PackageUserKey;
 
-import java.lang.ref.WeakReference;
-
 @WorkerThread
 public class InstallSessionTracker extends PackageInstaller.SessionCallback {
 
     // Lazily initialized
     private SparseArray<PackageUserKey> mActiveSessions = null;
 
-    private final WeakReference<InstallSessionHelper> mWeakHelper;
-    private final WeakReference<Callback> mWeakCallback;
-    private final PackageInstaller mInstaller;
-    private final LauncherApps mLauncherApps;
+    private final InstallSessionHelper mInstallerCompat;
+    private final Callback mCallback;
 
-
-    InstallSessionTracker(InstallSessionHelper installerCompat, Callback callback,
-            PackageInstaller installer, LauncherApps launcherApps) {
-        mWeakHelper = new WeakReference<>(installerCompat);
-        mWeakCallback = new WeakReference<>(callback);
-        mInstaller = installer;
-        mLauncherApps = launcherApps;
+    InstallSessionTracker(InstallSessionHelper installerCompat, Callback callback) {
+        mInstallerCompat = installerCompat;
+        mCallback = callback;
     }
 
     @Override
     public void onCreated(int sessionId) {
-        InstallSessionHelper helper = mWeakHelper.get();
-        Callback callback = mWeakCallback.get();
-        if (callback == null || helper == null) {
-            return;
-        }
-        SessionInfo sessionInfo = pushSessionDisplayToLauncher(sessionId, helper, callback);
+        SessionInfo sessionInfo = pushSessionDisplayToLauncher(sessionId);
         if (sessionInfo != null) {
-            callback.onInstallSessionCreated(PackageInstallInfo.fromInstallingState(sessionInfo));
+            mCallback.onInstallSessionCreated(PackageInstallInfo.fromInstallingState(sessionInfo));
         }
 
-        helper.tryQueuePromiseAppIcon(sessionInfo);
+        mInstallerCompat.tryQueuePromiseAppIcon(sessionInfo);
     }
 
     @Override
     public void onFinished(int sessionId, boolean success) {
-        InstallSessionHelper helper = mWeakHelper.get();
-        Callback callback = mWeakCallback.get();
-        if (callback == null || helper == null) {
-            return;
-        }
         // For a finished session, we can't get the session info. So use the
         // packageName from our local cache.
-        SparseArray<PackageUserKey> activeSessions = getActiveSessionMap(helper);
+        SparseArray<PackageUserKey> activeSessions = getActiveSessionMap();
         PackageUserKey key = activeSessions.get(sessionId);
         activeSessions.remove(sessionId);
 
@@ -86,26 +65,21 @@ public class InstallSessionTracker extends PackageInstaller.SessionCallback {
             PackageInstallInfo info = PackageInstallInfo.fromState(
                     success ? STATUS_INSTALLED : STATUS_FAILED,
                     packageName, key.mUser);
-            callback.onPackageStateChanged(info);
+            mCallback.onPackageStateChanged(info);
 
-            if (!success && helper.promiseIconAddedForId(sessionId)) {
-                callback.onSessionFailure(packageName, key.mUser);
+            if (!success && mInstallerCompat.promiseIconAddedForId(sessionId)) {
+                mCallback.onSessionFailure(packageName, key.mUser);
                 // If it is successful, the id is removed in the the package added flow.
-                helper.removePromiseIconId(sessionId);
+                mInstallerCompat.removePromiseIconId(sessionId);
             }
         }
     }
 
     @Override
     public void onProgressChanged(int sessionId, float progress) {
-        InstallSessionHelper helper = mWeakHelper.get();
-        Callback callback = mWeakCallback.get();
-        if (callback == null || helper == null) {
-            return;
-        }
-        SessionInfo session = helper.getVerifiedSessionInfo(sessionId);
+        SessionInfo session = mInstallerCompat.getVerifiedSessionInfo(sessionId);
         if (session != null && session.getAppPackageName() != null) {
-            callback.onPackageStateChanged(PackageInstallInfo.fromInstallingState(session));
+            mCallback.onPackageStateChanged(PackageInstallInfo.fromInstallingState(session));
         }
     }
 
@@ -114,53 +88,35 @@ public class InstallSessionTracker extends PackageInstaller.SessionCallback {
 
     @Override
     public void onBadgingChanged(int sessionId) {
-        InstallSessionHelper helper = mWeakHelper.get();
-        Callback callback = mWeakCallback.get();
-        if (callback == null || helper == null) {
-            return;
-        }
-        SessionInfo sessionInfo = pushSessionDisplayToLauncher(sessionId, helper, callback);
+        SessionInfo sessionInfo = pushSessionDisplayToLauncher(sessionId);
         if (sessionInfo != null) {
-            helper.tryQueuePromiseAppIcon(sessionInfo);
+            mInstallerCompat.tryQueuePromiseAppIcon(sessionInfo);
         }
     }
 
-    private SessionInfo pushSessionDisplayToLauncher(
-            int sessionId, InstallSessionHelper helper, Callback callback) {
-        SessionInfo session = helper.getVerifiedSessionInfo(sessionId);
+    private SessionInfo pushSessionDisplayToLauncher(int sessionId) {
+        SessionInfo session = mInstallerCompat.getVerifiedSessionInfo(sessionId);
         if (session != null && session.getAppPackageName() != null) {
             PackageUserKey key =
                     new PackageUserKey(session.getAppPackageName(), getUserHandle(session));
-            getActiveSessionMap(helper).put(session.getSessionId(), key);
-            callback.onUpdateSessionDisplay(key, session);
+            getActiveSessionMap().put(session.getSessionId(), key);
+            mCallback.onUpdateSessionDisplay(key, session);
             return session;
         }
         return null;
     }
 
-    private SparseArray<PackageUserKey> getActiveSessionMap(InstallSessionHelper helper) {
+    private SparseArray<PackageUserKey> getActiveSessionMap() {
         if (mActiveSessions == null) {
             mActiveSessions = new SparseArray<>();
-            helper.getActiveSessions().forEach(
+            mInstallerCompat.getActiveSessions().forEach(
                     (key, si) -> mActiveSessions.put(si.getSessionId(), key));
         }
         return mActiveSessions;
     }
 
-    void register() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            mInstaller.registerSessionCallback(this, MODEL_EXECUTOR.getHandler());
-        } else {
-            mLauncherApps.registerPackageInstallerSessionCallback(MODEL_EXECUTOR, this);
-        }
-    }
-
     public void unregister() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            mInstaller.unregisterSessionCallback(this);
-        } else {
-            mLauncherApps.unregisterPackageInstallerSessionCallback(this);
-        }
+        mInstallerCompat.unregister(this);
     }
 
     public interface Callback {

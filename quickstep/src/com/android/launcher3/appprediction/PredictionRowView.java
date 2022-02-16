@@ -48,7 +48,6 @@ import com.android.launcher3.touch.ItemLongClickListener;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @TargetApi(Build.VERSION_CODES.P)
 public class PredictionRowView extends LinearLayout implements
@@ -171,9 +170,10 @@ public class PredictionRowView extends LinearLayout implements
     private void applyPredictedApps(List<ItemInfo> items) {
         mPendingPredictedItems = null;
         mPredictedApps.clear();
-        mPredictedApps.addAll(items.stream()
+        items.stream()
                 .filter(itemInfo -> itemInfo instanceof WorkspaceItemInfo)
-                .map(itemInfo -> (WorkspaceItemInfo) itemInfo).collect(Collectors.toList()));
+                .map(itemInfo -> (WorkspaceItemInfo) itemInfo)
+                .forEach(mPredictedApps::add);
         applyPredictionApps();
     }
 
@@ -249,7 +249,8 @@ public class PredictionRowView extends LinearLayout implements
 
     @Override
     public void setInsets(Rect insets, DeviceProfile grid) {
-        int leftRightPadding = grid.allAppsLeftRightPadding;
+        int leftRightPadding = grid.desiredWorkspaceLeftRightMarginPx
+                + grid.cellLayoutPaddingLeftRightPx;
         setPadding(leftRightPadding, getPaddingTop(), leftRightPadding, getPaddingBottom());
     }
 
