@@ -17,7 +17,6 @@ package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.util.Themes;
@@ -43,10 +42,6 @@ public class QuickSwitchState extends BackgroundAppState {
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
-        DeviceProfile dp = launcher.getDeviceProfile();
-        if (dp.isTaskbarPresentInApps) {
-            return launcher.getColor(R.color.taskbar_background);
-        }
         return Themes.getAttrColor(launcher, R.attr.overviewScrimColor);
     }
 
@@ -58,16 +53,6 @@ public class QuickSwitchState extends BackgroundAppState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return NONE;
-    }
-
-    @Override
-    public boolean isTaskbarStashed(Launcher launcher) {
-        return !launcher.getDeviceProfile().isTaskbarPresentInApps;
-    }
-
-    @Override
-    public boolean isTaskbarAlignedWithHotseat(Launcher launcher) {
-        return false;
+        return TASKBAR;
     }
 }
