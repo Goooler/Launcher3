@@ -40,7 +40,6 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.util.Themes;
-import com.android.quickstep.TaskAnimationManager;
 import com.android.systemui.shared.pip.PipSurfaceTransactionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
@@ -116,7 +115,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             @NonNull Rect destinationBoundsTransformed,
             int cornerRadius,
             @NonNull View view) {
-        super(startBounds, new RectF(destinationBoundsTransformed), context, null);
+        super(startBounds, new RectF(destinationBoundsTransformed), context);
         mTaskId = taskId;
         mComponentName = componentName;
         mLeash = leash;
@@ -158,7 +157,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             t.reparent(mContentOverlay, mLeash);
             t.apply();
 
-            addOnUpdateListener((currentRect, progress) -> {
+            addOnUpdateListener((values, currentRect, progress) -> {
                 float alpha = progress < 0.5f
                         ? 0
                         : Utilities.mapToRange(Math.min(progress, 1f), 0.5f, 1f,
@@ -201,7 +200,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         addOnUpdateListener(this::onAnimationUpdate);
     }
 
-    private void onAnimationUpdate(RectF currentRect, float progress) {
+    private void onAnimationUpdate(@Nullable AppCloseConfig values, RectF currentRect,
+            float progress) {
         if (mHasAnimationEnded) return;
         final SurfaceControl.Transaction tx =
                 PipSurfaceTransactionHelper.newSurfaceControlTransaction();
@@ -278,36 +278,19 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
     private RotatedPosition getRotatedPosition(float progress) {
         final float degree, positionX, positionY;
-        if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
-            if (mFromRotation == Surface.ROTATION_90) {
-                degree = -90 * (1 - progress);
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top + mStartBounds.bottom * (1 - progress);
-            } else {
-                degree = 90 * (1 - progress);
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left + mStartBounds.right * (1 - progress);
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top;
-            }
+        if (mFromRotation == Surface.ROTATION_90) {
+            degree = -90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.bottom - mStartBounds.top)
+                    + mStartBounds.top;
         } else {
-            if (mFromRotation == Surface.ROTATION_90) {
-                degree = -90 * progress;
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.bottom - mStartBounds.top)
-                        + mStartBounds.top;
-            } else {
-                degree = 90 * progress;
-                positionX = progress * (mDestinationBoundsTransformed.right - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top;
-            }
+            degree = 90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.right - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
+                    + mStartBounds.top;
         }
-
         return new RotatedPosition(degree, positionX, positionY);
     }
 

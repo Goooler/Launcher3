@@ -64,23 +64,20 @@ public class ImageActionsApi {
      */
     @UiThread
     public void shareWithExplicitIntent(@Nullable Rect crop, Intent intent) {
-        addImageAndSendIntent(crop, intent, false, null /* exceptionCallback */);
+        addImageAndSendIntent(crop, intent, false);
     }
 
     /**
      * Share the image this api was constructed with using the provided intent. The implementation
      * should set the intent's data field to the URI pointing to the image.
-     * @param exceptionCallback An optional callback to be called when the intent can't be resolved
      */
     @UiThread
-    public void shareAsDataWithExplicitIntent(@Nullable Rect crop, Intent intent,
-            @Nullable Runnable exceptionCallback) {
-        addImageAndSendIntent(crop, intent, true, exceptionCallback);
+    public void shareAsDataWithExplicitIntent(@Nullable Rect crop, Intent intent) {
+        addImageAndSendIntent(crop, intent, true);
     }
 
     @UiThread
-    private void addImageAndSendIntent(@Nullable Rect crop, Intent intent, boolean setData,
-            @Nullable Runnable exceptionCallback) {
+    private void addImageAndSendIntent(@Nullable Rect crop, Intent intent, boolean setData) {
         if (mBitmapSupplier.get() == null) {
             Log.e(TAG, "No snapshot available, not starting share.");
             return;
@@ -95,7 +92,7 @@ public class ImageActionsApi {
                         intentForUri.putExtra(EXTRA_STREAM, uri);
                     }
                     return new Intent[]{intentForUri};
-                }, TAG, exceptionCallback));
+                }, TAG));
     }
 
     /**

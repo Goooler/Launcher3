@@ -104,9 +104,6 @@ public class TaskThumbnailCache {
      * Synchronously fetches the thumbnail for the given {@param task} and puts it in the cache.
      */
     public void updateThumbnailInCache(Task task) {
-        if (task == null) {
-            return;
-        }
         Preconditions.assertUIThread();
         // Fetch the thumbnail for this task and put it in the cache
         if (task.thumbnail == null) {
@@ -134,8 +131,7 @@ public class TaskThumbnailCache {
         Preconditions.assertUIThread();
 
         boolean lowResolution = !mHighResLoadingState.isEnabled();
-        if (task.thumbnail != null && task.thumbnail.thumbnail != null
-                && (!task.thumbnail.reducedResolution || lowResolution)) {
+        if (task.thumbnail != null && (!task.thumbnail.reducedResolution || lowResolution)) {
             // Nothing to load, the thumbnail is already high-resolution or matches what the
             // request, so just callback
             callback.accept(task.thumbnail);
@@ -153,8 +149,7 @@ public class TaskThumbnailCache {
         Preconditions.assertUIThread();
 
         ThumbnailData cachedThumbnail = mCache.getAndInvalidateIfModified(key);
-        if (cachedThumbnail != null &&  cachedThumbnail.thumbnail != null
-                && (!cachedThumbnail.reducedResolution || lowResolution)) {
+        if (cachedThumbnail != null && (!cachedThumbnail.reducedResolution || lowResolution)) {
             // Already cached, lets use that thumbnail
             callback.accept(cachedThumbnail);
             return null;

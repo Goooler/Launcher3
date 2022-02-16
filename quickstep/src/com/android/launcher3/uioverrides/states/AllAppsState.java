@@ -23,6 +23,7 @@ import android.content.Context;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.util.Themes;
 
 /**
@@ -31,6 +32,13 @@ import com.android.launcher3.util.Themes;
 public class AllAppsState extends LauncherState {
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE | FLAG_CLOSE_POPUPS;
+
+    private static final PageAlphaProvider PAGE_ALPHA_PROVIDER = new PageAlphaProvider(DEACCEL_2) {
+        @Override
+        public float getPageAlpha(int pageIndex) {
+            return 0;
+        }
+    };
 
     public AllAppsState(int id) {
         super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
@@ -43,7 +51,8 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public String getDescription(Launcher launcher) {
-        return launcher.getAppsView().getDescription();
+        AllAppsContainerView appsView = launcher.getAppsView();
+        return appsView.getDescription();
     }
 
     @Override
@@ -60,11 +69,6 @@ public class AllAppsState extends LauncherState {
     }
 
     @Override
-    public boolean isTaskbarStashed(Launcher launcher) {
-        return true;
-    }
-
-    @Override
     protected float getDepthUnchecked(Context context) {
         // The scrim fades in at approximately 50% of the swipe gesture.
         // This means that the depth should be greater than 1, in order to fully zoom out.
@@ -73,15 +77,7 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
-        PageAlphaProvider superPageAlphaProvider = super.getWorkspacePageAlphaProvider(launcher);
-        return new PageAlphaProvider(DEACCEL_2) {
-            @Override
-            public float getPageAlpha(int pageIndex) {
-                return launcher.getDeviceProfile().isTablet
-                        ? superPageAlphaProvider.getPageAlpha(pageIndex)
-                        : 0;
-            }
-        };
+        return PAGE_ALPHA_PROVIDER;
     }
 
     @Override
@@ -96,8 +92,6 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
-        return launcher.getDeviceProfile().isTablet
-                ? launcher.getResources().getColor(R.color.widgets_picker_scrim)
-                : Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
+        return Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
     }
 }
