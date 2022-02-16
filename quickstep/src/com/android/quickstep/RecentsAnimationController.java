@@ -46,8 +46,6 @@ public class RecentsAnimationController {
     private boolean mUseLauncherSysBarFlags = false;
     private boolean mSplitScreenMinimized = false;
     private boolean mFinishRequested = false;
-    // Only valid when mFinishRequested == true.
-    private boolean mFinishTargetIsLauncher;
     private RunnableList mPendingFinishCallbacks = new RunnableList();
 
     public RecentsAnimationController(RecentsAnimationControllerCompat controller,
@@ -147,7 +145,6 @@ public class RecentsAnimationController {
 
         // Finish not yet requested
         mFinishRequested = true;
-        mFinishTargetIsLauncher = toRecents;
         mOnFinishedListener.accept(this);
         mPendingFinishCallbacks.add(callback);
         UI_HELPER_EXECUTOR.execute(() -> {
@@ -219,13 +216,5 @@ public class RecentsAnimationController {
     /** @return wrapper controller. */
     public RecentsAnimationControllerCompat getController() {
         return mController;
-    }
-
-    /**
-     * RecentsAnimationListeners can check this in onRecentsAnimationFinished() to determine whether
-     * the animation was finished to launcher vs an app.
-     */
-    public boolean getFinishTargetIsLauncher() {
-        return mFinishTargetIsLauncher;
     }
 }

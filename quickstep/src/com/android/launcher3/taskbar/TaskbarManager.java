@@ -15,79 +15,44 @@
  */
 package com.android.launcher3.taskbar;
 
-import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.view.Display.DEFAULT_DISPLAY;
-import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 
-import android.content.ComponentCallbacks;
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.ActivityInfo;
-import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
-import android.net.Uri;
-import android.os.Handler;
-import android.provider.Settings;
+import android.inputmethodservice.InputMethodService;
 import android.view.Display;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
-import com.android.launcher3.util.SettingsCache;
-import com.android.launcher3.util.SimpleBroadcastReceiver;
-import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
-import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
-import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
-import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
-
-import java.io.PrintWriter;
 
 /**
- * Class to manage taskbar lifecycle
+ * Class to manager taskbar lifecycle
  */
 public class TaskbarManager implements DisplayController.DisplayInfoChangeListener,
         SysUINavigationMode.NavigationModeChangeListener {
-
-    private static final Uri USER_SETUP_COMPLETE_URI = Settings.Secure.getUriFor(
-            Settings.Secure.USER_SETUP_COMPLETE);
-
-    private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor(
-            Settings.Secure.NAV_BAR_KIDS_MODE);
 
     private final Context mContext;
     private final DisplayController mDisplayController;
     private final SysUINavigationMode mSysUINavigationMode;
     private final TaskbarNavButtonController mNavButtonController;
-    private final SettingsCache.OnChangeListener mUserSetupCompleteListener;
-    private final SettingsCache.OnChangeListener mNavBarKidsModeListener;
-    private final ComponentCallbacks mComponentCallbacks;
-    private final SimpleBroadcastReceiver mShutdownReceiver;
-
-    // The source for this provider is set when Launcher is available
-    private final ScopedUnfoldTransitionProgressProvider mUnfoldProgressProvider =
-            new ScopedUnfoldTransitionProgressProvider();
 
     private TaskbarActivityContext mTaskbarActivityContext;
-    private StatefulActivity mActivity;
-    /**
-     * Cache a copy here so we can initialize state whenever taskbar is recreated, since
-     * this class does not get re-initialized w/ new taskbars.
-     */
-    private final TaskbarSharedState mSharedState = new TaskbarSharedState();
+    private BaseQuickstepLauncher mLauncher;
 
     private static final int CHANGE_FLAGS =
             CHANGE_ACTIVE_SCREEN | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS;
@@ -99,52 +64,11 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         mSysUINavigationMode = SysUINavigationMode.INSTANCE.get(service);
         Display display =
                 service.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
-        mContext = service.createWindowContext(display, TYPE_NAVIGATION_BAR_PANEL, null);
-        mNavButtonController = new TaskbarNavButtonController(service,
-                SystemUiProxy.INSTANCE.get(mContext), new Handler());
-        mUserSetupCompleteListener = isUserSetupComplete -> recreateTaskbar();
-        mNavBarKidsModeListener = isNavBarKidsMode -> recreateTaskbar();
-        mComponentCallbacks = new ComponentCallbacks() {
-            private Configuration mOldConfig = mContext.getResources().getConfiguration();
-
-            @Override
-            public void onConfigurationChanged(Configuration newConfig) {
-                int configDiff = mOldConfig.diff(newConfig);
-                int configsRequiringRecreate = ActivityInfo.CONFIG_ASSETS_PATHS
-                        | ActivityInfo.CONFIG_LAYOUT_DIRECTION | ActivityInfo.CONFIG_UI_MODE;
-                if ((configDiff & configsRequiringRecreate) != 0) {
-                    // Color has changed, recreate taskbar to reload background color & icons.
-                    recreateTaskbar();
-                } else {
-                    // Config change might be handled without re-creating the taskbar
-                    if (mTaskbarActivityContext != null) {
-                        DeviceProfile dp = mUserUnlocked
-                                ? LauncherAppState.getIDP(mContext).getDeviceProfile(mContext)
-                                : null;
-
-                        if (dp != null && dp.isTaskbarPresent) {
-                            mTaskbarActivityContext.updateDeviceProfile(dp.copy(mContext));
-                        }
-                        mTaskbarActivityContext.onConfigurationChanged(configDiff);
-                    }
-                }
-                mOldConfig = newConfig;
-            }
-
-            @Override
-            public void onLowMemory() { }
-        };
-        mShutdownReceiver = new SimpleBroadcastReceiver(i -> destroyExistingTaskbar());
+        mContext = service.createWindowContext(display, TYPE_APPLICATION_OVERLAY, null);
+        mNavButtonController = new TaskbarNavButtonController(service);
 
         mDisplayController.addChangeListener(this);
         mSysUINavigationMode.addModeChangeListener(this);
-        SettingsCache.INSTANCE.get(mContext).register(USER_SETUP_COMPLETE_URI,
-                mUserSetupCompleteListener);
-        SettingsCache.INSTANCE.get(mContext).register(NAV_BAR_KIDS_MODE,
-                mNavBarKidsModeListener);
-        mContext.registerComponentCallbacks(mComponentCallbacks);
-        mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
-
         recreateTaskbar();
     }
 
@@ -176,123 +100,61 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
     }
 
     /**
-     * Sets a {@link StatefulActivity} to act as taskbar callback
+     * Sets or clears a launcher to act as taskbar callback
      */
-    public void setActivity(@NonNull StatefulActivity activity) {
-        mActivity = activity;
-        mUnfoldProgressProvider.setSourceProvider(getUnfoldTransitionProgressProviderForActivity(
-                activity));
-
+    public void setLauncher(@Nullable BaseQuickstepLauncher launcher) {
+        mLauncher = launcher;
         if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.setUIController(
-                    createTaskbarUIControllerForActivity(mActivity));
-        }
-    }
-
-    /**
-     * Returns an {@link UnfoldTransitionProgressProvider} to use while the given StatefulActivity
-     * is active.
-     */
-    private UnfoldTransitionProgressProvider getUnfoldTransitionProgressProviderForActivity(
-            StatefulActivity activity) {
-        if (activity instanceof BaseQuickstepLauncher) {
-            return ((BaseQuickstepLauncher) activity).getUnfoldTransitionProgressProvider();
-        }
-        return null;
-    }
-
-    /**
-     * Creates a {@link TaskbarUIController} to use while the given StatefulActivity is active.
-     */
-    private TaskbarUIController createTaskbarUIControllerForActivity(StatefulActivity activity) {
-        if (activity instanceof BaseQuickstepLauncher) {
-            if (mTaskbarActivityContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
-                return new DesktopTaskbarUIController((BaseQuickstepLauncher) activity);
-            }
-            return new LauncherTaskbarUIController((BaseQuickstepLauncher) activity);
-        }
-        if (activity instanceof RecentsActivity) {
-            return new FallbackTaskbarUIController((RecentsActivity) activity);
-        }
-        return TaskbarUIController.DEFAULT;
-    }
-
-    /**
-     * Clears a previously set {@link StatefulActivity}
-     */
-    public void clearActivity(@NonNull StatefulActivity activity) {
-        if (mActivity == activity) {
-            mActivity = null;
-            if (mTaskbarActivityContext != null) {
-                mTaskbarActivityContext.setUIController(TaskbarUIController.DEFAULT);
-            }
-            mUnfoldProgressProvider.setSourceProvider(null);
+            mTaskbarActivityContext.setUIController(mLauncher == null
+                    ? TaskbarUIController.DEFAULT
+                    : new LauncherTaskbarUIController(launcher, mTaskbarActivityContext));
         }
     }
 
     private void recreateTaskbar() {
         destroyExistingTaskbar();
-
-        DeviceProfile dp =
-                mUserUnlocked ? LauncherAppState.getIDP(mContext).getDeviceProfile(mContext) : null;
-
-        boolean isTaskBarEnabled =
-                FeatureFlags.ENABLE_TASKBAR.get() && dp != null && dp.isTaskbarPresent;
-
-        if (!isTaskBarEnabled) {
-            SystemUiProxy.INSTANCE.get(mContext)
-                    .notifyTaskbarStatus(/* visible */ false, /* stashed */ false);
+        if (!FeatureFlags.ENABLE_TASKBAR.get()) {
             return;
         }
-
-        mTaskbarActivityContext = new TaskbarActivityContext(mContext, dp.copy(mContext),
-                mNavButtonController, mUnfoldProgressProvider);
-
-        mTaskbarActivityContext.init(mSharedState);
-        if (mActivity != null) {
-            mTaskbarActivityContext.setUIController(
-                    createTaskbarUIControllerForActivity(mActivity));
+        if (!mUserUnlocked) {
+            return;
         }
-    }
-
-    public void onSystemUiFlagsChanged(int systemUiStateFlags) {
-        mSharedState.sysuiStateFlags = systemUiStateFlags;
-        if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.updateSysuiStateFlags(systemUiStateFlags, false /* fromInit */);
+        DeviceProfile dp = LauncherAppState.getIDP(mContext).getDeviceProfile(mContext);
+        if (!dp.isTaskbarPresent) {
+            return;
+        }
+        mTaskbarActivityContext = new TaskbarActivityContext(
+                mContext, dp.copy(mContext), mNavButtonController);
+        mTaskbarActivityContext.init();
+        if (mLauncher != null) {
+            mTaskbarActivityContext.setUIController(
+                    new LauncherTaskbarUIController(mLauncher, mTaskbarActivityContext));
         }
     }
 
     /**
-     * Sets the flag indicating setup UI is visible
+     * See {@link com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags}
+     * @param systemUiStateFlags The latest SystemUiStateFlags
      */
-    public void setSetupUIVisible(boolean isVisible) {
-        mSharedState.setupUIVisible = isVisible;
+    public void onSystemUiFlagsChanged(int systemUiStateFlags) {
+        boolean isImeVisible = (systemUiStateFlags & SYSUI_STATE_IME_SHOWING) != 0;
         if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.setSetupUIVisible(isVisible);
+            mTaskbarActivityContext.setImeIsVisible(isImeVisible);
         }
     }
 
-    public void onRotationProposal(int rotation, boolean isValid) {
+    /**
+     * When in 3 button nav, the above doesn't get called since we prevent sysui nav bar from
+     * instantiating at all, which is what's responsible for sending sysui state flags over.
+     *
+     * @param vis IME visibility flag
+     * @param backDisposition Used to determine back button behavior for software keyboard
+     *                        See BACK_DISPOSITION_* constants in {@link InputMethodService}
+     */
+    public void updateImeStatus(int displayId, int vis, int backDisposition,
+            boolean showImeSwitcher) {
         if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.onRotationProposal(rotation, isValid);
-        }
-    }
-
-    public void disableNavBarElements(int displayId, int state1, int state2, boolean animate) {
-        if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.disableNavBarElements(displayId, state1, state2, animate);
-        }
-    }
-
-    public void onSystemBarAttributesChanged(int displayId, int behavior) {
-        if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.onSystemBarAttributesChanged(displayId, behavior);
-        }
-    }
-
-    public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
-        if (mTaskbarActivityContext != null) {
-            mTaskbarActivityContext.onNavButtonsDarkIntensityChanged(darkIntensity);
+            mTaskbarActivityContext.updateImeStatus(displayId, vis, showImeSwitcher);
         }
     }
 
@@ -303,24 +165,5 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         destroyExistingTaskbar();
         mDisplayController.removeChangeListener(this);
         mSysUINavigationMode.removeModeChangeListener(this);
-        SettingsCache.INSTANCE.get(mContext).unregister(USER_SETUP_COMPLETE_URI,
-                mUserSetupCompleteListener);
-        SettingsCache.INSTANCE.get(mContext).unregister(NAV_BAR_KIDS_MODE,
-                mNavBarKidsModeListener);
-        mContext.unregisterComponentCallbacks(mComponentCallbacks);
-        mContext.unregisterReceiver(mShutdownReceiver);
-    }
-
-    public @Nullable TaskbarActivityContext getCurrentActivityContext() {
-        return mTaskbarActivityContext;
-    }
-
-    public void dumpLogs(String prefix, PrintWriter pw) {
-        pw.println(prefix + "TaskbarManager:");
-        if (mTaskbarActivityContext == null) {
-            pw.println(prefix + "\tTaskbarActivityContext: null");
-        } else {
-            mTaskbarActivityContext.dumpLogs(prefix + "\t", pw);
-        }
     }
 }

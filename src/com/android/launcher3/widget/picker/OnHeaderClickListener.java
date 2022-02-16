@@ -24,5 +24,5 @@ public interface OnHeaderClickListener {
     /**
      * Calls when a header is clicked to show / hide widgets for a package.
      */
-    void onHeaderClicked(boolean showWidgets, PackageUserKey key);
+    void onHeaderClicked(boolean showWidgets, PackageUserKey packageUserKey);
 }
