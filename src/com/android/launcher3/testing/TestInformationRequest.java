@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.tapl;
+package com.android.launcher3.testing;
 
-import android.graphics.Rect;
+import android.os.Parcelable;
 
-public interface FolderDragTarget {
-
-    /** This method requires public access, however should not be called in tests. */
-    Rect getDropLocationBounds();
-
-    /** This method requires public access, however should not be called in tests. */
-    FolderIcon getTargetFolder(Rect bounds);
+/**
+ * A Request sent to TestInformationHandler can implement this interface to carry more information.
+ */
+public interface TestInformationRequest extends Parcelable {
+    /**
+     * The name for handler to dispatch request.
+     */
+    String getRequestName();
 }
