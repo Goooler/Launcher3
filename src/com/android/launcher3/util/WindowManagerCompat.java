@@ -24,7 +24,6 @@ import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Build;
-import android.util.ArraySet;
 import android.view.WindowInsets;
 import android.view.WindowInsets.Type;
 import android.view.WindowManager;
@@ -32,14 +31,14 @@ import android.view.WindowMetrics;
 
 import com.android.launcher3.R;
 import com.android.launcher3.ResourceUtils;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.util.DisplayController.PortraitSize;
 
-import java.util.Collections;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Utility class to estimate window manager values
+ * Utility class to simulate window manager APIs until proper APIs are available
  */
 @TargetApi(Build.VERSION_CODES.S)
 public class WindowManagerCompat {
@@ -47,51 +46,51 @@ public class WindowManagerCompat {
     public static final int MIN_TABLET_WIDTH = 600;
 
     /**
-     * Returns a set of supported render sizes for a internal display.
-     * This is a temporary workaround which assumes only nav-bar insets change across displays, and
-     * is only used until we eventually get the real values
+     * Returns a set of supported render sizes for a set of internal displays.
+     * This is a temporary workaround which assumes only nav-bar insets change across displays
      * @param consumeTaskBar if true, it assumes that task bar is part of the app window
      *                       and ignores any insets because of task bar.
      */
-    public static Set<WindowBounds> estimateDisplayProfiles(
-            Context windowContext, PortraitSize size, int densityDpi, boolean consumeTaskBar) {
-        if (!Utilities.ATLEAST_S) {
-            return Collections.emptySet();
-        }
-        WindowInsets defaultInsets = windowContext.getSystemService(WindowManager.class)
+    public static Set<WindowMetrics> getDisplayProfiles(
+            Context windowContext, Collection<PortraitSize> allDisplaySizes,
+            int densityDpi, boolean consumeTaskBar) {
+        WindowInsets metrics = windowContext.getSystemService(WindowManager.class)
                 .getMaximumWindowMetrics().getWindowInsets();
-        boolean isGesturalMode = ResourceUtils.getIntegerByName(
+        boolean hasNavbar = ResourceUtils.getIntegerByName(
                 "config_navBarInteractionMode",
                 windowContext.getResources(),
-                INVALID_RESOURCE_HANDLE) == 2;
+                INVALID_RESOURCE_HANDLE) != 0;
 
-        WindowInsets.Builder insetsBuilder = new WindowInsets.Builder(defaultInsets);
-        Set<WindowBounds> result = new ArraySet<>();
-        int swDP = (int) dpiFromPx(size.width, densityDpi);
-        boolean isTablet = swDP >= MIN_TABLET_WIDTH;
+        WindowInsets.Builder insetsBuilder = new WindowInsets.Builder(metrics);
 
-        final Insets portraitNav, landscapeNav;
-        if (isTablet && !consumeTaskBar) {
-            portraitNav = landscapeNav = Insets.of(0, 0, 0, windowContext.getResources()
-                    .getDimensionPixelSize(R.dimen.taskbar_size));
-        } else if (!isGesturalMode) {
-            portraitNav = Insets.of(0, 0, 0,
-                    getSystemResource(windowContext, "navigation_bar_height", swDP));
-            landscapeNav = isTablet
-                    ? Insets.of(0, 0, 0, getSystemResource(windowContext,
-                            "navigation_bar_height_landscape", swDP))
-                    : Insets.of(0, 0, getSystemResource(windowContext,
-                            "navigation_bar_width", swDP), 0);
-        } else {
-            portraitNav = landscapeNav = Insets.of(0, 0, 0, 0);
+        Set<WindowMetrics> result = new HashSet<>();
+        for (PortraitSize size : allDisplaySizes) {
+            int swDP = (int) dpiFromPx(size.width, densityDpi);
+            boolean isTablet = swDP >= MIN_TABLET_WIDTH;
+
+            final Insets portraitNav, landscapeNav;
+            if (isTablet && !consumeTaskBar) {
+                portraitNav = landscapeNav = Insets.of(0, 0, 0, windowContext.getResources()
+                        .getDimensionPixelSize(R.dimen.taskbar_size));
+            } else if (hasNavbar) {
+                portraitNav = Insets.of(0, 0, 0,
+                        getSystemResource(windowContext, "navigation_bar_height", swDP));
+                landscapeNav = isTablet
+                        ? Insets.of(0, 0, 0, getSystemResource(windowContext,
+                                "navigation_bar_height_landscape", swDP))
+                        : Insets.of(0, 0, getSystemResource(windowContext,
+                                "navigation_bar_width", swDP), 0);
+            } else {
+                portraitNav = landscapeNav = Insets.of(0, 0, 0, 0);
+            }
+
+            result.add(new WindowMetrics(
+                    new Rect(0, 0, size.width, size.height),
+                    insetsBuilder.setInsets(Type.navigationBars(), portraitNav).build()));
+            result.add(new WindowMetrics(
+                    new Rect(0, 0, size.height, size.width),
+                    insetsBuilder.setInsets(Type.navigationBars(), landscapeNav).build()));
         }
-
-        result.add(WindowBounds.fromWindowMetrics(new WindowMetrics(
-                new Rect(0, 0, size.width, size.height),
-                insetsBuilder.setInsets(Type.navigationBars(), portraitNav).build())));
-        result.add(WindowBounds.fromWindowMetrics(new WindowMetrics(
-                new Rect(0, 0, size.height, size.width),
-                insetsBuilder.setInsets(Type.navigationBars(), landscapeNav).build())));
         return result;
     }
 

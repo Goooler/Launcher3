@@ -23,8 +23,6 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.WindowManagerCompat.MIN_TABLET_WIDTH;
 
-import static java.util.Collections.emptyMap;
-
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.ComponentCallbacks;
@@ -36,11 +34,10 @@ import android.graphics.Point;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManager.DisplayListener;
 import android.os.Build;
-import android.text.TextUtils;
-import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.view.Display;
+import android.view.WindowMetrics;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.UiThread;
@@ -50,7 +47,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.uioverrides.ApiWrapper;
 
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
 
@@ -58,7 +55,7 @@ import java.util.Set;
  * Utility class to cache properties of default display to avoid a system RPC on every call.
  */
 @SuppressLint("NewApi")
-public class DisplayController implements DisplayListener, ComponentCallbacks, SafeCloseable {
+public class DisplayController implements DisplayListener, ComponentCallbacks {
 
     private static final String TAG = "DisplayController";
 
@@ -67,23 +64,21 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
 
     public static final int CHANGE_ACTIVE_SCREEN = 1 << 0;
     public static final int CHANGE_ROTATION = 1 << 1;
-    public static final int CHANGE_DENSITY = 1 << 2;
-    public static final int CHANGE_SUPPORTED_BOUNDS = 1 << 3;
+    public static final int CHANGE_FRAME_DELAY = 1 << 2;
+    public static final int CHANGE_DENSITY = 1 << 3;
+    public static final int CHANGE_SUPPORTED_BOUNDS = 1 << 4;
 
     public static final int CHANGE_ALL = CHANGE_ACTIVE_SCREEN | CHANGE_ROTATION
-            | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS;
+            | CHANGE_FRAME_DELAY | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS;
 
     private final Context mContext;
     private final DisplayManager mDM;
 
     // Null for SDK < S
     private final Context mWindowContext;
-    // The callback in this listener updates DeviceProfile, which other listeners might depend on
-    private DisplayInfoChangeListener mPriorityListener;
-    private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
 
+    private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
     private Info mInfo;
-    private boolean mDestroyed = false;
 
     private DisplayController(Context context) {
         mContext = context;
@@ -100,35 +95,19 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
             mContext.registerReceiver(configChangeReceiver,
                     new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED));
         }
-        mInfo = new Info(getDisplayInfoContext(display), display,
-                getInternalDisplays(mDM), emptyMap());
-        mDM.registerDisplayListener(this, UI_HELPER_EXECUTOR.getHandler());
-    }
 
-    private static ArrayMap<String, PortraitSize> getInternalDisplays(
-            DisplayManager displayManager) {
-        Display[] displays = displayManager.getDisplays();
-        ArrayMap<String, PortraitSize> internalDisplays = new ArrayMap<>();
-        for (Display display : displays) {
-            if (ApiWrapper.isInternalDisplay(display)) {
+        // Create a single holder for all internal displays. External display holders created
+        // lazily.
+        Set<PortraitSize> extraInternalDisplays = new ArraySet<>();
+        for (Display d : mDM.getDisplays()) {
+            if (ApiWrapper.isInternalDisplay(display) && d.getDisplayId() != DEFAULT_DISPLAY) {
                 Point size = new Point();
-                display.getRealSize(size);
-                internalDisplays.put(ApiWrapper.getUniqueId(display),
-                        new PortraitSize(size.x, size.y));
+                d.getRealSize(size);
+                extraInternalDisplays.add(new PortraitSize(size.x, size.y));
             }
         }
-        return internalDisplays;
-    }
-
-    @Override
-    public void close() {
-        mDestroyed = true;
-        if (mWindowContext != null) {
-            mWindowContext.unregisterComponentCallbacks(this);
-        } else {
-            // TODO: unregister broadcast receiver
-        }
-        mDM.unregisterDisplayListener(this);
+        mInfo = new Info(getDisplayInfoContext(display), display, extraInternalDisplays);
+        mDM.registerDisplayListener(this, UI_HELPER_EXECUTOR.getHandler());
     }
 
     @Override
@@ -148,15 +127,16 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
             return;
         }
         if (Utilities.ATLEAST_S) {
-            // Only update refresh rate. Everything else comes from component callbacks
-            mInfo.mSingleFrameMs = getSingleFrameMs(display);
-            return;
+            // Only check for refresh rate. Everything else comes from component callbacks
+            if (getSingleFrameMs(display) == mInfo.singleFrameMs) {
+                return;
+            }
         }
         handleInfoChange(display);
     }
 
     public static int getSingleFrameMs(Context context) {
-        return INSTANCE.get(context).getInfo().mSingleFrameMs;
+        return INSTANCE.get(context).getInfo().singleFrameMs;
     }
 
     /**
@@ -177,9 +157,6 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
      * Only used for pre-S
      */
     private void onConfigChanged(Intent intent) {
-        if (mDestroyed) {
-            return;
-        }
         Configuration config = mContext.getResources().getConfiguration();
         if (mInfo.fontScale != config.fontScale || mInfo.densityDpi != config.densityDpi) {
             Log.d(TAG, "Configuration changed, notifying listeners");
@@ -207,10 +184,6 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
     @Override
     public final void onLowMemory() { }
 
-    public void setPriorityListener(DisplayInfoChangeListener listener) {
-        mPriorityListener = listener;
-    }
-
     public void addChangeListener(DisplayInfoChangeListener listener) {
         mListeners.add(listener);
     }
@@ -230,43 +203,26 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
     @AnyThread
     private void handleInfoChange(Display display) {
         Info oldInfo = mInfo;
+        Set<PortraitSize> extraDisplaysSizes = oldInfo.mAllSizes.size() > 1
+                ? oldInfo.mAllSizes : Collections.emptySet();
 
         Context displayContext = getDisplayInfoContext(display);
-        Info newInfo = new Info(displayContext, display,
-                oldInfo.mInternalDisplays, oldInfo.mPerDisplayBounds);
-
-        if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale) {
-            // Cache may not be valid anymore, recreate without cache
-            newInfo = new Info(displayContext, display, getInternalDisplays(mDM), emptyMap());
-        }
-
+        Info newInfo = new Info(displayContext, display, extraDisplaysSizes);
         int change = 0;
-        if (!newInfo.displayId.equals(oldInfo.displayId)) {
+        if (!newInfo.mScreenSizeDp.equals(oldInfo.mScreenSizeDp)) {
             change |= CHANGE_ACTIVE_SCREEN;
         }
         if (newInfo.rotation != oldInfo.rotation) {
             change |= CHANGE_ROTATION;
+        }
+        if (newInfo.singleFrameMs != oldInfo.singleFrameMs) {
+            change |= CHANGE_FRAME_DELAY;
         }
         if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale) {
             change |= CHANGE_DENSITY;
         }
         if (!newInfo.supportedBounds.equals(oldInfo.supportedBounds)) {
             change |= CHANGE_SUPPORTED_BOUNDS;
-
-            PortraitSize realSize = new PortraitSize(newInfo.currentSize.x, newInfo.currentSize.y);
-            PortraitSize expectedSize = oldInfo.mInternalDisplays.get(
-                    ApiWrapper.getUniqueId(display));
-            if (newInfo.supportedBounds.size() != oldInfo.supportedBounds.size()) {
-                Log.e("b/198965093",
-                        "Inconsistent number of displays"
-                                + "\ndisplay state: " + display.getState()
-                                + "\noldInfo.supportedBounds: " + oldInfo.supportedBounds
-                                + "\nnewInfo.supportedBounds: " + newInfo.supportedBounds);
-            }
-            if (!realSize.equals(expectedSize) && display.getState() == Display.STATE_OFF) {
-                Log.e("b/198965093", "Display size changed while display is off, ignoring change");
-                return;
-            }
         }
 
         if (change != 0) {
@@ -277,9 +233,6 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
     }
 
     private void notifyChange(Context context, int flags) {
-        if (mPriorityListener != null) {
-            mPriorityListener.onDisplayInfoChanged(context, mInfo, flags);
-        }
         for (int i = mListeners.size() - 1; i >= 0; i--) {
             mListeners.get(i).onDisplayInfoChanged(context, mInfo, flags);
         }
@@ -287,7 +240,8 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
 
     public static class Info {
 
-        private int mSingleFrameMs;
+        public final int id;
+        public final int singleFrameMs;
 
         // Configuration properties
         public final int rotation;
@@ -295,22 +249,19 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         public final int densityDpi;
 
         private final PortraitSize mScreenSizeDp;
+        private final Set<PortraitSize> mAllSizes;
 
         public final Point currentSize;
 
-        public String displayId;
         public final Set<WindowBounds> supportedBounds = new ArraySet<>();
-        private final Map<String, Set<WindowBounds>> mPerDisplayBounds = new ArrayMap<>();
-        private final ArrayMap<String, PortraitSize> mInternalDisplays;
 
         public Info(Context context, Display display) {
-            this(context, display, new ArrayMap<>(), emptyMap());
+            this(context, display, Collections.emptySet());
         }
 
-        private Info(Context context, Display display,
-                ArrayMap<String, PortraitSize> internalDisplays,
-                Map<String, Set<WindowBounds>> perDisplayBoundsCache) {
-            mInternalDisplays = internalDisplays;
+        private Info(Context context, Display display, Set<PortraitSize> extraDisplaysSizes) {
+            id = display.getDisplayId();
+
             rotation = display.getRotation();
 
             Configuration config = context.getResources().getConfiguration();
@@ -318,53 +269,32 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
             densityDpi = config.densityDpi;
             mScreenSizeDp = new PortraitSize(config.screenHeightDp, config.screenWidthDp);
 
-            mSingleFrameMs = getSingleFrameMs(display);
+            singleFrameMs = getSingleFrameMs(display);
             currentSize = new Point();
+
             display.getRealSize(currentSize);
 
-            displayId = ApiWrapper.getUniqueId(display);
-            Set<WindowBounds> currentSupportedBounds =
-                    getSupportedBoundsForDisplay(display, currentSize);
-            mPerDisplayBounds.put(displayId, currentSupportedBounds);
-            supportedBounds.addAll(currentSupportedBounds);
+            if (extraDisplaysSizes.isEmpty() || !Utilities.ATLEAST_S) {
+                Point smallestSize = new Point();
+                Point largestSize = new Point();
+                display.getCurrentSizeRange(smallestSize, largestSize);
 
-            if (ApiWrapper.isInternalDisplay(display) && internalDisplays.size() > 1) {
-                int displayCount = internalDisplays.size();
-                for (int i = 0; i < displayCount; i++) {
-                    String displayKey = internalDisplays.keyAt(i);
-                    if (TextUtils.equals(displayId, displayKey)) {
-                        continue;
-                    }
+                int portraitWidth = Math.min(currentSize.x, currentSize.y);
+                int portraitHeight = Math.max(currentSize.x, currentSize.y);
 
-                    Set<WindowBounds> displayBounds = perDisplayBoundsCache.get(displayKey);
-                    if (displayBounds == null) {
-                        // We assume densityDpi is the same across all internal displays
-                        displayBounds = WindowManagerCompat.estimateDisplayProfiles(
-                                context, internalDisplays.valueAt(i), densityDpi,
-                                ApiWrapper.TASKBAR_DRAWN_IN_PROCESS);
-                    }
-
-                    supportedBounds.addAll(displayBounds);
-                    mPerDisplayBounds.put(displayKey, displayBounds);
-                }
+                supportedBounds.add(new WindowBounds(portraitWidth, portraitHeight,
+                        smallestSize.x, largestSize.y));
+                supportedBounds.add(new WindowBounds(portraitHeight, portraitWidth,
+                        largestSize.x, smallestSize.y));
+                mAllSizes = Collections.singleton(new PortraitSize(currentSize.x, currentSize.y));
+            } else {
+                mAllSizes = new ArraySet<>(extraDisplaysSizes);
+                mAllSizes.add(new PortraitSize(currentSize.x, currentSize.y));
+                Set<WindowMetrics> metrics = WindowManagerCompat.getDisplayProfiles(
+                        context, mAllSizes, densityDpi,
+                        ApiWrapper.TASKBAR_DRAWN_IN_PROCESS);
+                metrics.forEach(wm -> supportedBounds.add(WindowBounds.fromWindowMetrics(wm)));
             }
-            Log.d("b/211775278", "displayId: " + displayId + ", currentSize: " + currentSize);
-            Log.d("b/211775278", "perDisplayBounds: " + mPerDisplayBounds);
-        }
-
-        private static Set<WindowBounds> getSupportedBoundsForDisplay(Display display, Point size) {
-            Point smallestSize = new Point();
-            Point largestSize = new Point();
-            display.getCurrentSizeRange(smallestSize, largestSize);
-
-            int portraitWidth = Math.min(size.x, size.y);
-            int portraitHeight = Math.max(size.x, size.y);
-            Set<WindowBounds> result = new ArraySet<>();
-            result.add(new WindowBounds(portraitWidth, portraitHeight,
-                    smallestSize.x, largestSize.y));
-            result.add(new WindowBounds(portraitHeight, portraitWidth,
-                    largestSize.x, smallestSize.y));
-            return result;
         }
 
         /**

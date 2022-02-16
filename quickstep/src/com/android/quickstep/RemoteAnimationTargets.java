@@ -77,12 +77,8 @@ public class RemoteAnimationTargets {
      * Gets the navigation bar remote animation target if exists.
      */
     public RemoteAnimationTargetCompat getNavBarRemoteAnimationTarget() {
-        return getNonAppTargetOfType(TYPE_NAVIGATION_BAR);
-    }
-
-    public RemoteAnimationTargetCompat getNonAppTargetOfType(int type) {
         for (RemoteAnimationTargetCompat target : nonApps) {
-            if (target.windowType == type) {
+            if (target.windowType == TYPE_NAVIGATION_BAR) {
                 return target;
             }
         }
