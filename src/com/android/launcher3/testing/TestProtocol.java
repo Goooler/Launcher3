@@ -68,6 +68,7 @@ public final class TestProtocol {
         }
     }
 
+    public static final String TEST_INFO_REQUEST_FIELD = "request";
     public static final String TEST_INFO_RESPONSE_FIELD = "response";
 
     public static final String REQUEST_HOME_TO_OVERVIEW_SWIPE_HEIGHT =
@@ -104,6 +105,10 @@ public final class TestProtocol {
     public static final String REQUEST_GET_ACTIVITIES_CREATED_COUNT =
             "get-activities-created-count";
     public static final String REQUEST_GET_ACTIVITIES = "get-activities";
+
+    public static final String REQUEST_WORKSPACE_CELL_LAYOUT_SIZE = "workspace-cell-layout-size";
+    public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
+
     public static final String REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET =
             "get-focused-task-height-for-tablet";
     public static final String REQUEST_GET_GRID_TASK_SIZE_RECT_FOR_TABLET =
@@ -126,4 +131,5 @@ public final class TestProtocol {
     public static final String TASK_VIEW_ID_CRASH = "b/195430732";
     public static final String NO_DROP_TARGET = "b/195031154";
     public static final String NULL_INT_SET = "b/200572078";
+    public static final String MISSING_PROMISE_ICON = "b/202985412";
 }
