@@ -16,7 +16,8 @@
 
 package com.android.quickstep.views;
 
-import static com.android.quickstep.SysUINavigationMode.Mode.THREE_BUTTONS;
+import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_OVERVIEW_SHARE;
 
 import android.content.Context;
 import android.content.res.Configuration;
@@ -24,10 +25,7 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -35,7 +33,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.quickstep.SysUINavigationMode;
@@ -57,17 +55,13 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @IntDef(flag = true, value = {
             HIDDEN_NON_ZERO_ROTATION,
             HIDDEN_NO_TASKS,
-            HIDDEN_NO_RECENTS,
-            HIDDEN_FOCUSED_SCROLL,
-            HIDDEN_SPLIT_SCREEN})
+            HIDDEN_NO_RECENTS})
     @Retention(RetentionPolicy.SOURCE)
     public @interface ActionsHiddenFlags { }
 
     public static final int HIDDEN_NON_ZERO_ROTATION = 1 << 0;
     public static final int HIDDEN_NO_TASKS = 1 << 1;
     public static final int HIDDEN_NO_RECENTS = 1 << 2;
-    public static final int HIDDEN_FOCUSED_SCROLL = 1 << 3;
-    public static final int HIDDEN_SPLIT_SCREEN = 1 << 4;
 
     @IntDef(flag = true, value = {
             DISABLED_SCROLLING,
@@ -84,9 +78,9 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     private static final int INDEX_VISIBILITY_ALPHA = 1;
     private static final int INDEX_FULLSCREEN_ALPHA = 2;
     private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
+    private static final int INDEX_SCROLL_ALPHA = 4;
 
     private final MultiValueAlpha mMultiValueAlpha;
-    private Button mSplitButton;
 
     @ActionsHiddenFlags
     private int mHiddenFlags;
@@ -94,10 +88,11 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @ActionsDisabledFlags
     protected int mDisabledFlags;
 
-    @Nullable
     protected T mCallbacks;
 
-    @Nullable
+    private float mModalness;
+    private float mModalTransformY;
+
     protected DeviceProfile mDp;
 
     public OverviewActionsView(Context context) {
@@ -117,10 +112,13 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
+        View share = findViewById(R.id.action_share);
+        share.setOnClickListener(this);
         findViewById(R.id.action_screenshot).setOnClickListener(this);
-
-        mSplitButton = findViewById(R.id.action_split);
-        mSplitButton.setOnClickListener(this);
+        if (ENABLE_OVERVIEW_SHARE.get()) {
+            share.setVisibility(VISIBLE);
+            findViewById(R.id.oav_three_button_space).setVisibility(VISIBLE);
+        }
     }
 
     /**
@@ -138,10 +136,10 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             return;
         }
         int id = view.getId();
-        if (id == R.id.action_screenshot) {
+        if (id == R.id.action_share) {
+            mCallbacks.onShare();
+        } else if (id == R.id.action_screenshot) {
             mCallbacks.onScreenshot();
-        } else if (id == R.id.action_split) {
-            mCallbacks.onSplit();
         }
     }
 
@@ -155,7 +153,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     public void setInsets(Rect insets) {
         mInsets.set(insets);
         updateVerticalMargin(SysUINavigationMode.getMode(getContext()));
-        updatePaddingAndTranslations();
+        updateHorizontalPadding();
     }
 
     public void updateHiddenFlags(@ActionsHiddenFlags int visibilityFlags, boolean enable) {
@@ -182,6 +180,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         } else {
             mDisabledFlags &= ~disabledFlags;
         }
+        //
         boolean isEnabled = (mDisabledFlags & ~DISABLED_ROTATED) == 0;
         LayoutUtils.setViewEnabled(this, isEnabled);
     }
@@ -198,38 +197,12 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         return mMultiValueAlpha.getProperty(INDEX_FULLSCREEN_ALPHA);
     }
 
-    /**
-     * Aligns OverviewActionsView vertically with and offsets horizontal position based on
-     * 3 button nav container in taskbar.
-     */
-    private void updatePaddingAndTranslations() {
-        boolean alignFor3ButtonTaskbar = mDp.isTaskbarPresent &&
-                SysUINavigationMode.getMode(getContext()) == THREE_BUTTONS;
-        if (alignFor3ButtonTaskbar) {
-            // Add extra horizontal spacing
-            int additionalPadding = ApiWrapper.getHotseatEndOffset(getContext());
-            if (isLayoutRtl()) {
-                setPadding(mInsets.left + additionalPadding, 0, mInsets.right, 0);
-            } else {
-                setPadding(mInsets.left, 0, mInsets.right + additionalPadding, 0);
-            }
+    public AlphaProperty getScrollAlpha() {
+        return mMultiValueAlpha.getProperty(INDEX_SCROLL_ALPHA);
+    }
 
-            // Align vertically, using taskbar height + mDp.taskbarOffsetY() to estimate where
-            // the button nav top is.
-            View startActionView = findViewById(R.id.action_screenshot);
-            int marginBottom = getOverviewActionsBottomMarginPx(
-                    SysUINavigationMode.getMode(getContext()), mDp);
-            int actionsTop =
-                    (mDp.heightPx - marginBottom - mInsets.bottom) - startActionView.getHeight();
-            int navTop = mDp.heightPx - (mDp.taskbarSize + mDp.getTaskbarOffsetY());
-            int transY = navTop - actionsTop
-                    + ((mDp.taskbarSize - startActionView.getHeight()) / 2);
-            setTranslationY(transY);
-        } else {
-            setPadding(mInsets.left, 0, mInsets.right, 0);
-            setTranslationX(0);
-            setTranslationY(0);
-        }
+    private void updateHorizontalPadding() {
+        setPadding(mInsets.left, 0, mInsets.right, 0);
     }
 
     /** Updates vertical margins for different navigation mode or configuration changes. */
@@ -250,27 +223,30 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     public void setDp(DeviceProfile dp) {
         mDp = dp;
         updateVerticalMargin(SysUINavigationMode.getMode(getContext()));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                dp.isVerticalBarLayout() ? 0 : dp.overviewActionsButtonSpacing,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        params.weight = dp.isVerticalBarLayout() ? 1 : 0;
-        findViewById(R.id.action_split_space).setLayoutParams(params);
-
         requestLayout();
-
-        mSplitButton.setCompoundDrawablesWithIntrinsicBounds(
-                (dp.isLandscape ? R.drawable.ic_split_horizontal : R.drawable.ic_split_vertical),
-                0, 0, 0);
     }
 
-    public void setSplitButtonVisible(boolean visible) {
-        if (mSplitButton == null) {
-            return;
-        }
+    /**
+     * The current task is fully modal (modalness = 1) when it is shown on its own in a modal
+     * way. Modalness 0 means the task is shown in context with all the other tasks.
+     */
+    public void setTaskModalness(float modalness) {
+        mModalness = modalness;
+        applyTranslationY();
+    }
 
-        mSplitButton.setVisibility(visible ? VISIBLE : GONE);
-        findViewById(R.id.action_split_space).setVisibility(visible ? VISIBLE : GONE);
+    public void setModalTransformY(float modalTransformY) {
+        mModalTransformY = modalTransformY;
+        applyTranslationY();
+    }
+
+    private void applyTranslationY() {
+        setTranslationY(getModalTrans(mModalTransformY));
+    }
+
+    private float getModalTrans(float endTranslation) {
+        float progress = ACCEL_DEACCEL.getInterpolation(mModalness);
+        return Utilities.mapRange(progress, 0, endTranslation);
     }
 
     /** Get the top margin associated with the action buttons in Overview. */
@@ -285,7 +261,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             return dp.overviewActionsMarginThreeButtonPx;
         }
 
-        return dp.overviewActionsTopMarginGesturePx;
+        return dp.overviewActionsMarginGesturePx;
     }
 
     /** Get the bottom margin associated with the action buttons in Overview. */
@@ -297,13 +273,10 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             return inset;
         }
 
-        // Actions button will be aligned with nav buttons in updatePaddingAndTranslations().
         if (mode == SysUINavigationMode.Mode.THREE_BUTTONS) {
             return dp.overviewActionsMarginThreeButtonPx + inset;
         }
 
-        // There is no bottom inset when taskbar is present, use stashed taskbar as padding instead.
-        return dp.overviewActionsBottomMarginGesturePx
-                + (dp.isTaskbarPresent ? dp.stashedTaskbarSize : inset);
+        return dp.overviewActionsMarginGesturePx + inset;
     }
 }
