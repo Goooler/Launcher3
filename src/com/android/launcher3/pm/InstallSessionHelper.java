@@ -17,6 +17,7 @@
 package com.android.launcher3.pm;
 
 import static com.android.launcher3.Utilities.getPrefs;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -24,6 +25,7 @@ import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -236,10 +238,22 @@ public class InstallSessionHelper {
     }
 
     public InstallSessionTracker registerInstallTracker(InstallSessionTracker.Callback callback) {
-        InstallSessionTracker tracker = new InstallSessionTracker(
-                this, callback, mInstaller, mLauncherApps);
-        tracker.register();
+        InstallSessionTracker tracker = new InstallSessionTracker(this, callback);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            mInstaller.registerSessionCallback(tracker, MODEL_EXECUTOR.getHandler());
+        } else {
+            mLauncherApps.registerPackageInstallerSessionCallback(MODEL_EXECUTOR, tracker);
+        }
         return tracker;
+    }
+
+    void unregister(InstallSessionTracker tracker) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            mInstaller.unregisterSessionCallback(tracker);
+        } else {
+            mLauncherApps.unregisterPackageInstallerSessionCallback(tracker);
+        }
     }
 
     public static UserHandle getUserHandle(SessionInfo info) {

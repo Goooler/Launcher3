@@ -28,7 +28,6 @@ import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.ACT
 
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
-import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -50,6 +49,7 @@ import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
@@ -58,6 +58,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.quickstep.fallback.FallbackRecentsView;
 import com.android.quickstep.fallback.RecentsState;
+import com.android.quickstep.util.AppCloseConfig;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.TransformParams.BuilderProxy;
@@ -100,9 +101,7 @@ public class FallbackSwipeHandler extends
 
         mRunningOverHome = ActivityManagerWrapper.isHomeTask(mGestureState.getRunningTask());
         if (mRunningOverHome) {
-            runActionOnRemoteHandles(remoteTargetHandle ->
-                    remoteTargetHandle.getTransformParams().setHomeBuilderProxy(
-                    FallbackSwipeHandler.this::updateHomeActivityTransformDuringSwipeUp));
+            mTransformParams.setHomeBuilderProxy(this::updateHomeActivityTransformDuringSwipeUp);
         }
     }
 
@@ -110,9 +109,7 @@ public class FallbackSwipeHandler extends
     protected void initTransitionEndpoints(DeviceProfile dp) {
         super.initTransitionEndpoints(dp);
         if (mRunningOverHome) {
-            // Full screen scale should be independent of remote target handle
-            mMaxLauncherScale = 1 / mRemoteTargetHandles[0].getTaskViewSimulator()
-                    .getFullScreenScale();
+            mMaxLauncherScale = 1 / mTaskViewSimulator.getFullScreenScale();
         }
     }
 
@@ -147,7 +144,7 @@ public class FallbackSwipeHandler extends
     }
 
     @Override
-    protected boolean handleTaskAppeared(RemoteAnimationTargetCompat[] appearedTaskTarget) {
+    protected boolean handleTaskAppeared(RemoteAnimationTargetCompat appearedTaskTarget) {
         if (mActiveAnimationFactory != null
                 && mActiveAnimationFactory.handleHomeTaskAppeared(appearedTaskTarget)) {
             mActiveAnimationFactory = null;
@@ -176,10 +173,7 @@ public class FallbackSwipeHandler extends
     @Override
     protected void notifyGestureAnimationStartToRecents() {
         if (mRunningOverHome) {
-            if (SysUINavigationMode.getMode(mContext).hasGestures) {
-                mRecentsView.onGestureAnimationStartOnHome(
-                        new ActivityManager.RunningTaskInfo[]{mGestureState.getRunningTask()});
-            }
+            mRecentsView.onGestureAnimationStartOnHome(mGestureState.getRunningTask());
         } else {
             super.notifyGestureAnimationStartToRecents();
         }
@@ -206,24 +200,19 @@ public class FallbackSwipeHandler extends
                 mHomeAlpha = new AnimatedFloat();
                 mHomeAlpha.value = Utilities.boundToRange(1 - mCurrentShift.value, 0, 1);
                 mVerticalShiftForScale.value = mCurrentShift.value;
-                runActionOnRemoteHandles(remoteTargetHandle ->
-                        remoteTargetHandle.getTransformParams().setHomeBuilderProxy(
-                                FallbackHomeAnimationFactory.this
-                                        ::updateHomeActivityTransformDuringHomeAnim));
+                mTransformParams.setHomeBuilderProxy(
+                        this::updateHomeActivityTransformDuringHomeAnim);
             } else {
                 mHomeAlpha = new AnimatedFloat(this::updateHomeAlpha);
                 mHomeAlpha.value = 0;
-                runActionOnRemoteHandles(remoteTargetHandle ->
-                        remoteTargetHandle.getTransformParams().setHomeBuilderProxy(
-                                FallbackHomeAnimationFactory.this
-                                        ::updateHomeActivityTransformDuringHomeAnim));
+
+                mHomeAlphaParams.setHomeBuilderProxy(
+                        this::updateHomeActivityTransformDuringHomeAnim);
             }
 
             mRecentsAlpha.value = 1;
-            runActionOnRemoteHandles(remoteTargetHandle ->
-                    remoteTargetHandle.getTransformParams().setHomeBuilderProxy(
-                            FallbackHomeAnimationFactory.this
-                                    ::updateRecentsActivityTransformDuringHomeAnim));
+            mTransformParams.setBaseBuilderProxy(
+                    this::updateRecentsActivityTransformDuringHomeAnim);
         }
 
         @NonNull
@@ -260,8 +249,7 @@ public class FallbackSwipeHandler extends
             }
         }
 
-        public boolean handleHomeTaskAppeared(RemoteAnimationTargetCompat[] appearedTaskTargets) {
-            RemoteAnimationTargetCompat appearedTaskTarget = appearedTaskTargets[0];
+        public boolean handleHomeTaskAppeared(RemoteAnimationTargetCompat appearedTaskTarget) {
             if (appearedTaskTarget.activityType == ACTIVITY_TYPE_HOME) {
                 RemoteAnimationTargets targets = new RemoteAnimationTargets(
                         new RemoteAnimationTargetCompat[] {appearedTaskTarget},
@@ -316,7 +304,8 @@ public class FallbackSwipeHandler extends
         }
 
         @Override
-        public void update(RectF currentRect, float progress, float radius) {
+        public void update(@Nullable AppCloseConfig config, RectF currentRect, float progress,
+                 float radius) {
             if (mSurfaceControl != null) {
                 currentRect.roundOut(mTempRect);
                 Transaction t = new Transaction();

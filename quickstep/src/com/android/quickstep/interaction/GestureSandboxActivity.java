@@ -35,9 +35,10 @@ import java.util.List;
 /** Shows the gesture interactive sandbox in full screen mode. */
 public class GestureSandboxActivity extends FragmentActivity {
 
+    private static final String LOG_TAG = "GestureSandboxActivity";
+
     private static final String KEY_TUTORIAL_STEPS = "tutorial_steps";
     private static final String KEY_CURRENT_STEP = "current_step";
-    private static final String KEY_GESTURE_COMPLETE = "gesture_complete";
 
     private TutorialType[] mTutorialSteps;
     private TutorialType mCurrentTutorialStep;
@@ -55,8 +56,7 @@ public class GestureSandboxActivity extends FragmentActivity {
         Bundle args = savedInstanceState == null ? getIntent().getExtras() : savedInstanceState;
         mTutorialSteps = getTutorialSteps(args);
         mCurrentTutorialStep = mTutorialSteps[mCurrentStep - 1];
-        mFragment = TutorialFragment.newInstance(
-                mCurrentTutorialStep, args.getBoolean(KEY_GESTURE_COMPLETE, false));
+        mFragment = TutorialFragment.newInstance(mCurrentTutorialStep);
         getSupportFragmentManager().beginTransaction()
                 .add(R.id.gesture_tutorial_fragment_container, mFragment)
                 .commit();
@@ -87,7 +87,6 @@ public class GestureSandboxActivity extends FragmentActivity {
     protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
         savedInstanceState.putStringArray(KEY_TUTORIAL_STEPS, getTutorialStepNames());
         savedInstanceState.putInt(KEY_CURRENT_STEP, mCurrentStep);
-        savedInstanceState.putBoolean(KEY_GESTURE_COMPLETE, mFragment.isGestureComplete());
         super.onSaveInstanceState(savedInstanceState);
     }
 
@@ -122,7 +121,7 @@ public class GestureSandboxActivity extends FragmentActivity {
             return;
         }
         mCurrentTutorialStep = mTutorialSteps[mCurrentStep];
-        mFragment = TutorialFragment.newInstance(mCurrentTutorialStep, false);
+        mFragment = TutorialFragment.newInstance(mCurrentTutorialStep);
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.gesture_tutorial_fragment_container, mFragment)
                 .runOnCommit(() -> mFragment.onAttachedToWindow())

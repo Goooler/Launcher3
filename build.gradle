@@ -2,6 +2,7 @@ buildscript {
     repositories {
         mavenCentral()
         google()
+        jcenter()
     }
     dependencies {
         classpath GRADLE_CLASS_PATH
@@ -20,8 +21,8 @@ android {
     buildToolsVersion BUILD_TOOLS_VERSION
 
     defaultConfig {
-        minSdkVersion 26
-        targetSdkVersion 30
+        minSdkVersion 25
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
 
@@ -163,8 +164,6 @@ dependencies {
     androidTestImplementation 'com.android.support.test:rules:1.0.0'
     androidTestImplementation 'com.android.support.test.uiautomator:uiautomator-v18:2.1.2'
     androidTestImplementation "androidx.annotation:annotation:${ANDROID_X_VERSION}"
-
-    api 'com.airbnb.android:lottie:3.3.0'
 }
 
 protobuf {

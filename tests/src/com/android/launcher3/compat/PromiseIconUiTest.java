@@ -25,9 +25,8 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.Workspace;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
-import com.android.launcher3.util.LauncherBindableItemsContainer.ItemOperator;
-import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 
 import org.junit.After;
 import org.junit.Test;
@@ -74,10 +73,9 @@ public class PromiseIconUiTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    @ScreenRecord // b/202985412
     public void testPromiseIcon_addedFromEligibleSession() throws Throwable {
         final String appLabel = "Test Promise App " + UUID.randomUUID().toString();
-        final ItemOperator findPromiseApp = (info, view) ->
+        final Workspace.ItemOperator findPromiseApp = (info, view) ->
                 info != null && TextUtils.equals(info.title, appLabel);
 
         // Create and add test session
@@ -97,10 +95,9 @@ public class PromiseIconUiTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    @ScreenRecord // b/202985412
     public void testPromiseIcon_notAddedFromIneligibleSession() throws Throwable {
         final String appLabel = "Test Promise App " + UUID.randomUUID().toString();
-        final ItemOperator findPromiseApp = (info, view) ->
+        final Workspace.ItemOperator findPromiseApp = (info, view) ->
                 info != null && TextUtils.equals(info.title, appLabel);
 
         // Create and add test session without icon or label

@@ -16,6 +16,7 @@
 
 package com.android.launcher3.graphics;
 
+import static com.android.launcher3.config.FeatureFlags.MULTI_DB_GRID_MIRATION_ALGO;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -37,14 +38,14 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import androidx.annotation.UiThread;
 import androidx.annotation.WorkerThread;
 
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.Workspace;
 import com.android.launcher3.graphics.LauncherPreviewRenderer.PreviewContext;
 import com.android.launcher3.model.BgDataModel;
+import com.android.launcher3.model.GridSizeMigrationTask;
 import com.android.launcher3.model.GridSizeMigrationTaskV2;
 import com.android.launcher3.model.LoaderTask;
 import com.android.launcher3.model.ModelDelegate;
@@ -148,8 +149,7 @@ public class PreviewSurfaceRenderer {
             inflationContext = new ContextThemeWrapper(context,
                     Themes.getActivityThemeRes(context, mWallpaperColors.getColorHints()));
         } else {
-            inflationContext = new ContextThemeWrapper(mContext,
-                    Themes.getActivityThemeRes(mContext));
+            inflationContext = new ContextThemeWrapper(mContext,  R.style.AppTheme);
         }
 
         if (migrated) {
@@ -162,18 +162,10 @@ public class PreviewSurfaceRenderer {
 
                 @Override
                 public void run() {
-                    DeviceProfile deviceProfile = mIdp.getDeviceProfile(previewContext);
-                    String query =
-                            LauncherSettings.Favorites.SCREEN + " = " + Workspace.FIRST_SCREEN_ID
-                            + " or " + LauncherSettings.Favorites.CONTAINER + " = "
-                            + LauncherSettings.Favorites.CONTAINER_HOTSEAT;
-                    if (deviceProfile.isTwoPanels) {
-                        query += " or " + LauncherSettings.Favorites.SCREEN + " = "
-                                + Workspace.SECOND_SCREEN_ID;
-                    }
                     loadWorkspace(new ArrayList<>(), LauncherSettings.Favorites.PREVIEW_CONTENT_URI,
-                            query);
-
+                            LauncherSettings.Favorites.SCREEN + " = 0 or "
+                                    + LauncherSettings.Favorites.CONTAINER + " = "
+                                    + LauncherSettings.Favorites.CONTAINER_HOTSEAT);
                     MAIN_EXECUTOR.execute(() -> {
                         renderView(previewContext, mBgDataModel, mWidgetProvidersMap);
                         mOnDestroyCallbacks.add(previewContext::onDestroy);
@@ -193,10 +185,16 @@ public class PreviewSurfaceRenderer {
 
     @WorkerThread
     private boolean doGridMigrationIfNecessary() {
-        if (!GridSizeMigrationTaskV2.needsToMigrate(mContext, mIdp)) {
+        boolean needsToMigrate =
+                MULTI_DB_GRID_MIRATION_ALGO.get()
+                        ? GridSizeMigrationTaskV2.needsToMigrate(mContext, mIdp)
+                        : GridSizeMigrationTask.needsToMigrate(mContext, mIdp);
+        if (!needsToMigrate) {
             return false;
         }
-        return GridSizeMigrationTaskV2.migrateGridIfNeeded(mContext, mIdp);
+        return MULTI_DB_GRID_MIRATION_ALGO.get()
+                ? GridSizeMigrationTaskV2.migrateGridIfNeeded(mContext, mIdp)
+                : GridSizeMigrationTask.migrateGridIfNeeded(mContext, mIdp);
     }
 
     @UiThread
