@@ -17,7 +17,6 @@
 package com.android.launcher3.uioverrides;
 
 import android.app.Person;
-import android.content.Context;
 import android.content.pm.ShortcutInfo;
 import android.view.Display;
 
@@ -36,19 +35,5 @@ public class ApiWrapper {
      */
     public static boolean isInternalDisplay(Display display) {
         return display.getDisplayId() == Display.DEFAULT_DISPLAY;
-    }
-
-    /**
-     * Returns a unique ID representing the display
-     */
-    public static String getUniqueId(Display display) {
-        return Integer.toString(display.getDisplayId());
-    }
-
-    /**
-     * Returns the minimum space that should be left empty at the end of hotseat
-     */
-    public static int getHotseatEndOffset(Context context) {
-        return 0;
     }
 }

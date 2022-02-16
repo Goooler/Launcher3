@@ -20,11 +20,9 @@ import android.content.ComponentName;
 import android.os.UserHandle;
 
 import com.android.launcher3.LauncherSettings.Favorites;
-import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -32,11 +30,6 @@ import java.util.Set;
  * A utility class to check for {@link ItemInfo}
  */
 public interface ItemInfoMatcher {
-
-    /**
-     * Empty component used for match testing
-     */
-    ComponentName EMPTY_COMPONENT = new ComponentName("", "");
 
     boolean matches(ItemInfo info, ComponentName cn);
 
@@ -46,7 +39,7 @@ public interface ItemInfoMatcher {
     default boolean matchesInfo(ItemInfo info) {
         if (info != null) {
             ComponentName cn = info.getTargetComponent();
-            return matches(info, cn != null ? cn : EMPTY_COMPONENT);
+            return cn != null && matches(info, cn);
         } else {
             return false;
         }
@@ -86,16 +79,8 @@ public interface ItemInfoMatcher {
     }
 
     static ItemInfoMatcher ofShortcutKeys(Set<ShortcutKey> keys) {
-        return (info, cn) -> info.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT
-                && keys.contains(ShortcutKey.fromItemInfo(info));
-    }
-
-    /**
-     * Returns a matcher for items within folders.
-     */
-    static ItemInfoMatcher forFolderMatch(ItemInfoMatcher childOperator) {
-        return (info, cn) -> info instanceof FolderInfo && ((FolderInfo) info).contents.stream()
-                .anyMatch(childOperator::matchesInfo);
+        return  (info, cn) -> info.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT &&
+                        keys.contains(ShortcutKey.fromItemInfo(info));
     }
 
     /**
@@ -103,14 +88,5 @@ public interface ItemInfoMatcher {
      */
     static ItemInfoMatcher ofItemIds(IntSet ids) {
         return (info, cn) -> ids.contains(info.id);
-    }
-
-    /**
-     * Returns a matcher for items with provided items
-     */
-    static ItemInfoMatcher ofItems(Collection<? extends ItemInfo> items) {
-        IntSet ids = new IntSet();
-        items.forEach(item -> ids.add(item.id));
-        return ofItemIds(ids);
     }
 }

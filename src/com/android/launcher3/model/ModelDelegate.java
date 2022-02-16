@@ -40,23 +40,19 @@ public class ModelDelegate implements ResourceBasedOverride {
      * Creates and initializes a new instance of the delegate
      */
     public static ModelDelegate newInstance(
-            Context context, LauncherAppState app, AllAppsList appsList, BgDataModel dataModel,
-            boolean isPrimaryInstance) {
+            Context context, LauncherAppState app, AllAppsList appsList, BgDataModel dataModel) {
         ModelDelegate delegate = Overrides.getObject(
                 ModelDelegate.class, context, R.string.model_delegate_class);
+
         delegate.mApp = app;
         delegate.mAppsList = appsList;
         delegate.mDataModel = dataModel;
-        delegate.mIsPrimaryInstance = isPrimaryInstance;
-        delegate.mContext = context;
         return delegate;
     }
 
-    protected Context mContext;
     protected LauncherAppState mApp;
     protected AllAppsList mAppsList;
     protected BgDataModel mDataModel;
-    protected boolean mIsPrimaryInstance;
 
     public ModelDelegate() { }
 
@@ -76,15 +72,6 @@ public class ModelDelegate implements ResourceBasedOverride {
      */
     @WorkerThread
     public void loadItems(UserManagerState ums, Map<ShortcutKey, ShortcutInfo> pinnedShortcuts) { }
-
-    /**
-     * Load String cache
-     */
-    @WorkerThread
-    public void loadStringCache(StringCache cache) {
-        cache.loadDefaultStrings(mContext);
-    }
-
 
     /**
      * Called during loader after workspace loading is complete

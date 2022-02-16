@@ -31,7 +31,6 @@ import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 
@@ -52,8 +51,7 @@ public class ModelUtils {
      * Filters the set of items who are directly or indirectly (via another container) on the
      * specified screen.
      */
-    public static <T extends ItemInfo> void filterCurrentWorkspaceItems(
-            IntSet currentScreenIds,
+    public static <T extends ItemInfo> void filterCurrentWorkspaceItems(int currentScreenId,
             ArrayList<T> allWorkspaceItems,
             ArrayList<T> currentScreenItems,
             ArrayList<T> otherScreenItems) {
@@ -67,11 +65,7 @@ public class ModelUtils {
                 (lhs, rhs) -> Integer.compare(lhs.container, rhs.container));
         for (T info : allWorkspaceItems) {
             if (info.container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
-                if (TestProtocol.sDebugTracing) {
-                    Log.d(TestProtocol.NULL_INT_SET, "filterCurrentWorkspaceItems: "
-                            + currentScreenIds);
-                }
-                if (currentScreenIds.contains(info.screenId)) {
+                if (info.screenId == currentScreenId) {
                     currentScreenItems.add(info);
                     itemsOnScreen.add(info.id);
                 } else {
