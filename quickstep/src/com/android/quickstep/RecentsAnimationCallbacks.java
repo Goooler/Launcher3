@@ -16,14 +16,11 @@
 package com.android.quickstep;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.ACTIVITY_TYPE_HOME;
 
 import android.graphics.Rect;
 import android.util.ArraySet;
-import android.view.RemoteAnimationTarget;
 
 import androidx.annotation.BinderThread;
-import androidx.annotation.NonNull;
 import androidx.annotation.UiThread;
 
 import com.android.launcher3.Utilities;
@@ -32,8 +29,6 @@ import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Set;
 
 /**
@@ -44,7 +39,6 @@ public class RecentsAnimationCallbacks implements
         com.android.systemui.shared.system.RecentsAnimationListener {
 
     private final Set<RecentsAnimationListener> mListeners = new ArraySet<>();
-    private final SystemUiProxy mSystemUiProxy;
     private final boolean mAllowMinimizeSplitScreen;
 
     // TODO(141886704): Remove these references when they are no longer needed
@@ -52,9 +46,7 @@ public class RecentsAnimationCallbacks implements
 
     private boolean mCancelled;
 
-    public RecentsAnimationCallbacks(SystemUiProxy systemUiProxy,
-            boolean allowMinimizeSplitScreen) {
-        mSystemUiProxy = systemUiProxy;
+    public RecentsAnimationCallbacks(boolean allowMinimizeSplitScreen) {
         mAllowMinimizeSplitScreen = allowMinimizeSplitScreen;
     }
 
@@ -78,7 +70,7 @@ public class RecentsAnimationCallbacks implements
 
     public void notifyAnimationCanceled() {
         mCancelled = true;
-        onAnimationCanceled(new HashMap<>());
+        onAnimationCanceled(null);
     }
 
     // Called only in Q platform
@@ -97,19 +89,8 @@ public class RecentsAnimationCallbacks implements
             RemoteAnimationTargetCompat[] appTargets,
             RemoteAnimationTargetCompat[] wallpaperTargets,
             Rect homeContentInsets, Rect minimizedHomeBounds) {
-        // Convert appTargets to type RemoteAnimationTarget for all apps except Home app
-        RemoteAnimationTarget[] nonHomeApps = Arrays.stream(appTargets)
-                .filter(remoteAnimationTarget ->
-                        remoteAnimationTarget.activityType != ACTIVITY_TYPE_HOME)
-                .map(RemoteAnimationTargetCompat::unwrap)
-                .toArray(RemoteAnimationTarget[]::new);
-
-        RemoteAnimationTarget[] nonAppTargets =
-                mSystemUiProxy.onGoingToRecentsLegacy(mCancelled, nonHomeApps);
-
         RecentsAnimationTargets targets = new RecentsAnimationTargets(appTargets,
-                wallpaperTargets, RemoteAnimationTargetCompat.wrap(nonAppTargets),
-                homeContentInsets, minimizedHomeBounds);
+                wallpaperTargets, homeContentInsets, minimizedHomeBounds);
         mController = new RecentsAnimationController(animationController,
                 mAllowMinimizeSplitScreen, this::onAnimationFinished);
 
@@ -127,20 +108,20 @@ public class RecentsAnimationCallbacks implements
 
     @BinderThread
     @Override
-    public final void onAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
+    public final void onAnimationCanceled(ThumbnailData thumbnailData) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
             for (RecentsAnimationListener listener : getListeners()) {
-                listener.onRecentsAnimationCanceled(thumbnailDatas);
+                listener.onRecentsAnimationCanceled(thumbnailData);
             }
         });
     }
 
     @BinderThread
     @Override
-    public void onTasksAppeared(RemoteAnimationTargetCompat[] apps) {
+    public void onTaskAppeared(RemoteAnimationTargetCompat app) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
             for (RecentsAnimationListener listener : getListeners()) {
-                listener.onTasksAppeared(apps);
+                listener.onTaskAppeared(app);
             }
         });
     }
@@ -168,17 +149,16 @@ public class RecentsAnimationCallbacks implements
          * Callback from the system when the recents animation is canceled. {@param thumbnailData}
          * is passed back for rendering screenshot to replace live tile.
          */
-        default void onRecentsAnimationCanceled(
-                @NonNull HashMap<Integer, ThumbnailData> thumbnailDatas) {}
+        default void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {}
 
         /**
          * Callback made whenever the recents animation is finished.
          */
-        default void onRecentsAnimationFinished(@NonNull RecentsAnimationController controller) {}
+        default void onRecentsAnimationFinished(RecentsAnimationController controller) {}
 
         /**
          * Callback made when a task started from the recents is ready for an app transition.
          */
-        default void onTasksAppeared(@NonNull RemoteAnimationTargetCompat[] appearedTaskTarget) {}
+        default void onTaskAppeared(RemoteAnimationTargetCompat appearedTaskTarget) {}
     }
 }

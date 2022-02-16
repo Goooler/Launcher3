@@ -18,6 +18,7 @@ package com.android.launcher3.allapps;
 import static com.android.launcher3.touch.ItemLongClickListener.INSTANCE_ALL_APPS;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -37,22 +38,19 @@ import androidx.core.view.accessibility.AccessibilityRecordCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfoWithIcon;
-import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.util.PackageManagerHelper;
 
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * The grid view adapter of all the apps.
- *
- * @param <T> Type of context inflating all apps.
  */
-public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
+public class AllAppsGridAdapter extends
         RecyclerView.Adapter<AllAppsGridAdapter.ViewHolder> {
 
     public static final String TAG = "AppsGridAdapter";
@@ -97,15 +95,16 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
         // The type of this item
         public int viewType;
 
-        // The section name of this item.  Note that there can be multiple items with different
+        /** App-only properties */
+        // The section name of this app.  Note that there can be multiple items with different
         // sectionNames in the same section
         public String sectionName = null;
         // The row that this item shows up on
         public int rowIndex;
         // The index of this app in the row
         public int rowAppIndex;
-        // The associated ItemInfoWithIcon for the item
-        public ItemInfoWithIcon itemInfo = null;
+        // The associated AppInfo for the app
+        public AppInfo appInfo = null;
         // The index of this app not including sections
         public int appIndex = -1;
         // Search section associated to result
@@ -120,7 +119,7 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
             item.viewType = VIEW_TYPE_ICON;
             item.position = pos;
             item.sectionName = sectionName;
-            item.itemInfo = appInfo;
+            item.appInfo = appInfo;
             item.appIndex = appIndex;
             return item;
         }
@@ -256,9 +255,9 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
         }
     }
 
-    private final T mActivityContext;
+    private final BaseDraggingActivity mLauncher;
     private final LayoutInflater mLayoutInflater;
-    private final AlphabeticalAppsList<T> mApps;
+    private final AlphabeticalAppsList mApps;
     private final GridLayoutManager mGridLayoutMgr;
     private final GridSpanSizer mGridSizer;
 
@@ -271,28 +270,24 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
 
     // The text to show when there are no search results and no market search handler.
     protected String mEmptySearchMessage;
-    // The click listener to send off to the market app, updated each time the search query changes.
-    private OnClickListener mMarketSearchClickListener;
+    // The intent to send off to the market app, updated each time the search query changes.
+    private Intent mMarketSearchIntent;
 
-    private final int mExtraHeight;
-
-    public AllAppsGridAdapter(T activityContext, LayoutInflater inflater,
-            AlphabeticalAppsList<T> apps, BaseAdapterProvider[] adapterProviders) {
-        Resources res = activityContext.getResources();
-        mActivityContext = activityContext;
+    public AllAppsGridAdapter(BaseDraggingActivity launcher, LayoutInflater inflater,
+            AlphabeticalAppsList apps, BaseAdapterProvider[] adapterProviders) {
+        Resources res = launcher.getResources();
+        mLauncher = launcher;
         mApps = apps;
         mEmptySearchMessage = res.getString(R.string.all_apps_loading_message);
         mGridSizer = new GridSpanSizer();
-        mGridLayoutMgr = new AppsGridLayoutManager(mActivityContext);
+        mGridLayoutMgr = new AppsGridLayoutManager(launcher);
         mGridLayoutMgr.setSpanSizeLookup(mGridSizer);
         mLayoutInflater = inflater;
 
-        mOnIconClickListener = mActivityContext.getItemOnClickListener();
+        mOnIconClickListener = launcher.getItemOnClickListener();
 
         mAdapterProviders = adapterProviders;
-        setAppsPerRow(mActivityContext.getDeviceProfile().numShownAllAppsColumns);
-        mExtraHeight = mActivityContext.getResources().getDimensionPixelSize(
-                R.dimen.all_apps_height_extra);
+        setAppsPerRow(mLauncher.getDeviceProfile().numShownAllAppsColumns);
     }
 
     public void setAppsPerRow(int appsPerRow) {
@@ -335,10 +330,10 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
      * Sets the last search query that was made, used to show when there are no results and to also
      * seed the intent for searching the market.
      */
-    public void setLastSearchQuery(String query, OnClickListener marketSearchClickListener) {
-        Resources res = mActivityContext.getResources();
+    public void setLastSearchQuery(String query) {
+        Resources res = mLauncher.getResources();
         mEmptySearchMessage = res.getString(R.string.all_apps_no_search_results, query);
-        mMarketSearchClickListener = marketSearchClickListener;
+        mMarketSearchIntent = PackageManagerHelper.getMarketSearchIntent(mLauncher, query);
     }
 
     /**
@@ -352,20 +347,14 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         switch (viewType) {
             case VIEW_TYPE_ICON:
-                int layout = !FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get() ? R.layout.all_apps_icon
-                        : R.layout.all_apps_icon_twoline;
                 BubbleTextView icon = (BubbleTextView) mLayoutInflater.inflate(
-                        layout, parent, false);
+                        R.layout.all_apps_icon, parent, false);
                 icon.setLongPressTimeoutFactor(1f);
                 icon.setOnFocusChangeListener(mIconFocusListener);
                 icon.setOnClickListener(mOnIconClickListener);
                 icon.setOnLongClickListener(mOnIconLongClickListener);
                 // Ensure the all apps icon height matches the workspace icons in portrait mode.
-                icon.getLayoutParams().height =
-                        mActivityContext.getDeviceProfile().allAppsCellHeightPx;
-                if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get()) {
-                    icon.getLayoutParams().height += mExtraHeight;
-                }
+                icon.getLayoutParams().height = mLauncher.getDeviceProfile().allAppsCellHeightPx;
                 return new ViewHolder(icon);
             case VIEW_TYPE_EMPTY_SEARCH:
                 return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_empty_search,
@@ -373,7 +362,8 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
             case VIEW_TYPE_SEARCH_MARKET:
                 View searchMarketView = mLayoutInflater.inflate(R.layout.all_apps_search_market,
                         parent, false);
-                searchMarketView.setOnClickListener(mMarketSearchClickListener);
+                searchMarketView.setOnClickListener(v -> mLauncher.startActivitySafely(
+                        v, mMarketSearchIntent, null));
                 return new ViewHolder(searchMarketView);
             case VIEW_TYPE_ALL_APPS_DIVIDER:
                 return new ViewHolder(mLayoutInflater.inflate(
@@ -383,7 +373,7 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
                 if (adapterProvider != null) {
                     return adapterProvider.onCreateViewHolder(mLayoutInflater, parent, viewType);
                 }
-                throw new RuntimeException("Unexpected view type" + viewType);
+                throw new RuntimeException("Unexpected view type");
         }
     }
 
@@ -392,13 +382,10 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
         switch (holder.getItemViewType()) {
             case VIEW_TYPE_ICON:
                 AdapterItem adapterItem = mApps.getAdapterItems().get(position);
+                AppInfo info = adapterItem.appInfo;
                 BubbleTextView icon = (BubbleTextView) holder.itemView;
                 icon.reset();
-                if (adapterItem.itemInfo instanceof AppInfo) {
-                    icon.applyFromApplicationInfo((AppInfo) adapterItem.itemInfo);
-                } else {
-                    icon.applyFromItemInfoWithIcon(adapterItem.itemInfo);
-                }
+                icon.applyFromApplicationInfo(info);
                 break;
             case VIEW_TYPE_EMPTY_SEARCH:
                 TextView emptyViewText = (TextView) holder.itemView;
@@ -408,7 +395,7 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
                 break;
             case VIEW_TYPE_SEARCH_MARKET:
                 TextView searchView = (TextView) holder.itemView;
-                if (mMarketSearchClickListener != null) {
+                if (mMarketSearchIntent != null) {
                     searchView.setVisibility(View.VISIBLE);
                 } else {
                     searchView.setVisibility(View.GONE);

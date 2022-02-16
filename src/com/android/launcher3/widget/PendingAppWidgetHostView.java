@@ -17,8 +17,7 @@
 package com.android.launcher3.widget;
 
 import static com.android.launcher3.graphics.PreloadIconDrawable.newPendingIcon;
-import static com.android.launcher3.icons.FastBitmapDrawable.getDisabledColorFilter;
-import static com.android.launcher3.widget.WidgetSections.getWidgetSections;
+import static com.android.launcher3.model.data.PackageItemInfo.CONVERSATIONS;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -90,8 +89,8 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         setOnClickListener(ItemClickHandler.INSTANCE);
 
         if (info.pendingItemInfo == null) {
-            info.pendingItemInfo = new PackageItemInfo(info.providerName.getPackageName(),
-                    info.user);
+            info.pendingItemInfo = new PackageItemInfo(info.providerName.getPackageName());
+            info.pendingItemInfo.user = info.user;
             cache.updateIconInBackground(this, info.pendingItemInfo);
         } else {
             reapplyItemInfo(info.pendingItemInfo);
@@ -160,7 +159,8 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
                     disabledIcon.setIsDisabled(true);
                     mCenterDrawable = disabledIcon;
                 } else {
-                    widgetCategoryIcon.setColorFilter(getDisabledColorFilter());
+                    widgetCategoryIcon.setColorFilter(
+                            FastBitmapDrawable.getDisabledFColorFilter(/* disabledAlpha= */ 1f));
                     mCenterDrawable = widgetCategoryIcon;
                 }
                 mSettingIconDrawable = null;
@@ -268,8 +268,8 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             if (availableWidth > 0) {
                 // Recreate the setup text.
                 mSetupTextLayout = new StaticLayout(
-                        getResources().getText(R.string.gadget_complete_setup_text), mPaint,
-                        availableWidth, Layout.Alignment.ALIGN_CENTER, 1, 0, true);
+                        getResources().getText(R.string.gadget_setup_text), mPaint, availableWidth,
+                        Layout.Alignment.ALIGN_CENTER, 1, 0, true);
                 int textHeight = mSetupTextLayout.getHeight();
 
                 // Extra icon size due to the setting icon
@@ -338,11 +338,10 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
      */
     @Nullable
     private Drawable getWidgetCategoryIcon() {
-        if (mInfo.pendingItemInfo.widgetCategory == WidgetSections.NO_CATEGORY) {
-            return null;
+        switch (mInfo.pendingItemInfo.category) {
+            case CONVERSATIONS:
+                return getContext().getDrawable(R.drawable.ic_conversations_widget_category);
         }
-        Context context = getContext();
-        return context.getDrawable(getWidgetSections(context).get(
-                mInfo.pendingItemInfo.widgetCategory).mSectionDrawable);
+        return null;
     }
 }

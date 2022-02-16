@@ -16,7 +16,6 @@
 
 package com.android.launcher3;
 
-import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
 
 import android.annotation.TargetApi;
@@ -37,6 +36,7 @@ import android.content.pm.ShortcutInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.LightingColorFilter;
@@ -45,15 +45,14 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.InsetDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.DeadObjectException;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Process;
 import android.os.TransactionTooLargeException;
 import android.provider.Settings;
 import android.text.Spannable;
@@ -69,25 +68,23 @@ import android.view.ViewConfiguration;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
 
-import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.os.BuildCompat;
 
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.graphics.GridCustomizationsProvider;
 import com.android.launcher3.graphics.TintedDrawableSpan;
+import com.android.launcher3.icons.BitmapInfo;
+import com.android.launcher3.icons.FastBitmapDrawable;
+import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.ShortcutCachingLogic;
-import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
-import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.PackageManagerHelper;
-import com.android.launcher3.util.Themes;
-import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
@@ -109,6 +106,8 @@ public final class Utilities {
     private static final Pattern sTrimPattern =
             Pattern.compile("^[\\s|\\p{javaSpaceChar}]*(.*)[\\s|\\p{javaSpaceChar}]*$");
 
+    private static final float[] sTmpFloatArray = new float[4];
+
     private static final int[] sLoc0 = new int[2];
     private static final int[] sLoc1 = new int[2];
     private static final Matrix sMatrix = new Matrix();
@@ -123,9 +122,8 @@ public final class Utilities {
 
     public static final boolean ATLEAST_R = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
 
-    public static final boolean ATLEAST_S = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
-
-    public static final boolean ATLEAST_T = BuildCompat.isAtLeastT();
+    public static final boolean ATLEAST_S = BuildCompat.isAtLeastS()
+            || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
 
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
@@ -229,7 +227,7 @@ public final class Utilities {
             offsetPoints(coord, v.getLeft(), v.getTop());
             scale *= v.getScaleX();
 
-            v = v.getParent() instanceof View ? (View) v.getParent() : null;
+            v = (View) v.getParent();
         }
         return scale;
     }
@@ -382,21 +380,6 @@ public final class Utilities {
     }
 
     /**
-     * Similar to {@link #scaleRectAboutCenter(Rect, float)} except this allows different scales
-     * for X and Y
-     */
-    public static void scaleRectFAboutCenter(RectF r, float scaleX, float scaleY) {
-        float px = r.centerX();
-        float py = r.centerY();
-        r.offset(-px, -py);
-        r.left = r.left * scaleX;
-        r.top = r.top * scaleY;
-        r.right = r.right * scaleX;
-        r.bottom = r.bottom * scaleY;
-        r.offset(px, py);
-    }
-
-    /**
      * Maps t from one range to another range.
      * @param t The value to map.
      * @param fromMin The lower bound of the range that t is being mapped from.
@@ -458,10 +441,9 @@ public final class Utilities {
      * Trims the string, removing all whitespace at the beginning and end of the string.
      * Non-breaking whitespaces are also removed.
      */
-    @NonNull
     public static String trim(CharSequence s) {
         if (s == null) {
-            return "";
+            return null;
         }
 
         // Just strip any sequence of whitespace or java space characters from the beginning and end
@@ -523,18 +505,6 @@ public final class Utilities {
             Log.d(TAG, "Unable to read system properties");
         }
         return defaultValue;
-    }
-
-    /**
-     * Using the view's bounds and icon size, calculate where the icon bounds will
-     * be if it was positioned at the center of the view.
-     */
-    public static void setRectToViewCenter(View iconView, int iconSize, Rect outBounds) {
-        int top = (iconView.getHeight() - iconSize) / 2;
-        int left = (iconView.getWidth() - iconSize) / 2;
-        int right = left + iconSize;
-        int bottom = top + iconSize;
-        outBounds.set(left, top, right, bottom);
     }
 
     /**
@@ -662,6 +632,21 @@ public final class Utilities {
         handler.sendMessage(msg);
     }
 
+    /**
+     * Parses a string encoded using {@link #getPointString(int, int)}
+     */
+    public static Point parsePoint(String point) {
+        String[] split = point.split(",");
+        return new Point(Integer.parseInt(split[0]), Integer.parseInt(split[1]));
+    }
+
+    /**
+     * Encodes a point to string to that it can be persisted atomically.
+     */
+    public static String getPointString(int x, int y) {
+        return String.format(Locale.ENGLISH, "%d,%d", x, y);
+    }
+
     public static void unregisterReceiverSafely(Context context, BroadcastReceiver receiver) {
         try {
             context.unregisterReceiver(receiver);
@@ -674,34 +659,25 @@ public final class Utilities {
      * @param outObj this is set to the internal data associated with {@param info},
      *               eg {@link LauncherActivityInfo} or {@link ShortcutInfo}.
      */
-    @TargetApi(Build.VERSION_CODES.TIRAMISU)
-    public static Drawable getFullDrawable(Context context, ItemInfo info, int width, int height,
+    public static Drawable getFullDrawable(Launcher launcher, ItemInfo info, int width, int height,
             Object[] outObj) {
-        Drawable icon = loadFullDrawableWithoutTheme(context, info, width, height, outObj);
-        if (ATLEAST_T && icon instanceof AdaptiveIconDrawable) {
-            AdaptiveIconDrawable aid = (AdaptiveIconDrawable) icon.mutate();
-            Drawable mono = aid.getMonochrome();
-            if (mono != null && Themes.isThemedIconEnabled(context)) {
-                int[] colors = ThemedIconDrawable.getColors(context);
-                mono = mono.mutate();
-                mono.setTint(colors[1]);
-                return new AdaptiveIconDrawable(new ColorDrawable(colors[0]), mono);
-            }
+        Drawable icon = loadFullDrawableWithoutTheme(launcher, info, width, height, outObj);
+        if (icon instanceof BitmapInfo.Extender) {
+            icon = ((BitmapInfo.Extender) icon).getThemedDrawable(launcher);
         }
         return icon;
     }
 
-    private static Drawable loadFullDrawableWithoutTheme(Context context, ItemInfo info,
+    private static Drawable loadFullDrawableWithoutTheme(Launcher launcher, ItemInfo info,
             int width, int height, Object[] outObj) {
-        ActivityContext activity = ActivityContext.lookupContext(context);
-        LauncherAppState appState = LauncherAppState.getInstance(context);
+        LauncherAppState appState = LauncherAppState.getInstance(launcher);
         if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
-            LauncherActivityInfo activityInfo = context.getSystemService(LauncherApps.class)
+            LauncherActivityInfo activityInfo = launcher.getSystemService(LauncherApps.class)
                     .resolveActivity(info.getIntent(), info.user);
             outObj[0] = activityInfo;
-            return activityInfo == null ? null : LauncherAppState.getInstance(context)
+            return activityInfo == null ? null : LauncherAppState.getInstance(launcher)
                     .getIconProvider().getIcon(
-                            activityInfo, activity.getDeviceProfile().inv.fillResIconDpi);
+                            activityInfo, launcher.getDeviceProfile().inv.fillResIconDpi);
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
             if (info instanceof PendingAddShortcutInfo) {
                 ShortcutConfigActivityInfo activityInfo =
@@ -710,26 +686,23 @@ public final class Utilities {
                 return activityInfo.getFullResIcon(appState.getIconCache());
             }
             List<ShortcutInfo> si = ShortcutKey.fromItemInfo(info)
-                    .buildRequest(context)
+                    .buildRequest(launcher)
                     .query(ShortcutRequest.ALL);
             if (si.isEmpty()) {
                 return null;
             } else {
                 outObj[0] = si.get(0);
-                return ShortcutCachingLogic.getIcon(context, si.get(0),
+                return ShortcutCachingLogic.getIcon(launcher, si.get(0),
                         appState.getInvariantDeviceProfile().fillResIconDpi);
             }
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
             FolderAdaptiveIcon icon = FolderAdaptiveIcon.createFolderAdaptiveIcon(
-                    activity, info.id, new Point(width, height));
+                    launcher, info.id, new Point(width, height));
             if (icon == null) {
                 return null;
             }
             outObj[0] = icon;
             return icon;
-        } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION
-                && info instanceof SearchActionItemInfo) {
-            return ((SearchActionItemInfo) info).bitmap.newIcon(context);
         } else {
             return null;
         }
@@ -742,25 +715,29 @@ public final class Utilities {
      * badge. When dragged from workspace or folder, it may contain app AND/OR work profile badge
      **/
     @TargetApi(Build.VERSION_CODES.O)
-    public static Drawable getBadge(Context context, ItemInfo info, Object obj) {
-        LauncherAppState appState = LauncherAppState.getInstance(context);
+    public static Drawable getBadge(Launcher launcher, ItemInfo info, Object obj) {
+        LauncherAppState appState = LauncherAppState.getInstance(launcher);
+        int iconSize = appState.getInvariantDeviceProfile().iconBitmapSize;
         if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
             boolean iconBadged = (info instanceof ItemInfoWithIcon)
                     && (((ItemInfoWithIcon) info).runtimeStatusFlags & FLAG_ICON_BADGED) > 0;
             if ((info.id == ItemInfo.NO_ID && !iconBadged)
                     || !(obj instanceof ShortcutInfo)) {
                 // The item is not yet added on home screen.
-                return new ColorDrawable(Color.TRANSPARENT);
+                return new FixedSizeEmptyDrawable(iconSize);
             }
             ShortcutInfo si = (ShortcutInfo) obj;
-            return LauncherAppState.getInstance(appState.getContext())
-                    .getIconCache().getShortcutInfoBadge(si).newIcon(context, FLAG_THEMED);
+            Bitmap badge = LauncherAppState.getInstance(appState.getContext())
+                    .getIconCache().getShortcutInfoBadge(si).icon;
+            float badgeSize = LauncherIcons.getBadgeSizeForIconSize(iconSize);
+            float insetFraction = (iconSize - badgeSize) / iconSize;
+            return new InsetDrawable(new FastBitmapDrawable(badge),
+                    insetFraction, insetFraction, 0, 0);
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
             return ((FolderAdaptiveIcon) obj).getBadge();
         } else {
-            return Process.myUserHandle().equals(info.user)
-                    ? new ColorDrawable(Color.TRANSPARENT)
-                    : context.getDrawable(R.drawable.ic_work_app_badge);
+            return launcher.getPackageManager()
+                    .getUserBadgedIcon(new FixedSizeEmptyDrawable(iconSize), info.user);
         }
     }
 
@@ -861,9 +838,23 @@ public final class Utilities {
         view.setLayoutParams(lp);
     }
 
-    public static Rect getViewBounds(@NonNull View v) {
-        int[] pos = new int[2];
-        v.getLocationOnScreen(pos);
-        return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
+    private static class FixedSizeEmptyDrawable extends ColorDrawable {
+
+        private final int mSize;
+
+        public FixedSizeEmptyDrawable(int size) {
+            super(Color.TRANSPARENT);
+            mSize = size;
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return mSize;
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return mSize;
+        }
     }
 }
