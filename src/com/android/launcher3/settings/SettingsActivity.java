@@ -49,7 +49,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.WidgetsModel;
-import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 
 import java.util.Collections;
@@ -63,9 +62,8 @@ public class SettingsActivity extends FragmentActivity
         SharedPreferences.OnSharedPreferenceChangeListener{
 
     /** List of fragments that can be hosted by this activity. */
-    private static final List<String> VALID_PREFERENCE_FRAGMENTS =
-            !Utilities.IS_DEBUG_DEVICE ? Collections.emptyList()
-                    : Collections.singletonList(DeveloperOptionsFragment.class.getName());
+    private static final List<String> VALID_PREFERENCE_FRAGMENTS = Collections.singletonList(
+            DeveloperOptionsFragment.class.getName());
 
     private static final String DEVELOPER_OPTIONS_KEY = "pref_developer_options";
     private static final String FLAGS_PREFERENCE_KEY = "flag_toggler";
@@ -254,13 +252,12 @@ public class SettingsActivity extends FragmentActivity
                 case ALLOW_ROTATION_PREFERENCE_KEY:
                     DeviceProfile deviceProfile = InvariantDeviceProfile.INSTANCE.get(
                             getContext()).getDeviceProfile(getContext());
-                    if (deviceProfile.isTablet) {
+                    if (deviceProfile.allowRotation) {
                         // Launcher supports rotation by default. No need to show this setting.
                         return false;
                     }
                     // Initialize the UI once
-                    preference.setDefaultValue(
-                            RotationHelper.getAllowRotationDefaultValue(deviceProfile));
+                    preference.setDefaultValue(false);
                     return true;
 
                 case FLAGS_PREFERENCE_KEY:

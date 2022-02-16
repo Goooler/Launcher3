@@ -142,7 +142,7 @@ public class PreloadIconDrawable extends FastBitmapDrawable {
         mSystemBackgroundColor = preloadColors[PRELOAD_BACKGROUND_COLOR_INDEX];
         mIsDarkMode = isDarkMode;
 
-        setLevel(info.getProgressLevel());
+        setInternalProgress(info.getProgressLevel());
         setIsStartable(info.isAppStartable());
     }
 
@@ -345,10 +345,11 @@ public class PreloadIconDrawable extends FastBitmapDrawable {
     }
 
     @Override
-    public FastBitmapConstantState newConstantState() {
+    public ConstantState getConstantState() {
         return new PreloadIconConstantState(
                 mBitmap,
                 mIconColor,
+                !mItem.isAppStartable(),
                 mItem,
                 mIndicatorColor,
                 new int[] {mSystemAccentColor, mSystemBackgroundColor},
@@ -366,11 +367,12 @@ public class PreloadIconDrawable extends FastBitmapDrawable {
         public PreloadIconConstantState(
                 Bitmap bitmap,
                 int iconColor,
+                boolean isDisabled,
                 ItemInfoWithIcon info,
                 int indicatorColor,
                 int[] preloadColors,
                 boolean isDarkMode) {
-            super(bitmap, iconColor);
+            super(bitmap, iconColor, isDisabled);
             mInfo = info;
             mIndicatorColor = indicatorColor;
             mPreloadColors = preloadColors;
@@ -379,12 +381,17 @@ public class PreloadIconDrawable extends FastBitmapDrawable {
         }
 
         @Override
-        public PreloadIconDrawable createDrawable() {
+        public PreloadIconDrawable newDrawable() {
             return new PreloadIconDrawable(
                     mInfo,
                     mIndicatorColor,
                     mPreloadColors,
                     mIsDarkMode);
+        }
+
+        @Override
+        public int getChangingConfigurations() {
+            return 0;
         }
     }
 }

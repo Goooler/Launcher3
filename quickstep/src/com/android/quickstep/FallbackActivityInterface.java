@@ -21,8 +21,6 @@ import static com.android.quickstep.fallback.RecentsState.BACKGROUND_APP;
 import static com.android.quickstep.fallback.RecentsState.DEFAULT;
 import static com.android.quickstep.fallback.RecentsState.HOME;
 
-import android.animation.Animator;
-import android.animation.AnimatorSet;
 import android.content.Context;
 import android.graphics.Rect;
 import android.view.MotionEvent;
@@ -31,9 +29,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.statemanager.StateManager;
-import com.android.launcher3.taskbar.FallbackTaskbarUIController;
 import com.android.launcher3.touch.PagedOrientationHandler;
-import com.android.quickstep.GestureState.GestureEndTarget;
 import com.android.quickstep.fallback.RecentsState;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
@@ -61,7 +57,7 @@ public final class FallbackActivityInterface extends
     @Override
     public int getSwipeUpDestinationAndLength(DeviceProfile dp, Context context, Rect outRect,
             PagedOrientationHandler orientationHandler) {
-        calculateTaskSize(context, dp, outRect);
+        calculateTaskSize(context, dp, outRect, orientationHandler);
         if (dp.isVerticalBarLayout()
                 && SysUINavigationMode.INSTANCE.get(context).getMode() != NO_BUTTON) {
             return dp.isSeascape() ? outRect.left : (dp.widthPx - outRect.right);
@@ -104,15 +100,6 @@ public final class FallbackActivityInterface extends
     @Override
     public RecentsActivity getCreatedActivity() {
         return RecentsActivity.ACTIVITY_TRACKER.getCreatedActivity();
-    }
-
-    @Override
-    public FallbackTaskbarUIController getTaskbarController() {
-        RecentsActivity activity = getCreatedActivity();
-        if (activity == null) {
-            return null;
-        }
-        return activity.getTaskbarUIController();
     }
 
     @Nullable
@@ -195,7 +182,7 @@ public final class FallbackActivityInterface extends
     }
 
     @Override
-    public RecentsState stateFromGestureEndTarget(GestureEndTarget endTarget) {
+    public RecentsState stateFromGestureEndTarget(GestureState.GestureEndTarget endTarget) {
         switch (endTarget) {
             case RECENTS:
                 return DEFAULT;
@@ -213,28 +200,6 @@ public final class FallbackActivityInterface extends
         RecentsView recentsView = getCreatedActivity().getOverviewPanel();
         recentsView.setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
                 rotationTouchHelper.getDisplayRotation());
-    }
-
-    @Override
-    public @Nullable Animator getParallelAnimationToLauncher(GestureEndTarget endTarget,
-            long duration, RecentsAnimationCallbacks callbacks) {
-        FallbackTaskbarUIController uiController = getTaskbarController();
-        Animator superAnimator = super.getParallelAnimationToLauncher(
-                endTarget, duration, callbacks);
-        if (uiController == null) {
-            return superAnimator;
-        }
-        RecentsState toState = stateFromGestureEndTarget(endTarget);
-        Animator taskbarAnimator = uiController.createAnimToRecentsState(toState, duration);
-        if (taskbarAnimator == null) {
-            return superAnimator;
-        }
-        if (superAnimator == null) {
-            return taskbarAnimator;
-        }
-        AnimatorSet animatorSet = new AnimatorSet();
-        animatorSet.playTogether(superAnimator, taskbarAnimator);
-        return animatorSet;
     }
 
     @Override

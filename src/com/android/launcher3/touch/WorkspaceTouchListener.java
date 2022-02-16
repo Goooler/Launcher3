@@ -21,9 +21,7 @@ import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_POINTER_UP;
 import static android.view.MotionEvent.ACTION_UP;
 
-import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_CLOSE_TAP_OUTSIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WORKSPACE_LONGPRESS;
 
 import android.graphics.PointF;
@@ -41,9 +39,9 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.dragndrop.DragLayer;
-import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.views.OptionsPopupView;
 
 /**
  * Helper class to handle touch on empty space in workspace and show options popup on long press
@@ -153,21 +151,6 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
         if (action == ACTION_UP || action == ACTION_CANCEL) {
             cancelLongPress();
         }
-        if (action == ACTION_UP
-                && mLauncher.isInState(ALL_APPS)
-                && mLauncher.getDeviceProfile().isTablet) {
-            mLauncher.getStateManager().goToState(NORMAL);
-            mLauncher.getStatsLogManager().logger()
-                    .withSrcState(ALL_APPS.statsLogOrdinal)
-                    .withDstState(NORMAL.statsLogOrdinal)
-                    .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
-                            .setWorkspace(
-                                    LauncherAtom.WorkspaceContainer.newBuilder()
-                                            .setPageIndex(
-                                                    mLauncher.getWorkspace().getCurrentPage()))
-                            .build())
-                    .log(LAUNCHER_ALLAPPS_CLOSE_TAP_OUTSIDE);
-        }
 
         return result;
     }
@@ -192,7 +175,7 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
                 mWorkspace.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
                         HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
                 mLauncher.getStatsLogManager().logger().log(LAUNCHER_WORKSPACE_LONGPRESS);
-                mLauncher.showDefaultOptions(mTouchDownPoint.x, mTouchDownPoint.y);
+                OptionsPopupView.showDefaultOptions(mLauncher, mTouchDownPoint.x, mTouchDownPoint.y);
             } else {
                 cancelLongPress();
             }

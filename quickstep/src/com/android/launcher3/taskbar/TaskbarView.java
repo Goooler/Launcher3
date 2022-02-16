@@ -15,61 +15,75 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.view.View.MeasureSpec.EXACTLY;
+import static android.view.View.MeasureSpec.makeMeasureSpec;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.view.DragEvent;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
+import android.view.ViewConfiguration;
+import android.widget.LinearLayout;
 
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.uioverrides.ApiWrapper;
-import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.AllAppsButton;
 
 /**
  * Hosts the Taskbar content such as Hotseat and Recent Apps. Drawn on top of other apps.
  */
-public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconParent, Insettable {
+public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconParent, Insettable {
 
+    private final int mIconTouchSize;
+    private final boolean mIsRtl;
+    private final int mTouchSlop;
+    private final RectF mTempDelegateBounds = new RectF();
+    private final RectF mDelegateSlopBounds = new RectF();
     private final int[] mTempOutLocation = new int[2];
 
-    private final Rect mIconLayoutBounds = new Rect();
-    private final int mIconTouchSize;
     private final int mItemMarginLeftRight;
-    private final int mItemPadding;
 
     private final TaskbarActivityContext mActivityContext;
 
-    // Initialized in init.
-    private TaskbarViewController.TaskbarViewCallbacks mControllerCallbacks;
+    // Initialized in TaskbarController constructor.
     private View.OnClickListener mIconClickListener;
     private View.OnLongClickListener mIconLongClickListener;
 
+    LinearLayout mSystemButtonContainer;
+    LinearLayout mHotseatIconsContainer;
+
+    // Delegate touches to the closest view if within mIconTouchSize.
+    private boolean mDelegateTargeted;
+    private View mDelegateView;
     // Prevents dispatching touches to children if true
     private boolean mTouchEnabled = true;
 
+    private boolean mIsDraggingItem;
     // Only non-null when the corresponding Folder is open.
     private @Nullable FolderIcon mLeaveBehindFolderIcon;
 
-    // Only non-null when device supports having an All Apps button.
-    private @Nullable AllAppsButton mAllAppsButton;
+    /** Provider of buttons added to taskbar in 3 button nav */
+    private ButtonProvider mButtonProvider;
+
+    private boolean mDisableRelayout;
+    private boolean mAreHolesAllowed;
 
     public TaskbarView(@NonNull Context context) {
         this(context, null);
@@ -91,95 +105,85 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         Resources resources = getResources();
         mIconTouchSize = resources.getDimensionPixelSize(R.dimen.taskbar_icon_touch_size);
+        mItemMarginLeftRight = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
 
-        int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
-        int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
+        mIsRtl = Utilities.isRtl(resources);
+        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+    }
 
-        // We layout the icons to be of mIconTouchSize in width and height
-        mItemMarginLeftRight = actualMargin - (mIconTouchSize - actualIconSize) / 2;
-        mItemPadding = (mIconTouchSize - actualIconSize) / 2;
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+        mSystemButtonContainer = findViewById(R.id.system_button_layout);
+        mHotseatIconsContainer = findViewById(R.id.hotseat_icons_layout);
+    }
 
-        // Needed to draw folder leave-behind when opening one.
-        setWillNotDraw(false);
+    protected void construct(OnClickListener clickListener, OnLongClickListener longClickListener,
+                ButtonProvider buttonProvider) {
+        mIconClickListener = clickListener;
+        mIconLongClickListener = longClickListener;
+        mButtonProvider = buttonProvider;
 
-        if (FeatureFlags.ENABLE_ALL_APPS_IN_TASKBAR.get()) {
-            mAllAppsButton = new AllAppsButton(context);
-            mAllAppsButton.setLayoutParams(
-                    new ViewGroup.LayoutParams(mIconTouchSize, mIconTouchSize));
-            mAllAppsButton.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
+        if (mActivityContext.canShowNavButtons()) {
+            createNavButtons();
+        } else {
+            mSystemButtonContainer.setVisibility(GONE);
+        }
+
+        int numHotseatIcons = mActivityContext.getDeviceProfile().numShownHotseatIcons;
+        updateHotseatItems(new ItemInfo[numHotseatIcons]);
+    }
+
+    /**
+     * Enables/disables empty icons in taskbar so that the layout matches with Launcher
+     */
+    public void setHolesAllowedInLayout(boolean areHolesAllowed) {
+        if (mAreHolesAllowed != areHolesAllowed) {
+            mAreHolesAllowed = areHolesAllowed;
+            updateHotseatItemsVisibility();
+            // TODO: Add animation
         }
     }
 
-    protected void init(TaskbarViewController.TaskbarViewCallbacks callbacks) {
-        mControllerCallbacks = callbacks;
-        mIconClickListener = mControllerCallbacks.getIconOnClickListener();
-        mIconLongClickListener = mControllerCallbacks.getIconOnLongClickListener();
-
-        setOnLongClickListener(mControllerCallbacks.getBackgroundOnLongClickListener());
-
-        if (mAllAppsButton != null) {
-            mAllAppsButton.setOnClickListener(mControllerCallbacks.getAllAppsButtonClickListener());
+    private void setHolesAllowedInLayoutNoAnimation(boolean areHolesAllowed) {
+        if (mAreHolesAllowed != areHolesAllowed) {
+            mAreHolesAllowed = areHolesAllowed;
+            updateHotseatItemsVisibility();
+            onMeasure(makeMeasureSpec(getMeasuredWidth(), EXACTLY),
+                    makeMeasureSpec(getMeasuredHeight(), EXACTLY));
+            onLayout(false, getLeft(), getTop(), getRight(), getBottom());
         }
-    }
-
-    private void removeAndRecycle(View view) {
-        removeView(view);
-        view.setOnClickListener(null);
-        view.setOnLongClickListener(null);
-        if (!(view.getTag() instanceof FolderInfo)) {
-            mActivityContext.getViewCache().recycleView(view.getSourceLayoutResId(), view);
-        }
-        view.setTag(null);
     }
 
     /**
      * Inflates/binds the Hotseat views to show in the Taskbar given their ItemInfos.
      */
     protected void updateHotseatItems(ItemInfo[] hotseatItemInfos) {
-        int nextViewIndex = 0;
-        int numViewsAnimated = 0;
-
-        if (mAllAppsButton != null) {
-            removeView(mAllAppsButton);
-        }
-
         for (int i = 0; i < hotseatItemInfos.length; i++) {
-            ItemInfo hotseatItemInfo = hotseatItemInfos[i];
-            if (hotseatItemInfo == null) {
-                continue;
-            }
+            ItemInfo hotseatItemInfo = hotseatItemInfos[
+                    !mIsRtl ? i : hotseatItemInfos.length - i - 1];
+            View hotseatView = mHotseatIconsContainer.getChildAt(i);
 
             // Replace any Hotseat views with the appropriate type if it's not already that type.
             final int expectedLayoutResId;
             boolean isFolder = false;
-            if (hotseatItemInfo.isPredictedItem()) {
+            boolean needsReinflate = false;
+            if (hotseatItemInfo != null && hotseatItemInfo.isPredictedItem()) {
                 expectedLayoutResId = R.layout.taskbar_predicted_app_icon;
             } else if (hotseatItemInfo instanceof FolderInfo) {
                 expectedLayoutResId = R.layout.folder_icon;
                 isFolder = true;
+                // Unlike for BubbleTextView, we can't reapply a new FolderInfo after inflation, so
+                // if the info changes we need to reinflate. This should only happen if a new folder
+                // is dragged to the position that another folder previously existed.
+                needsReinflate = hotseatView != null && hotseatView.getTag() != hotseatItemInfo;
             } else {
                 expectedLayoutResId = R.layout.taskbar_app_icon;
             }
-
-            View hotseatView = null;
-            while (nextViewIndex < getChildCount()) {
-                hotseatView = getChildAt(nextViewIndex);
-
-                // see if the view can be reused
-                if ((hotseatView.getSourceLayoutResId() != expectedLayoutResId)
-                        || (isFolder && (hotseatView.getTag() != hotseatItemInfo))) {
-                    // Unlike for BubbleTextView, we can't reapply a new FolderInfo after inflation,
-                    // so if the info changes we need to reinflate. This should only happen if a new
-                    // folder is dragged to the position that another folder previously existed.
-                    removeAndRecycle(hotseatView);
-                    hotseatView = null;
-                } else {
-                    // View found
-                    break;
-                }
-            }
-
-            if (hotseatView == null) {
+            if (hotseatView == null
+                    || hotseatView.getSourceLayoutResId() != expectedLayoutResId
+                    || needsReinflate) {
+                mHotseatIconsContainer.removeView(hotseatView);
                 if (isFolder) {
                     FolderInfo folderInfo = (FolderInfo) hotseatItemInfo;
                     FolderIcon folderIcon = FolderIcon.inflateFolderAndIcon(expectedLayoutResId,
@@ -189,73 +193,40 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 } else {
                     hotseatView = inflate(expectedLayoutResId);
                 }
-                LayoutParams lp = new LayoutParams(mIconTouchSize, mIconTouchSize);
-                hotseatView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                addView(hotseatView, nextViewIndex, lp);
+                int iconSize = mActivityContext.getDeviceProfile().iconSizePx;
+                LayoutParams lp = new LayoutParams(iconSize, iconSize);
+                lp.setMargins(mItemMarginLeftRight, 0, mItemMarginLeftRight, 0);
+                mHotseatIconsContainer.addView(hotseatView, i, lp);
             }
 
             // Apply the Hotseat ItemInfos, or hide the view if there is none for a given index.
             if (hotseatView instanceof BubbleTextView
                     && hotseatItemInfo instanceof WorkspaceItemInfo) {
-                BubbleTextView btv = (BubbleTextView) hotseatView;
-                WorkspaceItemInfo workspaceInfo = (WorkspaceItemInfo) hotseatItemInfo;
-
-                boolean animate = btv.shouldAnimateIconChange((WorkspaceItemInfo) hotseatItemInfo);
-                btv.applyFromWorkspaceItem(workspaceInfo, animate, numViewsAnimated);
-                if (animate) {
-                    numViewsAnimated++;
-                }
+                ((BubbleTextView) hotseatView).applyFromWorkspaceItem(
+                        (WorkspaceItemInfo) hotseatItemInfo);
+                hotseatView.setOnClickListener(mIconClickListener);
+                hotseatView.setOnLongClickListener(mIconLongClickListener);
+            } else if (isFolder) {
+                hotseatView.setOnClickListener(mIconClickListener);
+                hotseatView.setOnLongClickListener(mIconLongClickListener);
+            } else {
+                hotseatView.setOnClickListener(null);
+                hotseatView.setOnLongClickListener(null);
+                hotseatView.setTag(null);
             }
-            setClickAndLongClickListenersForIcon(hotseatView);
-            nextViewIndex++;
-        }
-        // Remove remaining views
-        while (nextViewIndex < getChildCount()) {
-            removeAndRecycle(getChildAt(nextViewIndex));
-        }
-
-        if (mAllAppsButton != null) {
-            int index = Utilities.isRtl(getResources()) ? 0 : getChildCount();
-            addView(mAllAppsButton, index);
+            updateHotseatItemVisibility(hotseatView);
         }
     }
 
-    /**
-     * Sets OnClickListener and OnLongClickListener for the given view.
-     */
-    public void setClickAndLongClickListenersForIcon(View icon) {
-        icon.setOnClickListener(mIconClickListener);
-        icon.setOnLongClickListener(mIconLongClickListener);
+    protected void updateHotseatItemsVisibility() {
+        for (int i = mHotseatIconsContainer.getChildCount() - 1; i >= 0; i--) {
+            updateHotseatItemVisibility(mHotseatIconsContainer.getChildAt(i));
+        }
     }
 
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        int count = getChildCount();
-        int spaceNeeded = count * (mItemMarginLeftRight * 2 + mIconTouchSize);
-        int navSpaceNeeded = ApiWrapper.getHotseatEndOffset(getContext());
-        boolean layoutRtl = isLayoutRtl();
-        int iconEnd = right - (right - left - spaceNeeded) / 2;
-        boolean needMoreSpaceForNav = layoutRtl ?
-                navSpaceNeeded > (iconEnd - spaceNeeded) :
-                iconEnd > (right - navSpaceNeeded);
-        if (needMoreSpaceForNav) {
-            int offset = layoutRtl ?
-                    navSpaceNeeded - (iconEnd - spaceNeeded) :
-                    (right - navSpaceNeeded) - iconEnd;
-            iconEnd += offset;
-        }
-        // Layout the children
-        mIconLayoutBounds.right = iconEnd;
-        mIconLayoutBounds.top = (bottom - top - mIconTouchSize) / 2;
-        mIconLayoutBounds.bottom = mIconLayoutBounds.top + mIconTouchSize;
-        for (int i = count; i > 0; i--) {
-            View child = getChildAt(i - 1);
-            iconEnd -= mItemMarginLeftRight;
-            int iconStart = iconEnd - mIconTouchSize;
-            child.layout(iconStart, mIconLayoutBounds.top, iconEnd, mIconLayoutBounds.bottom);
-            iconEnd = iconStart - mItemMarginLeftRight;
-        }
-        mIconLayoutBounds.left = iconEnd;
+    private void updateHotseatItemVisibility(View hotseatView) {
+        hotseatView.setVisibility(
+                hotseatView.getTag() != null ? VISIBLE : (mAreHolesAllowed ? INVISIBLE : GONE));
     }
 
     @Override
@@ -268,27 +239,87 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (!mTouchEnabled) {
-            return true;
-        }
-        if (mIconLayoutBounds.contains((int) event.getX(), (int) event.getY())) {
-            // Don't allow long pressing between icons.
-            return true;
-        }
-        if (mControllerCallbacks.onTouchEvent(event)) {
-            int oldAction = event.getAction();
-            try {
-                event.setAction(MotionEvent.ACTION_CANCEL);
-                return super.onTouchEvent(event);
-            } finally {
-                event.setAction(oldAction);
-            }
-        }
-        return super.onTouchEvent(event);
+        boolean handled = delegateTouchIfNecessary(event);
+        return super.onTouchEvent(event) || handled;
     }
 
     public void setTouchesEnabled(boolean touchEnabled) {
         this.mTouchEnabled = touchEnabled;
+    }
+
+    /**
+     * User touched the Taskbar background. Determine whether the touch is close enough to a view
+     * that we should forward the touches to it.
+     * @return Whether a delegate view was chosen and it handled the touch event.
+     */
+    private boolean delegateTouchIfNecessary(MotionEvent event) {
+        final float x = event.getX();
+        final float y = event.getY();
+        if (mDelegateView == null && event.getAction() == MotionEvent.ACTION_DOWN) {
+            View delegateView = findDelegateView(x, y);
+            if (delegateView != null) {
+                mDelegateTargeted = true;
+                mDelegateView = delegateView;
+                mDelegateSlopBounds.set(mTempDelegateBounds);
+                mDelegateSlopBounds.inset(-mTouchSlop, -mTouchSlop);
+            }
+        }
+
+        boolean sendToDelegate = mDelegateTargeted;
+        boolean inBounds = true;
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_MOVE:
+                inBounds = mDelegateSlopBounds.contains(x, y);
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                mDelegateTargeted = false;
+                break;
+        }
+
+        boolean handled = false;
+        if (sendToDelegate) {
+            if (inBounds) {
+                // Offset event coordinates to be inside the target view
+                event.setLocation(mDelegateView.getWidth() / 2f, mDelegateView.getHeight() / 2f);
+            } else {
+                // Offset event coordinates to be outside the target view (in case it does
+                // something like tracking pressed state)
+                event.setLocation(-mTouchSlop * 2, -mTouchSlop * 2);
+            }
+            handled = mDelegateView.dispatchTouchEvent(event);
+            // Cleanup if this was the last event to send to the delegate.
+            if (!mDelegateTargeted) {
+                mDelegateView = null;
+            }
+        }
+        return handled;
+    }
+
+    /**
+     * Return an item whose touch bounds contain the given coordinates,
+     * or null if no such item exists.
+     *
+     * Also sets {@link #mTempDelegateBounds} to be the touch bounds of the chosen delegate view.
+     */
+    private @Nullable View findDelegateView(float x, float y) {
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (!child.isShown() || !child.isClickable()) {
+                continue;
+            }
+            int childCenterX = child.getLeft() + child.getWidth() / 2;
+            int childCenterY = child.getTop() + child.getHeight() / 2;
+            mTempDelegateBounds.set(
+                    childCenterX - mIconTouchSize / 2f,
+                    childCenterY - mIconTouchSize / 2f,
+                    childCenterX + mIconTouchSize / 2f,
+                    childCenterY + mIconTouchSize / 2f);
+            if (mTempDelegateBounds.contains(x, y)) {
+                return child;
+            }
+        }
+        return null;
     }
 
     /**
@@ -297,32 +328,69 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
      */
     public boolean isEventOverAnyItem(MotionEvent ev) {
         getLocationOnScreen(mTempOutLocation);
-        int xInOurCoordinates = (int) ev.getX() - mTempOutLocation[0];
-        int yInOurCoorindates = (int) ev.getY() - mTempOutLocation[1];
-        return isShown() && mIconLayoutBounds.contains(xInOurCoordinates, yInOurCoorindates);
-    }
-
-    public Rect getIconLayoutBounds() {
-        return mIconLayoutBounds;
+        float xInOurCoordinates = ev.getX() - mTempOutLocation[0];
+        float yInOurCoorindates = ev.getY() - mTempOutLocation[1];
+        return findDelegateView(xInOurCoordinates, yInOurCoorindates) != null;
     }
 
     /**
-     * Returns the app icons currently shown in the taskbar.
+     * Add back/home/recents buttons into a single ViewGroup that will be inserted at
+     * {@param navButtonStartIndex}
      */
-    public View[] getIconViews() {
-        final int count = getChildCount();
-        View[] icons = new View[count];
-        for (int i = 0; i < count; i++) {
-            icons[i] = getChildAt(i);
+    private void createNavButtons() {
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                mActivityContext.getDeviceProfile().iconSizePx,
+                mActivityContext.getDeviceProfile().iconSizePx
+        );
+        buttonParams.gravity = Gravity.CENTER;
+
+        mSystemButtonContainer.addView(mButtonProvider.getBack(), buttonParams);
+        mSystemButtonContainer.addView(mButtonProvider.getHome(), buttonParams);
+        mSystemButtonContainer.addView(mButtonProvider.getRecents(), buttonParams);
+    }
+
+    @Override
+    public boolean onDragEvent(DragEvent event) {
+        switch (event.getAction()) {
+            case DragEvent.ACTION_DRAG_STARTED:
+                mIsDraggingItem = true;
+                AbstractFloatingView.closeAllOpenViews(mActivityContext);
+                return true;
+            case DragEvent.ACTION_DRAG_ENDED:
+                mIsDraggingItem = false;
+                break;
         }
-        return icons;
+        return super.onDragEvent(event);
+    }
+
+    public boolean isDraggingItem() {
+        return mIsDraggingItem;
     }
 
     /**
-     * Returns the all apps button in the taskbar.
+     * @return The bounding box of where the hotseat elements are relative to this TaskbarView.
      */
-    public View getAllAppsButtonView() {
-        return mAllAppsButton;
+    protected RectF getHotseatBounds() {
+        RectF result;
+        mDisableRelayout = true;
+        boolean wereHolesAllowed = mAreHolesAllowed;
+        setHolesAllowedInLayoutNoAnimation(true);
+        result = new RectF(
+                mHotseatIconsContainer.getLeft(),
+                mHotseatIconsContainer.getTop(),
+                mHotseatIconsContainer.getRight(),
+                mHotseatIconsContainer.getBottom());
+        setHolesAllowedInLayoutNoAnimation(wereHolesAllowed);
+        mDisableRelayout = false;
+
+        return result;
+    }
+
+    @Override
+    public void requestLayout() {
+        if (!mDisableRelayout) {
+            super.requestLayout();
+        }
     }
 
     // FolderIconParent implemented methods.
@@ -353,7 +421,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     private View inflate(@LayoutRes int layoutResId) {
-        return mActivityContext.getViewCache().getView(layoutResId, mActivityContext, this);
+        return mActivityContext.getLayoutInflater().inflate(layoutResId, this, false);
     }
 
     @Override
@@ -361,23 +429,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // Ignore, we just implement Insettable to draw behind system insets.
     }
 
-    public boolean areIconsVisible() {
-        // Consider the overall visibility
-        return getVisibility() == VISIBLE;
+    public void setIconsVisibility(boolean isVisible) {
+        mHotseatIconsContainer.setVisibility(isVisible ? VISIBLE : INVISIBLE);
     }
 
-    /**
-     * Maps {@code op} over all the child views, returning the view that {@code op} evaluates
-     * {@code true} for, or {@code null} if none satisfy {@code op}.
-     */
-    protected View mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
-        // map over all the shortcuts on the taskbar
-        for (int i = 0; i < getChildCount(); i++) {
-            View item = getChildAt(i);
-            if (op.evaluate((ItemInfo) item.getTag(), item)) {
-                return item;
-            }
-        }
-        return null;
+    public boolean areIconsVisible() {
+        return mHotseatIconsContainer.getVisibility() == VISIBLE;
     }
 }
