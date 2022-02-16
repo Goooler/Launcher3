@@ -68,11 +68,6 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
     public static final int FLAG_SUPPORTS_WEB_UI = 1 << 3;
 
     /**
-     *
-     */
-    public static final int FLAG_START_FOR_RESULT = 1 << 4;
-
-    /**
      * The intent used to start the application.
      */
     public Intent intent;
@@ -96,8 +91,6 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
      * represents a deep shortcut.
      */
     @NonNull private String[] personKeys = Utilities.EMPTY_STRING_ARRAY;
-
-    public int options;
 
 
     public WorkspaceItemInfo() {
@@ -134,7 +127,6 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
         super.onAddToDatabase(writer);
         writer.put(Favorites.TITLE, title)
                 .put(Favorites.INTENT, getIntent())
-                .put(Favorites.OPTIONS, options)
                 .put(Favorites.RESTORED, status);
 
         if (!usingLowResIcon()) {
@@ -212,7 +204,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
     }
 
     @Override
-    public WorkspaceItemInfo clone() {
+    public ItemInfoWithIcon clone() {
         return new WorkspaceItemInfo(this);
     }
 }

@@ -17,6 +17,7 @@ package com.android.launcher3.views;
 
 import static com.android.launcher3.Utilities.getBadge;
 import static com.android.launcher3.Utilities.getFullDrawable;
+import static com.android.launcher3.config.FeatureFlags.ADAPTIVE_ICON_WINDOW_ANIM;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.views.IconLabelDotView.setIconAndDotVisible;
 
@@ -69,8 +70,6 @@ public class FloatingIconView extends FrameLayout implements
 
     // Manages loading the icon on a worker thread
     private static @Nullable IconLoadResult sIconLoadResult;
-    private static long sFetchIconId = 0;
-    private static long sRecycledFetchIconId = sFetchIconId;
 
     public static final float SHAPE_PROGRESS_DURATION = 0.10f;
     private static final RectF sTmpRectF = new RectF();
@@ -87,6 +86,7 @@ public class FloatingIconView extends FrameLayout implements
 
     private IconLoadResult mIconLoadResult;
 
+    // Draw the drawable of the BubbleTextView behind ClipIconView to reveal the built in shadow.
     private View mBtvDrawable;
 
     private ClipIconView mClipIconView;
@@ -253,7 +253,8 @@ public class FloatingIconView extends FrameLayout implements
     private static void getIconResult(Launcher l, View originalView, ItemInfo info, RectF pos,
             Drawable btvIcon, IconLoadResult iconLoadResult) {
         Drawable drawable;
-        boolean supportsAdaptiveIcons = !info.isDisabled(); // Use original icon for disabled icons.
+        boolean supportsAdaptiveIcons = ADAPTIVE_ICON_WINDOW_ANIM.get()
+                && !info.isDisabled(); // Use original icon for disabled icons.
 
         Drawable badge = null;
         if (info instanceof SystemShortcut) {
@@ -335,32 +336,21 @@ public class FloatingIconView extends FrameLayout implements
             setLayoutParams(lp);
 
             final LayoutParams clipViewLp = (LayoutParams) mClipIconView.getLayoutParams();
-            if (mBadge != null) {
-                Rect badgeBounds = new Rect(0, 0, clipViewLp.width, clipViewLp.height);
-                FastBitmapDrawable.setBadgeBounds(mBadge, badgeBounds);
-            }
+            final int clipViewOgHeight = clipViewLp.height;
+            final int clipViewOgWidth = clipViewLp.width;
             clipViewLp.width = lp.width;
             clipViewLp.height = lp.height;
             mClipIconView.setLayoutParams(clipViewLp);
+
+            if (mBadge != null) {
+                mBadge.setBounds(0, 0, clipViewOgWidth, clipViewOgHeight);
+            }
         }
 
-        setOriginalDrawableBackground(btvIcon);
-        invalidate();
-    }
-
-    /**
-     * Draws the drawable of the BubbleTextView behind ClipIconView
-     *
-     * This is used to:
-     * - Have icon displayed while Adaptive Icon is loading
-     * - Displays the built in shadow to ensure a clean handoff
-     *
-     * Allows nullable as this may be cleared when drawing is deferred to ClipIconView.
-     */
-    private void setOriginalDrawableBackground(@Nullable Drawable btvIcon) {
-        if (!mIsOpening) {
+        if (!mIsOpening && btvIcon != null) {
             mBtvDrawable.setBackground(btvIcon);
         }
+        invalidate();
     }
 
     /**
@@ -465,12 +455,10 @@ public class FloatingIconView extends FrameLayout implements
 
     @Override
     public void onAnimationStart(Animator animator) {
-        if ((mIconLoadResult != null && mIconLoadResult.isIconLoaded)
-                || (!mIsOpening && mBtvDrawable.getBackground() != null)) {
-            // No need to wait for icon load since we can display the BubbleTextView drawable.
+        if (mIconLoadResult != null && mIconLoadResult.isIconLoaded) {
             setVisibility(View.VISIBLE);
         }
-        if (!mIsOpening && mOriginalIcon != null) {
+        if (!mIsOpening) {
             // When closing an app, we want the item on the workspace to be invisible immediately
             setIconAndDotVisible(mOriginalIcon, false);
         }
@@ -530,15 +518,9 @@ public class FloatingIconView extends FrameLayout implements
 
         IconLoadResult result = new IconLoadResult(info,
                 btvIcon == null ? false : btvIcon.isThemed());
-        result.btvDrawable = btvIcon;
 
-        final long fetchIconId = sFetchIconId++;
-        MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() -> {
-            if (fetchIconId < sRecycledFetchIconId) {
-                return;
-            }
-            getIconResult(l, v, info, position, btvIcon, result);
-        });
+        MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() ->
+                getIconResult(l, v, info, position, btvIcon, result));
 
         sIconLoadResult = result;
         return result;
@@ -569,7 +551,6 @@ public class FloatingIconView extends FrameLayout implements
                 view.mIconLoadResult = fetchIcon(launcher, originalView,
                         (ItemInfo) originalView.getTag(), isOpening);
             }
-            view.setOriginalDrawableBackground(view.mIconLoadResult.btvDrawable);
         }
         sIconLoadResult = null;
 
@@ -641,7 +622,6 @@ public class FloatingIconView extends FrameLayout implements
         mOnTargetChangeRunnable = null;
         mBadge = null;
         sTmpObjArray[0] = null;
-        sRecycledFetchIconId = sFetchIconId;
         mIconLoadResult = null;
         mClipIconView.recycle();
         mBtvDrawable.setBackground(null);

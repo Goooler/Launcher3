@@ -17,13 +17,9 @@ package com.android.quickstep.views;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.view.Gravity;
 import android.view.View;
-
-import androidx.annotation.Nullable;
 
 import com.android.launcher3.Utilities;
 
@@ -33,9 +29,7 @@ import com.android.launcher3.Utilities;
  */
 public class IconView extends View {
 
-    @Nullable
     private Drawable mDrawable;
-    private int mDrawableWidth, mDrawableHeight;
 
     public IconView(Context context) {
         super(context);
@@ -49,57 +43,27 @@ public class IconView extends View {
         super(context, attrs, defStyleAttr);
     }
 
-    /**
-     * Sets a {@link Drawable} to be displayed.
-     */
-    public void setDrawable(@Nullable Drawable d) {
+    public void setDrawable(Drawable d) {
         if (mDrawable != null) {
             mDrawable.setCallback(null);
         }
         mDrawable = d;
         if (mDrawable != null) {
             mDrawable.setCallback(this);
-            setDrawableSizeInternal(getWidth(), getHeight());
+            mDrawable.setBounds(0, 0, getWidth(), getHeight());
         }
         invalidate();
     }
 
-    /**
-     * Sets the size of the icon drawable.
-     */
-    public void setDrawableSize(int iconWidth, int iconHeight) {
-        mDrawableWidth = iconWidth;
-        mDrawableHeight = iconHeight;
-        if (mDrawable != null) {
-            setDrawableSizeInternal(getWidth(), getHeight());
-        }
-    }
-
-    private void setDrawableSizeInternal(int selfWidth, int selfHeight) {
-        Rect selfRect = new Rect(0, 0, selfWidth, selfHeight);
-        Rect drawableRect = new Rect();
-        Gravity.apply(Gravity.CENTER, mDrawableWidth, mDrawableHeight, selfRect, drawableRect);
-        mDrawable.setBounds(drawableRect);
-    }
-
-    @Nullable
     public Drawable getDrawable() {
         return mDrawable;
-    }
-
-    public int getDrawableWidth() {
-        return mDrawableWidth;
-    }
-
-    public int getDrawableHeight() {
-        return mDrawableHeight;
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         if (mDrawable != null) {
-            setDrawableSizeInternal(w, h);
+            mDrawable.setBounds(0, 0, w, h);
         }
     }
 
