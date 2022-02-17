@@ -36,6 +36,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.IconProvider;
+import com.android.launcher3.icons.LauncherIconProvider;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.pm.InstallSessionHelper;
@@ -48,10 +49,9 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.launcher3.util.Themes;
-import com.android.launcher3.widget.DatabaseWidgetPreviewLoader;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
-public class LauncherAppState {
+public class LauncherAppState implements SafeCloseable {
 
     public static final String ACTION_FORCE_ROLOAD = "force-reload-launcher";
     private static final String KEY_ICON_STATE = "pref_icon_shape_path";
@@ -62,9 +62,8 @@ public class LauncherAppState {
 
     private final Context mContext;
     private final LauncherModel mModel;
-    private final IconProvider mIconProvider;
+    private final LauncherIconProvider mIconProvider;
     private final IconCache mIconCache;
-    private final DatabaseWidgetPreviewLoader mWidgetCache;
     private final InvariantDeviceProfile mInvariantDeviceProfile;
     private final RunnableList mOnTerminateCallback = new RunnableList();
 
@@ -85,7 +84,11 @@ public class LauncherAppState {
         Log.v(Launcher.TAG, "LauncherAppState initiated");
         Preconditions.assertUIThread();
 
-        mInvariantDeviceProfile.addOnChangeListener(idp -> refreshAndReloadLauncher());
+        mInvariantDeviceProfile.addOnChangeListener(modelPropertiesChanged -> {
+            if (modelPropertiesChanged) {
+                refreshAndReloadLauncher();
+            }
+        });
 
         mContext.getSystemService(LauncherApps.class).registerCallback(mModel);
 
@@ -96,7 +99,7 @@ public class LauncherAppState {
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_UNLOCKED);
         if (FeatureFlags.IS_STUDIO_BUILD) {
-            modelChangeReceiver.register(mContext, ACTION_FORCE_ROLOAD);
+            modelChangeReceiver.register(mContext, Context.RECEIVER_EXPORTED, ACTION_FORCE_ROLOAD);
         }
         mOnTerminateCallback.add(() -> mContext.unregisterReceiver(modelChangeReceiver));
 
@@ -136,11 +139,11 @@ public class LauncherAppState {
         mContext = context;
 
         mInvariantDeviceProfile = InvariantDeviceProfile.INSTANCE.get(context);
-        mIconProvider =  new IconProvider(context, Themes.isThemedIconEnabled(context));
+        mIconProvider = new LauncherIconProvider(context);
         mIconCache = new IconCache(mContext, mInvariantDeviceProfile,
                 iconCacheFileName, mIconProvider);
-        mWidgetCache = new DatabaseWidgetPreviewLoader(mContext, mIconCache);
-        mModel = new LauncherModel(context, this, mIconCache, new AppFilter(mContext));
+        mModel = new LauncherModel(context, this, mIconCache, new AppFilter(mContext),
+                iconCacheFileName != null);
         mOnTerminateCallback.add(mIconCache::close);
     }
 
@@ -155,14 +158,14 @@ public class LauncherAppState {
         LauncherIcons.clearPool();
         mIconCache.updateIconParams(
                 mInvariantDeviceProfile.fillResIconDpi, mInvariantDeviceProfile.iconBitmapSize);
-        mWidgetCache.refresh();
         mModel.forceReload();
     }
 
     /**
      * Call from Application.onTerminate(), which is not guaranteed to ever be called.
      */
-    public void onTerminate() {
+    @Override
+    public void close() {
         mModel.destroy();
         mContext.getSystemService(LauncherApps.class).unregisterCallback(mModel);
         CustomWidgetManager.INSTANCE.get(mContext).setWidgetRefreshCallback(null);
@@ -179,10 +182,6 @@ public class LauncherAppState {
 
     public LauncherModel getModel() {
         return mModel;
-    }
-
-    public DatabaseWidgetPreviewLoader getWidgetCache() {
-        return mWidgetCache;
     }
 
     public InvariantDeviceProfile getInvariantDeviceProfile() {

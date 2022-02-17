@@ -30,9 +30,10 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
+import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.BaseDragLayer;
@@ -46,7 +47,7 @@ import java.util.Collections;
 public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> {
 
     private View mAllAppsButton;
-    private AllAppsContainerView mAppsView;
+    private ActivityAllAppsContainerView<SecondaryDisplayLauncher> mAppsView;
 
     private GridView mWorkspace;
     private PinnedAppsAdapter mPinnedAppsAdapter;
@@ -112,7 +113,7 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         for (int i = 0; i < count; i++) {
             final View child = getChildAt(i);
             if (child == mAppsView) {
-                int padding = 2 * (grid.desiredWorkspaceLeftRightMarginPx
+                int padding = 2 * (grid.desiredWorkspaceHorizontalMarginPx
                         + grid.cellLayoutPaddingLeftRightPx);
 
                 int maxWidth = grid.allAppsCellWidthPx * grid.numShownAllAppsColumns + padding;
@@ -177,12 +178,16 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         if (!ShortcutUtil.supportsShortcuts(item)) {
             return false;
         }
+        PopupDataProvider popupDataProvider = mActivity.getPopupDataProvider();
+        if (popupDataProvider == null) {
+            return false;
+        }
         final PopupContainerWithArrow container =
                 (PopupContainerWithArrow) mActivity.getLayoutInflater().inflate(
                         R.layout.popup_container, mActivity.getDragLayer(), false);
 
         container.populateAndShow((BubbleTextView) v,
-                mActivity.getPopupDataProvider().getShortcutCountForItem(item),
+                popupDataProvider.getShortcutCountForItem(item),
                 Collections.emptyList(),
                 Arrays.asList(mPinnedAppsAdapter.getSystemShortcut(item),
                         APP_INFO.getShortcut(mActivity, item)));
