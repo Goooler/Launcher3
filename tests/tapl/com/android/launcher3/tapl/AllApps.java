@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.Direction;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 /**
  * Operations on AllApps opened from Home. Also a parent for All Apps opened from Overview.
  */
-public class AllApps extends LauncherInstrumentation.VisibleContainer {
+public abstract class AllApps extends LauncherInstrumentation.VisibleContainer {
     private static final int MAX_SCROLL_ATTEMPTS = 40;
 
     private final int mHeight;
@@ -50,14 +51,8 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
         // Wait for the recycler to populate.
         mLauncher.waitForObjectInContainer(appListRecycler, By.clazz(TextView.class));
         verifyNotFrozen("All apps freeze flags upon opening all apps");
-        mIconHeight = mLauncher.getTestInfo(
-                TestProtocol.REQUEST_ICON_HEIGHT).
-                getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
-    }
-
-    @Override
-    protected LauncherInstrumentation.ContainerType getContainerType() {
-        return LauncherInstrumentation.ContainerType.ALL_APPS;
+        mIconHeight = mLauncher.getTestInfo(TestProtocol.REQUEST_ICON_HEIGHT)
+                .getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
     private boolean hasClickableIcon(UiObject2 allAppsContainer, UiObject2 appListRecycler,
@@ -98,14 +93,14 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
     }
 
     /**
-     * Finds an icon. Fails if the icon doesn't exist. Scrolls the app list when needed to make
-     * sure the icon is visible.
+     * Finds an icon. If the icon doesn't exist, return null.
+     * Scrolls the app list when needed to make sure the icon is visible.
      *
      * @param appName name of the app.
-     * @return The app.
+     * @return The app if found, and null if not found.
      */
-    @NonNull
-    public AppIcon getAppIcon(String appName) {
+    @Nullable
+    public AppIcon tryGetAppIcon(String appName) {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "getting app icon " + appName + " on all apps")) {
@@ -135,6 +130,7 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
                                         .collect(Collectors.toList()),
                                 mLauncher.getVisibleBounds(searchBox).bottom
                                         - mLauncher.getVisibleBounds(allAppsContainer).top);
+                        verifyActiveContainer();
                         final int newScroll = getAllAppsScroll();
                         mLauncher.assertTrue(
                                 "Scrolled in a wrong direction in AllApps: from " + scroll + " to "
@@ -144,24 +140,40 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
                         mLauncher.assertTrue(
                                 "Exceeded max scroll attempts: " + MAX_SCROLL_ATTEMPTS,
                                 ++attempts <= MAX_SCROLL_ATTEMPTS);
-                        verifyActiveContainer();
                         scroll = newScroll;
                     }
                 }
                 verifyActiveContainer();
             }
-
             // Ignore bottom offset selection here as there might not be any scroll more scroll
             // region available.
-            mLauncher.assertTrue("Unable to scroll to a clickable icon: " + appName,
-                    hasClickableIcon(allAppsContainer, appListRecycler, appIconSelector,
-                            deviceHeight));
+            if (hasClickableIcon(
+                    allAppsContainer, appListRecycler, appIconSelector, deviceHeight)) {
 
-            final UiObject2 appIcon = mLauncher.waitForObjectInContainer(appListRecycler,
-                    appIconSelector);
-            return new AppIcon(mLauncher, appIcon);
+                final UiObject2 appIcon = mLauncher.waitForObjectInContainer(appListRecycler,
+                        appIconSelector);
+                return createAppIcon(appIcon);
+            } else {
+                return null;
+            }
         }
     }
+
+    /**
+     * Finds an icon. Fails if the icon doesn't exist. Scrolls the app list when needed to make
+     * sure the icon is visible.
+     *
+     * @param appName name of the app.
+     * @return The app.
+     */
+    @NonNull
+    public AppIcon getAppIcon(String appName) {
+        AppIcon appIcon = tryGetAppIcon(appName);
+        mLauncher.assertNotNull("Unable to scroll to a clickable icon: " + appName, appIcon);
+        return appIcon;
+    }
+
+    protected abstract AppIcon createAppIcon(UiObject2 icon);
 
     private void scrollBackToBeginning() {
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
