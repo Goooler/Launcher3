@@ -15,6 +15,20 @@
  */
 package com.android.launcher3.model;
 
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.ALL_APPS_PERSONAL_TAB;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.ALL_APPS_PERSONAL_TAB_ACCESSIBILITY;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.ALL_APPS_WORK_TAB;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.ALL_APPS_WORK_TAB_ACCESSIBILITY;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.DISABLED_BY_ADMIN_MESSAGE;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WIDGETS_PERSONAL_TAB;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WIDGETS_WORK_TAB;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_FOLDER_NAME;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_EDU;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_EDU_ACCEPT;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_ENABLE_BUTTON;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_PAUSED_DESCRIPTION;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_PAUSED_TITLE;
+import static android.app.admin.DevicePolicyResources.Strings.Launcher.WORK_PROFILE_PAUSE_BUTTON;
 import static android.text.format.DateUtils.DAY_IN_MILLIS;
 import static android.text.format.DateUtils.formatElapsedTime;
 
@@ -25,7 +39,14 @@ import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICA
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.Utilities.getDevicePrefs;
 import static com.android.launcher3.hybridhotseat.HotseatPredictionModel.convertDataModelToAppTargetBundle;
+import static com.android.launcher3.model.PredictionHelper.getAppTargetFromItemInfo;
+import static com.android.launcher3.model.PredictionHelper.wrapAppTargetWithItemLocation;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
+import static java.util.stream.Collectors.toCollection;
+
+import android.app.StatsManager;
+import android.app.admin.DevicePolicyManager;
 import android.app.prediction.AppPredictionContext;
 import android.app.prediction.AppPredictionManager;
 import android.app.prediction.AppPredictor;
@@ -37,15 +58,17 @@ import android.content.SharedPreferences;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.ShortcutInfo;
+import android.os.Bundle;
 import android.os.UserHandle;
 import android.util.Log;
+import android.util.StatsEvent;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.InvariantDeviceProfile;
-import com.android.launcher3.InvariantDeviceProfile.OnIDPChangeListener;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
@@ -54,11 +77,13 @@ import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
-import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSparseArrayMap;
 import com.android.launcher3.util.PersistedItemArray;
+import com.android.quickstep.logging.SettingsChangeLogger;
 import com.android.quickstep.logging.StatsLogCompatManager;
+import com.android.systemui.shared.system.SysUiStatsLog;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -68,10 +93,11 @@ import java.util.stream.IntStream;
 /**
  * Model delegate which loads prediction items
  */
-public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChangeListener {
+public class QuickstepModelDelegate extends ModelDelegate {
 
     public static final String LAST_PREDICTION_ENABLED_STATE = "last_prediction_enabled_state";
     private static final String LAST_SNAPSHOT_TIME_MILLIS = "LAST_SNAPSHOT_TIME_MILLIS";
+    private static final String BUNDLE_KEY_ADDED_APP_WIDGETS = "added_app_widgets";
     private static final int NUM_OF_RECOMMENDED_WIDGETS_PREDICATION = 20;
 
     private static final boolean IS_DEBUG = false;
@@ -86,15 +112,18 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
 
     private final InvariantDeviceProfile mIDP;
     private final AppEventProducer mAppEventProducer;
+    private final StatsManager mStatsManager;
+    private final Context mContext;
 
     protected boolean mActive = false;
 
     public QuickstepModelDelegate(Context context) {
+        mContext = context;
         mAppEventProducer = new AppEventProducer(context, this::onAppTargetEvent);
 
         mIDP = InvariantDeviceProfile.INSTANCE.get(context);
-        mIDP.addOnChangeListener(this);
         StatsLogCompatManager.LOGS_CONSUMER.add(mAppEventProducer);
+        mStatsManager = context.getSystemService(StatsManager.class);
     }
 
     @Override
@@ -105,19 +134,56 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
 
         WorkspaceItemFactory allAppsFactory = new WorkspaceItemFactory(
                 mApp, ums, pinnedShortcuts, mIDP.numDatabaseAllAppsColumns);
-        mAllAppsState.items.setItems(
+        FixedContainerItems allAppsItems = new FixedContainerItems(mAllAppsState.containerId,
                 mAllAppsState.storage.read(mApp.getContext(), allAppsFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(CONTAINER_PREDICTION, mAllAppsState.items);
+        mDataModel.extraItems.put(mAllAppsState.containerId, allAppsItems);
 
         WorkspaceItemFactory hotseatFactory =
                 new WorkspaceItemFactory(mApp, ums, pinnedShortcuts, mIDP.numDatabaseHotseatIcons);
-        mHotseatState.items.setItems(
+        FixedContainerItems hotseatItems = new FixedContainerItems(mHotseatState.containerId,
                 mHotseatState.storage.read(mApp.getContext(), hotseatFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(CONTAINER_HOTSEAT_PREDICTION, mHotseatState.items);
+        mDataModel.extraItems.put(mHotseatState.containerId, hotseatItems);
 
         // Widgets prediction isn't used frequently. And thus, it is not persisted on disk.
-        mDataModel.extraItems.put(CONTAINER_WIDGETS_PREDICTION, mWidgetsRecommendationState.items);
+        mDataModel.extraItems.put(mWidgetsRecommendationState.containerId,
+                new FixedContainerItems(mWidgetsRecommendationState.containerId));
         mActive = true;
+    }
+
+    @Override
+    @WorkerThread
+    public void loadStringCache(StringCache cache) {
+        cache.loadDefaultStrings(mContext);
+
+        cache.workProfileEdu = getEnterpriseString(WORK_PROFILE_EDU, cache.workProfileEdu);
+        cache.workProfileEduAccept = getEnterpriseString(
+                WORK_PROFILE_EDU_ACCEPT, cache.workProfileEduAccept);
+        cache.workProfilePausedTitle = getEnterpriseString(
+                WORK_PROFILE_PAUSED_TITLE, cache.workProfilePausedTitle);
+        cache.workProfilePausedDescription = getEnterpriseString(
+                WORK_PROFILE_PAUSED_DESCRIPTION, cache.workProfilePausedDescription);
+        cache.workProfilePauseButton = getEnterpriseString(
+                WORK_PROFILE_PAUSE_BUTTON, cache.workProfilePauseButton);
+        cache.workProfileEnableButton = getEnterpriseString(
+                WORK_PROFILE_ENABLE_BUTTON, cache.workProfileEnableButton);
+        cache.allAppsWorkTab = getEnterpriseString(ALL_APPS_WORK_TAB, cache.allAppsWorkTab);
+        cache.allAppsPersonalTab = getEnterpriseString(
+                ALL_APPS_PERSONAL_TAB, cache.allAppsPersonalTab);
+        cache.allAppsWorkTabAccessibility = getEnterpriseString(
+                ALL_APPS_WORK_TAB_ACCESSIBILITY, cache.allAppsWorkTabAccessibility);
+        cache.allAppsPersonalTabAccessibility = getEnterpriseString(
+                ALL_APPS_PERSONAL_TAB_ACCESSIBILITY, cache.allAppsPersonalTabAccessibility);
+        cache.workFolderName = getEnterpriseString(WORK_FOLDER_NAME, cache.workFolderName);
+        cache.widgetsWorkTab = getEnterpriseString(WIDGETS_WORK_TAB, cache.widgetsWorkTab);
+        cache.widgetsPersonalTab = getEnterpriseString(
+                WIDGETS_PERSONAL_TAB, cache.widgetsPersonalTab);
+        cache.disabledByAdminMessage = getEnterpriseString(
+                DISABLED_BY_ADMIN_MESSAGE, cache.disabledByAdminMessage);
+    }
+
+    private String getEnterpriseString(String updatableStringId, String defaultString) {
+        DevicePolicyManager dpm = mContext.getSystemService(DevicePolicyManager.class);
+        return dpm.getString(updatableStringId, () -> defaultString);
     }
 
     @Override
@@ -150,16 +216,81 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
             }
             InstanceId instanceId = new InstanceIdSequence().newInstanceId();
             for (ItemInfo info : itemsIdMap) {
-                FolderInfo parent = info.container > 0
-                        ? (FolderInfo) itemsIdMap.get(info.container) : null;
+                FolderInfo parent = getContainer(info, itemsIdMap);
                 StatsLogCompatManager.writeSnapshot(info.buildProto(parent), instanceId);
             }
             additionalSnapshotEvents(instanceId);
             prefs.edit().putLong(LAST_SNAPSHOT_TIME_MILLIS, now).apply();
         }
+
+        // Only register for launcher snapshot logging if this is the primary ModelDelegate
+        // instance, as there will be additional instances that may be destroyed at any time.
+        if (mIsPrimaryInstance) {
+            registerSnapshotLoggingCallback();
+        }
     }
 
     protected void additionalSnapshotEvents(InstanceId snapshotInstanceId){}
+
+    /**
+     * Registers a callback to log launcher workspace layout using Statsd pulled atom.
+     */
+    protected void registerSnapshotLoggingCallback() {
+        if (mStatsManager == null) {
+            Log.d(TAG, "Failed to get StatsManager");
+        }
+
+        try {
+            mStatsManager.setPullAtomCallback(
+                    SysUiStatsLog.LAUNCHER_LAYOUT_SNAPSHOT,
+                    null /* PullAtomMetadata */,
+                    MODEL_EXECUTOR,
+                    (i, eventList) -> {
+                        InstanceId instanceId = new InstanceIdSequence().newInstanceId();
+                        IntSparseArrayMap<ItemInfo> itemsIdMap;
+                        synchronized (mDataModel) {
+                            itemsIdMap = mDataModel.itemsIdMap.clone();
+                        }
+
+                        for (ItemInfo info : itemsIdMap) {
+                            FolderInfo parent = getContainer(info, itemsIdMap);
+                            LauncherAtom.ItemInfo itemInfo = info.buildProto(parent);
+                            Log.d(TAG, itemInfo.toString());
+                            StatsEvent statsEvent = StatsLogCompatManager.buildStatsEvent(itemInfo,
+                                    instanceId);
+                            eventList.add(statsEvent);
+                        }
+                        Log.d(TAG,
+                                String.format(
+                                        "Successfully logged %d workspace items with instanceId=%d",
+                                        itemsIdMap.size(), instanceId.getId()));
+                        additionalSnapshotEvents(instanceId);
+                        SettingsChangeLogger.INSTANCE.get(mContext).logSnapshot(instanceId);
+                        return StatsManager.PULL_SUCCESS;
+                    }
+            );
+            Log.d(TAG, "Successfully registered for launcher snapshot logging!");
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Failed to register launcher snapshot logging callback with StatsManager",
+                    e);
+        }
+    }
+
+    private static FolderInfo getContainer(ItemInfo info, IntSparseArrayMap<ItemInfo> itemsIdMap) {
+        if (info.container > 0) {
+            ItemInfo containerInfo = itemsIdMap.get(info.container);
+
+            if (!(containerInfo instanceof FolderInfo)) {
+                Log.e(TAG, String.format(
+                        "Item info: %s found with invalid container: %s",
+                        info,
+                        containerInfo));
+            }
+            // Allow crash to help debug b/173838775
+            return (FolderInfo) containerInfo;
+        }
+        return null;
+    }
 
     @Override
     public void validateData() {
@@ -177,9 +308,10 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
         super.destroy();
         mActive = false;
         StatsLogCompatManager.LOGS_CONSUMER.remove(mAppEventProducer);
-
+        if (mIsPrimaryInstance) {
+            mStatsManager.clearPullAtomCallback(SysUiStatsLog.LAUNCHER_LAYOUT_SNAPSHOT);
+        }
         destroyPredictors();
-        mIDP.removeOnChangeListener(this);
     }
 
     private void destroyPredictors() {
@@ -217,6 +349,7 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
         registerWidgetsPredictor(apm.createAppPredictionSession(
                 new AppPredictionContext.Builder(context)
                         .setUiSurface("widgets")
+                        .setExtras(getBundleForWidgetsOnWorkspace(context, mDataModel))
                         .setPredictedTargetCount(NUM_OF_RECOMMENDED_WIDGETS_PREDICATION)
                         .build()));
     }
@@ -224,7 +357,7 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
     private void registerPredictor(PredictorState state, AppPredictor predictor) {
         state.predictor = predictor;
         state.predictor.registerPredictionUpdates(
-                Executors.MODEL_EXECUTOR, t -> handleUpdate(state, t));
+                MODEL_EXECUTOR, t -> handleUpdate(state, t));
         state.predictor.requestPredictionUpdate();
     }
 
@@ -239,7 +372,7 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
     private void registerWidgetsPredictor(AppPredictor predictor) {
         mWidgetsRecommendationState.predictor = predictor;
         mWidgetsRecommendationState.predictor.registerPredictionUpdates(
-                Executors.MODEL_EXECUTOR, targets -> {
+                MODEL_EXECUTOR, targets -> {
                     if (mWidgetsRecommendationState.setTargets(targets)) {
                         // No diff, skip
                         return;
@@ -250,29 +383,54 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
         mWidgetsRecommendationState.predictor.requestPredictionUpdate();
     }
 
-    @Override
-    public void onIdpChanged(InvariantDeviceProfile profile) {
-        // Reinitialize everything
-        Executors.MODEL_EXECUTOR.execute(this::recreatePredictors);
-    }
-
     private void onAppTargetEvent(AppTargetEvent event, int client) {
-        PredictorState state = client == CONTAINER_PREDICTION ? mAllAppsState : mHotseatState;
+        PredictorState state;
+        switch(client) {
+            case CONTAINER_PREDICTION:
+                state = mAllAppsState;
+                break;
+            case CONTAINER_WIDGETS_PREDICTION:
+                state = mWidgetsRecommendationState;
+                break;
+            case CONTAINER_HOTSEAT_PREDICTION:
+            default:
+                state = mHotseatState;
+                break;
+        }
         if (state.predictor != null) {
             state.predictor.notifyAppTargetEvent(event);
+            Log.d(TAG, "notifyAppTargetEvent action=" + event.getAction()
+                    + " launchLocation=" + event.getLaunchLocation());
         }
+    }
+
+    private Bundle getBundleForWidgetsOnWorkspace(Context context, BgDataModel dataModel) {
+        Bundle bundle = new Bundle();
+        ArrayList<AppTargetEvent> widgetEvents =
+                dataModel.getAllWorkspaceItems().stream()
+                        .filter(PredictionHelper::isTrackedForWidgetPrediction)
+                        .map(item -> {
+                            AppTarget target = getAppTargetFromItemInfo(context, item);
+                            if (target == null) return null;
+                            return wrapAppTargetWithItemLocation(
+                                    target, AppTargetEvent.ACTION_PIN, item);
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(toCollection(ArrayList::new));
+        bundle.putParcelableArrayList(BUNDLE_KEY_ADDED_APP_WIDGETS, widgetEvents);
+        return bundle;
     }
 
     static class PredictorState {
 
-        public final FixedContainerItems items;
+        public final int containerId;
         public final PersistedItemArray<ItemInfo> storage;
         public AppPredictor predictor;
 
         private List<AppTarget> mLastTargets;
 
-        PredictorState(int container, String storageName) {
-            items = new FixedContainerItems(container);
+        PredictorState(int containerId, String storageName) {
+            this.containerId = containerId;
             storage = new PersistedItemArray<>(storageName);
             mLastTargets = Collections.emptyList();
         }
