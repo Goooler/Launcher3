@@ -21,6 +21,7 @@ import static android.view.View.MeasureSpec.makeMeasureSpec;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END;
+import static com.android.launcher3.util.LogConfig.SEARCH_LOGGING;
 import static com.android.launcher3.util.UiThreadHelper.hideKeyboardAsync;
 
 import android.content.Context;
@@ -35,11 +36,11 @@ import android.view.View;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.views.ActivityContext;
@@ -54,8 +55,9 @@ import java.util.List;
 public class AllAppsRecyclerView extends BaseRecyclerView {
     private static final String TAG = "AllAppsContainerView";
     private static final boolean DEBUG = false;
+    private static final boolean DEBUG_LATENCY = Utilities.isPropertyEnabled(SEARCH_LOGGING);
 
-    private AlphabeticalAppsList mApps;
+    private AlphabeticalAppsList<?> mApps;
     private final int mNumAppsPerRow;
 
     // The specific view heights that we use to calculate scroll
@@ -101,16 +103,16 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     /**
      * Sets the list of apps in this view, used to determine the fastscroll position.
      */
-    public void setApps(AlphabeticalAppsList apps) {
+    public void setApps(AlphabeticalAppsList<?> apps) {
         mApps = apps;
     }
 
-    public AlphabeticalAppsList getApps() {
+    public AlphabeticalAppsList<?> getApps() {
         return mApps;
     }
 
     private void updatePoolSize() {
-        DeviceProfile grid = BaseDraggingActivity.fromContext(getContext()).getDeviceProfile();
+        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
         RecyclerView.RecycledViewPool pool = getRecycledViewPool();
         int approxRows = (int) Math.ceil(grid.availableHeightPx / grid.allAppsIconSizePx);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_EMPTY_SEARCH, 1);
@@ -132,6 +134,10 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         }
         if (DEBUG) {
             Log.d(TAG, "onDraw at = " + System.currentTimeMillis());
+        }
+        if (DEBUG_LATENCY) {
+            Log.d(SEARCH_LOGGING,
+                    "-- Recycle view onDraw, time stamp = " + System.currentTimeMillis());
         }
         super.onDraw(c);
     }
@@ -194,7 +200,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     public void onScrollStateChanged(int state) {
         super.onScrollStateChanged(state);
 
-        StatsLogManager mgr = BaseDraggingActivity.fromContext(getContext()).getStatsLogManager();
+        StatsLogManager mgr = ActivityContext.lookupContext(getContext()).getStatsLogManager();
         switch (state) {
             case SCROLL_STATE_DRAGGING:
                 requestFocus();
@@ -463,7 +469,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
      * Returns distance between left and right app icons
      */
     public int getTabWidth() {
-        DeviceProfile grid = BaseDraggingActivity.fromContext(getContext()).getDeviceProfile();
+        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
         int totalWidth = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
         int iconPadding = totalWidth / grid.numShownAllAppsColumns - grid.allAppsIconSizePx;
         return totalWidth - iconPadding - grid.allAppsIconDrawablePaddingPx;

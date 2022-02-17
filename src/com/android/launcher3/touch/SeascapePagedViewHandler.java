@@ -16,6 +16,11 @@
 
 package com.android.launcher3.touch;
 
+import static android.view.Gravity.BOTTOM;
+import static android.view.Gravity.CENTER_VERTICAL;
+import static android.view.Gravity.END;
+import static android.view.Gravity.START;
+
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
@@ -24,14 +29,17 @@ import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MA
 import android.content.res.Resources;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.util.Pair;
 import android.view.Surface;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
+import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
 import com.android.launcher3.views.BaseDragLayer;
 
 import java.util.Collections;
@@ -45,17 +53,12 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     }
 
     @Override
-    public int getSplitTranslationDirectionFactor(int stagePosition) {
+    public int getSplitTranslationDirectionFactor(int stagePosition, DeviceProfile deviceProfile) {
         if (stagePosition == STAGE_POSITION_BOTTOM_OR_RIGHT) {
             return -1;
         } else {
             return 1;
         }
-    }
-
-    @Override
-    public int getSplitAnimationTranslation(int translationOffset, DeviceProfile dp) {
-        return translationOffset;
     }
 
     @Override
@@ -81,13 +84,15 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     }
 
     @Override
-    public float getTaskMenuX(float x, View thumbnailView, int overScroll) {
+    public float getTaskMenuX(float x, View thumbnailView, int overScroll,
+            DeviceProfile deviceProfile) {
         return x;
     }
 
     @Override
     public float getTaskMenuY(float y, View thumbnailView, int overScroll) {
-        return y + thumbnailView.getMeasuredHeight() + overScroll;
+        return y + overScroll +
+                (thumbnailView.getMeasuredHeight() + thumbnailView.getMeasuredWidth()) / 2f;
     }
 
     @Override
@@ -101,6 +106,54 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
         return new PointF(-margin, margin);
     }
 
+
+
+    @Override
+    public Pair<Float, Float> getDwbLayoutTranslations(int taskViewWidth,
+            int taskViewHeight, StagedSplitBounds splitBounds, DeviceProfile deviceProfile,
+            View[] thumbnailViews, int desiredTaskId, View banner) {
+        boolean isRtl = banner.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
+        float translationX = 0;
+        float translationY = 0;
+        FrameLayout.LayoutParams bannerParams = (FrameLayout.LayoutParams) banner.getLayoutParams();
+        banner.setPivotX(0);
+        banner.setPivotY(0);
+        banner.setRotation(getDegreesRotated());
+        translationX = taskViewWidth - banner.getHeight();
+        FrameLayout.LayoutParams snapshotParams =
+                (FrameLayout.LayoutParams) thumbnailViews[0]
+                        .getLayoutParams();
+        bannerParams.gravity = BOTTOM | (isRtl ? END : START);
+
+        if (splitBounds == null) {
+            // Single, fullscreen case
+            bannerParams.width = taskViewHeight - snapshotParams.topMargin;
+            translationY = banner.getHeight();
+            return new Pair<>(translationX, translationY);
+        }
+
+        // Set correct width
+        if (desiredTaskId == splitBounds.leftTopTaskId) {
+            bannerParams.width = thumbnailViews[0].getMeasuredHeight();
+        } else {
+            bannerParams.width = thumbnailViews[1].getMeasuredHeight();
+        }
+
+        // Set translations
+        if (desiredTaskId == splitBounds.rightBottomTaskId) {
+            translationY = banner.getHeight();
+        }
+        if (desiredTaskId == splitBounds.leftTopTaskId) {
+            float bottomRightTaskPlusDividerPercent = splitBounds.appsStackedVertically
+                    ? (1f - splitBounds.topTaskPercent)
+                    : (1f - splitBounds.leftTaskPercent);
+            translationY = banner.getHeight()
+                    - ((taskViewHeight - snapshotParams.topMargin)
+                    * bottomRightTaskPlusDividerPercent);
+        }
+        return new Pair<>(translationX, translationY);
+    }
+
     @Override
     public int getDistanceToBottomOfRect(DeviceProfile dp, Rect rect) {
         return dp.widthPx - rect.right;
@@ -110,8 +163,36 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
         // Add "right" option which is actually the top
         return Collections.singletonList(new SplitPositionOption(
-                R.drawable.ic_split_screen, R.string.split_screen_position_right,
+                R.drawable.ic_split_right, R.string.split_screen_position_right,
                 STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+    }
+
+    @Override
+    public void setIconAndSnapshotParams(View mIconView, int taskIconMargin, int taskIconHeight,
+            FrameLayout.LayoutParams snapshotParams, boolean isRtl) {
+        FrameLayout.LayoutParams iconParams =
+                (FrameLayout.LayoutParams) mIconView.getLayoutParams();
+        iconParams.gravity = (isRtl ? END : START) | CENTER_VERTICAL;
+        iconParams.leftMargin = -taskIconHeight - taskIconMargin / 2;
+        iconParams.rightMargin = 0;
+        iconParams.topMargin = snapshotParams.topMargin / 2;
+    }
+
+    @Override
+    public void setSplitIconParams(View primaryIconView, View secondaryIconView,
+            int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
+            boolean isRtl, DeviceProfile deviceProfile, StagedSplitBounds splitConfig) {
+        super.setSplitIconParams(primaryIconView, secondaryIconView, taskIconHeight,
+                primarySnapshotWidth, primarySnapshotHeight, isRtl, deviceProfile, splitConfig);
+        FrameLayout.LayoutParams primaryIconParams =
+                (FrameLayout.LayoutParams) primaryIconView.getLayoutParams();
+        FrameLayout.LayoutParams secondaryIconParams =
+                (FrameLayout.LayoutParams) secondaryIconView.getLayoutParams();
+
+        primaryIconParams.gravity = CENTER_VERTICAL | (isRtl ? END : START);
+        secondaryIconParams.gravity = CENTER_VERTICAL | (isRtl ? END : START);
+        primaryIconView.setLayoutParams(primaryIconParams);
+        secondaryIconView.setLayoutParams(secondaryIconParams);
     }
 
     /* ---------- The following are only used by TaskViewTouchHandler. ---------- */

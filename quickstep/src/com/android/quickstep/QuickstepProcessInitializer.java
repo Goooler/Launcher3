@@ -16,16 +16,16 @@
 package com.android.quickstep;
 
 import android.annotation.TargetApi;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.RemoteException;
 import android.os.UserManager;
 import android.util.Log;
 
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.MainProcessInitializer;
-import com.android.launcher3.util.Executors;
-import com.android.quickstep.logging.SettingsChangeLogger;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.ThreadedRendererCompat;
 
@@ -63,8 +63,11 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
         ThreadedRendererCompat.setContextPriority(
                 ThreadedRendererCompat.EGL_CONTEXT_PRIORITY_HIGH_IMG);
 
-        // Initialize settings logger after a default timeout
-        Executors.MAIN_EXECUTOR.getHandler()
-                .postDelayed(() -> new SettingsChangeLogger(context), SETUP_DELAY_MILLIS);
+        // Enable binder tracing on system server for calls originating from Launcher
+        try {
+            ActivityManager.getService().enableBinderTracing();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Unable to enable binder tracing", e);
+        }
     }
 }
