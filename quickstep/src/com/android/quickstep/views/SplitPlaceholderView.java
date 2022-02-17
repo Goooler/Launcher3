@@ -17,12 +17,13 @@
 package com.android.quickstep.views;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.view.Gravity;
 import android.widget.FrameLayout;
 
-import com.android.quickstep.util.SplitSelectStateController;
+import androidx.annotation.Nullable;
 
 public class SplitPlaceholderView extends FrameLayout {
 
@@ -40,29 +41,27 @@ public class SplitPlaceholderView extends FrameLayout {
                 }
             };
 
-    private SplitSelectStateController mSplitController;
-    private IconView mIcon;
+    @Nullable
+    private IconView mIconView;
 
     public SplitPlaceholderView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public void init(SplitSelectStateController controller) {
-        this.mSplitController = controller;
+    @Nullable
+    public IconView getIconView() {
+        return mIconView;
     }
 
-    public SplitSelectStateController getSplitController() {
-        return mSplitController;
-    }
-
-    public void setIcon(IconView icon) {
-        if (mIcon == null) {
-            mIcon = new IconView(getContext());
-            addView(mIcon);
+    public void setIcon(Drawable drawable, int iconSize) {
+        if (mIconView == null) {
+            mIconView = new IconView(getContext());
+            addView(mIconView);
         }
-        mIcon.setDrawable(icon.getDrawable());
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(icon.getLayoutParams());
+        mIconView.setDrawable(drawable);
+        mIconView.setDrawableSize(iconSize, iconSize);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(iconSize, iconSize);
         params.gravity = Gravity.CENTER;
-        mIcon.setLayoutParams(params);
+        mIconView.setLayoutParams(params);
     }
 }

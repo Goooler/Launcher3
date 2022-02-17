@@ -32,7 +32,6 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.util.MainThreadInitializedObject;
 
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -61,25 +60,28 @@ public class SysUINavigationMode {
         return INSTANCE.get(context).getMode();
     }
 
+    public static boolean getImeDrawsImeNavBar(Context context) {
+        return INSTANCE.get(context).getImeDrawsImeNavBar();
+    }
+
     public static final MainThreadInitializedObject<SysUINavigationMode> INSTANCE =
             new MainThreadInitializedObject<>(SysUINavigationMode::new);
 
     private static final String TAG = "SysUINavigationMode";
     private static final String ACTION_OVERLAY_CHANGED = "android.intent.action.OVERLAY_CHANGED";
-    private static final String NAV_BAR_INTERACTION_MODE_RES_NAME =
-            "config_navBarInteractionMode";
+    private static final String NAV_BAR_INTERACTION_MODE_RES_NAME = "config_navBarInteractionMode";
+    private static final String IME_DRAWS_IME_NAV_BAR_RES_NAME = "config_imeDrawsImeNavBar";
     private static final String TARGET_OVERLAY_PACKAGE = "android";
 
     private final Context mContext;
     private Mode mMode;
+    private boolean mImeDrawsImeNavBar;
 
     private int mNavBarGesturalHeight;
     private int mNavBarLargerGesturalHeight;
 
     private final List<NavigationModeChangeListener> mChangeListeners =
             new CopyOnWriteArrayList<>();
-    private final List<OneHandedModeChangeListener> mOneHandedOverlayChangeListeners =
-            new ArrayList<>();
 
     public SysUINavigationMode(Context context) {
         mContext = context;
@@ -126,7 +128,6 @@ public class SysUINavigationMode {
         }
         if (mNavBarLargerGesturalHeight != newLargerGesturalHeight) {
             mNavBarLargerGesturalHeight = newLargerGesturalHeight;
-            dispatchOneHandedOverlayChange();
         }
     }
 
@@ -139,6 +140,8 @@ public class SysUINavigationMode {
         mNavBarLargerGesturalHeight = ResourceUtils.getDimenByName(
                 ResourceUtils.NAVBAR_BOTTOM_GESTURE_LARGER_SIZE, mContext.getResources(),
                 mNavBarGesturalHeight);
+        mImeDrawsImeNavBar = ResourceUtils.getBoolByName(IME_DRAWS_IME_NAV_BAR_RES_NAME,
+                mContext.getResources(), false);
 
         if (modeInt == INVALID_RESOURCE_HANDLE) {
             Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");
@@ -158,12 +161,6 @@ public class SysUINavigationMode {
         }
     }
 
-    private void dispatchOneHandedOverlayChange() {
-        for (OneHandedModeChangeListener listener : mOneHandedOverlayChangeListeners) {
-            listener.onOneHandedModeChanged(mNavBarLargerGesturalHeight);
-        }
-    }
-
     public Mode addModeChangeListener(NavigationModeChangeListener listener) {
         mChangeListeners.add(listener);
         return mMode;
@@ -173,22 +170,18 @@ public class SysUINavigationMode {
         mChangeListeners.remove(listener);
     }
 
-    public int addOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
-        mOneHandedOverlayChangeListeners.add(listener);
-        return mNavBarLargerGesturalHeight;
-    }
-
-    public void removeOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
-        mOneHandedOverlayChangeListeners.remove(listener);
-    }
-
     public Mode getMode() {
         return mMode;
+    }
+
+    public boolean getImeDrawsImeNavBar() {
+        return mImeDrawsImeNavBar;
     }
 
     public void dump(PrintWriter pw) {
         pw.println("SysUINavigationMode:");
         pw.println("  mode=" + mMode.name());
+        pw.println("  mImeDrawsImeNavBar=:" + mImeDrawsImeNavBar);
         pw.println("  mNavBarGesturalHeight=:" + mNavBarGesturalHeight);
     }
 
