@@ -57,6 +57,7 @@ import android.view.animation.AnimationUtils;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 
+import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
 
@@ -75,10 +76,10 @@ import com.android.launcher3.PagedView;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.Workspace.ItemOperator;
 import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
 import com.android.launcher3.accessibility.FolderAccessibilityHelper;
 import com.android.launcher3.anim.KeyboardInsetAnimationCallback;
+import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragController.DragListener;
@@ -94,12 +95,15 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicatorDots;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.LauncherBindableItemsContainer.ItemOperator;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.views.ClipPathView;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -129,10 +133,13 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
      */
     private static final int MIN_CONTENT_DIMEN = 5;
 
-    static final int STATE_NONE = -1;
-    static final int STATE_SMALL = 0;
-    static final int STATE_ANIMATING = 1;
-    static final int STATE_OPEN = 2;
+    public static final int STATE_CLOSED = 0;
+    public static final int STATE_ANIMATING = 1;
+    public static final int STATE_OPEN = 2;
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({STATE_CLOSED, STATE_ANIMATING, STATE_OPEN})
+    public @interface FolderState {}
 
     /**
      * Time for which the scroll hint is shown before automatically changing page.
@@ -197,13 +204,12 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     @ViewDebug.ExportedProperty(category = "launcher",
             mapping = {
-                    @ViewDebug.IntToString(from = STATE_NONE, to = "STATE_NONE"),
-                    @ViewDebug.IntToString(from = STATE_SMALL, to = "STATE_SMALL"),
+                    @ViewDebug.IntToString(from = STATE_CLOSED, to = "STATE_CLOSED"),
                     @ViewDebug.IntToString(from = STATE_ANIMATING, to = "STATE_ANIMATING"),
                     @ViewDebug.IntToString(from = STATE_OPEN, to = "STATE_OPEN"),
             })
-    @Thunk
-    int mState = STATE_NONE;
+    private int mState = STATE_CLOSED;
+    private OnFolderStateChangedListener mOnFolderStateChangedListener;
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mRearrangeOnClose = false;
     boolean mItemsInvalidated = false;
@@ -556,7 +562,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         a.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
-                mState = STATE_ANIMATING;
+                setState(STATE_ANIMATING);
                 mCurrentAnimator = a;
             }
 
@@ -681,8 +687,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                mState = STATE_OPEN;
+                setState(STATE_OPEN);
                 announceAccessibilityChanges();
+                AccessibilityManagerCompat.sendFolderOpenedEventToTest(getContext());
 
                 mContent.setFocusOnFirstChild();
             }
@@ -856,7 +863,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         }
         mSuppressFolderDeletion = false;
         clearDragInfo();
-        mState = STATE_SMALL;
+        setState(STATE_CLOSED);
         mContent.setCurrentPage(0);
     }
 
@@ -1196,8 +1203,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     }
 
     void replaceFolderWithFinalItem() {
-        mLauncherDelegate.replaceFolderWithFinalItem(this);
-        mDestroyed = true;
+        mDestroyed = mLauncherDelegate.replaceFolderWithFinalItem(this);
     }
 
     public boolean isDestroyed() {
@@ -1262,7 +1268,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
         PendingAddShortcutInfo pasi = d.dragInfo instanceof PendingAddShortcutInfo
                 ? (PendingAddShortcutInfo) d.dragInfo : null;
-        WorkspaceItemInfo pasiSi = pasi != null ? pasi.activityInfo.createWorkspaceItemInfo() : null;
+        WorkspaceItemInfo pasiSi =
+                pasi != null ? pasi.activityInfo.createWorkspaceItemInfo() : null;
         if (pasi != null && pasiSi == null) {
             // There is no WorkspaceItemInfo, so we have to go through a configuration activity.
             pasi.container = mInfo.id;
@@ -1648,5 +1655,22 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         int windowBottomPx = mActivityContext.getDeviceProfile().heightPx;
 
         return windowBottomPx - folderBottomPx;
+    }
+
+    private void setState(@FolderState int newState) {
+        mState = newState;
+        if (mOnFolderStateChangedListener != null) {
+            mOnFolderStateChangedListener.onFolderStateChanged(mState);
+        }
+    }
+
+    public void setOnFolderStateChangedListener(@Nullable OnFolderStateChangedListener listener) {
+        mOnFolderStateChangedListener = listener;
+    }
+
+    /** Listener that can be registered via {@link Folder#setOnFolderStateChangedListener} */
+    public interface OnFolderStateChangedListener {
+        /** See {@link Folder.FolderState} */
+        void onFolderStateChanged(@FolderState int newState);
     }
 }
