@@ -23,7 +23,9 @@ import android.content.Intent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.icons.BitmapInfo;
+import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags;
 import com.android.launcher3.icons.FastBitmapDrawable;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.util.PackageManagerHelper;
 
@@ -179,6 +181,12 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      */
     public void setProgressLevel(PackageInstallInfo installInfo) {
         setProgressLevel(installInfo.progress, installInfo.state);
+
+        if (installInfo.state == PackageInstallInfo.STATUS_FAILED) {
+            FileLog.d(TAG,
+                    "Icon info: " + this + " marked broken with install info: " + installInfo,
+                    new Exception());
+        }
     }
 
     /**
@@ -223,15 +231,14 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      * Returns a FastBitmapDrawable with the icon.
      */
     public FastBitmapDrawable newIcon(Context context) {
-        return newIcon(context, false);
+        return newIcon(context, 0);
     }
 
     /**
      * Returns a FastBitmapDrawable with the icon and context theme applied
      */
-    public FastBitmapDrawable newIcon(Context context, boolean applyTheme) {
-        FastBitmapDrawable drawable = applyTheme
-                ? bitmap.newThemedIcon(context) : bitmap.newIcon(context);
+    public FastBitmapDrawable newIcon(Context context, @DrawableCreationFlags int creationFlags) {
+        FastBitmapDrawable drawable = bitmap.newIcon(context, creationFlags);
         drawable.setIsDisabled(isDisabled());
         return drawable;
     }
