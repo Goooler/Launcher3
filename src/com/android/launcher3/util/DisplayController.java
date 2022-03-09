@@ -15,12 +15,18 @@
  */
 package com.android.launcher3.util;
 
+import static android.content.Intent.ACTION_CONFIGURATION_CHANGED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 
+import static com.android.launcher3.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.Utilities.dpiFromPx;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_2_BUTTON;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_3_BUTTON;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
+import static com.android.launcher3.util.WindowManagerCompat.MIN_LARGE_TABLET_WIDTH;
 import static com.android.launcher3.util.WindowManagerCompat.MIN_TABLET_WIDTH;
 
 import static java.util.Collections.emptyMap;
@@ -30,11 +36,9 @@ import android.annotation.TargetApi;
 import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Point;
 import android.hardware.display.DisplayManager;
-import android.hardware.display.DisplayManager.DisplayListener;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -44,11 +48,13 @@ import android.view.Display;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.UiThread;
-import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.uioverrides.ApiWrapper;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -58,7 +64,7 @@ import java.util.Set;
  * Utility class to cache properties of default display to avoid a system RPC on every call.
  */
 @SuppressLint("NewApi")
-public class DisplayController implements DisplayListener, ComponentCallbacks, SafeCloseable {
+public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
     private static final String TAG = "DisplayController";
 
@@ -69,9 +75,14 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
     public static final int CHANGE_ROTATION = 1 << 1;
     public static final int CHANGE_DENSITY = 1 << 2;
     public static final int CHANGE_SUPPORTED_BOUNDS = 1 << 3;
+    public static final int CHANGE_NAVIGATION_MODE = 1 << 4;
 
     public static final int CHANGE_ALL = CHANGE_ACTIVE_SCREEN | CHANGE_ROTATION
-            | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS;
+            | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS | CHANGE_NAVIGATION_MODE;
+
+    private static final String ACTION_OVERLAY_CHANGED = "android.intent.action.OVERLAY_CHANGED";
+    private static final String NAV_BAR_INTERACTION_MODE_RES_NAME = "config_navBarInteractionMode";
+    private static final String TARGET_OVERLAY_PACKAGE = "android";
 
     private final Context mContext;
     private final DisplayManager mDM;
@@ -81,6 +92,8 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
     // The callback in this listener updates DeviceProfile, which other listeners might depend on
     private DisplayInfoChangeListener mPriorityListener;
     private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
+
+    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onIntent);
 
     private Info mInfo;
     private boolean mDestroyed = false;
@@ -95,14 +108,15 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
             mWindowContext.registerComponentCallbacks(this);
         } else {
             mWindowContext = null;
-            SimpleBroadcastReceiver configChangeReceiver =
-                    new SimpleBroadcastReceiver(this::onConfigChanged);
-            mContext.registerReceiver(configChangeReceiver,
-                    new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED));
+            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
         }
+
+        // Initialize navigation mode change listener
+        mContext.registerReceiver(mReceiver,
+                getPackageFilter(TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED));
+
         mInfo = new Info(getDisplayInfoContext(display), display,
                 getInternalDisplays(mDM), emptyMap());
-        mDM.registerDisplayListener(this, UI_HELPER_EXECUTOR.getHandler());
     }
 
     private static ArrayMap<String, PortraitSize> getInternalDisplays(
@@ -120,6 +134,13 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         return internalDisplays;
     }
 
+    /**
+     * Returns the current navigation mode
+     */
+    public static NavigationMode getNavigationMode(Context context) {
+        return INSTANCE.get(context).getInfo().navigationMode;
+    }
+
     @Override
     public void close() {
         mDestroyed = true;
@@ -128,35 +149,6 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         } else {
             // TODO: unregister broadcast receiver
         }
-        mDM.unregisterDisplayListener(this);
-    }
-
-    @Override
-    public final void onDisplayAdded(int displayId) { }
-
-    @Override
-    public final void onDisplayRemoved(int displayId) { }
-
-    @WorkerThread
-    @Override
-    public final void onDisplayChanged(int displayId) {
-        if (displayId != DEFAULT_DISPLAY) {
-            return;
-        }
-        Display display = mDM.getDisplay(DEFAULT_DISPLAY);
-        if (display == null) {
-            return;
-        }
-        if (Utilities.ATLEAST_S) {
-            // Only update refresh rate. Everything else comes from component callbacks
-            mInfo.mSingleFrameMs = getSingleFrameMs(display);
-            return;
-        }
-        handleInfoChange(display);
-    }
-
-    public static int getSingleFrameMs(Context context) {
-        return INSTANCE.get(context).getInfo().mSingleFrameMs;
     }
 
     /**
@@ -173,15 +165,20 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         void onDisplayInfoChanged(Context context, Info info, int flags);
     }
 
-    /**
-     * Only used for pre-S
-     */
-    private void onConfigChanged(Intent intent) {
+    private void onIntent(Intent intent) {
         if (mDestroyed) {
             return;
         }
-        Configuration config = mContext.getResources().getConfiguration();
-        if (mInfo.fontScale != config.fontScale || mInfo.densityDpi != config.densityDpi) {
+        boolean reconfigure = false;
+        if (ACTION_OVERLAY_CHANGED.equals(intent.getAction())) {
+            reconfigure = true;
+        } else if (ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+            Configuration config = mContext.getResources().getConfiguration();
+            reconfigure = mInfo.fontScale != config.fontScale
+                    || mInfo.densityDpi != config.densityDpi;
+        }
+
+        if (reconfigure) {
             Log.d(TAG, "Configuration changed, notifying listeners");
             Display display = mDM.getDisplay(DEFAULT_DISPLAY);
             if (display != null) {
@@ -235,7 +232,8 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         Info newInfo = new Info(displayContext, display,
                 oldInfo.mInternalDisplays, oldInfo.mPerDisplayBounds);
 
-        if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale) {
+        if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale
+                || newInfo.navigationMode != oldInfo.navigationMode) {
             // Cache may not be valid anymore, recreate without cache
             newInfo = new Info(displayContext, display, getInternalDisplays(mDM), emptyMap());
         }
@@ -249,6 +247,9 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         }
         if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale) {
             change |= CHANGE_DENSITY;
+        }
+        if (newInfo.navigationMode != oldInfo.navigationMode) {
+            change |= CHANGE_NAVIGATION_MODE;
         }
         if (!newInfo.supportedBounds.equals(oldInfo.supportedBounds)) {
             change |= CHANGE_SUPPORTED_BOUNDS;
@@ -280,19 +281,20 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         if (mPriorityListener != null) {
             mPriorityListener.onDisplayInfoChanged(context, mInfo, flags);
         }
-        for (int i = mListeners.size() - 1; i >= 0; i--) {
+
+        int count = mListeners.size();
+        for (int i = 0; i < count; i++) {
             mListeners.get(i).onDisplayInfoChanged(context, mInfo, flags);
         }
     }
 
     public static class Info {
 
-        private int mSingleFrameMs;
-
         // Configuration properties
         public final int rotation;
         public final float fontScale;
         public final int densityDpi;
+        public final NavigationMode navigationMode;
 
         private final PortraitSize mScreenSizeDp;
 
@@ -317,8 +319,8 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
             fontScale = config.fontScale;
             densityDpi = config.densityDpi;
             mScreenSizeDp = new PortraitSize(config.screenHeightDp, config.screenWidthDp);
+            navigationMode = parseNavigationMode(context);
 
-            mSingleFrameMs = getSingleFrameMs(display);
             currentSize = new Point();
             display.getRealSize(currentSize);
 
@@ -368,12 +370,35 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         }
 
         /**
-         * Returns true if the bounds represent a tablet
+         * Returns {@code true} if the bounds represent a tablet.
          */
         public boolean isTablet(WindowBounds bounds) {
             return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()),
                     densityDpi) >= MIN_TABLET_WIDTH;
         }
+
+        /**
+         * Returns {@code true} if the bounds represent a large tablet.
+         */
+        public boolean isLargeTablet(WindowBounds bounds) {
+            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()),
+                    densityDpi) >= MIN_LARGE_TABLET_WIDTH;
+        }
+    }
+
+    /**
+     * Dumps the current state information
+     */
+    public void dump(PrintWriter pw) {
+        Info info = mInfo;
+        pw.println("DisplayController.Info:");
+        pw.println("  id=" + info.displayId);
+        pw.println("  rotation=" + info.rotation);
+        pw.println("  fontScale=" + info.fontScale);
+        pw.println("  densityDpi=" + info.displayId);
+        pw.println("  navigationMode=" + info.navigationMode.name());
+        pw.println("  currentSize=" + info.currentSize);
+        pw.println("  supportedBounds=" + info.supportedBounds);
     }
 
     /**
@@ -401,8 +426,35 @@ public class DisplayController implements DisplayListener, ComponentCallbacks, S
         }
     }
 
-    private static int getSingleFrameMs(Display display) {
-        float refreshRate = display.getRefreshRate();
-        return refreshRate > 0 ? (int) (1000 / refreshRate) : 16;
+    public enum NavigationMode {
+        THREE_BUTTONS(false, 0, LAUNCHER_NAVIGATION_MODE_3_BUTTON),
+        TWO_BUTTONS(true, 1, LAUNCHER_NAVIGATION_MODE_2_BUTTON),
+        NO_BUTTON(true, 2, LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON);
+
+        public final boolean hasGestures;
+        public final int resValue;
+        public final LauncherEvent launcherEvent;
+
+        NavigationMode(boolean hasGestures, int resValue, LauncherEvent launcherEvent) {
+            this.hasGestures = hasGestures;
+            this.resValue = resValue;
+            this.launcherEvent = launcherEvent;
+        }
+    }
+
+    private static NavigationMode parseNavigationMode(Context context) {
+        int modeInt = ResourceUtils.getIntegerByName(NAV_BAR_INTERACTION_MODE_RES_NAME,
+                context.getResources(), INVALID_RESOURCE_HANDLE);
+
+        if (modeInt == INVALID_RESOURCE_HANDLE) {
+            Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");
+        } else {
+            for (NavigationMode m : NavigationMode.values()) {
+                if (m.resValue == modeInt) {
+                    return m;
+                }
+            }
+        }
+        return Utilities.ATLEAST_S ? NavigationMode.NO_BUTTON : NavigationMode.THREE_BUTTONS;
     }
 }

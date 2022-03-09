@@ -37,6 +37,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.AnimatedFloat;
@@ -191,15 +192,23 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     }
 
     /**
+     * Creates the icon alignment controller if it does not already exist.
+     * @param launcherDp Launcher device profile.
+     */
+    public void createIconAlignmentControllerIfNotExists(DeviceProfile launcherDp) {
+        if (mIconAlignControllerLazy == null) {
+            mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
+        }
+    }
+
+    /**
      * Sets the taskbar icon alignment relative to Launcher hotseat icons
      * @param alignmentRatio [0, 1]
      *                       0 => not aligned
      *                       1 => fully aligned
      */
     public void setLauncherIconAlignment(float alignmentRatio, DeviceProfile launcherDp) {
-        if (mIconAlignControllerLazy == null) {
-            mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
-        }
+        createIconAlignmentControllerIfNotExists(launcherDp);
         mIconAlignControllerLazy.setPlayFraction(alignmentRatio);
         if (alignmentRatio <= 0 || alignmentRatio >= 1) {
             // Cleanup lazy controller so that it is created again in next animation
@@ -274,8 +283,22 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarNavButtonTranslationY.updateValue(-deviceProfile.getTaskbarOffsetY());
     }
 
-    public View mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
-        return mTaskbarView.mapOverItems(op);
+    /**
+     * Maps the given operator to all the top-level children of TaskbarView.
+     */
+    public void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
+        mTaskbarView.mapOverItems(op);
+    }
+
+    /**
+     * Returns the first icon to match the given parameter, in priority from:
+     * 1) Icons directly on Taskbar
+     * 2) FolderIcon of the Folder containing the given icon
+     * 3) All Apps button
+     */
+    public View getFirstIconMatch(ItemInfoMatcher matcher) {
+        ItemInfoMatcher folderMatcher = ItemInfoMatcher.forFolderMatch(matcher);
+        return mTaskbarView.getFirstMatch(matcher, folderMatcher);
     }
 
     /**

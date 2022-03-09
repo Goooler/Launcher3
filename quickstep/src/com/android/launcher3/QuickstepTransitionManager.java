@@ -44,7 +44,7 @@ import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVIT
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_TRANSITIONS;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
-import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
+import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
 import static com.android.launcher3.views.FloatingIconView.getFloatingIconView;
 import static com.android.quickstep.TaskViewUtils.findTaskViewToLaunch;
@@ -579,8 +579,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 }
             }
 
-            // Pause page indicator animations as they lead to layer trashing.
-            mLauncher.getWorkspace().getPageIndicator().pauseAnimations();
+            // Pause expensive view updates as they can lead to layer thrashing and skipped frames.
+            mLauncher.pauseExpensiveViewUpdates();
 
             endListener = () -> {
                 viewsToAnimate.forEach(view -> {
@@ -590,7 +590,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 if (scrimEnabled) {
                     mLauncher.getScrimView().setBackgroundColor(Color.TRANSPARENT);
                 }
-                mLauncher.getWorkspace().getPageIndicator().skipAnimationsToEnd();
+                mLauncher.resumeExpensiveViewUpdates();
             };
         }
 
