@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
+import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS;
 import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_CONTENT;
 import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_FRAME;
 import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_REGION;
@@ -181,6 +182,12 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
             } else if (!mControllers.uiController.isTaskbarTouchable()) {
                 // Let touches pass through us.
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
+            } else if (mControllers.taskbarDragController.isSystemDragInProgress()) {
+                // Let touches pass through us.
+                insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
+            } else if (AbstractFloatingView.getOpenView(mActivity, TYPE_TASKBAR_ALL_APPS) != null) {
+                // Let touches pass through us.
+                insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
             } else if (mControllers.taskbarViewController.areIconsVisible()
                     || AbstractFloatingView.getOpenView(mActivity, TYPE_ALL) != null
                     || mActivity.isNavBarKidsModeActive()) {
@@ -208,9 +215,7 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
          * Called when a child is removed from TaskbarDragLayer.
          */
         public void onDragLayerViewRemoved() {
-            if (AbstractFloatingView.getAnyView(mActivity, TYPE_ALL) == null) {
-                mActivity.setTaskbarWindowFullscreen(false);
-            }
+            mActivity.maybeSetTaskbarWindowNotFullscreen();
         }
 
         /**

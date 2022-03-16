@@ -527,7 +527,32 @@ public class StatsLogManager implements ResourceBasedOverride {
         LAUNCHER_TASKBAR_LONGPRESS_SHOW(897),
 
         @UiEvent(doc = "User clicks on the search icon on header to launch search in app.")
-        LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913);
+        LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913),
+
+        @UiEvent(doc = "User is shown the back gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_SHOWN(959),
+
+        @UiEvent(doc = "User is shown the home gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_SHOWN(960),
+
+        @UiEvent(doc = "User is shown the overview gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_SHOWN(961),
+
+        @UiEvent(doc = "User completed the back gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_COMPLETED(962),
+
+        @UiEvent(doc = "User completed the home gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_COMPLETED(963),
+
+        @UiEvent(doc = "User completed the overview gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_COMPLETED(964),
+
+        @UiEvent(doc = "User skips the gesture navigation tutorial.")
+        LAUNCHER_GESTURE_TUTORIAL_SKIPPED(965),
+
+        @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
+                + "result page etc.")
+        LAUNCHER_ALLAPPS_SCROLLED(985);
 
         // ADD MORE
 
@@ -562,7 +587,7 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
-     * Helps to construct and write the log message.
+     * Helps to construct and log launcher event.
      */
     public interface StatsLogger {
 
@@ -662,6 +687,64 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
+     * Helps to construct and log latency event.
+     */
+    public interface StatsLatencyLogger {
+
+        enum LatencyType {
+            UNKNOWN(0),
+            COLD(1),
+            HOT(2);
+
+            private final int mId;
+
+            LatencyType(int id) {
+                this.mId = id;
+            }
+
+            public int getId() {
+                return mId;
+            }
+
+        }
+
+        /**
+         * Sets {@link InstanceId} of log message.
+         */
+        default StatsLatencyLogger withInstanceId(InstanceId instanceId) {
+            return this;
+        }
+
+
+        /**
+         * Sets latency of the event.
+         */
+        default StatsLatencyLogger withLatency(long latencyInMillis) {
+            return this;
+        }
+
+        /**
+         * Sets {@link LatencyType} of log message.
+         */
+        default StatsLatencyLogger withType(LatencyType type) {
+            return this;
+        }
+
+        /**
+         * Sets packageId of log message.
+         */
+        default StatsLatencyLogger withPackageId(int packageId) {
+            return this;
+        }
+
+        /**
+         * Builds the final message and logs it as {@link EventEnum}.
+         */
+        default void log(EventEnum event) {
+        }
+    }
+
+    /**
      * Returns new logger object.
      */
     public StatsLogger logger() {
@@ -672,8 +755,24 @@ public class StatsLogManager implements ResourceBasedOverride {
         return logger;
     }
 
+    /**
+     * Returns new latency logger object.
+     */
+    public StatsLatencyLogger latencyLogger() {
+        StatsLatencyLogger logger = createLatencyLogger();
+        if (mInstanceId != null) {
+            logger.withInstanceId(mInstanceId);
+        }
+        return logger;
+    }
+
     protected StatsLogger createLogger() {
         return new StatsLogger() {
+        };
+    }
+
+    protected StatsLatencyLogger createLatencyLogger() {
+        return new StatsLatencyLogger() {
         };
     }
 

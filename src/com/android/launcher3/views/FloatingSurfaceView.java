@@ -40,8 +40,8 @@ import com.android.launcher3.GestureNavContract;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.window.RefreshRateTracker;
 
 /**
  * Similar to {@link FloatingIconView} but displays a surface with the targetIcon. It then passes
@@ -97,7 +97,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
 
         // Remove after some time, to avoid flickering
         Executors.MAIN_EXECUTOR.getHandler().postDelayed(mRemoveViewRunnable,
-                DisplayController.getSingleFrameMs(mLauncher));
+                RefreshRateTracker.getSingleFrameMs(mLauncher));
     }
 
     private void removeViewFromParent() {
@@ -159,7 +159,8 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
             return;
         }
         View icon = mLauncher.getFirstMatchForAppClose(-1,
-                mContract.componentName.getPackageName(), mContract.user);
+                mContract.componentName.getPackageName(), mContract.user,
+                false /* supportsAllAppsState */);
 
         boolean iconChanged = mIcon != icon;
         if (iconChanged) {

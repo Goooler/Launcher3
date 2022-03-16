@@ -19,6 +19,7 @@ package com.android.launcher3;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TWO_PANEL_HOME;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
+import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
@@ -54,6 +55,7 @@ import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.util.window.WindowManagerProxy;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -138,6 +140,11 @@ public class InvariantDeviceProfile {
     public int numShownHotseatIcons;
 
     /**
+     * Number of icons inside the hotseat area when using 3 buttons navigation.
+     */
+    public int numShrunkenHotseatIcons;
+
+    /**
      * Number of icons inside the hotseat area that is stored in the database. This is greater than
      * or equal to numnShownHotseatIcons, allowing for a seamless transition between two hotseat
      * sizes that share the same DB.
@@ -174,8 +181,7 @@ public class InvariantDeviceProfile {
     private final ArrayList<OnIDPChangeListener> mChangeListeners = new ArrayList<>();
 
     @VisibleForTesting
-    public InvariantDeviceProfile() {
-    }
+    public InvariantDeviceProfile() { }
 
     @TargetApi(23)
     private InvariantDeviceProfile(Context context) {
@@ -188,7 +194,8 @@ public class InvariantDeviceProfile {
 
         DisplayController.INSTANCE.get(context).setPriorityListener(
                 (displayContext, info, flags) -> {
-                    if ((flags & (CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS)) != 0) {
+                    if ((flags & (CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS
+                            | CHANGE_NAVIGATION_MODE)) != 0) {
                         onConfigChanged(displayContext);
                     }
                 });
@@ -271,11 +278,16 @@ public class InvariantDeviceProfile {
     }
 
     private static @DeviceType int getDeviceType(Info displayInfo) {
-        // Each screen has two profiles (portrait/landscape), so devices with four or more
-        // supported profiles implies two or more internal displays.
-        if (displayInfo.supportedBounds.size() >= 4 && ENABLE_TWO_PANEL_HOME.get()) {
+        int flagPhone = 1 << 0;
+        int flagTablet = 1 << 1;
+
+        int type = displayInfo.supportedBounds.stream()
+                .mapToInt(bounds -> displayInfo.isTablet(bounds) ? flagTablet : flagPhone)
+                .reduce(0, (a, b) -> a | b);
+        if ((type == (flagPhone | flagTablet)) && ENABLE_TWO_PANEL_HOME.get()) {
+            // device has profiles supporting both phone and table modes
             return TYPE_MULTI_DISPLAY;
-        } else if (displayInfo.supportedBounds.stream().allMatch(displayInfo::isTablet)) {
+        } else if (type == flagTablet) {
             return TYPE_TABLET;
         } else {
             return TYPE_PHONE;
@@ -336,6 +348,7 @@ public class InvariantDeviceProfile {
         horizontalMargin = displayOption.horizontalMargin;
 
         numShownHotseatIcons = closestProfile.numHotseatIcons;
+        numShrunkenHotseatIcons = closestProfile.numShrunkenHotseatIcons;
         numDatabaseHotseatIcons = deviceType == TYPE_MULTI_DISPLAY
                 ? closestProfile.numDatabaseHotseatIcons : closestProfile.numHotseatIcons;
         hotseatBorderSpaces = displayOption.hotseatBorderSpaces;
@@ -365,7 +378,8 @@ public class InvariantDeviceProfile {
         for (WindowBounds bounds : displayInfo.supportedBounds) {
             localSupportedProfiles.add(new DeviceProfile.Builder(context, this, displayInfo)
                     .setUseTwoPanels(deviceType == TYPE_MULTI_DISPLAY)
-                    .setWindowBounds(bounds).build());
+                    .setWindowBounds(bounds)
+                    .build());
 
             // Wallpaper size should be the maximum of the all possible sizes Launcher expects
             int displayWidth = bounds.bounds.width();
@@ -604,10 +618,14 @@ public class InvariantDeviceProfile {
 
         float screenWidth = config.screenWidthDp * res.getDisplayMetrics().density;
         float screenHeight = config.screenHeightDp * res.getDisplayMetrics().density;
-        return getBestMatch(screenWidth, screenHeight);
+        return getBestMatch(screenWidth, screenHeight,
+                WindowManagerProxy.INSTANCE.get(context).getRotation(context));
     }
 
-    public DeviceProfile getBestMatch(float screenWidth, float screenHeight) {
+    /**
+     * Returns the device profile matching the provided screen configuration
+     */
+    public DeviceProfile getBestMatch(float screenWidth, float screenHeight, int rotation) {
         DeviceProfile bestMatch = supportedProfiles.get(0);
         float minDiff = Float.MAX_VALUE;
 
@@ -616,6 +634,8 @@ public class InvariantDeviceProfile {
                     + Math.abs(profile.heightPx - screenHeight);
             if (diff < minDiff) {
                 minDiff = diff;
+                bestMatch = profile;
+            } else if (diff == minDiff && profile.rotationHint == rotation) {
                 bestMatch = profile;
             }
         }
@@ -691,6 +711,7 @@ public class InvariantDeviceProfile {
         private final int numAllAppsColumns;
         private final int numDatabaseAllAppsColumns;
         private final int numHotseatIcons;
+        private final int numShrunkenHotseatIcons;
         private final int numDatabaseHotseatIcons;
 
         private final String dbFile;
@@ -727,6 +748,8 @@ public class InvariantDeviceProfile {
 
             numHotseatIcons = a.getInt(
                     R.styleable.GridDisplayOption_numHotseatIcons, numColumns);
+            numShrunkenHotseatIcons = a.getInt(
+                    R.styleable.GridDisplayOption_numShrunkenHotseatIcons, numHotseatIcons / 2);
             numDatabaseHotseatIcons = a.getInt(
                     R.styleable.GridDisplayOption_numExtendedHotseatIcons, 2 * numHotseatIcons);
 

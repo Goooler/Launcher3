@@ -34,7 +34,6 @@ import android.view.Surface;
 
 import com.android.launcher3.CellLayout.ContainerType;
 import com.android.launcher3.DevicePaddings.DevicePadding;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
@@ -59,6 +58,7 @@ public class DeviceProfile {
 
     // Device properties
     public final boolean isTablet;
+    public final boolean isLargeTablet;
     public final boolean isPhone;
     public final boolean transposeLayoutWithOrientation;
     public final boolean isTwoPanels;
@@ -67,6 +67,7 @@ public class DeviceProfile {
     // Device properties in current orientation
     public final boolean isLandscape;
     public final boolean isMultiWindowMode;
+    public final boolean isGestureMode;
 
     public final int windowX;
     public final int windowY;
@@ -74,6 +75,7 @@ public class DeviceProfile {
     public final int heightPx;
     public final int availableWidthPx;
     public final int availableHeightPx;
+    public final int rotationHint;
 
     public final float aspectRatio;
 
@@ -173,6 +175,7 @@ public class DeviceProfile {
     public Point allAppsBorderSpacePx;
     public int allAppsShiftRange;
     public int allAppsTopPadding;
+    public int bottomSheetTopPadding;
     public int allAppsCellHeightPx;
     public int allAppsCellWidthPx;
     public int allAppsIconSizePx;
@@ -189,6 +192,7 @@ public class DeviceProfile {
     public int overviewTaskIconDrawableSizePx;
     public int overviewTaskIconDrawableSizeGridPx;
     public int overviewTaskThumbnailTopMarginPx;
+    public final int overviewActionsHeight;
     public final int overviewActionsMarginThreeButtonPx;
     public final int overviewActionsTopMarginGesturePx;
     public final int overviewActionsBottomMarginGesturePx;
@@ -229,20 +233,23 @@ public class DeviceProfile {
     /** TODO: Once we fully migrate to staged split, remove "isMultiWindowMode" */
     DeviceProfile(Context context, InvariantDeviceProfile inv, Info info, WindowBounds windowBounds,
             boolean isMultiWindowMode, boolean transposeLayoutWithOrientation,
-            boolean useTwoPanels) {
+            boolean useTwoPanels, boolean isGestureMode) {
 
         this.inv = inv;
         this.isLandscape = windowBounds.isLandscape();
         this.isMultiWindowMode = isMultiWindowMode;
         this.transposeLayoutWithOrientation = transposeLayoutWithOrientation;
+        this.isGestureMode = isGestureMode;
         windowX = windowBounds.bounds.left;
         windowY = windowBounds.bounds.top;
+        this.rotationHint = windowBounds.rotationHint;
 
         isScalableGrid = inv.isScalable && !isVerticalBarLayout() && !isMultiWindowMode;
 
         // Determine device posture.
         mInfo = info;
         isTablet = info.isTablet(windowBounds);
+        isLargeTablet = info.isLargeTablet(windowBounds);
         isPhone = !isTablet;
         isTwoPanels = isTablet && useTwoPanels;
         isTaskbarPresent = isTablet && ApiWrapper.TASKBAR_DRAWN_IN_PROCESS;
@@ -288,8 +295,11 @@ public class DeviceProfile {
         desiredWorkspaceHorizontalMarginPx = getHorizontalMarginPx(inv, res);
         desiredWorkspaceHorizontalMarginOriginalPx = desiredWorkspaceHorizontalMarginPx;
 
-        allAppsTopPadding = res.getDimensionPixelSize(R.dimen.all_apps_top_padding)
-                + (isTablet ? heightPx - availableHeightPx : 0);
+        bottomSheetTopPadding = windowBounds.insets.top // statusbar height
+                + res.getDimensionPixelSize(R.dimen.bottom_sheet_extra_top_padding)
+                + (isTablet ? 0 : edgeMarginPx); // phones need edgeMarginPx additional padding
+
+        allAppsTopPadding = isTablet ? bottomSheetTopPadding : 0;
         allAppsShiftRange = isTablet
                 ? heightPx - allAppsTopPadding
                 : res.getDimensionPixelSize(R.dimen.all_apps_starting_vertical_translate);
@@ -343,9 +353,20 @@ public class DeviceProfile {
         workspaceCellPaddingXPx = res.getDimensionPixelSize(R.dimen.dynamic_grid_cell_padding_x);
 
         hotseatQsbHeight = res.getDimensionPixelSize(R.dimen.qsb_widget_height);
-        isQsbInline = isTablet && isLandscape && !isTwoPanels && hotseatQsbHeight > 0;
-        numShownHotseatIcons =
-                isTwoPanels ? inv.numDatabaseHotseatIcons : inv.numShownHotseatIcons;
+        // Whether QSB might be inline in appropriate orientation (landscape).
+        boolean canQsbInline = isLargeTablet && hotseatQsbHeight > 0;
+        isQsbInline = canQsbInline && isLandscape;
+
+        // We shrink hotseat sizes regardless of orientation, if nav buttons are inline and QSB
+        // might be inline in either orientations, to keep hotseat size consistent across rotation.
+        boolean areNavButtonsInline = isTaskbarPresent && !isGestureMode;
+        if (areNavButtonsInline && canQsbInline) {
+            numShownHotseatIcons = inv.numShrunkenHotseatIcons;
+        } else {
+            numShownHotseatIcons =
+                    isTwoPanels ? inv.numDatabaseHotseatIcons : inv.numShownHotseatIcons;
+        }
+
         numShownAllAppsColumns =
                 isTwoPanels ? inv.numDatabaseAllAppsColumns : inv.numAllAppsColumns;
         hotseatBarSizeExtraSpacePx = 0;
@@ -391,6 +412,7 @@ public class DeviceProfile {
         overviewPageSpacing = res.getDimensionPixelSize(R.dimen.overview_page_spacing);
         overviewActionsButtonSpacing = res.getDimensionPixelSize(
                 R.dimen.overview_actions_button_spacing);
+        overviewActionsHeight = res.getDimensionPixelSize(R.dimen.overview_actions_height);
         overviewActionsMarginThreeButtonPx = res.getDimensionPixelSize(
                 R.dimen.overview_actions_margin_three_button);
         // Grid task's top margin is only overviewTaskIconSizePx + overviewTaskMarginGridPx, but
@@ -534,13 +556,14 @@ public class DeviceProfile {
     }
 
     public Builder toBuilder(Context context) {
-        WindowBounds bounds =
-                new WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx);
+        WindowBounds bounds = new WindowBounds(
+                widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint);
         bounds.bounds.offsetTo(windowX, windowY);
         return new Builder(context, inv, mInfo)
                 .setWindowBounds(bounds)
                 .setUseTwoPanels(isTwoPanels)
-                .setMultiWindowMode(isMultiWindowMode);
+                .setMultiWindowMode(isMultiWindowMode)
+                .setGestureMode(isGestureMode);
     }
 
     public DeviceProfile copy(Context context) {
@@ -1081,9 +1104,11 @@ public class DeviceProfile {
         writer.println(prefix + "\t1 dp = " + mMetrics.density + " px");
 
         writer.println(prefix + "\tisTablet:" + isTablet);
+        writer.println(prefix + "\tisLargeTablet:" + isLargeTablet);
         writer.println(prefix + "\tisPhone:" + isPhone);
         writer.println(prefix + "\ttransposeLayoutWithOrientation:"
                 + transposeLayoutWithOrientation);
+        writer.println(prefix + "\tisGestureMode:" + isGestureMode);
 
         writer.println(prefix + "\tisLandscape:" + isLandscape);
         writer.println(prefix + "\tisMultiWindowMode:" + isMultiWindowMode);
@@ -1266,6 +1291,7 @@ public class DeviceProfile {
 
         private boolean mIsMultiWindowMode = false;
         private Boolean mTransposeLayoutWithOrientation;
+        private Boolean mIsGestureMode;
 
         public Builder(Context context, InvariantDeviceProfile inv, Info info) {
             mContext = context;
@@ -1294,6 +1320,11 @@ public class DeviceProfile {
             return this;
         }
 
+        public Builder setGestureMode(boolean isGestureMode) {
+            mIsGestureMode = isGestureMode;
+            return this;
+        }
+
         public DeviceProfile build() {
             if (mWindowBounds == null) {
                 throw new IllegalArgumentException("Window bounds not set");
@@ -1301,8 +1332,11 @@ public class DeviceProfile {
             if (mTransposeLayoutWithOrientation == null) {
                 mTransposeLayoutWithOrientation = !mInfo.isTablet(mWindowBounds);
             }
-            return new DeviceProfile(mContext, mInv, mInfo, mWindowBounds,
-                    mIsMultiWindowMode, mTransposeLayoutWithOrientation, mUseTwoPanels);
+            if (mIsGestureMode == null) {
+                mIsGestureMode = DisplayController.getNavigationMode(mContext).hasGestures;
+            }
+            return new DeviceProfile(mContext, mInv, mInfo, mWindowBounds, mIsMultiWindowMode,
+                    mTransposeLayoutWithOrientation, mUseTwoPanels, mIsGestureMode);
         }
     }
 

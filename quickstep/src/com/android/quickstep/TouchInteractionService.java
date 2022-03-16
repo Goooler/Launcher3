@@ -26,6 +26,7 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_RECENT_TASKS;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_BACK_ANIMATION;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_ONE_HANDED;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_PIP;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
@@ -47,7 +48,6 @@ import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.drawable.Icon;
-import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -77,6 +77,7 @@ import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.tracing.LauncherTraceProto;
 import com.android.launcher3.tracing.TouchInteractionServiceProto;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.WindowBounds;
@@ -106,6 +107,7 @@ import com.android.systemui.shared.system.InputConsumerController;
 import com.android.systemui.shared.system.InputMonitorCompat;
 import com.android.systemui.shared.system.smartspace.ISysuiUnlockAnimationController;
 import com.android.systemui.shared.tracing.ProtoTraceable;
+import com.android.wm.shell.back.IBackAnimation;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.pip.IPip;
 import com.android.wm.shell.recents.IRecentTasks;
@@ -166,10 +168,12 @@ public class TouchInteractionService extends Service
                             bundle.getBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER));
             IRecentTasks recentTasks = IRecentTasks.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_RECENT_TASKS));
+            IBackAnimation backAnimation = IBackAnimation.Stub.asInterface(
+                    bundle.getBinder(KEY_EXTRA_SHELL_BACK_ANIMATION));
             MAIN_EXECUTOR.execute(() -> {
                 SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy, pip,
                         splitscreen, onehanded, shellTransitions, startingWindow, recentTasks,
-                        launcherUnlockAnimationController);
+                        launcherUnlockAnimationController, backAnimation);
                 TouchInteractionService.this.initInputMonitor();
                 preloadOverview(true /* fromInit */);
             });
@@ -344,8 +348,6 @@ public class TouchInteractionService extends Service
     private InputMonitorCompat mInputMonitorCompat;
     private InputEventReceiver mInputEventReceiver;
 
-    private DisplayManager mDisplayManager;
-
     private TaskbarManager mTaskbarManager;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
 
@@ -357,7 +359,6 @@ public class TouchInteractionService extends Service
         mMainChoreographer = Choreographer.getInstance();
         mAM = ActivityManagerWrapper.getInstance();
         mDeviceState = new RecentsAnimationDeviceState(this, true);
-        mDisplayManager = getSystemService(DisplayManager.class);
         mTaskbarManager = new TaskbarManager(this);
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
 
@@ -399,7 +400,7 @@ public class TouchInteractionService extends Service
     /**
      * Called when the navigation mode changes, guaranteed to be after the device state has updated.
      */
-    private void onNavigationModeChanged(SysUINavigationMode.Mode mode) {
+    private void onNavigationModeChanged() {
         initInputMonitor();
         resetHomeBounceSeenOnQuickstepEnabledFirstTime();
     }
@@ -762,7 +763,10 @@ public class TouchInteractionService extends Service
         } else if (gestureState.getRunningTask() == null) {
             return getDefaultInputConsumer();
         } else if (previousGestureState.isRunningAnimationToLauncher()
-                || gestureState.getActivityInterface().isResumed()
+                || (gestureState.getActivityInterface().isResumed()
+                        // with shell-transitions, home is resumed during recents animation, so
+                        // explicitly check against recents animation too.
+                        && !previousGestureState.isRecentsAnimationRunning())
                 || forceOverviewInputConsumer) {
             return createOverviewInputConsumer(
                     previousGestureState, gestureState, event, forceOverviewInputConsumer);
@@ -945,7 +949,7 @@ public class TouchInteractionService extends Service
             pw.println("Input state:");
             pw.println("  mInputMonitorCompat=" + mInputMonitorCompat);
             pw.println("  mInputEventReceiver=" + mInputEventReceiver);
-            SysUINavigationMode.INSTANCE.get(this).dump(pw);
+            DisplayController.INSTANCE.get(this).dump(pw);
             pw.println("TouchState:");
             BaseDraggingActivity createdOverviewActivity = mOverviewComponentObserver == null ? null
                     : mOverviewComponentObserver.getActivityInterface().getCreatedActivity();
