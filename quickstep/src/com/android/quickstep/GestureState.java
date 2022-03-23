@@ -20,7 +20,6 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 
-import android.annotation.Nullable;
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.Intent;
@@ -36,7 +35,6 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -124,6 +122,10 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     public static final int STATE_RECENTS_ANIMATION_ENDED =
             getFlagForIndex("STATE_RECENTS_ANIMATION_ENDED");
 
+    // Called when we create an overscroll window when swiping right to left on the most recent app
+    public static final int STATE_OVERSCROLL_WINDOW_CREATED =
+            getFlagForIndex("STATE_OVERSCROLL_WINDOW_CREATED");
+
     // Called when RecentsView stops scrolling and settles on a TaskView.
     public static final int STATE_RECENTS_SCROLLING_FINISHED =
             getFlagForIndex("STATE_RECENTS_SCROLLING_FINISHED");
@@ -136,13 +138,12 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     private final int mGestureId;
 
     private ActivityManager.RunningTaskInfo mRunningTask;
-    private ActivityManager.RunningTaskInfo[] mRunningTasks;
     private GestureEndTarget mEndTarget;
     private RemoteAnimationTargetCompat mLastAppearedTaskTarget;
     private Set<Integer> mPreviouslyAppearedTaskIds = new HashSet<>();
     private int mLastStartedTaskId = -1;
     private RecentsAnimationController mRecentsAnimationController;
-    private HashMap<Integer, ThumbnailData> mRecentsAnimationCanceledSnapshots;
+    private ThumbnailData mRecentsAnimationCanceledSnapshot;
 
     /** The time when the swipe up gesture is triggered. */
     private long mSwipeUpStartTimeMs;
@@ -237,14 +238,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     }
 
     /**
-     * This will array will contain the task returned by {@link #getRunningTask()}
-     * @return the running tasks for this gesture.
-     */
-    public ActivityManager.RunningTaskInfo[] getRunningTasks() {
-        return mRunningTasks;
-    }
-
-    /**
      * @return the running task id for this gesture.
      */
     public int getRunningTaskId() {
@@ -256,15 +249,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
      */
     public void updateRunningTask(ActivityManager.RunningTaskInfo runningTask) {
         mRunningTask = runningTask;
-    }
-
-    /**
-     * TODO(b/210903248) refactor to consolidate w/ method above
-     * Updates the running task for the gesture to be the given {@param runningTask}.
-     */
-    public void updateRunningTasks(ActivityManager.RunningTaskInfo[] runningTasks) {
-        mRunningTasks = runningTasks;
-        updateRunningTask(runningTasks[0]);
     }
 
     /**
@@ -374,16 +358,16 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     }
 
     @Override
-    public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
-        mRecentsAnimationCanceledSnapshots = thumbnailDatas;
+    public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
+        mRecentsAnimationCanceledSnapshot = thumbnailData;
         mStateCallback.setState(STATE_RECENTS_ANIMATION_CANCELED);
         mStateCallback.setState(STATE_RECENTS_ANIMATION_ENDED);
-        if (mRecentsAnimationCanceledSnapshots != null) {
+        if (mRecentsAnimationCanceledSnapshot != null) {
             // Clean up the screenshot to finalize the recents animation cancel
             if (mRecentsAnimationController != null) {
                 mRecentsAnimationController.cleanupScreenshot();
             }
-            mRecentsAnimationCanceledSnapshots = null;
+            mRecentsAnimationCanceledSnapshot = null;
         }
     }
 
@@ -398,15 +382,10 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
      * while STATE_RECENTS_ANIMATION_CANCELED state is being set, and the caller is responsible for
      * calling {@link RecentsAnimationController#cleanupScreenshot()}.
      */
-    @Nullable
-    HashMap<Integer, ThumbnailData> consumeRecentsAnimationCanceledSnapshot() {
-        if (mRecentsAnimationCanceledSnapshots != null) {
-            HashMap<Integer, ThumbnailData> data =
-                    new HashMap<Integer, ThumbnailData>(mRecentsAnimationCanceledSnapshots);
-            mRecentsAnimationCanceledSnapshots = null;
-            return data;
-        }
-        return null;
+    ThumbnailData consumeRecentsAnimationCanceledSnapshot() {
+        ThumbnailData data = mRecentsAnimationCanceledSnapshot;
+        mRecentsAnimationCanceledSnapshot = null;
+        return data;
     }
 
     void setSwipeUpStartTimeMs(long uptimeMs) {

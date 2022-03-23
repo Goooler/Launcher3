@@ -20,7 +20,7 @@ import android.util.ArrayMap;
 
 import androidx.annotation.StringDef;
 
-import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.Launcher;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -29,10 +29,8 @@ import java.util.Map;
 
 /**
  * Stores and retrieves onboarding-related data via SharedPreferences.
- *
- * @param <T> Context which owns these preferences.
  */
-public class OnboardingPrefs<T extends ActivityContext> {
+public class OnboardingPrefs<T extends Launcher> {
 
     public static final String HOME_BOUNCE_SEEN = "launcher.apps_view_shown";
     public static final String HOME_BOUNCE_COUNT = "launcher.home_bounce_count";
@@ -40,17 +38,6 @@ public class OnboardingPrefs<T extends ActivityContext> {
     public static final String HOTSEAT_LONGPRESS_TIP_SEEN = "launcher.hotseat_longpress_tip_seen";
     public static final String SEARCH_EDU_SEEN = "launcher.search_edu_seen";
     public static final String SEARCH_SNACKBAR_COUNT = "launcher.keyboard_snackbar_count";
-    public static final String TASKBAR_EDU_SEEN = "launcher.taskbar_edu_seen";
-    public static final String ALL_APPS_VISITED_COUNT = "launcher.all_apps_visited_count";
-    // When adding a new key, add it here as well, to be able to reset it from Developer Options.
-    public static final Map<String, String[]> ALL_PREF_KEYS = Map.of(
-            "All Apps Bounce", new String[] { HOME_BOUNCE_SEEN, HOME_BOUNCE_COUNT },
-            "Hybrid Hotseat Education", new String[] { HOTSEAT_DISCOVERY_TIP_COUNT,
-                    HOTSEAT_LONGPRESS_TIP_SEEN },
-            "Search Education", new String[] { SEARCH_EDU_SEEN, SEARCH_SNACKBAR_COUNT },
-            "Taskbar Education", new String[] { TASKBAR_EDU_SEEN },
-            "All Apps Visited Count", new String[] {ALL_APPS_VISITED_COUNT}
-    );
 
     /**
      * Events that either have happened or have not (booleans).
@@ -58,8 +45,7 @@ public class OnboardingPrefs<T extends ActivityContext> {
     @StringDef(value = {
             HOME_BOUNCE_SEEN,
             HOTSEAT_LONGPRESS_TIP_SEEN,
-            SEARCH_EDU_SEEN,
-            TASKBAR_EDU_SEEN
+            SEARCH_EDU_SEEN
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface EventBoolKey {
@@ -71,8 +57,7 @@ public class OnboardingPrefs<T extends ActivityContext> {
     @StringDef(value = {
             HOME_BOUNCE_COUNT,
             HOTSEAT_DISCOVERY_TIP_COUNT,
-            SEARCH_SNACKBAR_COUNT,
-            ALL_APPS_VISITED_COUNT
+            SEARCH_SNACKBAR_COUNT
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface EventCountKey {
@@ -85,7 +70,6 @@ public class OnboardingPrefs<T extends ActivityContext> {
         maxCounts.put(HOME_BOUNCE_COUNT, 3);
         maxCounts.put(HOTSEAT_DISCOVERY_TIP_COUNT, 5);
         maxCounts.put(SEARCH_SNACKBAR_COUNT, 3);
-        maxCounts.put(ALL_APPS_VISITED_COUNT, 20);
         MAX_COUNTS = Collections.unmodifiableMap(maxCounts);
     }
 

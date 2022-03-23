@@ -55,7 +55,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Reorderable;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
-import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.FolderDotInfo;
@@ -131,9 +131,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
     private Animator mDotScaleAnim;
 
     private Rect mTouchArea = new Rect();
-
-    private final PointF mTranslationForMoveFromCenterAnimation = new PointF(0, 0);
-    private float mTranslationXForTaskbarAlignmentAnimation = 0f;
 
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
@@ -339,6 +336,8 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
         if (animateView != null && mActivity instanceof Launcher) {
             final Launcher launcher = (Launcher) mActivity;
             DragLayer dragLayer = launcher.getDragLayer();
+            Rect from = new Rect();
+            dragLayer.getViewRectRelativeToSelf(animateView, from);
             Rect to = finalRect;
             if (to == null) {
                 to = new Rect();
@@ -397,21 +396,20 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             float finalScale = scale * scaleRelativeToDragLayer;
 
             // Account for potentially different icon sizes with non-default grid settings
-            if (d.dragSource instanceof ActivityAllAppsContainerView) {
+            if (d.dragSource instanceof AllAppsContainerView) {
                 DeviceProfile grid = mActivity.getDeviceProfile();
                 float containerScale = (1f * grid.iconSizePx / grid.allAppsIconSizePx);
                 finalScale *= containerScale;
             }
 
             final int finalIndex = index;
-            dragLayer.animateView(animateView, to, finalAlpha,
-                    finalScale, finalScale, DROP_IN_ANIMATION_DURATION,
-                    Interpolators.DEACCEL_2,
+            dragLayer.animateView(animateView, from, to, finalAlpha,
+                    1, 1, finalScale, finalScale, DROP_IN_ANIMATION_DURATION,
+                    Interpolators.DEACCEL_2, Interpolators.ACCEL_2,
                     () -> {
                         mPreviewItemManager.hidePreviewItem(finalIndex, false);
                         mFolder.showItem(item);
-                    }, 
-                    DragLayer.ANIMATION_END_DISAPPEAR, null);
+                    }, DragLayer.ANIMATION_END_DISAPPEAR, null);
 
             mFolder.hideItem(item);
 
@@ -628,10 +626,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
     public void drawDot(Canvas canvas) {
         if (!mForceHideDot && ((mDotInfo != null && mDotInfo.hasDot()) || mDotScale > 0)) {
             Rect iconBounds = mDotParams.iconBounds;
-
-            Utilities.setRectToViewCenter(this, mActivity.getDeviceProfile().iconSizePx,
-                    iconBounds);
-            iconBounds.offsetTo(iconBounds.left, getPaddingTop());
+            BubbleTextView.getIconBounds(this, iconBounds, mActivity.getDeviceProfile().iconSizePx);
             float iconScale = (float) mBackground.previewSize / iconBounds.width();
             Utilities.scaleRectAboutCenter(iconBounds, iconScale);
 
@@ -688,7 +683,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
     @Override
     public void onAdd(WorkspaceItemInfo item, int rank) {
-        updatePreviewItems(false);
         boolean wasDotted = mDotInfo.hasDot();
         mDotInfo.addDotInfo(mActivity.getDotInfoForItem(item));
         boolean isDotted = mDotInfo.hasDot();
@@ -700,7 +694,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
     @Override
     public void onRemove(List<WorkspaceItemInfo> items) {
-        updatePreviewItems(false);
         boolean wasDotted = mDotInfo.hasDot();
         items.stream().map(mActivity::getDotInfoForItem).forEach(mDotInfo::subtractDotInfo);
         boolean isDotted = mDotInfo.hasDot();
@@ -771,11 +764,8 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
     }
 
     private void updateTranslation() {
-        super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x
-                + mTranslationForMoveFromCenterAnimation.x
-                + mTranslationXForTaskbarAlignmentAnimation);
-        super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y
-                + mTranslationForMoveFromCenterAnimation.y);
+        super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x);
+        super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y);
     }
 
     public void setReorderBounceOffset(float x, float y) {
@@ -785,29 +775,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
     public void getReorderBounceOffset(PointF offset) {
         offset.set(mTranslationForReorderBounce);
-    }
-
-    /**
-     * Sets translationX value for taskbar to launcher alignment animation
-     */
-    public void setTranslationForTaskbarAlignmentAnimation(float translationX) {
-        mTranslationXForTaskbarAlignmentAnimation = translationX;
-        updateTranslation();
-    }
-
-    /**
-     * Returns translation values for taskbar to launcher alignment animation
-     */
-    public float getTranslationXForTaskbarAlignmentAnimation() {
-        return mTranslationXForTaskbarAlignmentAnimation;
-    }
-
-    /**
-     * Sets translation values for move from center animation
-     */
-    public void setTranslationForMoveFromCenterAnimation(float x, float y) {
-        mTranslationForMoveFromCenterAnimation.set(x, y);
-        updateTranslation();
     }
 
     @Override

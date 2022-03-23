@@ -41,8 +41,7 @@
         android:contentDescription="@string/all_apps_button_label"
         android:onClick="onAppsButtonClicked" />
 
-    <view
-        class="com.android.launcher3.allapps.SecondaryLauncherAllAppsContainerView"
+    <com.android.launcher3.allapps.AllAppsContainerView
         android:id="@+id/apps_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -54,10 +53,6 @@
         android:background="@drawable/round_rect_primary"
         android:elevation="2dp"
         android:visibility="invisible" >
-
-        <include
-            layout="@layout/all_apps_bottom_sheet_background"
-            android:visibility="gone" />
 
         <include
             layout="@layout/all_apps_rv_layout"
@@ -126,5 +121,5 @@
             android:textSize="16sp" />
 
         <include layout="@layout/all_apps_fast_scroller" />
-    </view>
+    </com.android.launcher3.allapps.AllAppsContainerView>
 </com.android.launcher3.secondarydisplay.SecondaryDragLayer>

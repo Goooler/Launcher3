@@ -27,8 +27,6 @@ import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.RemoteViews.RemoteViewOutlineProvider;
 
-import androidx.annotation.Nullable;
-
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.RoundedCornerEnforcement;
 
@@ -44,9 +42,7 @@ final class FloatingWidgetBackgroundView extends View {
     private final DrawableProperties mForegroundProperties = new DrawableProperties();
     private final DrawableProperties mBackgroundProperties = new DrawableProperties();
 
-    @Nullable
     private Drawable mOriginalForeground;
-    @Nullable
     private Drawable mOriginalBackground;
     private float mFinalRadius;
     private float mInitialOutlineRadius;
@@ -54,7 +50,7 @@ final class FloatingWidgetBackgroundView extends View {
     private boolean mIsUsingFallback;
     private View mSourceView;
 
-    FloatingWidgetBackgroundView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+    FloatingWidgetBackgroundView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setOutlineProvider(new ViewOutlineProvider() {
             @Override
@@ -136,7 +132,7 @@ final class FloatingWidgetBackgroundView extends View {
     }
 
     /** Returns the maximum corner radius of {@param drawable}. */
-    private static float getMaxRadius(@Nullable Drawable drawable) {
+    private static float getMaxRadius(Drawable drawable) {
         if (!(drawable instanceof GradientDrawable)) return 0;
         float[] cornerRadii = ((GradientDrawable) drawable).getCornerRadii();
         float cornerRadius = ((GradientDrawable) drawable).getCornerRadius();
@@ -165,10 +161,8 @@ final class FloatingWidgetBackgroundView extends View {
 
     /** Stores and modifies a drawable's properties through an animation. */
     private static class DrawableProperties {
-        @Nullable
         private Drawable mDrawable;
         private float mOriginalRadius;
-        @Nullable
         private float[] mOriginalRadii;
         private final float[] mTmpRadii = new float[8];
 
