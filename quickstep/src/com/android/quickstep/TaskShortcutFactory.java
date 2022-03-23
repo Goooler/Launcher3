@@ -35,6 +35,7 @@ import android.window.SplashScreen;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
@@ -44,7 +45,6 @@ import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
 import com.android.quickstep.views.TaskView;
-import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecCompat;
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecsFuture;
@@ -61,31 +61,9 @@ import java.util.List;
  * Represents a system shortcut that can be shown for a recent task.
  */
 public interface TaskShortcutFactory {
-    SystemShortcut getShortcut(BaseDraggingActivity activity,
-            TaskIdAttributeContainer taskContainer);
+    SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView view);
 
-    default boolean showForSplitscreen() {
-        return false;
-    }
-
-    TaskShortcutFactory APP_INFO = new TaskShortcutFactory() {
-        @Override
-        public SystemShortcut getShortcut(BaseDraggingActivity activity,
-                TaskIdAttributeContainer taskContainer) {
-            TaskView taskView = taskContainer.getTaskView();
-            AppInfo.SplitAccessibilityInfo accessibilityInfo =
-                    new AppInfo.SplitAccessibilityInfo(taskView.containsMultipleTasks(),
-                            TaskUtils.getTitle(taskView.getContext(), taskContainer.getTask()),
-                            taskContainer.getA11yNodeId()
-                    );
-            return new AppInfo(activity, taskContainer.getItemInfo(), accessibilityInfo);
-        }
-
-        @Override
-        public boolean showForSplitscreen() {
-            return true;
-        }
-    };
+    TaskShortcutFactory APP_INFO = (activity, view) -> new AppInfo(activity, view.getItemInfo());
 
     abstract class MultiWindowFactory implements TaskShortcutFactory {
 
@@ -104,28 +82,28 @@ public interface TaskShortcutFactory {
         protected abstract boolean onActivityStarted(BaseDraggingActivity activity);
 
         @Override
-        public SystemShortcut getShortcut(BaseDraggingActivity activity,
-                TaskIdAttributeContainer taskContainer) {
-            final Task task  = taskContainer.getTask();
+        public SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView taskView) {
+            final Task task  = taskView.getTask();
             if (!task.isDockable) {
                 return null;
             }
             if (!isAvailable(activity, task.key.displayId)) {
                 return null;
             }
-            return new MultiWindowSystemShortcut(mIconRes, mTextRes, activity, taskContainer, this,
+            return new MultiWindowSystemShortcut(mIconRes, mTextRes, activity, taskView, this,
                     mLauncherEvent);
         }
     }
 
     class SplitSelectSystemShortcut extends SystemShortcut {
         private final TaskView mTaskView;
-        private final SplitPositionOption mSplitPositionOption;
+        private SplitPositionOption mSplitPositionOption;
         public SplitSelectSystemShortcut(BaseDraggingActivity target, TaskView taskView,
                 SplitPositionOption option) {
-            super(option.iconResId, option.textResId, target, taskView.getItemInfo());
+            super(option.mIconResId, option.mTextResId, target, taskView.getItemInfo());
             mTaskView = taskView;
             mSplitPositionOption = option;
+            setEnabled(taskView.getRecentsView().getTaskViewCount() > 1);
         }
 
         @Override
@@ -134,7 +112,7 @@ public interface TaskShortcutFactory {
         }
     }
 
-    class MultiWindowSystemShortcut extends SystemShortcut<BaseDraggingActivity> {
+    class MultiWindowSystemShortcut extends SystemShortcut {
 
         private Handler mHandler;
 
@@ -145,14 +123,13 @@ public interface TaskShortcutFactory {
         private final LauncherEvent mLauncherEvent;
 
         public MultiWindowSystemShortcut(int iconRes, int textRes, BaseDraggingActivity activity,
-                TaskIdAttributeContainer taskContainer, MultiWindowFactory factory,
-                LauncherEvent launcherEvent) {
-            super(iconRes, textRes, activity, taskContainer.getItemInfo());
+                TaskView taskView, MultiWindowFactory factory, LauncherEvent launcherEvent) {
+            super(iconRes, textRes, activity, taskView.getItemInfo());
             mLauncherEvent = launcherEvent;
             mHandler = new Handler(Looper.getMainLooper());
-            mTaskView = taskContainer.getTaskView();
+            mTaskView = taskView;
             mRecentsView = activity.getOverviewPanel();
-            mThumbnailView = taskContainer.getThumbnailView();
+            mThumbnailView = taskView.getThumbnail();
             mFactory = factory;
         }
 
@@ -190,7 +167,7 @@ public interface TaskShortcutFactory {
 
             ActivityOptions options = mFactory.makeLaunchOptions(mTarget);
             if (options != null) {
-                options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+                options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
             }
             if (options != null
                     && ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
@@ -242,7 +219,6 @@ public interface TaskShortcutFactory {
         }
     }
 
-    /** @Deprecated */
     TaskShortcutFactory SPLIT_SCREEN = new MultiWindowFactory(R.drawable.ic_split_screen,
             R.string.recent_task_option_split_screen, LAUNCHER_SYSTEM_SHORTCUT_SPLIT_SCREEN_TAP) {
 
@@ -257,9 +233,20 @@ public interface TaskShortcutFactory {
         }
 
         @Override
+        public SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView taskView) {
+            SystemShortcut shortcut = super.getShortcut(activity, taskView);
+            if (shortcut != null && FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
+                // Disable if there's only one recent app for split screen
+                shortcut.setEnabled(taskView.getRecentsView().getTaskViewCount() > 1);
+            }
+            return shortcut;
+        }
+
+        @Override
         protected ActivityOptions makeLaunchOptions(Activity activity) {
+            final ActivityCompat act = new ActivityCompat(activity);
             final int navBarPosition = WindowManagerWrapper.getInstance().getNavBarPosition(
-                    activity.getDisplayId());
+                    act.getDisplayId());
             if (navBarPosition == WindowManagerWrapper.NAV_BAR_POS_INVALID) {
                 return null;
             }
@@ -297,7 +284,7 @@ public interface TaskShortcutFactory {
         }
     };
 
-    TaskShortcutFactory PIN = (activity, taskContainer) -> {
+    TaskShortcutFactory PIN = (activity, tv) -> {
         if (!SystemUiProxy.INSTANCE.get(activity).isActive()) {
             return null;
         }
@@ -308,20 +295,18 @@ public interface TaskShortcutFactory {
             // We shouldn't be able to pin while an app is locked.
             return null;
         }
-        return new PinSystemShortcut(activity, taskContainer);
+        return new PinSystemShortcut(activity, tv);
     };
 
-    class PinSystemShortcut extends SystemShortcut<BaseDraggingActivity> {
+    class PinSystemShortcut extends SystemShortcut {
 
         private static final String TAG = "PinSystemShortcut";
 
         private final TaskView mTaskView;
 
-        public PinSystemShortcut(BaseDraggingActivity target,
-                TaskIdAttributeContainer taskContainer) {
-            super(R.drawable.ic_pin, R.string.recent_task_option_pin, target,
-                    taskContainer.getItemInfo());
-            mTaskView = taskContainer.getTaskView();
+        public PinSystemShortcut(BaseDraggingActivity target, TaskView tv) {
+            super(R.drawable.ic_pin, R.string.recent_task_option_pin, target, tv.getItemInfo());
+            mTaskView = tv;
         }
 
         @Override
@@ -335,22 +320,20 @@ public interface TaskShortcutFactory {
         }
     }
 
-    TaskShortcutFactory INSTALL = (activity, taskContainer) ->
+    TaskShortcutFactory INSTALL = (activity, view) ->
             InstantAppResolver.newInstance(activity).isInstantApp(activity,
-                 taskContainer.getTask().getTopComponent().getPackageName())
-                    ? new SystemShortcut.Install(activity, taskContainer.getItemInfo()) : null;
+                 view.getTask().getTopComponent().getPackageName())
+                    ? new SystemShortcut.Install(activity, view.getItemInfo()) : null;
 
-    TaskShortcutFactory WELLBEING = (activity, taskContainer) ->
-            WellbeingModel.SHORTCUT_FACTORY.getShortcut(activity, taskContainer.getItemInfo());
+    TaskShortcutFactory WELLBEING = (activity, view) ->
+            WellbeingModel.SHORTCUT_FACTORY.getShortcut(activity, view.getItemInfo());
 
-    TaskShortcutFactory SCREENSHOT = (activity, taskContainer) ->
-            taskContainer.getThumbnailView().getTaskOverlay()
-                    .getScreenshotShortcut(activity, taskContainer.getItemInfo());
+    TaskShortcutFactory SCREENSHOT = (activity, tv) -> tv.getThumbnail().getTaskOverlay()
+            .getScreenshotShortcut(activity, tv.getItemInfo());
 
-    TaskShortcutFactory MODAL = (activity, taskContainer) -> {
+    TaskShortcutFactory MODAL = (activity, tv) -> {
         if (ENABLE_OVERVIEW_SELECTIONS.get()) {
-            return taskContainer.getThumbnailView()
-                    .getTaskOverlay().getModalStateSystemShortcut(taskContainer.getItemInfo());
+            return tv.getThumbnail().getTaskOverlay().getModalStateSystemShortcut(tv.getItemInfo());
         }
         return null;
     };

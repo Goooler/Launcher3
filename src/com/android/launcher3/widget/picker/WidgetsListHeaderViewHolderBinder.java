@@ -23,8 +23,6 @@ import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
 
-import java.util.List;
-
 /**
  * Binds data from {@link WidgetsListHeaderEntry} to UI elements in {@link WidgetsListHeaderHolder}.
  */
@@ -33,13 +31,16 @@ public final class WidgetsListHeaderViewHolderBinder implements
     private final LayoutInflater mLayoutInflater;
     private final OnHeaderClickListener mOnHeaderClickListener;
     private final WidgetsListDrawableFactory mListDrawableFactory;
+    private final WidgetsListAdapter mWidgetsListAdapter;
 
     public WidgetsListHeaderViewHolderBinder(LayoutInflater layoutInflater,
             OnHeaderClickListener onHeaderClickListener,
-            WidgetsListDrawableFactory listDrawableFactory) {
+            WidgetsListDrawableFactory listDrawableFactory,
+            WidgetsListAdapter listAdapter) {
         mLayoutInflater = layoutInflater;
         mOnHeaderClickListener = onHeaderClickListener;
         mListDrawableFactory = listDrawableFactory;
+        mWidgetsListAdapter = listAdapter;
     }
 
     @Override
@@ -52,17 +53,19 @@ public final class WidgetsListHeaderViewHolderBinder implements
 
     @Override
     public void bindViewHolder(WidgetsListHeaderHolder viewHolder, WidgetsListHeaderEntry data,
-            @ListPosition int position, List<Object> payloads) {
+            int position) {
         WidgetsListHeader widgetsListHeader = viewHolder.mWidgetsListHeader;
         widgetsListHeader.applyFromItemInfoWithIcon(data);
         widgetsListHeader.setExpanded(data.isWidgetListShown());
         widgetsListHeader.setListDrawableState(
                 WidgetsListDrawableState.obtain(
-                        (position & POSITION_FIRST) != 0,
-                        (position & POSITION_LAST) != 0,
+                        /* isFirst= */ position == 0,
+                        /* isLast= */ position == mWidgetsListAdapter.getItemCount() - 1,
                         /* isExpanded= */ data.isWidgetListShown()));
         widgetsListHeader.setOnExpandChangeListener(isExpanded ->
-                mOnHeaderClickListener.onHeaderClicked(isExpanded,
-                        PackageUserKey.fromPackageItemInfo(data.mPkgItem)));
+                mOnHeaderClickListener.onHeaderClicked(
+                        isExpanded,
+                        new PackageUserKey(data.mPkgItem.packageName, data.mPkgItem.user)
+                ));
     }
 }

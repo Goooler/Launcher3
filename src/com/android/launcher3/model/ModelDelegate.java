@@ -40,33 +40,21 @@ public class ModelDelegate implements ResourceBasedOverride {
      * Creates and initializes a new instance of the delegate
      */
     public static ModelDelegate newInstance(
-            Context context, LauncherAppState app, AllAppsList appsList, BgDataModel dataModel,
-            boolean isPrimaryInstance) {
+            Context context, LauncherAppState app, AllAppsList appsList, BgDataModel dataModel) {
         ModelDelegate delegate = Overrides.getObject(
                 ModelDelegate.class, context, R.string.model_delegate_class);
-        delegate.init(context, app, appsList, dataModel, isPrimaryInstance);
+
+        delegate.mApp = app;
+        delegate.mAppsList = appsList;
+        delegate.mDataModel = dataModel;
         return delegate;
     }
 
-    protected Context mContext;
     protected LauncherAppState mApp;
     protected AllAppsList mAppsList;
     protected BgDataModel mDataModel;
-    protected boolean mIsPrimaryInstance;
 
     public ModelDelegate() { }
-
-    /**
-     * Initializes the object with the given params.
-     */
-    private void init(Context context, LauncherAppState app, AllAppsList appsList,
-            BgDataModel dataModel, boolean isPrimaryInstance) {
-        this.mApp = app;
-        this.mAppsList = appsList;
-        this.mDataModel = dataModel;
-        this.mIsPrimaryInstance = isPrimaryInstance;
-        this.mContext = context;
-    }
 
     /**
      * Called periodically to validate and update any data
@@ -84,14 +72,6 @@ public class ModelDelegate implements ResourceBasedOverride {
      */
     @WorkerThread
     public void loadItems(UserManagerState ums, Map<ShortcutKey, ShortcutInfo> pinnedShortcuts) { }
-
-    /**
-     * Load String cache
-     */
-    @WorkerThread
-    public void loadStringCache(StringCache cache) {
-        cache.loadStrings(mContext);
-    }
 
     /**
      * Called during loader after workspace loading is complete

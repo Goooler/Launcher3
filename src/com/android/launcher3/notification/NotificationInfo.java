@@ -16,8 +16,6 @@
 
 package com.android.launcher3.notification;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_ACTION_POPUP;
-import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NOTIFICATION_LAUNCH_TAP;
 
 import android.app.ActivityOptions;
@@ -31,13 +29,12 @@ import android.service.notification.StatusBarNotification;
 import android.view.View;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.graphics.IconPalette;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.PackageUserKey;
-import com.android.launcher3.views.ActivityContext;
 
 /**
  * An object that contains relevant information from a {@link StatusBarNotification}. This should
@@ -102,24 +99,21 @@ public class NotificationInfo implements View.OnClickListener {
         if (intent == null) {
             return;
         }
-        final ActivityContext context = ActivityContext.lookupContext(view.getContext());
+        final Launcher launcher = Launcher.getLauncher(view.getContext());
         Bundle activityOptions = ActivityOptions.makeClipRevealAnimation(
                 view, 0, 0, view.getWidth(), view.getHeight()).toBundle();
         try {
             intent.send(null, 0, null, null, null, null, activityOptions);
-            context.getStatsLogManager().logger().withItemInfo(mItemInfo)
+            launcher.getStatsLogManager().logger().withItemInfo(mItemInfo)
                     .log(LAUNCHER_NOTIFICATION_LAUNCH_TAP);
         } catch (PendingIntent.CanceledException e) {
             e.printStackTrace();
         }
         if (autoCancel) {
-            PopupDataProvider popupDataProvider = context.getPopupDataProvider();
-            if (popupDataProvider != null) {
-                popupDataProvider.cancelNotification(notificationKey);
-            }
+            launcher.getPopupDataProvider().cancelNotification(notificationKey);
         }
-        AbstractFloatingView.closeOpenViews(
-                context, true, TYPE_ACTION_POPUP | TYPE_TASKBAR_ALL_APPS);
+        AbstractFloatingView.closeOpenContainer(launcher, AbstractFloatingView
+                .TYPE_ACTION_POPUP);
     }
 
     public Drawable getIconForBackground(Context context, int background) {

@@ -84,7 +84,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
                 + ", mCurrentStableState:" + mCurrentStableState
                 + ", mState:" + mState
                 + ", mRestState:" + mRestState
-                + ", isInTransition:" + isInTransition() + ")";
+                + ", isInTransition:" + (mConfig.currentAnimation != null) + ")";
     }
 
     public void dump(String prefix, PrintWriter writer) {
@@ -93,7 +93,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
         writer.println(prefix + "\tmCurrentStableState:" + mCurrentStableState);
         writer.println(prefix + "\tmState:" + mState);
         writer.println(prefix + "\tmRestState:" + mRestState);
-        writer.println(prefix + "\tisInTransition:" + isInTransition());
+        writer.println(prefix + "\tisInTransition:" + (mConfig.currentAnimation != null));
     }
 
     public StateHandler[] getStateHandlers() {
@@ -127,13 +127,6 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
     public boolean isInStableState(STATE_TYPE state) {
         return mState == state && mCurrentStableState == state
                 && (mConfig.targetState == null || mConfig.targetState == state);
-    }
-
-    /**
-     * @return {@code true} If there is an active transition.
-     */
-    public boolean isInTransition() {
-        return mConfig.currentAnimation != null;
     }
 
     /**
