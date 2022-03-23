@@ -49,6 +49,8 @@ public class Hotseat extends CellLayout implements Insettable {
     private final View mQsb;
     private final int mQsbHeight;
 
+    private final int mTaskbarViewHeight;
+
     public Hotseat(Context context) {
         this(context, null);
     }
@@ -61,9 +63,10 @@ public class Hotseat extends CellLayout implements Insettable {
         super(context, attrs, defStyle);
 
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
+        mQsbHeight = mQsb.getLayoutParams().height;
         addView(mQsb);
 
-        mQsbHeight = getResources().getDimensionPixelSize(R.dimen.qsb_widget_height);
+        mTaskbarViewHeight = context.getResources().getDimensionPixelSize(R.dimen.taskbar_size);
     }
 
     /**
@@ -84,7 +87,6 @@ public class Hotseat extends CellLayout implements Insettable {
         removeAllViewsInLayout();
         mHasVerticalHotseat = hasVerticalHotseat;
         DeviceProfile dp = mActivity.getDeviceProfile();
-        resetCellSize(dp);
         if (hasVerticalHotseat) {
             setGridSize(1, dp.numShownHotseatIcons);
         } else {
@@ -111,13 +113,19 @@ public class Hotseat extends CellLayout implements Insettable {
             mQsb.setVisibility(View.VISIBLE);
             lp.gravity = Gravity.BOTTOM;
             lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            lp.height = grid.isTaskbarPresent
-                    ? grid.workspacePadding.bottom
-                    : grid.hotseatBarSizePx + insets.bottom;
+            lp.height = (grid.isTaskbarPresent
+                        ? grid.workspacePadding.bottom
+                        : grid.hotseatBarSizePx)
+                    + (grid.isTaskbarPresent ? grid.taskbarSize : insets.bottom);
         }
 
-        Rect padding = grid.getHotseatLayoutPadding(getContext());
-        setPadding(padding.left, padding.top, padding.right, padding.bottom);
+        if (!grid.isTaskbarPresent) {
+            // When taskbar is present, we set the padding separately to ensure a seamless visual
+            // handoff between taskbar and hotseat during drag and drop.
+            Rect padding = grid.getHotseatLayoutPadding();
+            setPadding(padding.left, padding.top, padding.right, padding.bottom);
+        }
+
         setLayoutParams(lp);
         InsettableFrameLayout.dispatchInsets(this, insets);
     }
@@ -151,8 +159,7 @@ public class Hotseat extends CellLayout implements Insettable {
             }
             return mWorkspace.onTouchEvent(event);
         }
-        // Always let touch follow through to Workspace.
-        return false;
+        return event.getY() > getCellHeight();
     }
 
     @Override
@@ -173,16 +180,7 @@ public class Hotseat extends CellLayout implements Insettable {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        int width;
-        if (mActivity.getDeviceProfile().isQsbInline) {
-            width = mActivity.getDeviceProfile().qsbWidth;
-        } else {
-            MarginLayoutParams qsbParams = (MarginLayoutParams) mQsb.getLayoutParams();
-            width = getShortcutsAndWidgets().getMeasuredWidth()
-                    - qsbParams.getMarginStart()
-                    - qsbParams.getMarginEnd();
-        }
-
+        int width = getShortcutsAndWidgets().getMeasuredWidth();
         mQsb.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(mQsbHeight, MeasureSpec.EXACTLY));
     }
@@ -192,18 +190,37 @@ public class Hotseat extends CellLayout implements Insettable {
         super.onLayout(changed, l, t, r, b);
 
         int qsbWidth = mQsb.getMeasuredWidth();
-        int left;
-        if (mActivity.getDeviceProfile().isQsbInline) {
-            int qsbSpace = mActivity.getDeviceProfile().hotseatBorderSpace;
-            left = l + getPaddingLeft() - qsbWidth - qsbSpace;
-        } else {
-            left = (r - l - qsbWidth) / 2;
-        }
+        int left = (r - l - qsbWidth) / 2;
         int right = left + qsbWidth;
 
-        int bottom = b - t - mActivity.getDeviceProfile().getQsbOffsetY();
+        int bottom = b - t - getQsbOffsetY();
         int top = bottom - mQsbHeight;
         mQsb.layout(left, top, right, bottom);
+    }
+
+    /**
+     * Returns the number of pixels the QSB is translated from the bottom of the screen.
+     */
+    private int getQsbOffsetY() {
+        DeviceProfile dp = mActivity.getDeviceProfile();
+        int freeSpace = dp.isTaskbarPresent
+                ? dp.workspacePadding.bottom
+                : dp.hotseatBarSizePx - dp.hotseatCellHeightPx - mQsbHeight;
+
+        if (dp.isScalableGrid && dp.qsbBottomMarginPx > dp.getInsets().bottom) {
+            return Math.min(dp.qsbBottomMarginPx, freeSpace);
+        } else {
+            return (int) (freeSpace * QSB_CENTER_FACTOR) + (dp.isTaskbarPresent
+                    ? dp.taskbarSize
+                    : dp.getInsets().bottom);
+        }
+    }
+
+    /**
+     * Returns the number of pixels the taskbar is translated from the bottom of the screen.
+     */
+    public int getTaskbarOffsetY() {
+        return (getQsbOffsetY() - mTaskbarViewHeight) / 2;
     }
 
     /**
@@ -211,10 +228,6 @@ public class Hotseat extends CellLayout implements Insettable {
      */
     public void setIconsAlpha(float alpha) {
         getShortcutsAndWidgets().setAlpha(alpha);
-    }
-
-    public float getIconsAlpha() {
-        return getShortcutsAndWidgets().getAlpha();
     }
 
     /**

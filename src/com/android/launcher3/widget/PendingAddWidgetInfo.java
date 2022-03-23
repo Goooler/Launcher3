@@ -70,7 +70,7 @@ public class PendingAddWidgetInfo extends PendingAddItemInfo {
     public LauncherAtom.ItemInfo buildProto(FolderInfo folderInfo) {
         LauncherAtom.ItemInfo info = super.buildProto(folderInfo);
         return info.toBuilder()
-                .addItemAttributes(LauncherAppWidgetInfo.getAttribute(sourceContainer))
+                .setAttribute(LauncherAppWidgetInfo.getAttribute(sourceContainer))
                 .build();
     }
 }

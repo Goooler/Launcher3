@@ -16,7 +16,7 @@
 
 package com.android.launcher3.appprediction;
 
-import static com.android.launcher3.util.OnboardingPrefs.ALL_APPS_VISITED_COUNT;
+import static com.android.launcher3.LauncherState.ALL_APPS;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -34,17 +34,23 @@ import androidx.annotation.ColorInt;
 import androidx.core.content.ContextCompat;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.FloatingHeaderRow;
 import com.android.launcher3.allapps.FloatingHeaderView;
+import com.android.launcher3.statemanager.StateManager.StateListener;
 import com.android.launcher3.util.Themes;
-import com.android.launcher3.views.ActivityContext;
 
 /**
  * A view which shows a horizontal divider
  */
 @TargetApi(Build.VERSION_CODES.O)
-public class AppsDividerView extends View implements FloatingHeaderRow {
+public class AppsDividerView extends View implements StateListener<LauncherState>,
+        FloatingHeaderRow {
+
+    private static final String ALL_APPS_VISITED_COUNT = "launcher.all_apps_visited_count";
+    private static final int SHOW_ALL_APPS_LABEL_ON_ALL_APPS_VISITED_COUNT = 20;
 
     public enum DividerType {
         NONE,
@@ -52,6 +58,7 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
         ALL_APPS_LABEL
     }
 
+    private final Launcher mLauncher;
     private final TextPaint mPaint = new TextPaint();
     private DividerType mDividerType = DividerType.NONE;
 
@@ -79,6 +86,7 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
 
     public AppsDividerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        mLauncher = Launcher.getLauncher(context);
 
         boolean isMainColorDark = Themes.getAttrBoolean(context, R.attr.isMainColorDark);
         mDividerSize = new int[]{
@@ -93,9 +101,6 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
         mAllAppsLabelTextColor = ContextCompat.getColor(context, isMainColorDark
                 ? R.color.all_apps_label_text_dark
                 : R.color.all_apps_label_text);
-
-        mShowAllAppsLabel = !ActivityContext.lookupContext(
-                getContext()).getOnboardingPrefs().hasReachedMaxCount(ALL_APPS_VISITED_COUNT);
     }
 
     public void setup(FloatingHeaderView parent, FloatingHeaderRow[] rows, boolean tabsHidden) {
@@ -103,14 +108,6 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
         mTabsHidden = tabsHidden;
         mRows = rows;
         updateDividerType();
-    }
-
-    /** {@code true} if all apps label should be shown in place of divider. */
-    public void setShowAllAppsLabel(boolean showAllAppsLabel) {
-        if (showAllAppsLabel != mShowAllAppsLabel) {
-            mShowAllAppsLabel = showAllAppsLabel;
-            updateDividerType();
-        }
     }
 
     @Override
@@ -194,7 +191,7 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
     @Override
     protected void onDraw(Canvas canvas) {
         if (mDividerType == DividerType.LINE) {
-            int l = (getWidth() - mDividerSize[0]) / 2;
+            int l = (getWidth() - getPaddingLeft() - mDividerSize[0]) / 2;
             int t = getHeight() - (getPaddingBottom() / 2);
             int radius = mDividerSize[1];
             canvas.drawRoundRect(l, t, l + mDividerSize[0], t + mDividerSize[1], radius, radius,
@@ -212,7 +209,7 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
     private Layout getAllAppsLabelLayout() {
         if (mAllAppsLabelLayout == null) {
             mPaint.setAntiAlias(true);
-            mPaint.setTypeface(Typeface.create("google-sans", Typeface.NORMAL));
+            mPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             mPaint.setTextSize(
                     getResources().getDimensionPixelSize(R.dimen.all_apps_label_text_size));
 
@@ -239,8 +236,54 @@ public class AppsDividerView extends View implements FloatingHeaderRow {
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+
+        if (shouldShowAllAppsLabel()) {
+            mShowAllAppsLabel = true;
+            mLauncher.getStateManager().addStateListener(this);
+            updateDividerType();
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mLauncher.getStateManager().removeStateListener(this);
+    }
+
+    @Override
+    public void onStateTransitionComplete(LauncherState finalState) {
+        if (finalState == ALL_APPS) {
+            setAllAppsVisitedCount(getAllAppsVisitedCount() + 1);
+        } else {
+            if (mShowAllAppsLabel != shouldShowAllAppsLabel()) {
+                mShowAllAppsLabel = !mShowAllAppsLabel;
+                updateDividerType();
+            }
+
+            if (!mShowAllAppsLabel) {
+                mLauncher.getStateManager().removeStateListener(this);
+            }
+        }
+    }
+
+    private void setAllAppsVisitedCount(int count) {
+        mLauncher.getSharedPrefs().edit().putInt(ALL_APPS_VISITED_COUNT, count).apply();
+    }
+
+    private int getAllAppsVisitedCount() {
+        return mLauncher.getSharedPrefs().getInt(ALL_APPS_VISITED_COUNT, 0);
+    }
+
+    private boolean shouldShowAllAppsLabel() {
+        return getAllAppsVisitedCount() < SHOW_ALL_APPS_LABEL_ON_ALL_APPS_VISITED_COUNT;
+    }
+
+    @Override
     public void setInsets(Rect insets, DeviceProfile grid) {
-        int leftRightPadding = grid.allAppsLeftRightPadding;
+        int leftRightPadding = grid.desiredWorkspaceLeftRightMarginPx
+                + grid.cellLayoutPaddingLeftRightPx;
         setPadding(leftRightPadding, getPaddingTop(), leftRightPadding, getPaddingBottom());
     }
 

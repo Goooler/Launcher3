@@ -17,7 +17,6 @@ package com.android.quickstep.interaction;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 
-import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.annotation.TargetApi;
 import android.graphics.PointF;
@@ -29,8 +28,6 @@ import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SwipeUpAnimationLogic;
 import com.android.quickstep.interaction.EdgeBackGestureHandler.BackGestureResult;
 import com.android.quickstep.interaction.NavBarGestureHandler.NavBarGestureResult;
-
-import java.util.ArrayList;
 
 /** A {@link TutorialController} for the Overview tutorial. */
 @TargetApi(Build.VERSION_CODES.R)
@@ -52,22 +49,13 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
     }
 
     @Override
-    public Integer getSuccessFeedbackSubtitle() {
-        return mTutorialFragment.getNumSteps() > 1 && mTutorialFragment.isAtFinalStep()
-                ? R.string.overview_gesture_feedback_complete_with_follow_up
-                : R.string.overview_gesture_feedback_complete_without_follow_up;
-    }
-
-    @Override
-    protected int getMockAppTaskLayoutResId() {
-        return mTutorialFragment.isLargeScreen()
-                ? R.layout.gesture_tutorial_tablet_mock_conversation_list
-                : R.layout.gesture_tutorial_mock_conversation_list;
+    protected int getMockAppTaskThumbnailResId(boolean forDarkMode) {
+        return R.drawable.mock_conversations_list;
     }
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (isGestureCompleted()) {
+        if (mGestureCompleted) {
             return;
         }
         switch (mTutorialType) {
@@ -92,7 +80,7 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (isGestureCompleted()) {
+        if (mGestureCompleted) {
             return;
         }
         switch (mTutorialType) {
@@ -100,8 +88,8 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
                 switch (result) {
                     case HOME_GESTURE_COMPLETED: {
                         animateFakeTaskViewHome(finalVelocity, () -> {
+                            resetFakeTaskView();
                             showFeedback(R.string.overview_gesture_feedback_home_detected);
-                            resetFakeTaskView(true);
                         });
                         break;
                     }
@@ -110,10 +98,19 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
                         showFeedback(R.string.overview_gesture_feedback_swipe_too_far_from_edge);
                         break;
                     case OVERVIEW_GESTURE_COMPLETED:
-                        mTutorialFragment.releaseFeedbackAnimation();
-                        animateTaskViewToOverview();
+                        mTutorialFragment.releaseGestureVideoView();
+                        PendingAnimation anim = new PendingAnimation(300);
+                        anim.setFloat(mTaskViewSwipeUpAnimation
+                                .getCurrentShift(), AnimatedFloat.VALUE, 1, ACCEL);
+                        AnimatorSet animset = anim.buildAnim();
+                        animset.start();
+                        mRunningWindowAnim = SwipeUpAnimationLogic.RunningWindowAnim.wrap(animset);
                         onMotionPaused(true /*arbitrary value*/);
-                        showSuccessFeedback();
+                        int subtitleResId = mTutorialFragment.getNumSteps() > 1
+                                && mTutorialFragment.isAtFinalStep()
+                                ? R.string.overview_gesture_feedback_complete_with_follow_up
+                                : R.string.overview_gesture_feedback_complete_without_follow_up;
+                        showFeedback(subtitleResId, true);
                         break;
                     case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
                     case HOME_OR_OVERVIEW_CANCELLED:
@@ -128,29 +125,5 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
                 }
                 break;
         }
-    }
-
-    public void animateTaskViewToOverview() {
-        PendingAnimation anim = new PendingAnimation(TASK_VIEW_END_ANIMATION_DURATION_MILLIS);
-        anim.setFloat(mTaskViewSwipeUpAnimation
-                .getCurrentShift(), AnimatedFloat.VALUE, 1, ACCEL);
-
-        ArrayList<Animator> animators = new ArrayList<>();
-
-        if (mTutorialFragment.isLargeScreen()) {
-            Animator multiRowAnimation = mFakePreviousTaskView.createAnimationToMultiRowLayout();
-
-            if (multiRowAnimation != null) {
-                multiRowAnimation.setDuration(TASK_VIEW_END_ANIMATION_DURATION_MILLIS);
-                animators.add(multiRowAnimation);
-            }
-        }
-        animators.add(anim.buildAnim());
-
-        AnimatorSet animset = new AnimatorSet();
-        animset.playTogether(animators);
-        hideFakeTaskbar(/* animateToHotseat= */ false);
-        animset.start();
-        mRunningWindowAnim = SwipeUpAnimationLogic.RunningWindowAnim.wrap(animset);
     }
 }

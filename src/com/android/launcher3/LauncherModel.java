@@ -60,7 +60,6 @@ import com.android.launcher3.pm.InstallSessionTracker;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutRequest;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.PackageUserKey;
@@ -97,10 +96,9 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     // our monitoring of the package manager provides all updates and we never
     // need to do a requery. This is only ever touched from the loader thread.
     private boolean mModelLoaded;
-    private boolean mModelDestroyed = false;
     public boolean isModelLoaded() {
         synchronized (mLock) {
-            return mModelLoaded && mLoaderTask == null && !mModelDestroyed;
+            return mModelLoaded && mLoaderTask == null;
         }
     }
 
@@ -127,12 +125,10 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
         }
     };
 
-    LauncherModel(Context context, LauncherAppState app, IconCache iconCache, AppFilter appFilter,
-            boolean isPrimaryInstance) {
+    LauncherModel(Context context, LauncherAppState app, IconCache iconCache, AppFilter appFilter) {
         mApp = app;
         mBgAllAppsList = new AllAppsList(iconCache, appFilter);
-        mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel,
-                isPrimaryInstance);
+        mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel);
     }
 
     public ModelDelegate getModelDelegate() {
@@ -149,10 +145,9 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
         enqueueModelUpdateTask(new AddWorkspaceItemsTask(itemList));
     }
 
-    public ModelWriter getWriter(boolean hasVerticalHotseat, boolean verifyChanges,
-            @Nullable Callbacks owner) {
+    public ModelWriter getWriter(boolean hasVerticalHotseat, boolean verifyChanges) {
         return new ModelWriter(mApp.getContext(), this, mBgDataModel,
-                hasVerticalHotseat, verifyChanges, owner);
+                hasVerticalHotseat, verifyChanges);
     }
 
     @Override
@@ -249,7 +244,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
      * Called when the model is destroyed
      */
     public void destroy() {
-        mModelDestroyed = true;
         MODEL_EXECUTOR.execute(mModelDelegate::destroy);
     }
 
@@ -336,7 +330,7 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     public boolean addCallbacksAndLoad(Callbacks callbacks) {
         synchronized (mLock) {
             addCallbacks(callbacks);
-            return startLoader(new Callbacks[] { callbacks });
+            return startLoader();
 
         }
     }
@@ -347,12 +341,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     public void addCallbacks(Callbacks callbacks) {
         Preconditions.assertUIThread();
         synchronized (mCallbacksList) {
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.NULL_INT_SET, "addCallbacks pointer: "
-                        + callbacks
-                        + ", name: "
-                        + callbacks.getClass().getName(), new Exception());
-            }
             mCallbacksList.add(callbacks);
         }
     }
@@ -362,32 +350,26 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
      * @return true if the page could be bound synchronously.
      */
     public boolean startLoader() {
-        return startLoader(new Callbacks[0]);
-    }
-
-    private boolean startLoader(Callbacks[] newCallbacks) {
         // Enable queue before starting loader. It will get disabled in Launcher#finishBindingItems
         ItemInstallQueue.INSTANCE.get(mApp.getContext())
                 .pauseModelPush(ItemInstallQueue.FLAG_LOADER_RUNNING);
         synchronized (mLock) {
-            // If there is already one running, tell it to stop.
-            boolean wasRunning = stopLoader();
-            boolean bindDirectly = mModelLoaded && !mIsLoaderTaskRunning;
-            boolean bindAllCallbacks = wasRunning || !bindDirectly || newCallbacks.length == 0;
-            final Callbacks[] callbacksList = bindAllCallbacks ? getCallbacks() : newCallbacks;
-
+            // Don't bother to start the thread if we know it's not going to do anything
+            final Callbacks[] callbacksList = getCallbacks();
             if (callbacksList.length > 0) {
                 // Clear any pending bind-runnables from the synchronized load process.
                 for (Callbacks cb : callbacksList) {
                     MAIN_EXECUTOR.execute(cb::clearPendingBinds);
                 }
 
+                // If there is already one running, tell it to stop.
+                stopLoader();
                 LoaderResults loaderResults = new LoaderResults(
                         mApp, mBgDataModel, mBgAllAppsList, callbacksList);
-                if (bindDirectly) {
+                if (mModelLoaded && !mIsLoaderTaskRunning) {
                     // Divide the set of loaded items into those that we are binding synchronously,
                     // and everything else that is to be bound normally (asynchronously).
-                    loaderResults.bindWorkspace(bindAllCallbacks);
+                    loaderResults.bindWorkspace();
                     // For now, continue posting the binding of AllApps as there are other
                     // issues that arise from that.
                     loaderResults.bindAllApps();
@@ -412,7 +394,7 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
      * If there is already a loader task running, tell it to stop.
      * @return true if an existing loader was stopped.
      */
-    private boolean stopLoader() {
+    public boolean stopLoader() {
         synchronized (mLock) {
             LoaderTask oldTask = mLoaderTask;
             mLoaderTask = null;
@@ -568,9 +550,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     }
 
     public void enqueueModelUpdateTask(ModelUpdateTask task) {
-        if (mModelDestroyed) {
-            return;
-        }
         task.init(mApp, this, mBgDataModel, mBgAllAppsList, MAIN_EXECUTOR);
         MODEL_EXECUTOR.execute(task);
     }

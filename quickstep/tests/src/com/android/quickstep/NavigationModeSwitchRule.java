@@ -20,7 +20,9 @@ import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
 import static com.android.quickstep.NavigationModeSwitchRule.Mode.ALL;
 import static com.android.quickstep.NavigationModeSwitchRule.Mode.THREE_BUTTON;
+import static com.android.quickstep.NavigationModeSwitchRule.Mode.TWO_BUTTON;
 import static com.android.quickstep.NavigationModeSwitchRule.Mode.ZERO_BUTTON;
+import static com.android.systemui.shared.system.QuickStepContract.NAV_BAR_MODE_2BUTTON_OVERLAY;
 import static com.android.systemui.shared.system.QuickStepContract.NAV_BAR_MODE_3BUTTON_OVERLAY;
 import static com.android.systemui.shared.system.QuickStepContract.NAV_BAR_MODE_GESTURAL_OVERLAY;
 
@@ -28,12 +30,12 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.util.Log;
 
+import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 
 import com.android.launcher3.tapl.LauncherInstrumentation;
 import com.android.launcher3.tapl.TestHelpers;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.systemui.shared.system.QuickStepContract;
@@ -47,7 +49,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Test rule that allows executing a test with Quickstep on and then Quickstep off.
@@ -60,7 +61,7 @@ public class NavigationModeSwitchRule implements TestRule {
     public static final int WAIT_TIME_MS = 10000;
 
     public enum Mode {
-        THREE_BUTTON, ZERO_BUTTON, ALL
+        THREE_BUTTON, TWO_BUTTON, ZERO_BUTTON, ALL
     }
 
     // Annotation for tests that need to be run with quickstep enabled and disabled.
@@ -72,8 +73,8 @@ public class NavigationModeSwitchRule implements TestRule {
 
     private final LauncherInstrumentation mLauncher;
 
-    static final DisplayController DISPLAY_CONTROLLER =
-            DisplayController.INSTANCE.get(getInstrumentation().getTargetContext());
+    static final SysUINavigationMode SYS_UI_NAVIGATION_MODE =
+            SysUINavigationMode.INSTANCE.get(getInstrumentation().getTargetContext());
 
     public NavigationModeSwitchRule(LauncherInstrumentation launcher) {
         mLauncher = launcher;
@@ -98,6 +99,9 @@ public class NavigationModeSwitchRule implements TestRule {
                         if (mode == ZERO_BUTTON || mode == ALL) {
                             evaluateWithZeroButtons();
                         }
+                        if (mode == TWO_BUTTON || mode == ALL) {
+                            evaluateWithTwoButtons();
+                        }
                         if (mode == THREE_BUTTON || mode == ALL) {
                             evaluateWithThreeButtons();
                         }
@@ -119,6 +123,13 @@ public class NavigationModeSwitchRule implements TestRule {
                     }
                 }
 
+                private void evaluateWithTwoButtons() throws Throwable {
+                    if (setActiveOverlay(mLauncher, NAV_BAR_MODE_2BUTTON_OVERLAY,
+                            LauncherInstrumentation.NavigationModel.TWO_BUTTON, description)) {
+                        base.evaluate();
+                    }
+                }
+
                 private void evaluateWithZeroButtons() throws Throwable {
                     if (setActiveOverlay(mLauncher, NAV_BAR_MODE_GESTURAL_OVERLAY,
                             LauncherInstrumentation.NavigationModel.ZERO_BUTTON, description)) {
@@ -134,12 +145,14 @@ public class NavigationModeSwitchRule implements TestRule {
     public static String getCurrentOverlayPackage(int currentInteractionMode) {
         return QuickStepContract.isGesturalMode(currentInteractionMode)
                 ? NAV_BAR_MODE_GESTURAL_OVERLAY
-                : NAV_BAR_MODE_3BUTTON_OVERLAY;
+                : QuickStepContract.isSwipeUpMode(currentInteractionMode)
+                        ? NAV_BAR_MODE_2BUTTON_OVERLAY
+                        : NAV_BAR_MODE_3BUTTON_OVERLAY;
     }
 
     private static LauncherInstrumentation.NavigationModel currentSysUiNavigationMode() {
         return LauncherInstrumentation.getNavigationModel(
-                DisplayController.getNavigationMode(
+                SysUINavigationMode.getMode(
                         getInstrumentation().
                                 getTargetContext()).
                         resValue);
@@ -160,21 +173,26 @@ public class NavigationModeSwitchRule implements TestRule {
         if (currentSysUiNavigationMode() != expectedMode) {
             final CountDownLatch latch = new CountDownLatch(1);
             final Context targetContext = getInstrumentation().getTargetContext();
-            final DisplayController.DisplayInfoChangeListener listener =
-                    (context, info, flags) -> {
-                        if (LauncherInstrumentation.getNavigationModel(info.navigationMode.resValue)
+            final SysUINavigationMode.NavigationModeChangeListener listener =
+                    newMode -> {
+                        if (LauncherInstrumentation.getNavigationModel(newMode.resValue)
                                 == expectedMode) {
                             latch.countDown();
                         }
                     };
             targetContext.getMainExecutor().execute(() ->
-                    DISPLAY_CONTROLLER.addChangeListener(listener));
-            latch.await(60, TimeUnit.SECONDS);
+                    SYS_UI_NAVIGATION_MODE.addModeChangeListener(listener));
+            // b/139137636
+//            latch.await(60, TimeUnit.SECONDS);
             targetContext.getMainExecutor().execute(() ->
-                    DISPLAY_CONTROLLER.removeChangeListener(listener));
+                    SYS_UI_NAVIGATION_MODE.removeModeChangeListener(listener));
 
-            assertTrue(launcher, "Navigation mode didn't change to " + expectedMode,
-                    currentSysUiNavigationMode() == expectedMode, description);
+            Wait.atMost(() -> "Navigation mode didn't change to " + expectedMode,
+                    () -> currentSysUiNavigationMode() == expectedMode, WAIT_TIME_MS,
+                    launcher);
+            // b/139137636
+//            assertTrue(launcher, "Navigation mode didn't change to " + expectedMode,
+//                    currentSysUiNavigationMode() == expectedMode, description);
 
         }
 
@@ -203,11 +221,16 @@ public class NavigationModeSwitchRule implements TestRule {
 
     private static void assertTrue(LauncherInstrumentation launcher, String message,
             boolean condition, Description description) {
-        launcher.checkForAnomaly(true, true);
+        if (launcher.getDevice().hasObject(By.textStartsWith(""))) {
+            // The condition above is "screen is not empty". We are not treating
+            // "Screen is empty" as an anomaly here. It's an acceptable state when
+            // Launcher just starts under instrumentation.
+            launcher.checkForAnomaly();
+        }
         if (!condition) {
             final AssertionError assertionError = new AssertionError(message);
             if (description != null) {
-                FailureWatcher.onError(launcher, description, assertionError);
+                FailureWatcher.onError(launcher.getDevice(), description, assertionError);
             }
             throw assertionError;
         }

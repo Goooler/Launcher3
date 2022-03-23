@@ -19,7 +19,6 @@ package com.android.quickstep.logging;
 import static androidx.core.util.Preconditions.checkNotNull;
 import static androidx.core.util.Preconditions.checkState;
 
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_NON_ACTIONABLE;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.FOLDER;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.SEARCH_RESULT_CONTAINER;
@@ -32,26 +31,21 @@ import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGE
 
 import android.content.Context;
 import android.util.Log;
-import android.util.StatsEvent;
 import android.view.View;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.slice.SliceItem;
 
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.logger.LauncherAtom;
-import com.android.launcher3.logger.LauncherAtom.Attribute;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logger.LauncherAtom.FolderContainer.ParentContainerCase;
 import com.android.launcher3.logger.LauncherAtom.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom.FromState;
-import com.android.launcher3.logger.LauncherAtom.LauncherAttributes;
 import com.android.launcher3.logger.LauncherAtom.ToState;
 import com.android.launcher3.logger.LauncherAtomExtensions.DeviceSearchResultContainer;
-import com.android.launcher3.logger.LauncherAtomExtensions.DeviceSearchResultContainer.SearchAttributes;
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
@@ -62,7 +56,6 @@ import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.LogConfig;
-import com.android.launcher3.views.ActivityContext;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.SysUiStatsLog;
 
@@ -83,7 +76,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class StatsLogCompatManager extends StatsLogManager {
 
     private static final String TAG = "StatsLog";
-    private static final String LATENCY_TAG = "StatsLatencyLog";
     private static final boolean IS_VERBOSE = Utilities.isPropertyEnabled(LogConfig.STATSLOG);
     private static final InstanceId DEFAULT_INSTANCE_ID = InstanceId.fakeInstanceId(0);
     // LauncherAtom.ItemInfo.getDefaultInstance() should be used but until launcher proto migrates
@@ -92,14 +84,7 @@ public class StatsLogCompatManager extends StatsLogManager {
     private static final int FOLDER_HIERARCHY_OFFSET = 100;
     private static final int SEARCH_RESULT_HIERARCHY_OFFSET = 200;
     private static final int EXTENDED_CONTAINERS_HIERARCHY_OFFSET = 300;
-
-    /**
-     * Flags for converting SearchAttribute to integer value.
-     */
-    private static final int SEARCH_ATTRIBUTES_CORRECTED_QUERY = 1 << 0;
-    private static final int SEARCH_ATTRIBUTES_DIRECT_MATCH = 1 << 1;
-    private static final int SEARCH_ATTRIBUTES_ENTRY_STATE_ALL_APPS = 1 << 2;
-    private static final int SEARCH_ATTRIBUTES_ENTRY_STATE_QSB = 1 << 3;
+    private static final int ATTRIBUTE_MULTIPLIER = 100;
 
     public static final CopyOnWriteArrayList<StatsLogConsumer> LOGS_CONSUMER =
             new CopyOnWriteArrayList<>();
@@ -112,12 +97,7 @@ public class StatsLogCompatManager extends StatsLogManager {
 
     @Override
     protected StatsLogger createLogger() {
-        return new StatsCompatLogger(mContext, mActivityContext);
-    }
-
-    @Override
-    protected StatsLatencyLogger createLatencyLogger() {
-        return new StatsCompatLatencyLogger(mContext, mActivityContext);
+        return new StatsCompatLogger(mContext);
     }
 
     /**
@@ -133,7 +113,8 @@ public class StatsLogCompatManager extends StatsLogManager {
         }
         SysUiStatsLog.write(SysUiStatsLog.LAUNCHER_SNAPSHOT,
                 LAUNCHER_WORKSPACE_SNAPSHOT.getId() /* event_id */,
-                info.getItemCase().getNumber()  /* target_id */,
+                info.getAttribute().getNumber() * ATTRIBUTE_MULTIPLIER
+                        + info.getItemCase().getNumber()  /* target_id */,
                 instanceId.getId() /* instance_id */,
                 0 /* uid */,
                 getPackageName(info) /* package_name */,
@@ -146,50 +127,11 @@ public class StatsLogCompatManager extends StatsLogManager {
                 getParentPageId(info) /* page_id_parent */,
                 getHierarchy(info) /* hierarchy */,
                 info.getIsWork() /* is_work_profile */,
-                0 /* origin */,
+                info.getAttribute().getNumber() /* origin */,
                 getCardinality(info) /* cardinality */,
                 info.getWidget().getSpanX(),
                 info.getWidget().getSpanY(),
-                getFeatures(info),
-                getAttributes(info) /* attributes */
-        );
-    }
-
-    private static byte[] getAttributes(LauncherAtom.ItemInfo itemInfo) {
-        LauncherAttributes.Builder responseBuilder = LauncherAttributes.newBuilder();
-        itemInfo.getItemAttributesList().stream().map(Attribute::getNumber).forEach(
-                responseBuilder::addItemAttributes);
-        return responseBuilder.build().toByteArray();
-    }
-
-    /**
-     * Builds {@link StatsEvent} from {@link LauncherAtom.ItemInfo}. Used for pulled atom callback
-     * implementation.
-     */
-    public static StatsEvent buildStatsEvent(LauncherAtom.ItemInfo info,
-            @Nullable InstanceId instanceId) {
-        return SysUiStatsLog.buildStatsEvent(
-                SysUiStatsLog.LAUNCHER_LAYOUT_SNAPSHOT, // atom ID,
-                LAUNCHER_WORKSPACE_SNAPSHOT.getId(), // event_id = 1;
-                info.getItemCase().getNumber(), // item_id = 2;
-                instanceId == null ? 0 : instanceId.getId(), //instance_id = 3;
-                0, //uid = 4 [(is_uid) = true];
-                getPackageName(info), // package_name = 5;
-                getComponentName(info), // component_name = 6;
-                getGridX(info, false), //grid_x = 7 [default = -1];
-                getGridY(info, false), //grid_y = 8 [default = -1];
-                getPageId(info), // page_id = 9 [default = -2];
-                getGridX(info, true), //grid_x_parent = 10 [default = -1];
-                getGridY(info, true), //grid_y_parent = 11 [default = -1];
-                getParentPageId(info), //page_id_parent = 12 [default = -2];
-                getHierarchy(info), // container_id = 13;
-                info.getIsWork(), // is_work_profile = 14;
-                0, // attribute_id = 15;
-                getCardinality(info), // cardinality = 16;
-                info.getWidget().getSpanX(), // span_x = 17 [default = 1];
-                info.getWidget().getSpanY(), // span_y = 18 [default = 1];
-                getAttributes(info) /* attributes */
-        );
+                getFeatures(info));
     }
 
     /**
@@ -198,11 +140,8 @@ public class StatsLogCompatManager extends StatsLogManager {
     private static class StatsCompatLogger implements StatsLogger {
 
         private static final ItemInfo DEFAULT_ITEM_INFO = new ItemInfo();
-        static {
-            DEFAULT_ITEM_INFO.itemType = ITEM_TYPE_NON_ACTIONABLE;
-        }
-        private final Context mContext;
-        private final Optional<ActivityContext> mActivityContext;
+
+        private Context mContext;
         private ItemInfo mItemInfo = DEFAULT_ITEM_INFO;
         private InstanceId mInstanceId = DEFAULT_INSTANCE_ID;
         private OptionalInt mRank = OptionalInt.empty();
@@ -215,9 +154,8 @@ public class StatsLogCompatManager extends StatsLogManager {
         private SliceItem mSliceItem;
         private LauncherAtom.Slice mSlice;
 
-        StatsCompatLogger(Context context, ActivityContext activityContext) {
+        StatsCompatLogger(Context context) {
             mContext = context;
-            mActivityContext = Optional.ofNullable(activityContext);
         }
 
         @Override
@@ -369,9 +307,6 @@ public class StatsLogCompatManager extends StatsLogManager {
             mRank.ifPresent(itemInfoBuilder::setRank);
             mContainerInfo.ifPresent(itemInfoBuilder::setContainerInfo);
 
-            mActivityContext.ifPresent(activityContext ->
-                    activityContext.applyOverwritesToLogItem(itemInfoBuilder));
-
             if (mFromState.isPresent() || mToState.isPresent() || mEditText.isPresent()) {
                 FolderIcon.Builder folderIconBuilder = itemInfoBuilder
                         .getFolderIcon()
@@ -392,21 +327,13 @@ public class StatsLogCompatManager extends StatsLogManager {
             if (IS_VERBOSE) {
                 String name = (event instanceof Enum) ? ((Enum) event).name() :
                         event.getId() + "";
-                StringBuilder logStringBuilder = new StringBuilder("\n");
-                if (instanceId != DEFAULT_INSTANCE_ID) {
-                    logStringBuilder.append(String.format("InstanceId:%s ", instanceId));
-                }
-                logStringBuilder.append(name);
-                if (srcState != LAUNCHER_STATE_UNSPECIFIED
-                        || dstState != LAUNCHER_STATE_UNSPECIFIED) {
-                    logStringBuilder.append(
-                            String.format("(State:%s->%s)", getStateString(srcState),
-                                    getStateString(dstState)));
-                }
-                if (mItemInfo != DEFAULT_ITEM_INFO) {
-                    logStringBuilder.append("\n").append(atomInfo);
-                }
-                Log.d(TAG, logStringBuilder.toString());
+
+                Log.d(TAG, instanceId == DEFAULT_INSTANCE_ID
+                        ? String.format("\n%s (State:%s->%s)\n%s", name, getStateString(srcState),
+                        getStateString(dstState), atomInfo)
+                        : String.format("\n%s (State:%s->%s) (InstanceId:%s)\n%s", name,
+                                getStateString(srcState), getStateString(dstState), instanceId,
+                                atomInfo));
             }
 
             for (StatsLogConsumer consumer : LOGS_CONSUMER) {
@@ -421,7 +348,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                     null /* launcher extensions, deprecated */,
                     false /* quickstep_enabled, deprecated */,
                     event.getId() /* event_id */,
-                    atomInfo.getItemCase().getNumber() /* target_id */,
+                    atomInfo.getAttribute().getNumber() * ATTRIBUTE_MULTIPLIER
+                            + atomInfo.getItemCase().getNumber() /* target_id */,
                     instanceId.getId() /* instance_id TODO */,
                     0 /* uid TODO */,
                     getPackageName(atomInfo) /* package_name */,
@@ -439,73 +367,7 @@ public class StatsLogCompatManager extends StatsLogManager {
                     atomInfo.getFolderIcon().getToLabelState().getNumber() /* toState */,
                     atomInfo.getFolderIcon().getLabelInfo() /* edittext */,
                     getCardinality(atomInfo) /* cardinality */,
-                    getFeatures(atomInfo) /* features */,
-                    getSearchAttributes(atomInfo) /* searchAttributes */,
-                    getAttributes(atomInfo) /* attributes */
-            );
-        }
-    }
-
-    /**
-     * Helps to construct and log statsd compatible latency events.
-     */
-    private static class StatsCompatLatencyLogger implements StatsLatencyLogger {
-        private final Context mContext;
-        private final Optional<ActivityContext> mActivityContext;
-        private InstanceId mInstanceId = DEFAULT_INSTANCE_ID;
-        private LatencyType mType = LatencyType.UNKNOWN;
-        private int mPackageId = 0;
-        private long mLatencyInMillis;
-
-        StatsCompatLatencyLogger(Context context, ActivityContext activityContext) {
-            mContext = context;
-            mActivityContext = Optional.ofNullable(activityContext);
-        }
-
-        @Override
-        public StatsLatencyLogger withInstanceId(InstanceId instanceId) {
-            this.mInstanceId = instanceId;
-            return this;
-        }
-
-        @Override
-        public StatsLatencyLogger withType(LatencyType type) {
-            this.mType = type;
-            return this;
-        }
-
-        @Override
-        public StatsLatencyLogger withPackageId(int packageId) {
-            this.mPackageId = packageId;
-            return this;
-        }
-
-        @Override
-        public StatsLatencyLogger withLatency(long latencyInMillis) {
-            this.mLatencyInMillis = latencyInMillis;
-            return this;
-        }
-
-        @Override
-        public void log(EventEnum event) {
-            if (IS_VERBOSE) {
-                String name = (event instanceof Enum) ? ((Enum) event).name() :
-                        event.getId() + "";
-                StringBuilder logStringBuilder = new StringBuilder("\n");
-                if (mInstanceId != DEFAULT_INSTANCE_ID) {
-                    logStringBuilder.append(String.format("InstanceId:%s ", mInstanceId));
-                }
-                logStringBuilder.append(String.format("%s=%sms", name, mLatencyInMillis));
-                Log.d(LATENCY_TAG, logStringBuilder.toString());
-            }
-
-            SysUiStatsLog.write(SysUiStatsLog.LAUNCHER_LATENCY,
-                    event.getId(), // event_id
-                    mInstanceId.getId(), // instance_id
-                    mPackageId, // package_id
-                    mLatencyInMillis, // latency_in_millis
-                    mType.getId() //type
-            );
+                    getFeatures(atomInfo) /* features */);
         }
     }
 
@@ -513,8 +375,6 @@ public class StatsLogCompatManager extends StatsLogManager {
         switch (info.getContainerInfo().getContainerCase()) {
             case PREDICTED_HOTSEAT_CONTAINER:
                 return info.getContainerInfo().getPredictedHotseatContainer().getCardinality();
-            case TASK_BAR_CONTAINER:
-                return info.getContainerInfo().getTaskBarContainer().getCardinality();
             case SEARCH_RESULT_CONTAINER:
                 return info.getContainerInfo().getSearchResultContainer().getQueryLength();
             case EXTENDED_CONTAINERS:
@@ -601,8 +461,6 @@ public class StatsLogCompatManager extends StatsLogManager {
                 return info.getContainerInfo().getHotseat().getIndex();
             case PREDICTED_HOTSEAT_CONTAINER:
                 return info.getContainerInfo().getPredictedHotseatContainer().getIndex();
-            case TASK_BAR_CONTAINER:
-                return info.getContainerInfo().getTaskBarContainer().getIndex();
             default:
                 return info.getContainerInfo().getWorkspace().getPageIndex();
         }
@@ -661,36 +519,6 @@ public class StatsLogCompatManager extends StatsLogManager {
         return 0;
     }
 
-    private static int getSearchAttributes(LauncherAtom.ItemInfo info) {
-        ContainerInfo containerInfo = info.getContainerInfo();
-        if (containerInfo.getContainerCase() == EXTENDED_CONTAINERS
-                && containerInfo.getExtendedContainers().getContainerCase()
-                == DEVICE_SEARCH_RESULT_CONTAINER
-                && containerInfo.getExtendedContainers()
-                .getDeviceSearchResultContainer().hasSearchAttributes()
-        ) {
-            return searchAttributesToInt(containerInfo.getExtendedContainers()
-                    .getDeviceSearchResultContainer().getSearchAttributes());
-        }
-        return 0;
-    }
-
-    private static int searchAttributesToInt(SearchAttributes searchAttributes) {
-        int response = 0;
-        if (searchAttributes.getCorrectedQuery()) {
-            response = response | SEARCH_ATTRIBUTES_CORRECTED_QUERY;
-        }
-        if (searchAttributes.getDirectMatch()) {
-            response = response | SEARCH_ATTRIBUTES_DIRECT_MATCH;
-        }
-        if (searchAttributes.getEntryState() == SearchAttributes.EntryState.ALL_APPS) {
-            response = response | SEARCH_ATTRIBUTES_ENTRY_STATE_ALL_APPS;
-        } else if (searchAttributes.getEntryState() == SearchAttributes.EntryState.QSB) {
-            response = response | SEARCH_ATTRIBUTES_ENTRY_STATE_QSB;
-        }
-
-        return response;
-    }
 
     /**
      * Interface to get stats log while it is dispatched to the system

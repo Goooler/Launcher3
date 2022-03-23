@@ -23,6 +23,7 @@ import android.content.Context;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.util.Themes;
 
 /**
@@ -32,18 +33,26 @@ public class AllAppsState extends LauncherState {
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE | FLAG_CLOSE_POPUPS;
 
+    private static final PageAlphaProvider PAGE_ALPHA_PROVIDER = new PageAlphaProvider(DEACCEL_2) {
+        @Override
+        public float getPageAlpha(int pageIndex) {
+            return 0;
+        }
+    };
+
     public AllAppsState(int id) {
         super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
     }
 
     @Override
     public int getTransitionDuration(Context context) {
-        return 150;
+        return 320;
     }
 
     @Override
     public String getDescription(Launcher launcher) {
-        return launcher.getAppsView().getDescription();
+        AllAppsContainerView appsView = launcher.getAppsView();
+        return appsView.getDescription();
     }
 
     @Override
@@ -53,16 +62,9 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        ScaleAndTranslation scaleAndTranslation =
-                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
-        if (launcher.getDeviceProfile().isTablet) {
-            scaleAndTranslation.scale = 0.97f;
-        } else {
-            ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
-                    .getWorkspaceScaleAndTranslation(launcher);
-            scaleAndTranslation.translationX = overviewScaleAndTranslation.translationX;
-            scaleAndTranslation.translationY = overviewScaleAndTranslation.translationY;
-        }
+        ScaleAndTranslation scaleAndTranslation = LauncherState.OVERVIEW
+                .getWorkspaceScaleAndTranslation(launcher);
+        scaleAndTranslation.scale = 1;
         return scaleAndTranslation;
     }
 
@@ -75,20 +77,12 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
-        PageAlphaProvider superPageAlphaProvider = super.getWorkspacePageAlphaProvider(launcher);
-        return new PageAlphaProvider(DEACCEL_2) {
-            @Override
-            public float getPageAlpha(int pageIndex) {
-                return launcher.getDeviceProfile().isTablet
-                        ? superPageAlphaProvider.getPageAlpha(pageIndex)
-                        : 0;
-            }
-        };
+        return PAGE_ALPHA_PROVIDER;
     }
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return ALL_APPS_CONTENT | HOTSEAT_ICONS;
+        return ALL_APPS_CONTENT;
     }
 
     @Override
@@ -98,8 +92,6 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
-        return launcher.getDeviceProfile().isTablet
-                ? launcher.getResources().getColor(R.color.widgets_picker_scrim)
-                : Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
+        return Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
     }
 }
