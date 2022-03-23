@@ -21,7 +21,6 @@ import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
 import android.app.PendingIntent;
 import android.content.Intent;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 import android.util.Pair;
@@ -59,12 +58,6 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler {
         Pair<Intent, ActivityOptions> options = remoteResponse.getLaunchOptions(view);
         ActivityOptionsWrapper activityOptions = mLauncher.getAppTransitionManager()
                 .getActivityLaunchOptions(hostView);
-        Object itemInfo = hostView.getTag();
-        IBinder launchCookie = null;
-        if (itemInfo instanceof ItemInfo) {
-            launchCookie = mLauncher.getLaunchCookie((ItemInfo) itemInfo);
-            activityOptions.options.setLaunchCookie(launchCookie);
-        }
         if (Utilities.ATLEAST_S && !pendingIntent.isActivity()) {
             // In the event this pending intent eventually launches an activity, i.e. a trampoline,
             // use the Quickstep transition animation.
@@ -72,14 +65,17 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler {
                 ActivityTaskManager.getService()
                         .registerRemoteAnimationForNextActivityStart(
                                 pendingIntent.getCreatorPackage(),
-                                activityOptions.options.getRemoteAnimationAdapter(),
-                                launchCookie);
+                                activityOptions.options.getRemoteAnimationAdapter());
             } catch (RemoteException e) {
                 // Do nothing.
             }
         }
         activityOptions.options.setPendingIntentLaunchFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR);
+        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_EMPTY);
+        Object itemInfo = hostView.getTag();
+        if (itemInfo instanceof ItemInfo) {
+            mLauncher.addLaunchCookie((ItemInfo) itemInfo, activityOptions.options);
+        }
         options = Pair.create(options.first, activityOptions.options);
         if (pendingIntent.isActivity()) {
             logAppLaunch(itemInfo);

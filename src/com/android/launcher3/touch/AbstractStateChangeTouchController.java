@@ -21,12 +21,13 @@ import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
+import static com.android.launcher3.config.FeatureFlags.UNSTABLE_SPRINGS;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAPPS;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_UNKNOWN_SWIPEDOWN;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_UNKNOWN_SWIPEUP;
-import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
+import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 
 import android.animation.Animator.AnimatorListener;
 import android.animation.ValueAnimator;
@@ -216,7 +217,7 @@ public abstract class AbstractStateChangeTouchController
                     mFlingBlockCheck.blockFling();
                 }
             }
-            if (mToState == LauncherState.ALL_APPS) {
+            if (mToState == LauncherState.ALL_APPS && !UNSTABLE_SPRINGS.get()) {
                 mAllAppsOvershootStarted = true;
                 // 1f, value when all apps container hit the top
                 mLauncher.getAppsView().onPull(progress - 1f, progress - 1f);
@@ -332,7 +333,7 @@ public abstract class AbstractStateChangeTouchController
         anim.setFloatValues(startProgress, endProgress);
         updateSwipeCompleteAnimation(anim, duration, targetState, velocity, fling);
         mCurrentAnimation.dispatchOnStart();
-        if (targetState == LauncherState.ALL_APPS) {
+        if (targetState == LauncherState.ALL_APPS && !UNSTABLE_SPRINGS.get()) {
             if (mAllAppsOvershootStarted) {
                 mLauncher.getAppsView().onRelease();
                 mAllAppsOvershootStarted = false;
