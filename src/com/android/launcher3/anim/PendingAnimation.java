@@ -56,10 +56,6 @@ public class PendingAnimation implements PropertySetter {
         mAnim = new AnimatorSet();
     }
 
-    public long getDuration() {
-        return mDuration;
-    }
-
     /**
      * Utility method to sent an interpolator on an animation and add it to the list
      */
@@ -75,13 +71,6 @@ public class PendingAnimation implements PropertySetter {
     public void add(Animator a, SpringProperty springProperty) {
         mAnim.play(a.setDuration(mDuration));
         addAnimationHoldersRecur(a, mDuration, springProperty, mAnimHolders);
-    }
-
-    /**
-     * Configures interpolator of the underlying AnimatorSet.
-     */
-    public void setInterpolator(TimeInterpolator interpolator) {
-        mAnim.setInterpolator(interpolator);
     }
 
     @Override

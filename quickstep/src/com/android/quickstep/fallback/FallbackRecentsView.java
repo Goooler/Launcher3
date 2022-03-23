@@ -15,12 +15,10 @@
  */
 package com.android.quickstep.fallback;
 
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.fallback.RecentsState.DEFAULT;
 import static com.android.quickstep.fallback.RecentsState.HOME;
 import static com.android.quickstep.fallback.RecentsState.MODAL_TASK;
-import static com.android.quickstep.fallback.RecentsState.OVERVIEW_SPLIT_SELECT;
 
 import android.animation.AnimatorSet;
 import android.annotation.TargetApi;
@@ -29,24 +27,19 @@ import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.popup.QuickstepSystemShortcut;
 import com.android.launcher3.statemanager.StateManager.StateListener;
-import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.quickstep.FallbackActivityInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsActivity;
-import com.android.quickstep.util.GroupTask;
-import com.android.quickstep.util.SplitSelectStateController;
-import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.SplitPlaceholderView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.Task.TaskKey;
@@ -69,8 +62,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void init(OverviewActionsView actionsView, SplitSelectStateController splitController) {
-        super.init(actionsView, splitController);
+    public void init(OverviewActionsView actionsView, SplitPlaceholderView splitPlaceholderView) {
+        super.init(actionsView, splitPlaceholderView);
         setOverviewStateEnabled(true);
         setOverlayEnabled(true);
     }
@@ -78,7 +71,6 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     @Override
     public void startHome() {
         mActivity.startHome();
-        AbstractFloatingView.closeAllOpenViews(mActivity, mActivity.isStarted());
     }
 
     /**
@@ -86,10 +78,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
      * to the home task. This allows us to handle quick-switch similarly to a quick-switching
      * from a foreground task.
      */
-    public void onGestureAnimationStartOnHome(RunningTaskInfo[] homeTaskInfo) {
-        // TODO(b/195607777) General fallback love, but this might be correct
-        //  Home task should be defined as the front-most task info I think?
-        mHomeTaskInfo = homeTaskInfo[0];
+    public void onGestureAnimationStartOnHome(RunningTaskInfo homeTaskInfo) {
+        mHomeTaskInfo = homeTaskInfo;
         onGestureAnimationStart(homeTaskInfo);
     }
 
@@ -100,14 +90,12 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
      */
     @Override
     public void onPrepareGestureEndAnimation(
-            @Nullable AnimatorSet animatorSet, GestureState.GestureEndTarget endTarget,
-            TaskViewSimulator[] taskViewSimulators) {
-        super.onPrepareGestureEndAnimation(animatorSet, endTarget, taskViewSimulators);
+            @Nullable AnimatorSet animatorSet, GestureState.GestureEndTarget endTarget) {
+        super.onPrepareGestureEndAnimation(animatorSet, endTarget);
         if (mHomeTaskInfo != null && endTarget == RECENTS && animatorSet != null) {
-            TaskView tv = getTaskViewByTaskId(mHomeTaskInfo.taskId);
+            TaskView tv = getTaskView(mHomeTaskInfo.taskId);
             if (tv != null) {
-                PendingAnimation pa = createTaskDismissAnimation(tv, true, false, 150,
-                        false /* dismissingForSplitSelection*/);
+                PendingAnimation pa = createTaskDismissAnimation(tv, true, false, 150);
                 pa.addEndListener(e -> setCurrentTask(-1));
                 AnimatorPlaybackController controller = pa.createPlaybackController();
                 controller.dispatchOnStart();
@@ -126,67 +114,48 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void setCurrentTask(int runningTaskViewId) {
-        super.setCurrentTask(runningTaskViewId);
-        int runningTaskId = getTaskIdsForRunningTaskView()[0];
+    public void setCurrentTask(int runningTaskId) {
+        super.setCurrentTask(runningTaskId);
         if (mHomeTaskInfo != null && mHomeTaskInfo.taskId != runningTaskId) {
             mHomeTaskInfo = null;
             setRunningTaskHidden(false);
         }
     }
 
-    @Nullable
     @Override
-    protected TaskView getHomeTaskView() {
-        return mHomeTaskInfo != null ? getTaskViewByTaskId(mHomeTaskInfo.taskId) : null;
-    }
-
-    @Override
-    protected boolean shouldAddStubTaskView(RunningTaskInfo[] runningTaskInfos) {
-        if (runningTaskInfos.length > 1) {
-            // can't be in split screen w/ home task
-            return super.shouldAddStubTaskView(runningTaskInfos);
-        }
-
-        RunningTaskInfo runningTaskInfo = runningTaskInfos[0];
+    protected boolean shouldAddStubTaskView(RunningTaskInfo runningTaskInfo) {
         if (mHomeTaskInfo != null && runningTaskInfo != null &&
                 mHomeTaskInfo.taskId == runningTaskInfo.taskId
-                && getTaskViewCount() == 0 && mLoadPlanEverApplied) {
+                && getTaskViewCount() == 0) {
             // Do not add a stub task if we are running over home with empty recents, so that we
             // show the empty recents message instead of showing a stub task and later removing it.
-            // Ignore empty task signal if applyLoadPlan has never run.
             return false;
         }
-        return super.shouldAddStubTaskView(runningTaskInfos);
+        return super.shouldAddStubTaskView(runningTaskInfo);
     }
 
     @Override
-    protected void applyLoadPlan(ArrayList<GroupTask> taskGroups) {
+    protected void applyLoadPlan(ArrayList<Task> tasks) {
         // When quick-switching on 3p-launcher, we add a "stub" tile corresponding to Launcher
         // as well. This tile is never shown as we have setCurrentTaskHidden, but allows use to
         // track the index of the next task appropriately, as if we are switching on any other app.
-        // TODO(b/195607777) Confirm home task info is front-most task and not mixed in with others
-        int runningTaskId = getTaskIdsForRunningTaskView()[0];
-        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == runningTaskId 
-                && !taskGroups.isEmpty()) {
+        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == mRunningTaskId && !tasks.isEmpty()) {
             // Check if the task list has running task
             boolean found = false;
-            for (GroupTask group : taskGroups) {
-                if (group.containsTask(runningTaskId)) {
+            for (Task t : tasks) {
+                if (t.key.id == mRunningTaskId) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                ArrayList<GroupTask> newList = new ArrayList<>(taskGroups.size() + 1);
-                newList.addAll(taskGroups);
-                newList.add(new GroupTask(
-                        Task.from(new TaskKey(mHomeTaskInfo), mHomeTaskInfo, false),
-                        null, null));
-                taskGroups = newList;
+                ArrayList<Task> newList = new ArrayList<>(tasks.size() + 1);
+                newList.addAll(tasks);
+                newList.add(Task.from(new TaskKey(mHomeTaskInfo), mHomeTaskInfo, false));
+                tasks = newList;
             }
         }
-        super.applyLoadPlan(taskGroups);
+        super.applyLoadPlan(tasks);
     }
 
     @Override
@@ -206,16 +175,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         } else {
             if (mActivity.isInState(RecentsState.MODAL_TASK)) {
                 mActivity.getStateManager().goToState(DEFAULT);
-                resetModalVisuals();
             }
         }
-    }
-
-    @Override
-    public void initiateSplitSelect(TaskView taskView,
-            @SplitConfigurationOptions.StagePosition int stagePosition) {
-        super.initiateSplitSelect(taskView, stagePosition);
-        mActivity.getStateManager().goToState(OVERVIEW_SPLIT_SELECT);
     }
 
     @Override
@@ -223,7 +184,6 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         setOverviewStateEnabled(true);
         setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
         setOverviewFullscreenEnabled(toState.isFullScreen());
-        Log.d(BAD_STATE, "FRV onStateTransitionStart setFreezeVisibility=true, toState=" + toState);
         setFreezeViewVisibility(true);
     }
 
@@ -233,16 +193,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
             // Clean-up logic that occurs when recents is no longer in use/visible.
             reset();
         }
-        boolean isOverlayEnabled = finalState == DEFAULT || finalState == MODAL_TASK;
-        setOverlayEnabled(isOverlayEnabled);
-        Log.d(BAD_STATE, "FRV onStateTransitionComplete setFreezeVisibility=false, finalState="
-                + finalState);
+        setOverlayEnabled(finalState == DEFAULT || finalState == MODAL_TASK);
         setFreezeViewVisibility(false);
-
-        if (isOverlayEnabled) {
-            runActionOnRemoteHandles(remoteTargetHandle ->
-                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
-        }
     }
 
     @Override
@@ -252,18 +204,5 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
             RecentsState state = mActivity.getStateManager().getState();
             setDisallowScrollToClearAll(!state.hasClearAllButton());
         }
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent ev) {
-        boolean result = super.onTouchEvent(ev);
-        // Do not let touch escape to siblings below this view.
-        return result || mActivity.getStateManager().getState().overviewUi();
-    }
-
-    @Override
-    public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
-        super.initiateSplitSelect(splitSelectSource);
-        mActivity.getStateManager().goToState(OVERVIEW_SPLIT_SELECT);
     }
 }

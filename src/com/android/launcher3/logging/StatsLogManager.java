@@ -33,7 +33,6 @@ import com.android.launcher3.logger.LauncherAtom.FromState;
 import com.android.launcher3.logger.LauncherAtom.ToState;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ResourceBasedOverride;
-import com.android.launcher3.views.ActivityContext;
 
 /**
  * Handles the user event logging in R+.
@@ -54,9 +53,6 @@ public class StatsLogManager implements ResourceBasedOverride {
     public static final int LAUNCHER_STATE_UNCHANGED = 5;
 
     private InstanceId mInstanceId;
-
-    protected @Nullable ActivityContext mActivityContext = null;
-
     /**
      * Returns event enum based on the two state transition information when swipe
      * gesture happens(to be removed during UserEventDispatcher cleanup).
@@ -80,22 +76,6 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     public interface EventEnum {
-
-        /**
-         * Tag used to request new UI Event IDs via presubmit analysis.
-         *
-         * <p>Use RESERVE_NEW_UI_EVENT_ID as the constructor parameter for a new {@link EventEnum}
-         * to signal the presubmit analyzer to reserve a new ID for the event. The new ID will be
-         * returned as a Gerrit presubmit finding.  Do not submit {@code RESERVE_NEW_UI_EVENT_ID} as
-         * the constructor parameter for any event.
-         *
-         * <pre>
-         * &#064;UiEvent(doc = "Briefly describe the interaction when this event will be logged")
-         * UNIQUE_EVENT_NAME(RESERVE_NEW_UI_EVENT_ID);
-         * </pre>
-         */
-        int RESERVE_NEW_UI_EVENT_ID = Integer.MIN_VALUE; // Negative IDs are ignored by the logger.
-
         int getId();
     }
 
@@ -258,9 +238,6 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User swipes or fling in DOWN direction to close apps drawer.")
         LAUNCHER_ALLAPPS_CLOSE_DOWN(569),
 
-        @UiEvent(doc = "User tap outside apps drawer sheet to close apps drawer.")
-        LAUNCHER_ALLAPPS_CLOSE_TAP_OUTSIDE(941),
-
         @UiEvent(doc = "User swipes or fling in UP direction and hold from the bottom bazel area")
         LAUNCHER_OVERVIEW_GESTURE(570),
 
@@ -287,9 +264,6 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User tapped on the share button on overview")
         LAUNCHER_OVERVIEW_ACTIONS_SHARE(582),
-
-        @UiEvent(doc = "User tapped on the split screen button on overview")
-        LAUNCHER_OVERVIEW_ACTIONS_SPLIT(895),
 
         @UiEvent(doc = "User tapped on the close button in select mode")
         LAUNCHER_SELECT_MODE_CLOSE(583),
@@ -374,9 +348,6 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "Notification dismissed by swiping right.")
         LAUNCHER_NOTIFICATION_DISMISSED(652),
-
-        @UiEvent(doc = "Current grid size is changed to 6.")
-        LAUNCHER_GRID_SIZE_6(930),
 
         @UiEvent(doc = "Current grid size is changed to 5.")
         LAUNCHER_GRID_SIZE_5(662),
@@ -515,44 +486,8 @@ public class StatsLogManager implements ResourceBasedOverride {
         LAUNCHER_TURN_ON_WORK_APPS_TAP(838),
 
         @UiEvent(doc = "User tapped on 'Turn off work apps' button in all apps window.")
-        LAUNCHER_TURN_OFF_WORK_APPS_TAP(839),
-
-        @UiEvent(doc = "Launcher item drop failed since there was not enough room on the screen.")
-        LAUNCHER_ITEM_DROP_FAILED_INSUFFICIENT_SPACE(872),
-
-        @UiEvent(doc = "User long pressed on the taskbar background to hide the taskbar")
-        LAUNCHER_TASKBAR_LONGPRESS_HIDE(896),
-
-        @UiEvent(doc = "User long pressed on the taskbar gesture handle to show the taskbar")
-        LAUNCHER_TASKBAR_LONGPRESS_SHOW(897),
-
-        @UiEvent(doc = "User clicks on the search icon on header to launch search in app.")
-        LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913),
-
-        @UiEvent(doc = "User is shown the back gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_SHOWN(959),
-
-        @UiEvent(doc = "User is shown the home gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_SHOWN(960),
-
-        @UiEvent(doc = "User is shown the overview gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_SHOWN(961),
-
-        @UiEvent(doc = "User completed the back gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_COMPLETED(962),
-
-        @UiEvent(doc = "User completed the home gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_COMPLETED(963),
-
-        @UiEvent(doc = "User completed the overview gesture navigation tutorial step.")
-        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_COMPLETED(964),
-
-        @UiEvent(doc = "User skips the gesture navigation tutorial.")
-        LAUNCHER_GESTURE_TUTORIAL_SKIPPED(965),
-
-        @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
-                + "result page etc.")
-        LAUNCHER_ALLAPPS_SCROLLED(985);
+        LAUNCHER_TURN_OFF_WORK_APPS_TAP(839)
+        ;
 
         // ADD MORE
 
@@ -587,7 +522,7 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
-     * Helps to construct and log launcher event.
+     * Helps to construct and write the log message.
      */
     public interface StatsLogger {
 
@@ -687,92 +622,18 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
-     * Helps to construct and log latency event.
-     */
-    public interface StatsLatencyLogger {
-
-        enum LatencyType {
-            UNKNOWN(0),
-            COLD(1),
-            HOT(2);
-
-            private final int mId;
-
-            LatencyType(int id) {
-                this.mId = id;
-            }
-
-            public int getId() {
-                return mId;
-            }
-
-        }
-
-        /**
-         * Sets {@link InstanceId} of log message.
-         */
-        default StatsLatencyLogger withInstanceId(InstanceId instanceId) {
-            return this;
-        }
-
-
-        /**
-         * Sets latency of the event.
-         */
-        default StatsLatencyLogger withLatency(long latencyInMillis) {
-            return this;
-        }
-
-        /**
-         * Sets {@link LatencyType} of log message.
-         */
-        default StatsLatencyLogger withType(LatencyType type) {
-            return this;
-        }
-
-        /**
-         * Sets packageId of log message.
-         */
-        default StatsLatencyLogger withPackageId(int packageId) {
-            return this;
-        }
-
-        /**
-         * Builds the final message and logs it as {@link EventEnum}.
-         */
-        default void log(EventEnum event) {
-        }
-    }
-
-    /**
      * Returns new logger object.
      */
     public StatsLogger logger() {
         StatsLogger logger = createLogger();
         if (mInstanceId != null) {
-            logger.withInstanceId(mInstanceId);
-        }
-        return logger;
-    }
-
-    /**
-     * Returns new latency logger object.
-     */
-    public StatsLatencyLogger latencyLogger() {
-        StatsLatencyLogger logger = createLatencyLogger();
-        if (mInstanceId != null) {
-            logger.withInstanceId(mInstanceId);
+            return logger.withInstanceId(mInstanceId);
         }
         return logger;
     }
 
     protected StatsLogger createLogger() {
         return new StatsLogger() {
-        };
-    }
-
-    protected StatsLatencyLogger createLatencyLogger() {
-        return new StatsLatencyLogger() {
         };
     }
 
@@ -789,9 +650,7 @@ public class StatsLogManager implements ResourceBasedOverride {
      * Creates a new instance of {@link StatsLogManager} based on provided context.
      */
     public static StatsLogManager newInstance(Context context) {
-        StatsLogManager manager = Overrides.getObject(StatsLogManager.class,
+        return Overrides.getObject(StatsLogManager.class,
                 context.getApplicationContext(), R.string.stats_log_manager_class);
-        manager.mActivityContext = ActivityContext.lookupContextNoThrow(context);
-        return manager;
     }
 }

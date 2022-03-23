@@ -40,8 +40,8 @@ import com.android.launcher3.GestureNavContract;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.window.RefreshRateTracker;
 
 /**
  * Similar to {@link FloatingIconView} but displays a surface with the targetIcon. It then passes
@@ -97,7 +97,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
 
         // Remove after some time, to avoid flickering
         Executors.MAIN_EXECUTOR.getHandler().postDelayed(mRemoveViewRunnable,
-                RefreshRateTracker.getSingleFrameMs(mLauncher));
+                DisplayController.INSTANCE.get(mLauncher).getInfo().singleFrameMs);
     }
 
     private void removeViewFromParent() {
@@ -158,9 +158,8 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
         if (mContract == null) {
             return;
         }
-        View icon = mLauncher.getFirstMatchForAppClose(-1,
-                mContract.componentName.getPackageName(), mContract.user,
-                false /* supportsAllAppsState */);
+        View icon = mLauncher.getWorkspace().getFirstMatchForAppClose(-1,
+                mContract.componentName.getPackageName(), mContract.user);
 
         boolean iconChanged = mIcon != icon;
         if (iconChanged) {
@@ -183,7 +182,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
                 lp.topMargin = Math.round(mIconPosition.top);
             }
         }
-        if (mIcon != null && iconChanged && !mIconBounds.isEmpty()) {
+        if (iconChanged && !mIconBounds.isEmpty()) {
             // Record the icon display
             setCurrentIconVisible(true);
             Canvas c = mPicture.beginRecording(mIconBounds.width(), mIconBounds.height());

@@ -16,16 +16,22 @@
 
 package com.android.quickstep;
 
+import static com.android.launcher3.util.RaceConditionReproducer.enterEvt;
+import static com.android.launcher3.util.RaceConditionReproducer.exitEvt;
+
 import android.content.Intent;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
-import com.android.launcher3.ui.TaplTestsLauncher3;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.util.RaceConditionReproducer;
+import com.android.quickstep.NavigationModeSwitchRule.Mode;
 import com.android.quickstep.NavigationModeSwitchRule.NavigationModeSwitch;
+import com.android.quickstep.inputconsumers.OtherActivityInputConsumer;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -39,9 +45,8 @@ public class StartLauncherViaGestureTests extends AbstractQuickStepTest {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        TaplTestsLauncher3.initialize(this);
         // b/143488140
-        mLauncher.goHome();
+        mLauncher.pressHome();
         // Start an activity where the gestures start.
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
     }
@@ -54,8 +59,23 @@ public class StartLauncherViaGestureTests extends AbstractQuickStepTest {
 
         // The test action.
         eventProcessor.startIteration();
-        mLauncher.goHome();
+        mLauncher.pressHome();
         eventProcessor.finishIteration();
+    }
+
+    @Test
+    @Ignore // Ignoring until race condition repro framework is changes for multi-process case.
+    @NavigationModeSwitch(mode = Mode.TWO_BUTTON)
+    public void testPressHome() {
+        runTest(enterEvt(Launcher.ON_CREATE_EVT),
+                exitEvt(Launcher.ON_CREATE_EVT),
+                enterEvt(OtherActivityInputConsumer.DOWN_EVT),
+                exitEvt(OtherActivityInputConsumer.DOWN_EVT));
+
+        runTest(enterEvt(OtherActivityInputConsumer.DOWN_EVT),
+                exitEvt(OtherActivityInputConsumer.DOWN_EVT),
+                enterEvt(Launcher.ON_CREATE_EVT),
+                exitEvt(Launcher.ON_CREATE_EVT));
     }
 
     @Test
@@ -66,7 +86,7 @@ public class StartLauncherViaGestureTests extends AbstractQuickStepTest {
             closeLauncherActivity();
 
             // The test action.
-            mLauncher.goHome();
+            mLauncher.pressHome();
         }
     }
 
@@ -78,9 +98,9 @@ public class StartLauncherViaGestureTests extends AbstractQuickStepTest {
             closeLauncherActivity();
 
             // The test action.
-            mLauncher.getLaunchedAppState().switchToOverview();
+            mLauncher.getBackground().switchToOverview();
         }
         closeLauncherActivity();
-        mLauncher.goHome();
+        mLauncher.pressHome();
     }
 }
