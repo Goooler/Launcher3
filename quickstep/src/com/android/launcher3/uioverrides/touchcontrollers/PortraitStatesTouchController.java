@@ -23,13 +23,8 @@ import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
-import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
-import static com.android.launcher3.anim.Interpolators.INSTANT;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.anim.Interpolators.LINEAR_TELEPORT;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 
 import android.view.MotionEvent;
 
@@ -57,22 +52,22 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
     /**
      * The progress at which all apps content will be fully visible.
      */
-    public static final float ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD = 0.8f;
+    protected static final float ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD = 0.8f;
 
     /**
      * Minimum clamping progress for fading in all apps content
      */
-    public static final float ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD = 0.5f;
+    protected static final float ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD = 0.5f;
 
     /**
      * Minimum clamping progress for fading in all apps scrim
      */
-    public static final float ALL_APPS_SCRIM_VISIBLE_THRESHOLD = .1f;
+    protected static final float ALL_APPS_SCRIM_VISIBLE_THRESHOLD = .1f;
 
     /**
      * Maximum clamping progress for opaque all apps scrim
      */
-    public static final float ALL_APPS_SCRIM_OPAQUE_THRESHOLD = .5f;
+    protected static final float ALL_APPS_SCRIM_OPAQUE_THRESHOLD = .5f;
 
     private final PortraitOverviewStateTouchHelper mOverviewPortraitStateTouchHelper;
 
@@ -131,31 +126,23 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
     private StateAnimationConfig getNormalToAllAppsAnimation() {
         StateAnimationConfig builder = new StateAnimationConfig();
-        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
-                ? INSTANT
-                : Interpolators.clampToProgress(ACCEL,
-                        ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD,
-                        ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD));
+        builder.setInterpolator(ANIM_ALL_APPS_FADE, Interpolators.clampToProgress(ACCEL,
+                ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD,
+                ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD));
         builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(ACCEL,
                 ALL_APPS_SCRIM_VISIBLE_THRESHOLD,
                 ALL_APPS_SCRIM_OPAQUE_THRESHOLD));
-        builder.setInterpolator(ANIM_VERTICAL_PROGRESS, isTablet ? LINEAR_TELEPORT : LINEAR);
         return builder;
     }
 
     private StateAnimationConfig getAllAppsToNormalAnimation() {
         StateAnimationConfig builder = new StateAnimationConfig();
-        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
-                ? FINAL_FRAME
-                : Interpolators.clampToProgress(DEACCEL,
-                        1 - ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD,
-                        1 - ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD));
+        builder.setInterpolator(ANIM_ALL_APPS_FADE, Interpolators.clampToProgress(DEACCEL,
+                1 - ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD,
+                1 - ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD));
         builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(DEACCEL,
                 1 - ALL_APPS_SCRIM_OPAQUE_THRESHOLD,
                 1 - ALL_APPS_SCRIM_VISIBLE_THRESHOLD));
-        builder.setInterpolator(ANIM_VERTICAL_PROGRESS, isTablet ? LINEAR_TELEPORT : LINEAR);
         return builder;
     }
 
@@ -234,9 +221,13 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
      * @return true if the event is over the hotseat
      */
     static boolean isTouchOverHotseat(Launcher launcher, MotionEvent ev) {
+        return (ev.getY() >= getHotseatTop(launcher));
+    }
+
+    public static int getHotseatTop(Launcher launcher) {
         DeviceProfile dp = launcher.getDeviceProfile();
         int hotseatHeight = dp.hotseatBarSizePx + dp.getInsets().bottom;
-        return (ev.getY() >= (launcher.getDragLayer().getHeight() - hotseatHeight));
+        return launcher.getDragLayer().getHeight() - hotseatHeight;
     }
 
     @Override

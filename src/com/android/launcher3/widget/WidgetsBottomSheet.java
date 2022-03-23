@@ -36,6 +36,8 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.model.WidgetItem;
@@ -69,8 +71,8 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     private static final long EDUCATION_TIP_DELAY_MS = 300;
 
     private ItemInfo mOriginalItemInfo;
-    private int mMaxHorizontalSpan = DEFAULT_MAX_HORIZONTAL_SPANS;
-    private final int mWidgetCellHorizontalPadding;
+    private final int mMaxTableHeight;
+    private int mMaxHorizontalSpan = 4;
 
     private final OnLayoutChangeListener mLayoutChangeListenerToShowTips =
             new OnLayoutChangeListener() {
@@ -108,11 +110,13 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     public WidgetsBottomSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setWillNotDraw(false);
+        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
+        // Set the max table height to 2 / 3 of the grid height so that the bottom picker won't
+        // take over the entire view vertically.
+        mMaxTableHeight = deviceProfile.inv.numRows * 2 / 3  * deviceProfile.cellHeightPx;
         if (!hasSeenEducationTip()) {
             addOnLayoutChangeListener(mLayoutChangeListenerToShowTips);
         }
-        mWidgetCellHorizontalPadding = getResources().getDimensionPixelSize(
-                R.dimen.widget_cell_horizontal_padding);
     }
 
     @Override
@@ -133,7 +137,10 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     private boolean updateMaxSpansPerRow() {
         if (getMeasuredWidth() == 0) return false;
 
-        int maxHorizontalSpan = computeMaxHorizontalSpans(mContent, mWidgetCellHorizontalPadding);
+        int paddingPx = 2 * getResources().getDimensionPixelOffset(
+                R.dimen.widget_cell_horizontal_padding);
+        int maxHorizontalSpan = findViewById(R.id.widgets_table).getMeasuredWidth()
+                / (mActivityContext.getDeviceProfile().cellWidthPx + paddingPx);
         if (mMaxHorizontalSpan != maxHorizontalSpan) {
             // Ensure the table layout is showing widgets in the right column after measure.
             mMaxHorizontalSpan = maxHorizontalSpan;
@@ -156,9 +163,13 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
 
         setTranslationShift(mTranslationShift);
 
+        // Ensure the scroll view height is not larger than mMaxTableHeight, which is a value
+        // smaller than the entire screen height.
         ScrollView widgetsTableScrollView = findViewById(R.id.widgets_table_scroll_view);
-        TableLayout widgetsTable = findViewById(R.id.widgets_table);
-        if (widgetsTable.getMeasuredHeight() > widgetsTableScrollView.getMeasuredHeight()) {
+        if (widgetsTableScrollView.getMeasuredHeight() > mMaxTableHeight) {
+            ViewGroup.LayoutParams layoutParams = widgetsTableScrollView.getLayoutParams();
+            layoutParams.height = mMaxTableHeight;
+            widgetsTableScrollView.setLayoutParams(layoutParams);
             findViewById(R.id.collapse_handle).setVisibility(VISIBLE);
         }
     }
@@ -183,16 +194,19 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         TableLayout widgetsTable = findViewById(R.id.widgets_table);
         widgetsTable.removeAllViews();
 
-        WidgetsTableUtils.groupWidgetItemsIntoTableWithReordering(widgets, mMaxHorizontalSpan)
-                .forEach(row -> {
-                    TableRow tableRow = new TableRow(getContext());
-                    tableRow.setGravity(Gravity.TOP);
-                    row.forEach(widgetItem -> {
-                        WidgetCell widget = addItemCell(tableRow);
-                        widget.applyFromCellItem(widgetItem);
-                    });
-                    widgetsTable.addView(tableRow);
-                });
+        WidgetsTableUtils.groupWidgetItemsIntoTable(widgets, mMaxHorizontalSpan).forEach(row -> {
+            TableRow tableRow = new TableRow(getContext());
+            tableRow.setGravity(Gravity.TOP);
+            row.forEach(widgetItem -> {
+                WidgetCell widget = addItemCell(tableRow);
+                widget.setPreviewSize(widgetItem);
+                widget.applyFromCellItem(widgetItem, LauncherAppState.getInstance(mActivityContext)
+                        .getWidgetCache());
+                widget.ensurePreview();
+                widget.setVisibility(View.VISIBLE);
+            });
+            widgetsTable.addView(tableRow);
+        });
     }
 
     @Override
@@ -255,14 +269,6 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         } else {
             clearNavBarColor();
         }
-    }
-
-    @Override
-    protected void onContentHorizontalMarginChanged(int contentHorizontalMarginInPx) {
-        ViewGroup.MarginLayoutParams layoutParams =
-                ((ViewGroup.MarginLayoutParams) findViewById(R.id.widgets_table).getLayoutParams());
-        layoutParams.setMarginStart(contentHorizontalMarginInPx);
-        layoutParams.setMarginEnd(contentHorizontalMarginInPx);
     }
 
     @Override
