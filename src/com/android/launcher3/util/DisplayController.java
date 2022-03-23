@@ -15,46 +15,37 @@
  */
 package com.android.launcher3.util;
 
-import static android.content.Intent.ACTION_CONFIGURATION_CHANGED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 
-import static com.android.launcher3.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.Utilities.dpiFromPx;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_2_BUTTON;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_3_BUTTON;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
-import static com.android.launcher3.util.window.WindowManagerProxy.MIN_LARGE_TABLET_WIDTH;
-import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.WindowManagerCompat.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Point;
-import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
+import android.hardware.display.DisplayManager.DisplayListener;
 import android.os.Build;
-import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
-import android.util.Pair;
 import android.view.Display;
+import android.view.WindowMetrics;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
 
-import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
-import com.android.launcher3.util.window.CachedDisplayInfo;
-import com.android.launcher3.util.window.WindowManagerProxy;
+import com.android.launcher3.uioverrides.ApiWrapper;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Objects;
@@ -64,7 +55,7 @@ import java.util.Set;
  * Utility class to cache properties of default display to avoid a system RPC on every call.
  */
 @SuppressLint("NewApi")
-public class DisplayController implements ComponentCallbacks, SafeCloseable {
+public class DisplayController implements DisplayListener, ComponentCallbacks {
 
     private static final String TAG = "DisplayController";
 
@@ -73,16 +64,12 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
     public static final int CHANGE_ACTIVE_SCREEN = 1 << 0;
     public static final int CHANGE_ROTATION = 1 << 1;
-    public static final int CHANGE_DENSITY = 1 << 2;
-    public static final int CHANGE_SUPPORTED_BOUNDS = 1 << 3;
-    public static final int CHANGE_NAVIGATION_MODE = 1 << 4;
+    public static final int CHANGE_FRAME_DELAY = 1 << 2;
+    public static final int CHANGE_DENSITY = 1 << 3;
+    public static final int CHANGE_SUPPORTED_BOUNDS = 1 << 4;
 
     public static final int CHANGE_ALL = CHANGE_ACTIVE_SCREEN | CHANGE_ROTATION
-            | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS | CHANGE_NAVIGATION_MODE;
-
-    private static final String ACTION_OVERLAY_CHANGED = "android.intent.action.OVERLAY_CHANGED";
-    private static final String NAV_BAR_INTERACTION_MODE_RES_NAME = "config_navBarInteractionMode";
-    private static final String TARGET_OVERLAY_PACKAGE = "android";
+            | CHANGE_FRAME_DELAY | CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS;
 
     private final Context mContext;
     private final DisplayManager mDM;
@@ -90,14 +77,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     // Null for SDK < S
     private final Context mWindowContext;
 
-    // The callback in this listener updates DeviceProfile, which other listeners might depend on
-    private DisplayInfoChangeListener mPriorityListener;
     private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
-
-    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onIntent);
-
     private Info mInfo;
-    private boolean mDestroyed = false;
 
     private DisplayController(Context context) {
         mContext = context;
@@ -109,33 +90,53 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mWindowContext.registerComponentCallbacks(this);
         } else {
             mWindowContext = null;
-            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
+            SimpleBroadcastReceiver configChangeReceiver =
+                    new SimpleBroadcastReceiver(this::onConfigChanged);
+            mContext.registerReceiver(configChangeReceiver,
+                    new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED));
         }
 
-        // Initialize navigation mode change listener
-        mContext.registerReceiver(mReceiver,
-                getPackageFilter(TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED));
-
-        WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
-        mInfo = new Info(getDisplayInfoContext(display), display,
-                wmProxy, wmProxy.estimateInternalDisplayBounds(context));
-    }
-
-    /**
-     * Returns the current navigation mode
-     */
-    public static NavigationMode getNavigationMode(Context context) {
-        return INSTANCE.get(context).getInfo().navigationMode;
+        // Create a single holder for all internal displays. External display holders created
+        // lazily.
+        Set<PortraitSize> extraInternalDisplays = new ArraySet<>();
+        for (Display d : mDM.getDisplays()) {
+            if (ApiWrapper.isInternalDisplay(display) && d.getDisplayId() != DEFAULT_DISPLAY) {
+                Point size = new Point();
+                d.getRealSize(size);
+                extraInternalDisplays.add(new PortraitSize(size.x, size.y));
+            }
+        }
+        mInfo = new Info(getDisplayInfoContext(display), display, extraInternalDisplays);
+        mDM.registerDisplayListener(this, UI_HELPER_EXECUTOR.getHandler());
     }
 
     @Override
-    public void close() {
-        mDestroyed = true;
-        if (mWindowContext != null) {
-            mWindowContext.unregisterComponentCallbacks(this);
-        } else {
-            // TODO: unregister broadcast receiver
+    public final void onDisplayAdded(int displayId) { }
+
+    @Override
+    public final void onDisplayRemoved(int displayId) { }
+
+    @WorkerThread
+    @Override
+    public final void onDisplayChanged(int displayId) {
+        if (displayId != DEFAULT_DISPLAY) {
+            return;
         }
+        Display display = mDM.getDisplay(DEFAULT_DISPLAY);
+        if (display == null) {
+            return;
+        }
+        if (Utilities.ATLEAST_S) {
+            // Only check for refresh rate. Everything else comes from component callbacks
+            if (getSingleFrameMs(display) == mInfo.singleFrameMs) {
+                return;
+            }
+        }
+        handleInfoChange(display);
+    }
+
+    public static int getSingleFrameMs(Context context) {
+        return INSTANCE.get(context).getInfo().singleFrameMs;
     }
 
     /**
@@ -152,20 +153,12 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         void onDisplayInfoChanged(Context context, Info info, int flags);
     }
 
-    private void onIntent(Intent intent) {
-        if (mDestroyed) {
-            return;
-        }
-        boolean reconfigure = false;
-        if (ACTION_OVERLAY_CHANGED.equals(intent.getAction())) {
-            reconfigure = true;
-        } else if (ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
-            Configuration config = mContext.getResources().getConfiguration();
-            reconfigure = mInfo.fontScale != config.fontScale
-                    || mInfo.densityDpi != config.densityDpi;
-        }
-
-        if (reconfigure) {
+    /**
+     * Only used for pre-S
+     */
+    private void onConfigChanged(Intent intent) {
+        Configuration config = mContext.getResources().getConfiguration();
+        if (mInfo.fontScale != config.fontScale || mInfo.densityDpi != config.densityDpi) {
             Log.d(TAG, "Configuration changed, notifying listeners");
             Display display = mDM.getDisplay(DEFAULT_DISPLAY);
             if (display != null) {
@@ -191,10 +184,6 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     @Override
     public final void onLowMemory() { }
 
-    public void setPriorityListener(DisplayInfoChangeListener listener) {
-        mPriorityListener = listener;
-    }
-
     public void addChangeListener(DisplayInfoChangeListener listener) {
         mListeners.add(listener);
     }
@@ -213,50 +202,27 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
     @AnyThread
     private void handleInfoChange(Display display) {
-        WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(mContext);
         Info oldInfo = mInfo;
+        Set<PortraitSize> extraDisplaysSizes = oldInfo.mAllSizes.size() > 1
+                ? oldInfo.mAllSizes : Collections.emptySet();
 
         Context displayContext = getDisplayInfoContext(display);
-        Info newInfo = new Info(displayContext, display, wmProxy, oldInfo.mPerDisplayBounds);
-
-        if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale
-                || newInfo.navigationMode != oldInfo.navigationMode) {
-            // Cache may not be valid anymore, recreate without cache
-            newInfo = new Info(displayContext, display, wmProxy,
-                    wmProxy.estimateInternalDisplayBounds(displayContext));
-        }
-
+        Info newInfo = new Info(displayContext, display, extraDisplaysSizes);
         int change = 0;
-        if (!newInfo.displayId.equals(oldInfo.displayId)) {
+        if (!newInfo.mScreenSizeDp.equals(oldInfo.mScreenSizeDp)) {
             change |= CHANGE_ACTIVE_SCREEN;
         }
         if (newInfo.rotation != oldInfo.rotation) {
             change |= CHANGE_ROTATION;
         }
+        if (newInfo.singleFrameMs != oldInfo.singleFrameMs) {
+            change |= CHANGE_FRAME_DELAY;
+        }
         if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale) {
             change |= CHANGE_DENSITY;
         }
-        if (newInfo.navigationMode != oldInfo.navigationMode) {
-            change |= CHANGE_NAVIGATION_MODE;
-        }
         if (!newInfo.supportedBounds.equals(oldInfo.supportedBounds)) {
             change |= CHANGE_SUPPORTED_BOUNDS;
-
-            Point currentS = newInfo.currentSize;
-            Point expectedS = oldInfo.mPerDisplayBounds.get(newInfo.displayId).first.size;
-            if (newInfo.supportedBounds.size() != oldInfo.supportedBounds.size()) {
-                Log.e("b/198965093",
-                        "Inconsistent number of displays"
-                                + "\ndisplay state: " + display.getState()
-                                + "\noldInfo.supportedBounds: " + oldInfo.supportedBounds
-                                + "\nnewInfo.supportedBounds: " + newInfo.supportedBounds);
-            }
-            if ((Math.min(currentS.x, currentS.y) != Math.min(expectedS.x, expectedS.y)
-                    || Math.max(currentS.x, currentS.y) != Math.max(expectedS.x, expectedS.y))
-                    && display.getState() == Display.STATE_OFF) {
-                Log.e("b/198965093", "Display size changed while display is off, ignoring change");
-                return;
-            }
         }
 
         if (change != 0) {
@@ -267,115 +233,77 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     }
 
     private void notifyChange(Context context, int flags) {
-        if (mPriorityListener != null) {
-            mPriorityListener.onDisplayInfoChanged(context, mInfo, flags);
-        }
-
-        int count = mListeners.size();
-        for (int i = 0; i < count; i++) {
+        for (int i = mListeners.size() - 1; i >= 0; i--) {
             mListeners.get(i).onDisplayInfoChanged(context, mInfo, flags);
         }
     }
 
     public static class Info {
 
-        // Cached property
-        public final int rotation;
-        public final String displayId;
-        public final Point currentSize;
-        public final Rect cutout;
+        public final int id;
+        public final int singleFrameMs;
 
-        // Configuration property
+        // Configuration properties
+        public final int rotation;
         public final float fontScale;
         public final int densityDpi;
-        public final NavigationMode navigationMode;
 
         private final PortraitSize mScreenSizeDp;
+        private final Set<PortraitSize> mAllSizes;
+
+        public final Point currentSize;
 
         public final Set<WindowBounds> supportedBounds = new ArraySet<>();
 
-        private final ArrayMap<String, Pair<CachedDisplayInfo, WindowBounds[]>> mPerDisplayBounds =
-                new ArrayMap<>();
-
         public Info(Context context, Display display) {
-            /* don't need system overrides for external displays */
-            this(context, display, new WindowManagerProxy(), new ArrayMap<>());
+            this(context, display, Collections.emptySet());
         }
 
-        // Used for testing
-        public Info(Context context, Display display,
-                WindowManagerProxy wmProxy,
-                ArrayMap<String, Pair<CachedDisplayInfo, WindowBounds[]>> perDisplayBoundsCache) {
-            CachedDisplayInfo displayInfo = wmProxy.getDisplayInfo(display);
-            rotation = displayInfo.rotation;
-            currentSize = displayInfo.size;
-            displayId = displayInfo.id;
-            cutout = displayInfo.cutout;
+        private Info(Context context, Display display, Set<PortraitSize> extraDisplaysSizes) {
+            id = display.getDisplayId();
+
+            rotation = display.getRotation();
 
             Configuration config = context.getResources().getConfiguration();
             fontScale = config.fontScale;
             densityDpi = config.densityDpi;
             mScreenSizeDp = new PortraitSize(config.screenHeightDp, config.screenWidthDp);
-            navigationMode = parseNavigationMode(context);
 
-            mPerDisplayBounds.putAll(perDisplayBoundsCache);
-            Pair<CachedDisplayInfo, WindowBounds[]> cachedValue = mPerDisplayBounds.get(displayId);
+            singleFrameMs = getSingleFrameMs(display);
+            currentSize = new Point();
 
-            WindowBounds realBounds = wmProxy.getRealBounds(context, display, displayInfo);
-            if (cachedValue == null) {
-                supportedBounds.add(realBounds);
+            display.getRealSize(currentSize);
+
+            if (extraDisplaysSizes.isEmpty() || !Utilities.ATLEAST_S) {
+                Point smallestSize = new Point();
+                Point largestSize = new Point();
+                display.getCurrentSizeRange(smallestSize, largestSize);
+
+                int portraitWidth = Math.min(currentSize.x, currentSize.y);
+                int portraitHeight = Math.max(currentSize.x, currentSize.y);
+
+                supportedBounds.add(new WindowBounds(portraitWidth, portraitHeight,
+                        smallestSize.x, largestSize.y));
+                supportedBounds.add(new WindowBounds(portraitHeight, portraitWidth,
+                        largestSize.x, smallestSize.y));
+                mAllSizes = Collections.singleton(new PortraitSize(currentSize.x, currentSize.y));
             } else {
-                // Verify that the real bounds are a match
-                WindowBounds expectedBounds = cachedValue.second[displayInfo.rotation];
-                if (!realBounds.equals(expectedBounds)) {
-                    WindowBounds[] clone = new WindowBounds[4];
-                    System.arraycopy(cachedValue.second, 0, clone, 0, 4);
-                    clone[displayInfo.rotation] = realBounds;
-                    cachedValue = Pair.create(displayInfo.normalize(), clone);
-                    mPerDisplayBounds.put(displayId, cachedValue);
-                }
+                mAllSizes = new ArraySet<>(extraDisplaysSizes);
+                mAllSizes.add(new PortraitSize(currentSize.x, currentSize.y));
+                Set<WindowMetrics> metrics = WindowManagerCompat.getDisplayProfiles(
+                        context, mAllSizes, densityDpi,
+                        ApiWrapper.TASKBAR_DRAWN_IN_PROCESS);
+                metrics.forEach(wm -> supportedBounds.add(WindowBounds.fromWindowMetrics(wm)));
             }
-            mPerDisplayBounds.values().forEach(
-                    pair -> Collections.addAll(supportedBounds, pair.second));
-            Log.d("b/211775278", "displayId: " + displayId + ", currentSize: " + currentSize);
-            Log.d("b/211775278", "perDisplayBounds: " + mPerDisplayBounds);
         }
 
         /**
-         * Returns {@code true} if the bounds represent a tablet.
+         * Returns true if the bounds represent a tablet
          */
         public boolean isTablet(WindowBounds bounds) {
-            return smallestSizeDp(bounds) >= MIN_TABLET_WIDTH;
+            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()),
+                    densityDpi) >= MIN_TABLET_WIDTH;
         }
-
-        /**
-         * Returns {@code true} if the bounds represent a large tablet.
-         */
-        public boolean isLargeTablet(WindowBounds bounds) {
-            return smallestSizeDp(bounds) >= MIN_LARGE_TABLET_WIDTH;
-        }
-
-        /**
-         * Returns smallest size in dp for given bounds.
-         */
-        public float smallestSizeDp(WindowBounds bounds) {
-            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()), densityDpi);
-        }
-    }
-
-    /**
-     * Dumps the current state information
-     */
-    public void dump(PrintWriter pw) {
-        Info info = mInfo;
-        pw.println("DisplayController.Info:");
-        pw.println("  id=" + info.displayId);
-        pw.println("  rotation=" + info.rotation);
-        pw.println("  fontScale=" + info.fontScale);
-        pw.println("  densityDpi=" + info.displayId);
-        pw.println("  navigationMode=" + info.navigationMode.name());
-        pw.println("  currentSize=" + info.currentSize);
-        pw.println("  supportedBounds=" + info.supportedBounds);
     }
 
     /**
@@ -403,35 +331,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         }
     }
 
-    public enum NavigationMode {
-        THREE_BUTTONS(false, 0, LAUNCHER_NAVIGATION_MODE_3_BUTTON),
-        TWO_BUTTONS(true, 1, LAUNCHER_NAVIGATION_MODE_2_BUTTON),
-        NO_BUTTON(true, 2, LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON);
-
-        public final boolean hasGestures;
-        public final int resValue;
-        public final LauncherEvent launcherEvent;
-
-        NavigationMode(boolean hasGestures, int resValue, LauncherEvent launcherEvent) {
-            this.hasGestures = hasGestures;
-            this.resValue = resValue;
-            this.launcherEvent = launcherEvent;
-        }
-    }
-
-    private static NavigationMode parseNavigationMode(Context context) {
-        int modeInt = ResourceUtils.getIntegerByName(NAV_BAR_INTERACTION_MODE_RES_NAME,
-                context.getResources(), INVALID_RESOURCE_HANDLE);
-
-        if (modeInt == INVALID_RESOURCE_HANDLE) {
-            Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");
-        } else {
-            for (NavigationMode m : NavigationMode.values()) {
-                if (m.resValue == modeInt) {
-                    return m;
-                }
-            }
-        }
-        return Utilities.ATLEAST_S ? NavigationMode.NO_BUTTON : NavigationMode.THREE_BUTTONS;
+    private static int getSingleFrameMs(Display display) {
+        float refreshRate = display.getRefreshRate();
+        return refreshRate > 0 ? (int) (1000 / refreshRate) : 16;
     }
 }

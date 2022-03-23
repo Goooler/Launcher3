@@ -21,20 +21,17 @@ import static android.view.View.MeasureSpec.makeMeasureSpec;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.Utilities.getBadge;
-import static com.android.launcher3.icons.FastBitmapDrawable.getDisabledColorFilter;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorFilter;
 import android.graphics.Path;
 import android.graphics.Picture;
 import android.graphics.Point;
@@ -56,19 +53,23 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.statemanager.StateManager.StateListener;
 import com.android.launcher3.util.RunnableList;
-import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
 /** A custom view for rendering an icon, folder, shortcut or widget during drag-n-drop. */
-public abstract class DragView<T extends Context & ActivityContext> extends FrameLayout {
+public class DragView extends FrameLayout implements StateListener<LauncherState> {
 
     public static final int VIEW_ZOOM_DURATION = 150;
 
@@ -81,24 +82,22 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
     private final int mHeight;
 
     private final int mBlurSizeOutline;
-    protected final int mRegistrationX;
-    protected final int mRegistrationY;
+    private final int mRegistrationX;
+    private final int mRegistrationY;
     private final float mInitialScale;
-    protected final float mScaleOnDrop;
-    protected final int[] mTempLoc = new int[2];
+    private final float mScaleOnDrop;
+    private final int[] mTempLoc = new int[2];
 
     private final RunnableList mOnDragStartCallback = new RunnableList();
 
     private Point mDragVisualizeOffset = null;
     private Rect mDragRegion = null;
-    protected final T mActivity;
-    private final BaseDragLayer<T> mDragLayer;
+    private final Launcher mLauncher;
+    private final DragLayer mDragLayer;
+    @Thunk final DragController mDragController;
     private boolean mHasDrawn = false;
 
     final ValueAnimator mAnim;
-    // Whether mAnim has started. Unlike mAnim.isStarted(), this is true even after mAnim ends.
-    private boolean mAnimStarted;
-    private Runnable mOnAnimEndCallback = null;
 
     private int mLastTouchX;
     private int mLastTouchY;
@@ -111,7 +110,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
     private Path mScaledMaskPath;
     private Drawable mBadge;
 
-    public DragView(T launcher, Drawable drawable, int registrationX,
+    public DragView(Launcher launcher, Drawable drawable, int registrationX,
             int registrationY, final float initialScale, final float scaleOnDrop,
             final float finalScaleDps) {
         this(launcher, getViewFromDrawable(launcher, drawable),
@@ -124,7 +123,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
      * <p>
      * The registration point is the point inside our view that the touch events should
      * be centered upon.
-     * @param activity The Launcher instance/ActivityContext this DragView is in.
+     * @param launcher The Launcher instance
      * @param content the view content that is attached to the drag view.
      * @param width the width of the dragView
      * @param height the height of the dragView
@@ -134,12 +133,13 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
      * @param scaleOnDrop the scale used in the drop animation.
      * @param finalScaleDps the scale used in the zoom out animation when the drag view is shown.
      */
-    public DragView(T activity, View content, int width, int height, int registrationX,
+    public DragView(Launcher launcher, View content, int width, int height, int registrationX,
             int registrationY, final float initialScale, final float scaleOnDrop,
             final float finalScaleDps) {
-        super(activity);
-        mActivity = activity;
-        mDragLayer = activity.getDragLayer();
+        super(launcher);
+        mLauncher = launcher;
+        mDragLayer = launcher.getDragLayer();
+        mDragController = launcher.getDragController();
 
         mContent = content;
         mWidth = width;
@@ -152,12 +152,6 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         }
 
         addView(content, new LayoutParams(width, height));
-
-        // If there is already a scale set on the content, we don't want to clip the children.
-        if (content.getScaleX() != 1 || content.getScaleY() != 1) {
-            setClipChildren(false);
-            setClipToPadding(false);
-        }
 
         final float scale = (width + finalScaleDps) / width;
 
@@ -174,20 +168,6 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             setScaleY(initialScale + (value * (scale - initialScale)));
             if (!isAttachedToWindow()) {
                 animation.cancel();
-            }
-        });
-        mAnim.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                mAnimStarted = true;
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                if (mOnAnimEndCallback != null) {
-                    mOnAnimEndCallback.run();
-                }
             }
         });
 
@@ -208,8 +188,22 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         setWillNotDraw(false);
     }
 
-    public void setOnAnimationEndCallback(Runnable callback) {
-        mOnAnimEndCallback = callback;
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mLauncher.getStateManager().addStateListener(this);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mLauncher.getStateManager().removeStateListener(this);
+    }
+
+    @Override
+    public void onStateTransitionComplete(LauncherState finalState) {
+        setVisibility((finalState == LauncherState.NORMAL
+                || finalState == LauncherState.SPRING_LOADED) ? VISIBLE : INVISIBLE);
     }
 
     /**
@@ -219,7 +213,6 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
     @TargetApi(Build.VERSION_CODES.O)
     public void setItemInfo(final ItemInfo info) {
         if (info.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
-                && info.itemType != LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION
                 && info.itemType != LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT
                 && info.itemType != LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
             return;
@@ -229,24 +222,24 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             Object[] outObj = new Object[1];
             int w = mWidth;
             int h = mHeight;
-            Drawable dr = Utilities.getFullDrawable(mActivity, info, w, h,
-                    true /* shouldThemeIcon */, outObj);
+            Drawable dr = Utilities.getFullDrawable(mLauncher, info, w, h, outObj);
 
             if (dr instanceof AdaptiveIconDrawable) {
-                int blurMargin = (int) mActivity.getResources()
+                int blurMargin = (int) mLauncher.getResources()
                         .getDimension(R.dimen.blur_size_medium_outline) / 2;
 
                 Rect bounds = new Rect(0, 0, w, h);
                 bounds.inset(blurMargin, blurMargin);
                 // Badge is applied after icon normalization so the bounds for badge should not
                 // be scaled down due to icon normalization.
-                mBadge = getBadge(mActivity, info, outObj[0]);
-                FastBitmapDrawable.setBadgeBounds(mBadge, bounds);
+                Rect badgeBounds = new Rect(bounds);
+                mBadge = getBadge(mLauncher, info, outObj[0]);
+                mBadge.setBounds(badgeBounds);
 
                 // Do not draw the background in case of folder as its translucent
                 final boolean shouldDrawBackground = !(dr instanceof FolderAdaptiveIcon);
 
-                try (LauncherIcons li = LauncherIcons.obtain(mActivity)) {
+                try (LauncherIcons li = LauncherIcons.obtain(mLauncher)) {
                     Drawable nDr; // drawable to be normalized
                     if (shouldDrawBackground) {
                         nDr = dr;
@@ -294,10 +287,11 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                     removeAllViewsInLayout();
 
                     if (info.isDisabled()) {
-                        ColorFilter filter = getDisabledColorFilter();
-                        mBgSpringDrawable.setColorFilter(filter);
-                        mFgSpringDrawable.setColorFilter(filter);
-                        mBadge.setColorFilter(filter);
+                        FastBitmapDrawable d = new FastBitmapDrawable((Bitmap) null);
+                        d.setIsDisabled(true);
+                        mBgSpringDrawable.setColorFilter(d.getColorFilter());
+                        mFgSpringDrawable.setColorFilter(d.getColorFilter());
+                        mBadge.setColorFilter(d.getColorFilter());
                     }
                     invalidate();
                 }));
@@ -310,6 +304,16 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
      */
     public void onDragStart() {
         mOnDragStartCallback.executeAllAndDestroy();
+    }
+
+    // TODO(b/183609936): This is only for LauncherAppWidgetHostView that is rendered in a drawable.
+    // Once LauncherAppWidgetHostView is directly rendered in this view, removes this method.
+    @Override
+    public void invalidate() {
+        super.invalidate();
+        if (mContent instanceof ImageView) {
+            mContent.invalidate();
+        }
     }
 
     @Override
@@ -409,10 +413,6 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         }
     }
 
-    public boolean isAnimationFinished() {
-        return mAnimStarted && !mAnim.isRunning();
-    }
-
     /**
      * Move the window containing this view.
      *
@@ -430,11 +430,12 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         applyTranslation();
     }
 
-    /**
-     * Animate this DragView to the given DragLayer coordinates and then remove it.
-     */
-    public abstract void animateTo(int toTouchX, int toTouchY, Runnable onCompleteRunnable,
-            int duration);
+    public void animateTo(int toTouchX, int toTouchY, Runnable onCompleteRunnable, int duration) {
+        mTempLoc[0] = toTouchX - mRegistrationX;
+        mTempLoc[1] = toTouchY - mRegistrationY;
+        mDragLayer.animateViewIntoPosition(this, mTempLoc, 1f, mScaleOnDrop, mScaleOnDrop,
+                DragLayer.ANIMATION_END_DISAPPEAR, onCompleteRunnable, duration);
+    }
 
     public void animateShift(final int shiftX, final int shiftY) {
         if (mAnim.isStarted()) {
@@ -470,7 +471,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             Picture picture = new Picture();
             mContent.draw(picture.beginRecording(mWidth, mHeight));
             picture.endRecording();
-            View view = new View(mActivity);
+            View view = new View(mLauncher);
             view.setBackground(new PictureDrawable(picture));
             view.measure(makeMeasureSpec(mWidth, EXACTLY), makeMeasureSpec(mHeight, EXACTLY));
             view.layout(mContent.getLeft(), mContent.getTop(),
@@ -487,6 +488,24 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             }
             mContentViewParent = null;
             mContentViewInParentViewIndex = -1;
+        }
+    }
+
+    /**
+     * If the drag view uses color extraction, block it.
+     */
+    public void disableColorExtraction() {
+        if (mContent instanceof LauncherAppWidgetHostView) {
+            ((LauncherAppWidgetHostView) mContent).disableColorExtraction();
+        }
+    }
+
+    /**
+     * If the drag view uses color extraction, restores it.
+     */
+    public void resumeColorExtraction() {
+        if (mContent instanceof LauncherAppWidgetHostView) {
+            ((LauncherAppWidgetHostView) mContent).enableColorExtraction(/* updateColors= */ false);
         }
     }
 

@@ -16,30 +16,10 @@
 package com.android.launcher3.views;
 
 import com.android.launcher3.BubbleTextView;
-import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.model.data.ItemInfoWithIcon;
 
 /**
  * Views that contain {@link BubbleTextView} should implement this interface.
  */
-public interface BubbleTextHolder extends IconLabelDotView {
+public interface BubbleTextHolder {
     BubbleTextView getBubbleText();
-
-    /**
-     * Called when new {@link ItemInfo} is set to {@link BubbleTextView}
-     *
-     * @param itemInfo the new itemInfo
-     */
-    default void onItemInfoUpdated(ItemInfoWithIcon itemInfo) {
-    }
-
-    @Override
-    default void setIconVisible(boolean visible) {
-        getBubbleText().setIconVisible(visible);
-    }
-
-    @Override
-    default void setForceHideDot(boolean hide) {
-        getBubbleText().setForceHideDot(hide);
-    }
 }

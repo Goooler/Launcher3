@@ -17,13 +17,9 @@ package com.android.quickstep;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 
-import android.os.RemoteException;
-import android.util.Log;
 import android.view.IRecentsAnimationController;
 import android.view.SurfaceControl;
-import android.view.WindowManagerGlobal;
 import android.window.PictureInPictureSurfaceTransaction;
 
 import androidx.annotation.NonNull;
@@ -43,7 +39,6 @@ import java.util.function.Consumer;
  */
 public class RecentsAnimationController {
 
-    private static final String TAG = "RecentsAnimationController";
     private final RecentsAnimationControllerCompat mController;
     private final Consumer<RecentsAnimationController> mOnFinishedListener;
     private final boolean mAllowMinimizeSplitScreen;
@@ -51,8 +46,6 @@ public class RecentsAnimationController {
     private boolean mUseLauncherSysBarFlags = false;
     private boolean mSplitScreenMinimized = false;
     private boolean mFinishRequested = false;
-    // Only valid when mFinishRequested == true.
-    private boolean mFinishTargetIsLauncher;
     private RunnableList mPendingFinishCallbacks = new RunnableList();
 
     public RecentsAnimationController(RecentsAnimationControllerCompat controller,
@@ -79,16 +72,7 @@ public class RecentsAnimationController {
         if (mUseLauncherSysBarFlags != useLauncherSysBarFlags) {
             mUseLauncherSysBarFlags = useLauncherSysBarFlags;
             UI_HELPER_EXECUTOR.execute(() -> {
-                if (!ENABLE_SHELL_TRANSITIONS) {
-                    mController.setAnimationTargetsBehindSystemBars(!useLauncherSysBarFlags);
-                } else {
-                    try {
-                        WindowManagerGlobal.getWindowManagerService().setRecentsAppBehindSystemBars(
-                                useLauncherSysBarFlags);
-                    } catch (RemoteException e) {
-                        Log.e(TAG, "Unable to reach window manager", e);
-                    }
-                }
+                mController.setAnimationTargetsBehindSystemBars(!useLauncherSysBarFlags);
             });
         }
     }
@@ -161,7 +145,6 @@ public class RecentsAnimationController {
 
         // Finish not yet requested
         mFinishRequested = true;
-        mFinishTargetIsLauncher = toRecents;
         mOnFinishedListener.accept(this);
         mPendingFinishCallbacks.add(callback);
         UI_HELPER_EXECUTOR.execute(() -> {
@@ -233,13 +216,5 @@ public class RecentsAnimationController {
     /** @return wrapper controller. */
     public RecentsAnimationControllerCompat getController() {
         return mController;
-    }
-
-    /**
-     * RecentsAnimationListeners can check this in onRecentsAnimationFinished() to determine whether
-     * the animation was finished to launcher vs an app.
-     */
-    public boolean getFinishTargetIsLauncher() {
-        return mFinishTargetIsLauncher;
     }
 }

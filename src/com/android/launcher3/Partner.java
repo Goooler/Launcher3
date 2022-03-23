@@ -142,7 +142,7 @@ public class Partner {
         }
 
         if (iconSize > 0) {
-            inv.iconSize[InvariantDeviceProfile.INDEX_DEFAULT] = iconSize;
+            inv.iconSize = iconSize;
         }
     }
 }

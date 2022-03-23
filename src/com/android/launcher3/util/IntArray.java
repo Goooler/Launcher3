@@ -17,14 +17,13 @@
 package com.android.launcher3.util;
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.StringTokenizer;
 
 /**
  * Copy of the platform hidden implementation of android.util.IntArray.
  * Implements a growing array of int primitives.
  */
-public class IntArray implements Cloneable, Iterable<Integer> {
+public class IntArray implements Cloneable {
     private static final int MIN_CAPACITY_INCREMENT = 12;
 
     private static final int[] EMPTY_INT = new int[0];
@@ -271,32 +270,6 @@ public class IntArray implements Cloneable, Iterable<Integer> {
     private static void checkBounds(int len, int index) {
         if (index < 0 || len <= index) {
             throw new ArrayIndexOutOfBoundsException("length=" + len + "; index=" + index);
-        }
-    }
-
-    @Override
-    public Iterator<Integer> iterator() {
-        return new ValueIterator();
-    }
-
-    @Thunk
-    class ValueIterator implements Iterator<Integer> {
-
-        private int mNextIndex = 0;
-
-        @Override
-        public boolean hasNext() {
-            return mNextIndex < size();
-        }
-
-        @Override
-        public Integer next() {
-            return get(mNextIndex++);
-        }
-
-        @Override
-        public void remove() {
-            removeIndex(--mNextIndex);
         }
     }
 }
