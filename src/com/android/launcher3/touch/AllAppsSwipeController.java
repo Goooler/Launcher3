@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2019 The Android Open Source Project
+/*
+ * Copyright (C) 2015 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,34 @@ package com.android.launcher3.touch;
 
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
+import static com.android.launcher3.anim.Interpolators.INSTANT;
+import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.anim.Interpolators.LINEAR_TELEPORT;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 
 import android.view.MotionEvent;
+import android.view.animation.Interpolator;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.anim.Interpolators;
+import com.android.launcher3.states.StateAnimationConfig;
 
 /**
  * TouchController to switch between NORMAL and ALL_APPS state.
  */
 public class AllAppsSwipeController extends AbstractStateChangeTouchController {
+
+    private static final float ALLAPPS_STAGGERED_FADE_THRESHOLD = 0.5f;
+
+    public static final Interpolator ALLAPPS_STAGGERED_FADE_EARLY_RESPONDER =
+            Interpolators.clampToProgress(LINEAR, 0, ALLAPPS_STAGGERED_FADE_THRESHOLD);
+    public static final Interpolator ALLAPPS_STAGGERED_FADE_LATE_RESPONDER =
+            Interpolators.clampToProgress(LINEAR, ALLAPPS_STAGGERED_FADE_THRESHOLD, 1f);
 
     public AllAppsSwipeController(Launcher l) {
         super(l, SingleAxisSwipeDetector.VERTICAL);
@@ -65,12 +82,51 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
     @Override
     protected float initCurrentAnimation() {
         float range = getShiftRange();
-        long maxAccuracy = (long) (2 * range);
+        StateAnimationConfig config = getConfigForStates(mFromState, mToState);
+        config.duration = (long) (2 * range);
+
         mCurrentAnimation = mLauncher.getStateManager()
-                .createAnimationToNewWorkspace(mToState, maxAccuracy);
+                .createAnimationToNewWorkspace(mToState, config);
         float startVerticalShift = mFromState.getVerticalProgress(mLauncher) * range;
         float endVerticalShift = mToState.getVerticalProgress(mLauncher) * range;
         float totalShift = endVerticalShift - startVerticalShift;
         return 1 / totalShift;
     }
+
+    @Override
+    protected StateAnimationConfig getConfigForStates(LauncherState fromState,
+            LauncherState toState) {
+        StateAnimationConfig config = super.getConfigForStates(fromState, toState);
+        if (fromState == NORMAL && toState == ALL_APPS) {
+            applyNormalToAllAppsAnimConfig(mLauncher, config);
+        } else if (fromState == ALL_APPS && toState == NORMAL) {
+            applyAllAppsToNormalConfig(mLauncher, config);
+        }
+        return config;
+    }
+
+    /**
+     * Applies Animation config values for transition from all apps to home
+     */
+    public static void applyAllAppsToNormalConfig(Launcher launcher, StateAnimationConfig config) {
+        boolean isTablet = launcher.getDeviceProfile().isTablet;
+        config.setInterpolator(ANIM_SCRIM_FADE, ALLAPPS_STAGGERED_FADE_LATE_RESPONDER);
+        config.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
+                ? FINAL_FRAME : ALLAPPS_STAGGERED_FADE_EARLY_RESPONDER);
+        config.setInterpolator(ANIM_VERTICAL_PROGRESS, isTablet ? LINEAR_TELEPORT : LINEAR);
+    }
+
+    /**
+     * Applies Animation config values for transition from home to all apps
+     */
+    public static void applyNormalToAllAppsAnimConfig(Launcher launcher,
+            StateAnimationConfig config) {
+        boolean isTablet = launcher.getDeviceProfile().isTablet;
+        config.setInterpolator(ANIM_SCRIM_FADE, ALLAPPS_STAGGERED_FADE_EARLY_RESPONDER);
+        config.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
+                ? INSTANT : ALLAPPS_STAGGERED_FADE_LATE_RESPONDER);
+        config.setInterpolator(ANIM_VERTICAL_PROGRESS, isTablet ? LINEAR_TELEPORT : LINEAR);
+    }
+
+
 }

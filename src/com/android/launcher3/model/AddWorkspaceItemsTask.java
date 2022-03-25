@@ -15,11 +15,14 @@
  */
 package com.android.launcher3.model;
 
+import static com.android.launcher3.WorkspaceLayoutManager.FIRST_SCREEN_ID;
+
 import android.content.Intent;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller.SessionInfo;
 import android.os.UserHandle;
+import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.Pair;
 
@@ -27,6 +30,7 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel.CallbackTask;
 import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
@@ -36,8 +40,10 @@ import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.PackageInstallInfo;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.PackageManagerHelper;
 
 import java.util.ArrayList;
@@ -78,11 +84,19 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                         item.itemType == LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT) {
                     // Short-circuit this logic if the icon exists somewhere on the workspace
                     if (shortcutExists(dataModel, item.getIntent(), item.user)) {
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON,
+                                    LOG + " Item already on workspace.");
+                        }
                         continue;
                     }
 
                     // b/139663018 Short-circuit this logic if the icon is a system app
                     if (PackageManagerHelper.isSystemApp(app.getContext(), item.getIntent())) {
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON,
+                                    LOG + " Item is a system app.");
+                        }
                         continue;
                     }
                 }
@@ -122,6 +136,9 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     String packageName = item.getTargetComponent() != null
                             ? item.getTargetComponent().getPackageName() : null;
                     if (packageName == null) {
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON, LOG + " Null packageName.");
+                        }
                         continue;
                     }
                     SessionInfo sessionInfo = packageInstaller.getActiveSessionInfo(item.user,
@@ -130,6 +147,9 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     if (!packageInstaller.verifySessionInfo(sessionInfo)) {
                         FileLog.d(LOG, "Item info failed session info verification. "
                                 + "Skipping : " + workspaceInfo);
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON, LOG + "Failed verification.");
+                        }
                         continue;
                     }
 
@@ -140,6 +160,9 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     if (sessionInfo == null) {
                         if (!hasActivity) {
                             // Session was cancelled, do not add.
+                            if (TestProtocol.sDebugTracing) {
+                                Log.d(TestProtocol.MISSING_PROMISE_ICON, LOG + "Session cancelled");
+                            }
                             continue;
                         }
                     } else {
@@ -159,6 +182,9 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                             // workspace items as promise icons. At this point we now have the
                             // correct intent to compare against existing workspace icons.
                             // Icon already exists on the workspace and should not be auto-added.
+                            if (TestProtocol.sDebugTracing) {
+                                Log.d(TestProtocol.MISSING_PROMISE_ICON, LOG + "shortcutExists");
+                            }
                             continue;
                         }
 
@@ -287,28 +313,23 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
 
         // Find appropriate space for the item.
         int screenId = 0;
-        int[] cordinates = new int[2];
+        int[] coordinates = new int[2];
         boolean found = false;
 
         int screenCount = workspaceScreens.size();
         // First check the preferred screen.
-        int preferredScreenIndex = workspaceScreens.isEmpty() ? 0 : 1;
-        if (preferredScreenIndex < screenCount) {
-            screenId = workspaceScreens.get(preferredScreenIndex);
-            found = findNextAvailableIconSpaceInScreen(
-                    app, screenItems.get(screenId), cordinates, spanX, spanY);
+        IntSet screensToExclude = new IntSet();
+        if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
+            screensToExclude.add(FIRST_SCREEN_ID);
         }
 
-        if (!found) {
-            // Search on any of the screens starting from the first screen.
-            for (int screen = 1; screen < screenCount; screen++) {
-                screenId = workspaceScreens.get(screen);
-                if (findNextAvailableIconSpaceInScreen(
-                        app, screenItems.get(screenId), cordinates, spanX, spanY)) {
-                    // We found a space for it
-                    found = true;
-                    break;
-                }
+        for (int screen = 0; screen < screenCount; screen++) {
+            screenId = workspaceScreens.get(screen);
+            if (!screensToExclude.contains(screenId) && findNextAvailableIconSpaceInScreen(
+                    app, screenItems.get(screenId), coordinates, spanX, spanY)) {
+                // We found a space for it
+                found = true;
+                break;
             }
         }
 
@@ -324,11 +345,11 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
 
             // If we still can't find an empty space, then God help us all!!!
             if (!findNextAvailableIconSpaceInScreen(
-                    app, screenItems.get(screenId), cordinates, spanX, spanY)) {
+                    app, screenItems.get(screenId), coordinates, spanX, spanY)) {
                 throw new RuntimeException("Can't find space to add the item");
             }
         }
-        return new int[] {screenId, cordinates[0], cordinates[1]};
+        return new int[] {screenId, coordinates[0], coordinates[1]};
     }
 
     private boolean findNextAvailableIconSpaceInScreen(
