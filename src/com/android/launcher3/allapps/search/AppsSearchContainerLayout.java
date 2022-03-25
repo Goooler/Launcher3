@@ -32,17 +32,17 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.AllAppsContainerView;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AlphabeticalAppsList;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.search.SearchCallback;
+import com.android.launcher3.views.ActivityContext;
 
 import java.util.ArrayList;
 
@@ -53,12 +53,12 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         implements SearchUiManager, SearchCallback<AdapterItem>,
         AllAppsStore.OnUpdateListener, Insettable {
 
-    private final BaseDraggingActivity mLauncher;
+    private final ActivityContext mLauncher;
     private final AllAppsSearchBarController mSearchBarController;
     private final SpannableStringBuilder mSearchQueryBuilder;
 
-    private AlphabeticalAppsList mApps;
-    private AllAppsContainerView mAppsView;
+    private AlphabeticalAppsList<?> mApps;
+    private ActivityAllAppsContainerView<?> mAppsView;
 
     // The amount of pixels to shift down and overlap with the rest of the content.
     private final int mContentOverlap;
@@ -74,7 +74,7 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     public AppsSearchContainerLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
-        mLauncher = BaseDraggingActivity.fromContext(context);
+        mLauncher = ActivityContext.lookupContext(context);
         mSearchBarController = new AllAppsSearchBarController();
 
         mSearchQueryBuilder = new SpannableStringBuilder();
@@ -82,7 +82,7 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         setHint(prefixTextWithIcon(getContext(), R.drawable.ic_allapps_search, getHint()));
 
         mContentOverlap =
-                getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_field_height) / 2;
+                getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_content_overlap);
     }
 
     @Override
@@ -105,8 +105,8 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         int rowWidth = myRequestedWidth - mAppsView.getActiveRecyclerView().getPaddingLeft()
                 - mAppsView.getActiveRecyclerView().getPaddingRight();
 
-        int cellWidth = DeviceProfile.calculateCellWidth(rowWidth, dp.cellLayoutBorderSpacingPx,
-                dp.numShownHotseatIcons);
+        int cellWidth = DeviceProfile.calculateCellWidth(rowWidth,
+                dp.cellLayoutBorderSpacePx.x, dp.numShownHotseatIcons);
         int iconVisibleSize = Math.round(ICON_VISIBLE_AREA_FACTOR * dp.iconSizePx);
         int iconPadding = cellWidth - iconVisibleSize;
 
@@ -130,11 +130,11 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     }
 
     @Override
-    public void initializeSearch(AllAppsContainerView appsView) {
+    public void initializeSearch(ActivityAllAppsContainerView<?> appsView) {
         mApps = appsView.getApps();
         mAppsView = appsView;
         mSearchBarController.initialize(
-                new DefaultAppSearchAlgorithm(mLauncher),
+                new DefaultAppSearchAlgorithm(getContext()),
                 this, mLauncher, this);
     }
 

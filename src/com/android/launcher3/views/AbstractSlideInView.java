@@ -28,6 +28,7 @@ import android.util.AttributeSet;
 import android.util.Property;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.AbstractFloatingView;
@@ -68,7 +69,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected final SingleAxisSwipeDetector mSwipeDetector;
     protected final ObjectAnimator mOpenCloseAnimator;
 
-    protected View mContent;
+    protected ViewGroup mContent;
     protected final View mColorScrim;
     protected Interpolator mScrollInterpolator;
 
@@ -112,9 +113,16 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         return -1;
     }
 
+    /**
+     * Returns the range in height that the slide in view can be dragged.
+     */
+    protected float getShiftRange() {
+        return mContent.getHeight();
+    }
+
     protected void setTranslationShift(float translationShift) {
         mTranslationShift = translationShift;
-        mContent.setTranslationY(mTranslationShift * mContent.getHeight());
+        mContent.setTranslationY(mTranslationShift * getShiftRange());
         if (mColorScrim != null) {
             mColorScrim.setAlpha(1 - mTranslationShift);
         }
@@ -131,8 +139,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mSwipeDetector.setDetectableScrollConditions(
                 directionsToDetectScroll, false);
         mSwipeDetector.onTouchEvent(ev);
-        return mSwipeDetector.isDraggingOrSettling()
-                || !getPopupContainer().isEventOverView(mContent, ev);
+        return mSwipeDetector.isDraggingOrSettling() || !isEventOverContent(ev);
     }
 
     @Override
@@ -141,11 +148,21 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         if (ev.getAction() == MotionEvent.ACTION_UP && mSwipeDetector.isIdleState()
                 && !isOpeningAnimationRunning()) {
             // If we got ACTION_UP without ever starting swipe, close the panel.
-            if (!getPopupContainer().isEventOverView(mContent, ev)) {
+            if (!isEventOverContent(ev)) {
                 close(true);
             }
         }
         return true;
+    }
+
+    /**
+     * Returns {@code true} if the touch event is over the visible area of the bottom sheet.
+     *
+     * By default will check if the touch event is over {@code mContent}, subclasses should override
+     * this method if the visible area of the bottom sheet is different from {@code mContent}.
+     */
+    protected boolean isEventOverContent(MotionEvent ev) {
+        return getPopupContainer().isEventOverView(mContent, ev);
     }
 
     private boolean isOpeningAnimationRunning() {
@@ -159,7 +176,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
 
     @Override
     public boolean onDrag(float displacement) {
-        float range = mContent.getHeight();
+        float range = getShiftRange();
         displacement = Utilities.boundToRange(displacement, 0, range);
         setTranslationShift(displacement / range);
         return true;
@@ -202,6 +219,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mOpenCloseAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                mOpenCloseAnimator.removeListener(this);
                 onCloseComplete();
             }
         });
