@@ -18,12 +18,12 @@ package com.android.launcher3.allapps;
 
 import android.content.Context;
 
-import com.android.launcher3.BaseDraggingActivity;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LabelComparator;
+import com.android.launcher3.views.ActivityContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,8 +35,11 @@ import java.util.TreeMap;
 
 /**
  * The alphabetically sorted list of applications.
+ *
+ * @param <T> Type of context inflating this view.
  */
-public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
+public class AlphabeticalAppsList<T extends Context & ActivityContext> implements
+        AllAppsStore.OnUpdateListener {
 
     public static final String TAG = "AlphabeticalAppsList";
 
@@ -64,7 +67,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     }
 
 
-    private final BaseDraggingActivity mLauncher;
+    private final T mActivityContext;
 
     // The set of apps from the system
     private final List<AppInfo> mApps = new ArrayList<>();
@@ -78,20 +81,20 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     private final List<FastScrollSectionInfo> mFastScrollerSections = new ArrayList<>();
 
     // The of ordered component names as a result of a search query
-    private ArrayList<AdapterItem> mSearchResults;
-    private AllAppsGridAdapter mAdapter;
+    private final ArrayList<AdapterItem> mSearchResults = new ArrayList<>();
+    private BaseAllAppsAdapter<T> mAdapter;
     private AppInfoComparator mAppNameComparator;
-    private final int mNumAppsPerRow;
+    private final int mNumAppsPerRowAllApps;
     private int mNumAppRowsInAdapter;
     private ItemInfoMatcher mItemFilter;
 
     public AlphabeticalAppsList(Context context, AllAppsStore appsStore,
             WorkAdapterProvider adapterProvider) {
         mAllAppsStore = appsStore;
-        mLauncher = BaseDraggingActivity.fromContext(context);
+        mActivityContext = ActivityContext.lookupContext(context);
         mAppNameComparator = new AppInfoComparator(context);
         mWorkAdapterProvider = adapterProvider;
-        mNumAppsPerRow = mLauncher.getDeviceProfile().inv.numColumns;
+        mNumAppsPerRowAllApps = mActivityContext.getDeviceProfile().inv.numAllAppsColumns;
         mAllAppsStore.addUpdateListener(this);
     }
 
@@ -103,7 +106,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     /**
      * Sets the adapter to notify when this dataset changes.
      */
-    public void setAdapter(AllAppsGridAdapter adapter) {
+    public void setAdapter(BaseAllAppsAdapter<T> adapter) {
         mAdapter = adapter;
     }
 
@@ -168,30 +171,33 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
      * Returns whether there are is a filter set.
      */
     public boolean hasFilter() {
-        return (mSearchResults != null);
+        return !mSearchResults.isEmpty();
     }
 
     /**
      * Returns whether there are no filtered results.
      */
     public boolean hasNoFilteredResults() {
-        return (mSearchResults != null) && mAccessibilityResultsCount == 0;
+        return hasFilter() && mAccessibilityResultsCount == 0;
     }
 
     /**
      * Sets results list for search
      */
     public boolean setSearchResults(ArrayList<AdapterItem> results) {
-        if (!Objects.equals(results, mSearchResults)) {
-            mSearchResults = results;
-            updateAdapterItems();
-            return true;
+        if (Objects.equals(results, mSearchResults)) {
+            return false;
         }
-        return false;
+        mSearchResults.clear();
+        if (results != null) {
+            mSearchResults.addAll(results);
+        }
+        updateAdapterItems();
+        return true;
     }
 
     public boolean appendSearchResults(ArrayList<AdapterItem> results) {
-        if (mSearchResults != null && results != null && results.size() > 0) {
+        if (hasFilter() && results != null && results.size() > 0) {
             updateSearchAdapterItems(results, mSearchResults.size());
             refreshRecyclerView();
             return true;
@@ -229,7 +235,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
 
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
-        Locale curLocale = mLauncher.getResources().getConfiguration().locale;
+        Locale curLocale = mActivityContext.getResources().getConfiguration().locale;
         boolean localeRequiresSectionSorting = curLocale.equals(Locale.SIMPLIFIED_CHINESE);
         if (localeRequiresSectionSorting) {
             // Compute the section headers. We use a TreeMap with the section name comparator to
@@ -256,7 +262,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
         }
 
         // Recompose the set of adapter items from the current set of apps
-        if (mSearchResults == null) {
+        if (mSearchResults.isEmpty()) {
             updateAdapterItems();
         }
     }
@@ -330,7 +336,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
 
             }
         }
-        if (mNumAppsPerRow != 0) {
+        if (mNumAppsPerRowAllApps != 0) {
             // Update the number of rows in the adapter after we do all the merging (otherwise, we
             // would have to shift the values again)
             int numAppsInSection = 0;
@@ -338,10 +344,10 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
             int rowIndex = -1;
             for (AdapterItem item : mAdapterItems) {
                 item.rowIndex = 0;
-                if (AllAppsGridAdapter.isDividerViewType(item.viewType)) {
+                if (BaseAllAppsAdapter.isDividerViewType(item.viewType)) {
                     numAppsInSection = 0;
-                } else if (AllAppsGridAdapter.isIconViewType(item.viewType)) {
-                    if (numAppsInSection % mNumAppsPerRow == 0) {
+                } else if (BaseAllAppsAdapter.isIconViewType(item.viewType)) {
+                    if (numAppsInSection % mNumAppsPerRowAllApps == 0) {
                         numAppsInRow = 0;
                         rowIndex++;
                     }
@@ -359,12 +365,13 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
                     float rowFraction = 1f / mNumAppRowsInAdapter;
                     for (FastScrollSectionInfo info : mFastScrollerSections) {
                         AdapterItem item = info.fastScrollToItem;
-                        if (!AllAppsGridAdapter.isIconViewType(item.viewType)) {
+                        if (!BaseAllAppsAdapter.isIconViewType(item.viewType)) {
                             info.touchFraction = 0f;
                             continue;
                         }
 
-                        float subRowFraction = item.rowAppIndex * (rowFraction / mNumAppsPerRow);
+                        float subRowFraction =
+                                item.rowAppIndex * (rowFraction / mNumAppsPerRowAllApps);
                         info.touchFraction = item.rowIndex * rowFraction + subRowFraction;
                     }
                     break;
@@ -373,7 +380,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
                     float cumulativeTouchFraction = 0f;
                     for (FastScrollSectionInfo info : mFastScrollerSections) {
                         AdapterItem item = info.fastScrollToItem;
-                        if (!AllAppsGridAdapter.isIconViewType(item.viewType)) {
+                        if (!BaseAllAppsAdapter.isIconViewType(item.viewType)) {
                             info.touchFraction = 0f;
                             continue;
                         }
