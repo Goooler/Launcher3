@@ -18,8 +18,10 @@ package com.android.launcher3.allapps.search;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_FOCUSED_ITEM_SELECTED_WITH_IME;
 
 import android.text.Editable;
+import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.text.style.SuggestionSpan;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnFocusChangeListener;
@@ -27,14 +29,13 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.ExtendedEditText;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.search.SearchAlgorithm;
 import com.android.launcher3.search.SearchCallback;
+import com.android.launcher3.views.ActivityContext;
 
 /**
  * An interface to a search box that AllApps can command.
@@ -43,10 +44,11 @@ public class AllAppsSearchBarController
         implements TextWatcher, OnEditorActionListener, ExtendedEditText.OnBackKeyListener,
         OnFocusChangeListener {
 
-    protected BaseDraggingActivity mLauncher;
+    protected ActivityContext mLauncher;
     protected SearchCallback<AdapterItem> mCallback;
     protected ExtendedEditText mInput;
     protected String mQuery;
+    private String[] mTextConversions;
 
     protected SearchAlgorithm<AdapterItem> mSearchAlgorithm;
 
@@ -59,7 +61,7 @@ public class AllAppsSearchBarController
      */
     public final void initialize(
             SearchAlgorithm<AdapterItem> searchAlgorithm, ExtendedEditText input,
-            BaseDraggingActivity launcher, SearchCallback<AdapterItem> callback) {
+            ActivityContext launcher, SearchCallback<AdapterItem> callback) {
         mCallback = callback;
         mLauncher = launcher;
 
@@ -78,7 +80,20 @@ public class AllAppsSearchBarController
 
     @Override
     public void onTextChanged(CharSequence s, int start, int before, int count) {
-        // Do nothing
+        mTextConversions = extractTextConversions(s);
+    }
+
+    private static String[] extractTextConversions(CharSequence text) {
+        if (text instanceof SpannableStringBuilder) {
+            SpannableStringBuilder spanned = (SpannableStringBuilder) text;
+            SuggestionSpan[] suggestionSpans =
+                spanned.getSpans(0, text.length(), SuggestionSpan.class);
+            if (suggestionSpans != null && suggestionSpans.length > 0) {
+                spanned.removeSpan(suggestionSpans[0]);
+                return suggestionSpans[0].getSuggestions();
+            }
+        }
+        return null;
     }
 
     @Override
@@ -89,7 +104,7 @@ public class AllAppsSearchBarController
             mCallback.clearSearchResult();
         } else {
             mSearchAlgorithm.cancel(false);
-            mSearchAlgorithm.doSearch(mQuery, mCallback);
+            mSearchAlgorithm.doSearch(mQuery, mTextConversions, mCallback);
         }
     }
 
@@ -109,7 +124,7 @@ public class AllAppsSearchBarController
             mLauncher.getStatsLogManager().logger()
                     .log(LAUNCHER_ALLAPPS_FOCUSED_ITEM_SELECTED_WITH_IME);
             // selectFocusedView should return SearchTargetEvent that is passed onto onClick
-            return Launcher.getLauncher(mLauncher).getAppsView().launchHighlightedItem();
+            return mLauncher.getAppsView().getMainAdapterProvider().launchHighlightedItem();
         }
         return false;
     }
