@@ -30,6 +30,7 @@ import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_OVERLAY;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPELEFT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPERIGHT;
+import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -323,37 +324,14 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
             setPageSpacing(Math.max(maxInsets, maxPadding));
         }
 
-        updateWorkspaceScreensPadding();
+        updateCellLayoutPadding();
         updateWorkspaceWidgetsSizes();
     }
 
-    private void updateWorkspaceScreensPadding() {
-        DeviceProfile grid = mLauncher.getDeviceProfile();
-        int paddingLeftRight = grid.cellLayoutPaddingLeftRightPx;
-        int paddingBottom = grid.cellLayoutBottomPaddingPx;
-
-        int panelCount = getPanelCount();
-        int rightPanelModulus = mIsRtl ? 0 : panelCount - 1;
-        int leftPanelModulus = mIsRtl ? panelCount - 1 : 0;
-        int numberOfScreens = mScreenOrder.size();
-        for (int i = 0; i < numberOfScreens; i++) {
-            int paddingLeft = paddingLeftRight;
-            int paddingRight = paddingLeftRight;
-            // Add missing cellLayout border in-between panels.
-            if (panelCount > 1) {
-                if (i % panelCount == leftPanelModulus) {
-                    paddingRight += grid.cellLayoutBorderSpacePx.x / 2;
-                } else if (i % panelCount == rightPanelModulus) { // right side panel
-                    paddingLeft += grid.cellLayoutBorderSpacePx.x / 2;
-                } else { // middle panel
-                    paddingLeft += grid.cellLayoutBorderSpacePx.x / 2;
-                    paddingRight += grid.cellLayoutBorderSpacePx.x / 2;
-                }
-            }
-            // SparseArrayMap doesn't keep the order
-            mWorkspaceScreens.get(mScreenOrder.get(i))
-                    .setPadding(paddingLeft, 0, paddingRight, paddingBottom);
-        }
+    private void updateCellLayoutPadding() {
+        Rect padding = mLauncher.getDeviceProfile().cellLayoutPaddingPx;
+        mWorkspaceScreens.forEach(
+                s -> s.setPadding(padding.left, padding.top, padding.right, padding.bottom));
     }
 
     private void updateWorkspaceWidgetsSizes() {
@@ -651,7 +629,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                 mLauncher.getStateManager().getState(), newScreen, insertIndex);
 
         updatePageScrollValues();
-        updateWorkspaceScreensPadding();
+        updateCellLayoutPadding();
         return newScreen;
     }
 
@@ -1266,6 +1244,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         // different effects based on device performance. On at least one relatively high-end
         // device I've tried, translating the launcher causes things to get quite laggy.
         mLauncher.getDragLayer().setTranslationX(transX);
+        Log.d(BAD_STATE, "Workspace onOverlayScrollChanged DragLayer ALPHA_INDEX_OVERLAY=" + alpha);
         mLauncher.getDragLayer().getAlphaProperty(ALPHA_INDEX_OVERLAY).setValue(alpha);
     }
 
