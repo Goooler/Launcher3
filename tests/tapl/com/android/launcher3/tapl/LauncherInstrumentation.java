@@ -877,10 +877,9 @@ public final class LauncherInstrumentation {
     }
 
     /**
+     * @return the Workspace object.
      * @deprecated use goHome().
      * Presses nav bar home button.
-     *
-     * @return the Workspace object.
      */
     @Deprecated
     public Workspace pressHome() {
@@ -1651,9 +1650,10 @@ public final class LauncherInstrumentation {
     }
 
     Point getRealDisplaySize() {
-        final Point size = new Point();
-        getContext().getSystemService(WindowManager.class).getDefaultDisplay().getRealSize(size);
-        return size;
+        final Rect displayBounds = getContext().getSystemService(WindowManager.class)
+                .getMaximumWindowMetrics()
+                .getBounds();
+        return new Point(displayBounds.width(), displayBounds.height());
     }
 
     public void enableDebugTracing() {

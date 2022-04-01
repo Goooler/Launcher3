@@ -22,6 +22,7 @@ import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_M
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
+import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.ResourceUtils.getBoolByName;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
@@ -55,6 +56,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
@@ -65,6 +67,7 @@ import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom;
+import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -227,6 +230,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public void updateDeviceProfile(DeviceProfile dp) {
         mDeviceProfile = dp;
         updateIconSize(getResources());
+
+        AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
+        // Reapply fullscreen to take potential new screen size into account.
+        setTaskbarWindowFullscreen(mIsFullscreen);
+
         dispatchDeviceProfileChanged();
     }
 
@@ -236,6 +244,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         float iconScale = taskbarIconSize / mDeviceProfile.iconSizePx;
         mDeviceProfile.updateIconSize(iconScale, resources);
         mDeviceProfile.updateAllAppsIconSize(1, resources); // Leave all apps unscaled.
+    }
+
+    @VisibleForTesting
+    @Override
+    public StatsLogManager getStatsLogManager() {
+        // Used to mock, can't mock a default interface method directly
+        return super.getStatsLogManager();
     }
 
     /** Creates LayoutParams for adding a view directly to WindowManager as a new window */
