@@ -26,7 +26,6 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
-import static com.android.launcher3.util.window.WindowManagerProxy.MIN_LARGE_TABLET_WIDTH;
 import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
@@ -306,7 +305,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         public Info(Context context, Display display,
                 WindowManagerProxy wmProxy,
                 ArrayMap<String, Pair<CachedDisplayInfo, WindowBounds[]>> perDisplayBoundsCache) {
-            CachedDisplayInfo displayInfo = wmProxy.getDisplayInfo(display);
+            CachedDisplayInfo displayInfo = wmProxy.getDisplayInfo(context, display);
             rotation = displayInfo.rotation;
             currentSize = displayInfo.size;
             displayId = displayInfo.id;
@@ -345,16 +344,14 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
          * Returns {@code true} if the bounds represent a tablet.
          */
         public boolean isTablet(WindowBounds bounds) {
-            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()),
-                    densityDpi) >= MIN_TABLET_WIDTH;
+            return smallestSizeDp(bounds) >= MIN_TABLET_WIDTH;
         }
 
         /**
-         * Returns {@code true} if the bounds represent a large tablet.
+         * Returns smallest size in dp for given bounds.
          */
-        public boolean isLargeTablet(WindowBounds bounds) {
-            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()),
-                    densityDpi) >= MIN_LARGE_TABLET_WIDTH;
+        public float smallestSizeDp(WindowBounds bounds) {
+            return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()), densityDpi);
         }
     }
 
@@ -367,7 +364,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         pw.println("  id=" + info.displayId);
         pw.println("  rotation=" + info.rotation);
         pw.println("  fontScale=" + info.fontScale);
-        pw.println("  densityDpi=" + info.displayId);
+        pw.println("  densityDpi=" + info.densityDpi);
         pw.println("  navigationMode=" + info.navigationMode.name());
         pw.println("  currentSize=" + info.currentSize);
         pw.println("  supportedBounds=" + info.supportedBounds);

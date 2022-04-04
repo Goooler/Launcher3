@@ -237,7 +237,7 @@ public class GroupedTaskView extends TaskView {
         }
         getPagedOrientationHandler().measureGroupedTaskViewThumbnailBounds(mSnapshotView,
                 mSnapshotView2, widthSize, heightSize, mSplitBoundsConfig,
-                mActivity.getDeviceProfile());
+                mActivity.getDeviceProfile(), getLayoutDirection() == LAYOUT_DIRECTION_RTL);
         updateIconPlacement();
     }
 
@@ -271,7 +271,8 @@ public class GroupedTaskView extends TaskView {
 
         getPagedOrientationHandler().setSplitIconParams(mIconView, mIconView2,
                 taskIconHeight, mSnapshotView.getMeasuredWidth(), mSnapshotView.getMeasuredHeight(),
-                isRtl, deviceProfile, mSplitBoundsConfig);
+                getMeasuredHeight(), getMeasuredWidth(), isRtl, deviceProfile,
+                mSplitBoundsConfig);
     }
 
     private void updateSecondaryDwbPlacement() {

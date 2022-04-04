@@ -651,7 +651,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mDragLayer.onOneHandedModeStateChanged(activated);
     }
 
-    private void initDeviceProfile(InvariantDeviceProfile idp) {
+    protected void initDeviceProfile(InvariantDeviceProfile idp) {
         // Load configuration-specific DeviceProfile
         mDeviceProfile = idp.getDeviceProfile(this);
         if (isInMultiWindowMode()) {
@@ -2065,7 +2065,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @TargetApi(Build.VERSION_CODES.M)
     @Override
-    protected boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
+    public boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
         // Due to legacy reasons, direct call shortcuts require Launchers to have the
         // corresponding permission. Show the appropriate permission prompt if that
         // is the case.

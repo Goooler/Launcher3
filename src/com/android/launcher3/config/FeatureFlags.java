@@ -93,13 +93,6 @@ public final class FeatureFlags {
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
 
-    public static final BooleanFlag INJECT_WEB_TOP = new DeviceFlag("INJECT_WEB_TOP", false,
-            "Show web suggestions on top of the search results");
-
-    public static final BooleanFlag USE_FALLBACK_APP_SEARCH = new DeviceFlag(
-            "USE_FALLBACK_APP_SEARCH", false,
-            "Use fallback launcher app search results instead of AiAi app results");
-
     public static final BooleanFlag ENABLE_QUICK_SEARCH = new DeviceFlag("ENABLE_QUICK_SEARCH",
             true, "Use quick search behavior.");
 
@@ -264,6 +257,13 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
             "ENABLE_NEW_MIGRATION_LOGIC", true,
             "Enable the new grid migration logic, keeping pages when src < dest");
+
+    public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
+            "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
+
+    public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(
+            "USE_LOCAL_ICON_OVERRIDES", true,
+            "Use inbuilt monochrome icons if app doesn't provide one");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
