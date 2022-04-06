@@ -71,6 +71,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
@@ -174,7 +175,7 @@ public class TouchInteractionService extends Service
                 SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy, pip,
                         splitscreen, onehanded, shellTransitions, startingWindow, recentTasks,
                         launcherUnlockAnimationController, backAnimation);
-                TouchInteractionService.this.initInputMonitor();
+                TouchInteractionService.this.initInputMonitor("TISBinder#onInitialize()");
                 preloadOverview(true /* fromInit */);
             });
             sIsInitialized = true;
@@ -372,7 +373,8 @@ public class TouchInteractionService extends Service
         sConnected = true;
     }
 
-    private void disposeEventHandlers() {
+    private void disposeEventHandlers(String reason) {
+        Log.d(TAG, "disposeEventHandlers: Reason: " + reason);
         if (mInputEventReceiver != null) {
             mInputEventReceiver.dispose();
             mInputEventReceiver = null;
@@ -383,8 +385,8 @@ public class TouchInteractionService extends Service
         }
     }
 
-    private void initInputMonitor() {
-        disposeEventHandlers();
+    private void initInputMonitor(String reason) {
+        disposeEventHandlers("Initializing input monitor due to: " + reason);
 
         if (mDeviceState.isButtonNavMode()) {
             return;
@@ -401,7 +403,7 @@ public class TouchInteractionService extends Service
      * Called when the navigation mode changes, guaranteed to be after the device state has updated.
      */
     private void onNavigationModeChanged() {
-        initInputMonitor();
+        initInputMonitor("onNavigationModeChanged()");
         resetHomeBounceSeenOnQuickstepEnabledFirstTime();
     }
 
@@ -520,7 +522,7 @@ public class TouchInteractionService extends Service
             mInputConsumer.unregisterInputConsumer();
             mOverviewComponentObserver.onDestroy();
         }
-        disposeEventHandlers();
+        disposeEventHandlers("TouchInteractionService onDestroy()");
         mDeviceState.destroy();
         SystemUiProxy.INSTANCE.get(this).clearProxy();
         ProtoTracer.INSTANCE.get(this).stop();
@@ -687,11 +689,9 @@ public class TouchInteractionService extends Service
             }
 
             // If Taskbar is present, we listen for long press to unstash it.
-            BaseActivityInterface activityInterface = newGestureState.getActivityInterface();
-            StatefulActivity activity = activityInterface.getCreatedActivity();
-            if (activity != null && activity.getDeviceProfile().isTaskbarPresent) {
-                base = new TaskbarStashInputConsumer(this, base, mInputMonitorCompat,
-                        mTaskbarManager.getCurrentActivityContext());
+            TaskbarActivityContext tac = mTaskbarManager.getCurrentActivityContext();
+            if (tac != null) {
+                base = new TaskbarStashInputConsumer(this, base, mInputMonitorCompat, tac);
             }
 
             // If Bubbles is expanded, use the overlay input consumer, which will close Bubbles
