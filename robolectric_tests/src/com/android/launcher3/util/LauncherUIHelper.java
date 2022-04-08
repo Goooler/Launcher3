@@ -18,8 +18,6 @@ package com.android.launcher3.util;
 import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
-import static com.android.launcher3.Utilities.createHomeIntent;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -48,7 +46,10 @@ public class LauncherUIHelper {
      */
     public static String getLauncherClassName() {
         Context context = RuntimeEnvironment.application;
-        Intent homeIntent = createHomeIntent().setPackage(context.getPackageName());
+        Intent homeIntent = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .setPackage(context.getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         List<ResolveInfo> launchers = context.getPackageManager()
                 .queryIntentActivities(homeIntent, 0);

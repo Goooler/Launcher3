@@ -145,17 +145,14 @@ public class WallpaperOffsetInterpolator extends BroadcastReceiver {
         msg.sendToTarget();
     }
 
-    /** Returns the number of pages used for the wallpaper parallax. */
-    public int getNumPagesForWallpaperParallax() {
-        if (mWallpaperIsLiveWallpaper) {
-            return mNumScreens;
-        } else {
-            return Math.max(MIN_PARALLAX_PAGE_SPAN, mNumScreens);
-        }
-    }
-
     private void updateOffset() {
-        Message.obtain(mHandler, MSG_SET_NUM_PARALLAX, getNumPagesForWallpaperParallax(), 0,
+        int numPagesForWallpaperParallax;
+        if (mWallpaperIsLiveWallpaper) {
+            numPagesForWallpaperParallax = mNumScreens;
+        } else {
+            numPagesForWallpaperParallax = Math.max(MIN_PARALLAX_PAGE_SPAN, mNumScreens);
+        }
+        Message.obtain(mHandler, MSG_SET_NUM_PARALLAX, numPagesForWallpaperParallax, 0,
                 mWindowToken).sendToTarget();
     }
 

@@ -21,6 +21,8 @@ import com.android.launcher3.R;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
+import com.android.launcher3.userevent.nano.LauncherLogProto.ControlType;
 import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
@@ -44,13 +46,6 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
 
     protected final T mTarget;
     protected final ItemInfo mItemInfo;
-
-    /**
-     * Indicates if it's invokable or not through some disabled UI
-     */
-    private boolean isEnabled = true;
-
-    private boolean mHasFinishRecentsInAction = false;
 
     public SystemShortcut(int iconResId, int labelResId, T target, ItemInfo itemInfo) {
         mIconResId = iconResId;
@@ -90,24 +85,8 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
                 mAccessibilityActionId, context.getText(mLabelResId));
     }
 
-    public void setEnabled(boolean enabled) {
-        isEnabled = enabled;
-    }
-
-    public boolean isEnabled() {
-        return isEnabled;
-    }
-
     public boolean hasHandlerForAction(int action) {
         return mAccessibilityActionId == action;
-    }
-
-    public void setHasFinishRecentsInAction(boolean hasFinishRecentsInAction) {
-        mHasFinishRecentsInAction = hasFinishRecentsInAction;
-    }
-
-    public boolean hasFinishRecentsInAction() {
-        return mHasFinishRecentsInAction;
     }
 
     public interface Factory<T extends BaseDraggingActivity> {
@@ -120,7 +99,7 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
         final List<WidgetItem> widgets =
                 launcher.getPopupDataProvider().getWidgetsForPackageUser(new PackageUserKey(
                         itemInfo.getTargetComponent().getPackageName(), itemInfo.user));
-        if (widgets.isEmpty()) {
+        if (widgets == null) {
             return null;
         }
         return new Widgets(launcher, itemInfo);
@@ -138,6 +117,8 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
                     (WidgetsBottomSheet) mTarget.getLayoutInflater().inflate(
                             R.layout.widgets_bottom_sheet, mTarget.getDragLayer(), false);
             widgetsBottomSheet.populateAndShow(mItemInfo);
+            mTarget.getUserEventDispatcher().logActionOnControl(Action.Touch.TAP,
+                    ControlType.WIDGETS_BUTTON, view);
             mTarget.getStatsLogManager().logger().withItemInfo(mItemInfo)
                     .log(LAUNCHER_SYSTEM_SHORTCUT_WIDGETS_TAP);
         }
@@ -158,6 +139,8 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
             Rect sourceBounds = mTarget.getViewBounds(view);
             new PackageManagerHelper(mTarget).startDetailsActivityForInfo(
                     mItemInfo, sourceBounds, ActivityOptions.makeBasic().toBundle());
+            mTarget.getUserEventDispatcher().logActionOnControl(Action.Touch.TAP,
+                    ControlType.APPINFO_TARGET, view);
             mTarget.getStatsLogManager().logger().withItemInfo(mItemInfo)
                     .log(LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP);
         }
@@ -191,7 +174,7 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
         public void onClick(View view) {
             Intent intent = new PackageManagerHelper(view.getContext()).getMarketIntent(
                     mItemInfo.getTargetComponent().getPackageName());
-            mTarget.startActivitySafely(view, intent, mItemInfo);
+            mTarget.startActivitySafely(view, intent, mItemInfo, null);
             AbstractFloatingView.closeAllOpenViews(mTarget);
         }
     }

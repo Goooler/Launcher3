@@ -28,7 +28,7 @@ public interface WorkspaceLayoutManager {
 
     String TAG = "Launcher.Workspace";
 
-    // The screen id used for the empty screen always present at the end.
+    // The screen id used for the empty screen always present to the right.
     int EXTRA_EMPTY_SCREEN_ID = -201;
     // The is the first screen. It is always present, even if its empty.
     int FIRST_SCREEN_ID = 0;
@@ -130,14 +130,10 @@ public interface WorkspaceLayoutManager {
         }
 
         child.setHapticFeedbackEnabled(false);
-        child.setOnLongClickListener(getWorkspaceChildOnLongClickListener());
+        child.setOnLongClickListener(ItemLongClickListener.INSTANCE_WORKSPACE);
         if (child instanceof DropTarget) {
             onAddDropTarget((DropTarget) child);
         }
-    }
-
-    default View.OnLongClickListener getWorkspaceChildOnLongClickListener() {
-        return ItemLongClickListener.INSTANCE_WORKSPACE;
     }
 
     Hotseat getHotseat();

@@ -39,6 +39,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.graphics.LauncherPreviewRenderer;
@@ -47,7 +48,6 @@ import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
-import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.WidgetManagerHelper;
 
 import java.util.ArrayList;
@@ -67,7 +67,7 @@ import java.util.Set;
 public class GridSizeMigrationTaskV2 {
 
     private static final String TAG = "GridSizeMigrationTaskV2";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     private final Context mContext;
     private final SQLiteDatabase mDb;
@@ -110,7 +110,7 @@ public class GridSizeMigrationTaskV2 {
         String gridSizeString = getPointString(idp.numColumns, idp.numRows);
 
         return !gridSizeString.equals(prefs.getString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, ""))
-                || idp.numDatabaseHotseatIcons != prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, -1);
+                || idp.numHotseatIcons != prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, -1);
     }
 
     /** See {@link #migrateGridIfNeeded(Context, InvariantDeviceProfile)} */
@@ -148,8 +148,7 @@ public class GridSizeMigrationTaskV2 {
         SharedPreferences prefs = Utilities.getPrefs(context);
         String gridSizeString = getPointString(idp.numColumns, idp.numRows);
         HashSet<String> validPackages = getValidPackages(context);
-        int srcHotseatCount = prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT,
-                idp.numDatabaseHotseatIcons);
+        int srcHotseatCount = prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, idp.numHotseatIcons);
 
         if (migrateForPreview) {
             if (!LauncherSettings.Settings.call(
@@ -178,11 +177,11 @@ public class GridSizeMigrationTaskV2 {
             DbReader destReader = new DbReader(t.getDb(),
                     migrateForPreview ? LauncherSettings.Favorites.PREVIEW_TABLE_NAME
                             : LauncherSettings.Favorites.TABLE_NAME,
-                    context, validPackages, idp.numDatabaseHotseatIcons);
+                    context, validPackages, idp.numHotseatIcons);
 
             Point targetSize = new Point(idp.numColumns, idp.numRows);
             GridSizeMigrationTaskV2 task = new GridSizeMigrationTaskV2(context, t.getDb(),
-                    srcReader, destReader, idp.numDatabaseHotseatIcons, targetSize);
+                    srcReader, destReader, idp.numHotseatIcons, targetSize);
             task.migrate();
 
             if (!migrateForPreview) {
@@ -203,7 +202,7 @@ public class GridSizeMigrationTaskV2 {
                 // Save current configuration, so that the migration does not run again.
                 prefs.edit()
                         .putString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, gridSizeString)
-                        .putInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, idp.numDatabaseHotseatIcons)
+                        .putInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, idp.numHotseatIcons)
                         .apply();
             }
         }
@@ -407,7 +406,7 @@ public class GridSizeMigrationTaskV2 {
          * to speed up the search.
          */
         private boolean findPlacement(DbEntry entry) {
-            for (int y = mNextStartY; y >= (mScreenId == 0 ? 1 /* smartspace */ : 0); y--) {
+            for (int y = mNextStartY; y > 0; y--) {
                 for (int x = mNextStartX; x < mTrgX; x++) {
                     boolean fits = mOccupied.isRegionVacant(x, y, entry.spanX, entry.spanY);
                     boolean minFits = mOccupied.isRegionVacant(x, y, entry.minSpanX,

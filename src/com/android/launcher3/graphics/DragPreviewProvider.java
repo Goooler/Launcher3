@@ -29,15 +29,12 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 
-import androidx.annotation.Nullable;
-
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.icons.BitmapRenderer;
-import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
@@ -91,14 +88,10 @@ public class DragPreviewProvider {
     }
 
     /**
-     * Returns a new drawable to show when the {@link #mView} is being dragged around.
-     * Responsibility for the drawable is transferred to the caller.
+     * Returns a new bitmap to show when the {@link #mView} is being dragged around.
+     * Responsibility for the bitmap is transferred to the caller.
      */
-    public Drawable createDrawable() {
-        if (mView instanceof LauncherAppWidgetHostView) {
-            return null;
-        }
-
+    public Bitmap createDragBitmap() {
         int width = 0;
         int height = 0;
         // Assume scaleX == scaleY, which is always the case for workspace items.
@@ -112,21 +105,8 @@ public class DragPreviewProvider {
             height = mView.getHeight();
         }
 
-        return new FastBitmapDrawable(
-                BitmapRenderer.createHardwareBitmap(width + blurSizeOutline,
-                        height + blurSizeOutline, (c) -> drawDragView(c, scale)));
-    }
-
-    /**
-     * Returns the content view if the content should be rendered directly in
-     * {@link com.android.launcher3.dragndrop.DragView}. Otherwise, returns null.
-     */
-    @Nullable
-    public View getContentView() {
-        if (mView instanceof LauncherAppWidgetHostView) {
-            return mView;
-        }
-        return null;
+        return BitmapRenderer.createHardwareBitmap(width + blurSizeOutline,
+                height + blurSizeOutline, (c) -> drawDragView(c, scale));
     }
 
     public final void generateDragOutline(Bitmap preview) {
@@ -149,7 +129,7 @@ public class DragPreviewProvider {
         return bounds;
     }
 
-    public float getScaleAndPosition(Drawable preview, int[] outPos) {
+    public float getScaleAndPosition(Bitmap preview, int[] outPos) {
         float scale = Launcher.getLauncher(mView.getContext())
                 .getDragLayer().getLocationInDragLayer(mView, outPos);
         if (mView instanceof LauncherAppWidgetHostView) {
@@ -159,25 +139,9 @@ public class DragPreviewProvider {
         }
 
         outPos[0] = Math.round(outPos[0] -
-                (preview.getIntrinsicWidth() - scale * mView.getWidth() * mView.getScaleX()) / 2);
-        outPos[1] = Math.round(outPos[1] - (1 - scale) * preview.getIntrinsicHeight() / 2
+                (preview.getWidth() - scale * mView.getWidth() * mView.getScaleX()) / 2);
+        outPos[1] = Math.round(outPos[1] - (1 - scale) * preview.getHeight() / 2
                 - previewPadding / 2);
-        return scale;
-    }
-
-    /** Returns the scale and position of a given view for drag-n-drop. */
-    public float getScaleAndPosition(View view, int[] outPos) {
-        float scale = Launcher.getLauncher(mView.getContext())
-                .getDragLayer().getLocationInDragLayer(mView, outPos);
-        if (mView instanceof LauncherAppWidgetHostView) {
-            // App widgets are technically scaled, but are drawn at their expected size -- so the
-            // app widget scale should not affect the scale of the preview.
-            scale /= ((LauncherAppWidgetHostView) mView).getScaleToFit();
-        }
-
-        outPos[0] = Math.round(outPos[0]
-                - (view.getWidth() - scale * mView.getWidth() * mView.getScaleX()) / 2);
-        outPos[1] = Math.round(outPos[1] - (1 - scale) * view.getHeight() / 2 - previewPadding / 2);
         return scale;
     }
 

@@ -113,26 +113,14 @@ public class ContentWriter {
 
     public static final class CommitParams {
 
-        final Uri mUri;
-        final String mWhere;
-        final String[] mSelectionArgs;
+        final Uri mUri = LauncherSettings.Favorites.CONTENT_URI;
+        String mWhere;
+        String[] mSelectionArgs;
 
         public CommitParams(String where, String[] selectionArgs) {
-            this(LauncherSettings.Favorites.CONTENT_URI, where, selectionArgs);
-        }
-
-        private CommitParams(Uri uri, String where, String[] selectionArgs) {
-            mUri = uri;
             mWhere = where;
             mSelectionArgs = selectionArgs;
         }
 
-        /**
-         * Creates commit params for backup table.
-         */
-        public static CommitParams backupCommitParams(String where, String[] selectionArgs) {
-            return new CommitParams(
-                    LauncherSettings.Favorites.BACKUP_CONTENT_URI, where, selectionArgs);
-        }
     }
 }

@@ -17,7 +17,6 @@
 package com.android.launcher3.anim;
 
 import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.view.View;
@@ -26,7 +25,7 @@ import android.view.ViewGroup;
 /**
  * A convenience class to update a view's visibility state after an alpha animation.
  */
-public class AlphaUpdateListener extends AnimatorListenerAdapter
+public class AlphaUpdateListener extends AnimationSuccessListener
         implements AnimatorUpdateListener {
     public static final float ALPHA_CUTOFF_THRESHOLD = 0.01f;
 
@@ -42,7 +41,7 @@ public class AlphaUpdateListener extends AnimatorListenerAdapter
     }
 
     @Override
-    public void onAnimationEnd(Animator animator) {
+    public void onAnimationSuccess(Animator animator) {
         updateVisibility(mView);
     }
 

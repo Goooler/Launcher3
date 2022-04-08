@@ -17,8 +17,6 @@ package com.android.launcher3.statemanager;
 
 import android.content.Context;
 
-import com.android.launcher3.DeviceProfile;
-
 /**
  * Interface representing a state of a StatefulActivity
  */
@@ -54,11 +52,4 @@ public interface BaseState<T extends BaseState> {
      * Returns if the state has the provided flag
      */
     boolean hasFlag(int flagMask);
-
-    /**
-     * For this state, whether tasks should layout as a grid rather than a list.
-     */
-    default boolean displayOverviewTasksAsGrid(DeviceProfile deviceProfile) {
-        return false;
-    }
 }

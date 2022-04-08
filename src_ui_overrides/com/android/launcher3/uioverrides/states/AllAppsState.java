@@ -16,14 +16,13 @@
 package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
-import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAPPS;
 
 import android.content.Context;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
-import com.android.launcher3.util.Themes;
+import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 
 /**
  * Definition for AllApps state
@@ -42,7 +41,7 @@ public class AllAppsState extends LauncherState {
     };
 
     public AllAppsState(int id) {
-        super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
+        super(id, ContainerType.ALLAPPS, STATE_FLAGS);
     }
 
     @Override
@@ -57,7 +56,7 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return ALL_APPS_CONTENT;
+        return ALL_APPS_HEADER | ALL_APPS_CONTENT;
     }
 
     @Override
@@ -74,10 +73,5 @@ public class AllAppsState extends LauncherState {
     @Override
     public float getVerticalProgress(Launcher launcher) {
         return 0f;
-    }
-
-    @Override
-    public int getWorkspaceScrimColor(Launcher launcher) {
-        return Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
     }
 }

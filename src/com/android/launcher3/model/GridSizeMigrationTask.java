@@ -25,6 +25,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.LauncherSettings.Settings;
@@ -39,7 +40,6 @@ import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSparseArrayMap;
-import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.WidgetManagerHelper;
 
 import java.util.ArrayList;
@@ -53,7 +53,7 @@ import java.util.HashSet;
 public class GridSizeMigrationTask {
 
     private static final String TAG = "GridSizeMigrationTask";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     // These are carefully selected weights for various item types (Math.random?), to allow for
     // the least absurd migration experience.
@@ -893,7 +893,7 @@ public class GridSizeMigrationTask {
         String gridSizeString = getPointString(idp.numColumns, idp.numRows);
 
         return !gridSizeString.equals(prefs.getString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, ""))
-                || idp.numDatabaseHotseatIcons != prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, -1);
+                || idp.numHotseatIcons != prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, -1);
     }
 
     /** See {@link #migrateGridIfNeeded(Context, InvariantDeviceProfile)} */
@@ -928,7 +928,7 @@ public class GridSizeMigrationTask {
                 .getBinder(Settings.EXTRA_VALUE)) {
 
             int srcHotseatCount = prefs.getInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT,
-                    idp.numDatabaseHotseatIcons);
+                    idp.numHotseatIcons);
             Point sourceSize = parsePoint(prefs.getString(
                     KEY_MIGRATION_SRC_WORKSPACE_SIZE, gridSizeString));
 
@@ -948,10 +948,10 @@ public class GridSizeMigrationTask {
 
             HashSet<String> validPackages = getValidPackages(context);
             // Hotseat.
-            if (srcHotseatCount != idp.numDatabaseHotseatIcons
+            if (srcHotseatCount != idp.numHotseatIcons
                     && new GridSizeMigrationTask(context, transaction.getDb(), validPackages,
                             migrateForPreview, srcHotseatCount,
-                            idp.numDatabaseHotseatIcons).migrateHotseat()) {
+                            idp.numHotseatIcons).migrateHotseat()) {
                 dbChanged = true;
             }
 
@@ -991,7 +991,7 @@ public class GridSizeMigrationTask {
                 // Save current configuration, so that the migration does not run again.
                 prefs.edit()
                         .putString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, gridSizeString)
-                        .putInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, idp.numDatabaseHotseatIcons)
+                        .putInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, idp.numHotseatIcons)
                         .apply();
             }
         }

@@ -45,10 +45,9 @@
 
 # BUG(70852369): Surpress additional warnings after changing from Proguard to R8
 -dontwarn android.app.**
--dontwarn android.graphics.**
--dontwarn android.os.**
 -dontwarn android.view.**
--dontwarn android.window.**
+-dontwarn android.os.**
+-dontwarn android.graphics.**
 
 # Ignore warnings for hidden utility classes referenced from the shared lib
 -dontwarn com.android.internal.util.**

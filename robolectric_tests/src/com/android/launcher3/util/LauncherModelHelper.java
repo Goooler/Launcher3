@@ -48,12 +48,10 @@ import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.UserCache;
-import com.android.launcher3.shadows.ShadowLooperExecutor;
 
 import org.mockito.ArgumentCaptor;
 import org.robolectric.Robolectric;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowContentResolver;
 import org.robolectric.shadows.ShadowPackageManager;
 import org.robolectric.util.ReflectionHelpers;
@@ -83,7 +81,7 @@ public class LauncherModelHelper {
     public static final int NO__ICON = -1;
     public static final String TEST_PACKAGE = "com.android.launcher3.validpackage";
 
-    // Authority for providing a test default-workspace-layout data.
+    // Authority for providing a dummy default-workspace-layout data.
     private static final String TEST_PROVIDER_AUTHORITY =
             LauncherModelHelper.class.getName().toLowerCase();
     private static final int DEFAULT_BITMAP_SIZE = 10;
@@ -254,7 +252,7 @@ public class LauncherModelHelper {
     }
 
     /**
-     * Adds a mock item in the DB.
+     * Adds a dummy item in the DB.
      * @param type {@link #APP_ICON} or {@link #SHORTCUT} or >= 2 for
      *             folder (where the type represents the number of items in the folder).
      */
@@ -312,7 +310,7 @@ public class LauncherModelHelper {
     }
 
     /**
-     * Initializes the DB with mock elements to represent the provided grid structure.
+     * Initializes the DB with dummy elements to represent the provided grid structure.
      * @param typeArray A 3d array of item types. {@see #addItem(int, long, long, int, int)} for
      *                  type definitions. The first dimension represents the screens and the next
      *                  two represent the workspace grid.
@@ -349,20 +347,20 @@ public class LauncherModelHelper {
     }
 
     /**
-     * Sets up a mock provider to load the provided layout by default, next time the layout loads
+     * Sets up a dummy provider to load the provided layout by default, next time the layout loads
      */
     public LauncherModelHelper setupDefaultLayoutProvider(LauncherLayoutBuilder builder)
             throws Exception {
         Context context = RuntimeEnvironment.application;
         InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
-        idp.numRows = idp.numColumns = idp.numDatabaseHotseatIcons = DEFAULT_GRID_SIZE;
+        idp.numRows = idp.numColumns = idp.numHotseatIcons = DEFAULT_GRID_SIZE;
         idp.iconBitmapSize = DEFAULT_BITMAP_SIZE;
 
         Settings.Secure.putString(context.getContentResolver(),
                 "launcher3.layout.provider", TEST_PROVIDER_AUTHORITY);
 
         shadowOf(context.getPackageManager())
-                .addProviderIfNotPresent(new ComponentName("com.test", "Mock")).authority =
+                .addProviderIfNotPresent(new ComponentName("com.test", "Dummy")).authority =
                 TEST_PROVIDER_AUTHORITY;
 
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -405,16 +403,14 @@ public class LauncherModelHelper {
     public void loadModelSync() throws ExecutionException, InterruptedException {
         // Since robolectric tests run on main thread, we run the loader-UI calls on a temp thread,
         // so that we can wait appropriately for the loader to complete.
-        ShadowLooperExecutor sle = Shadow.extract(Executors.MAIN_EXECUTOR);
-        sle.setHandler(Executors.UI_HELPER_EXECUTOR.getHandler());
+        ReflectionHelpers.setField(getModel(), "mMainExecutor", Executors.UI_HELPER_EXECUTOR);
 
         Callbacks mockCb = mock(Callbacks.class);
         getModel().addCallbacksAndLoad(mockCb);
 
         Executors.MODEL_EXECUTOR.submit(() -> { }).get();
         Executors.UI_HELPER_EXECUTOR.submit(() -> { }).get();
-
-        sle.setHandler(null);
+        ReflectionHelpers.setField(getModel(), "mMainExecutor", Executors.MAIN_EXECUTOR);
         getModel().removeCallbacks(mockCb);
     }
 

@@ -17,6 +17,7 @@ package com.android.launcher3.touch;
 
 import android.content.Context;
 import android.graphics.PointF;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 
@@ -24,6 +25,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.Utilities;
+import com.android.launcher3.testing.TestProtocol;
 
 /**
  * One dimensional scroll/drag/swipe gesture detector (either HORIZONTAL or VERTICAL).
@@ -58,11 +60,6 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
             return direction.x;
         }
 
-        @NonNull
-        @Override
-        public String toString() {
-            return "VERTICAL";
-        }
     };
 
     public static final Direction HORIZONTAL = new Direction() {
@@ -89,11 +86,6 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
             return direction.y;
         }
 
-        @NonNull
-        @Override
-        public String toString() {
-            return "HORIZONTAL";
-        }
     };
 
     private final Direction mDir;
@@ -101,8 +93,6 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
     private final Listener mListener;
 
     private int mScrollDirections;
-
-    private float mTouchSlopMultiplier = 1f;
 
     public SingleAxisSwipeDetector(@NonNull Context context, @NonNull Listener l,
             @NonNull Direction dir) {
@@ -115,24 +105,20 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
         super(config, isRtl);
         mListener = l;
         mDir = dir;
-    }
-
-    /**
-     * Provides feasibility to adjust touch slop when visible window size changed. When visible
-     * bounds translate become smaller, multiply a larger multiplier could ensure the UX
-     * more consistent.
-     *
-     * @see #shouldScrollStart(PointF)
-     *
-     * @param touchSlopMultiplier the value to multiply original touch slop.
-     */
-    public void setTouchSlopMultiplier(float touchSlopMultiplier) {
-        mTouchSlopMultiplier = touchSlopMultiplier;
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.PAUSE_NOT_DETECTED, "SingleAxisSwipeDetector.ctor "
+                    + l.getClass().getSimpleName()
+                    + " @ " + android.util.Log.getStackTraceString(new Throwable()));
+        }
     }
 
     public void setDetectableScrollConditions(int scrollDirectionFlags, boolean ignoreSlop) {
         mScrollDirections = scrollDirectionFlags;
         mIgnoreSlopWhenSettling = ignoreSlop;
+    }
+
+    public int getScrollDirections() {
+        return mScrollDirections;
     }
 
     /**
@@ -148,7 +134,7 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
     @Override
     protected boolean shouldScrollStart(PointF displacement) {
         // Reject cases where the angle or slop condition is not met.
-        float minDisplacement = Math.max(mTouchSlop * mTouchSlopMultiplier,
+        float minDisplacement = Math.max(mTouchSlop,
                 Math.abs(mDir.extractOrthogonalDirection(displacement)));
         if (Math.abs(mDir.extractDirection(displacement)) < minDisplacement) {
             return false;
@@ -175,6 +161,10 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
 
     @Override
     protected void reportDraggingInternal(PointF displacement, MotionEvent event) {
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.PAUSE_NOT_DETECTED, "SingleAxisSwipeDetector "
+                    + mListener.getClass().getSimpleName());
+        }
         mListener.onDrag(mDir.extractDirection(displacement),
                 mDir.extractOrthogonalDirection(displacement), event);
     }

@@ -30,8 +30,6 @@ import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.views.BaseDragLayer;
 
-import java.util.List;
-
 /**
  * Abstract activity with state management
  * @param <STATE_TYPE> Type of state object
@@ -48,7 +46,7 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
     /**
      * Create handlers to control the property changes for this activity
      */
-    protected abstract void collectStateHandlers(List<StateHandler> out);
+    protected abstract StateHandler<STATE_TYPE>[] createStateHandlers();
 
     /**
      * Returns true if the activity is in the provided state
@@ -123,9 +121,7 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
         final int origDragLayerChildCount = dragLayer.getChildCount();
         super.onStop();
 
-        if (!isChangingConfigurations()) {
-            getStateManager().moveToRestState();
-        }
+        getStateManager().moveToRestState();
 
         // Workaround for b/78520668, explicitly trim memory once UI is hidden
         onTrimMemory(TRIM_MEMORY_UI_HIDDEN);
@@ -152,8 +148,8 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
 
     private void handleDeferredResume() {
         if (hasBeenResumed() && !getStateManager().getState().hasFlag(FLAG_NON_INTERACTIVE)) {
-            addActivityFlags(ACTIVITY_STATE_DEFERRED_RESUMED);
             onDeferredResumed();
+            addActivityFlags(ACTIVITY_STATE_DEFERRED_RESUMED);
 
             mDeferredResumePending = false;
         } else {

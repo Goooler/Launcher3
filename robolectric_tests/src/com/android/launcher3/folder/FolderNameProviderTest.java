@@ -25,20 +25,16 @@ import android.os.UserHandle;
 
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.util.Executors;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.LooperMode;
-import org.robolectric.annotation.LooperMode.Mode;
 
 import java.util.ArrayList;
 
 @RunWith(RobolectricTestRunner.class)
-@LooperMode(Mode.PAUSED)
 public final class FolderNameProviderTest {
     private Context mContext;
     private WorkspaceItemInfo mItem1;
@@ -62,20 +58,18 @@ public final class FolderNameProviderTest {
     }
 
     @Test
-    public void getSuggestedFolderName_workAssignedToEnd() throws Exception {
+    public void getSuggestedFolderName_workAssignedToEnd() {
         ArrayList<WorkspaceItemInfo> list = new ArrayList<>();
         list.add(mItem1);
         list.add(mItem2);
         FolderNameInfos nameInfos = new FolderNameInfos();
-        Executors.MODEL_EXECUTOR.submit(() ->
-                new FolderNameProvider().getSuggestedFolderName(mContext, list, nameInfos)).get();
+        new FolderNameProvider().getSuggestedFolderName(mContext, list, nameInfos);
         assertEquals("Work", nameInfos.getLabels()[0]);
 
         nameInfos.setLabel(0, "candidate1", 1.0f);
         nameInfos.setLabel(1, "candidate2", 1.0f);
         nameInfos.setLabel(2, "candidate3", 1.0f);
-        Executors.MODEL_EXECUTOR.submit(() ->
-                new FolderNameProvider().getSuggestedFolderName(mContext, list, nameInfos)).get();
+        new FolderNameProvider().getSuggestedFolderName(mContext, list, nameInfos);
         assertEquals("Work", nameInfos.getLabels()[3]);
         assertTrue(nameInfos.hasSuggestions());
         assertTrue(nameInfos.hasPrimary());

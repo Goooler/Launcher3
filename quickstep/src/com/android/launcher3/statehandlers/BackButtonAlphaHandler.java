@@ -18,7 +18,6 @@ package com.android.launcher3.statehandlers;
 
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.quickstep.AnimatedFloat.VALUE;
-import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
 
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
@@ -31,7 +30,7 @@ import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SystemUiProxy;
 
 /**
- * State handler for animating back button alpha in two-button nav mode.
+ * State handler for animating back button alpha
  */
 public class BackButtonAlphaHandler implements StateHandler<LauncherState> {
 
@@ -48,11 +47,18 @@ public class BackButtonAlphaHandler implements StateHandler<LauncherState> {
     @Override
     public void setStateWithAnimation(LauncherState toState, StateAnimationConfig config,
             PendingAnimation animation) {
-        if (SysUINavigationMode.getMode(mLauncher) != TWO_BUTTONS) {
+        if (config.onlyPlayAtomicComponent()) {
             return;
         }
 
-        mBackAlpha.value = SystemUiProxy.INSTANCE.get(mLauncher).getLastNavButtonAlpha();
+        if (!SysUINavigationMode.getMode(mLauncher).hasGestures) {
+            // If the nav mode is not gestural, then force back button alpha to be 1
+            UiThreadHelper.setBackButtonAlphaAsync(mLauncher,
+                    BaseQuickstepLauncher.SET_BACK_BUTTON_ALPHA, 1f, true /* animate */);
+            return;
+        }
+
+        mBackAlpha.value = SystemUiProxy.INSTANCE.get(mLauncher).getLastBackButtonAlpha();
         animation.setFloat(mBackAlpha, VALUE,
                 mLauncher.shouldBackButtonBeHidden(toState) ? 0 : 1, LINEAR);
     }

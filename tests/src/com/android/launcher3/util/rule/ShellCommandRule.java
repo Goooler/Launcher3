@@ -15,26 +15,20 @@
  */
 package com.android.launcher3.util.rule;
 
-import static androidx.test.InstrumentationRegistry.getInstrumentation;
-
 import static com.android.launcher3.tapl.TestHelpers.getLauncherInMyProcess;
+
+import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
 import android.content.ComponentName;
 import android.content.pm.ActivityInfo;
-import android.util.Log;
 
-import androidx.annotation.Nullable;
-import androidx.test.InstrumentationRegistry;
-import androidx.test.uiautomator.UiDevice;
-
-import com.android.systemui.shared.system.PackageManagerWrapper;
-
-import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
-import java.util.ArrayList;
+import androidx.annotation.Nullable;
+import androidx.test.InstrumentationRegistry;
+import androidx.test.uiautomator.UiDevice;
 
 /**
  * Test rule which executes a shell command at the start of the test.
@@ -43,19 +37,10 @@ public class ShellCommandRule implements TestRule {
 
     private final String mCmd;
     private final String mRevertCommand;
-    private final boolean mCheckSuccess;
-    private final Runnable mAdditionalChecks;
-
-    public ShellCommandRule(String cmd, @Nullable String revertCommand, boolean checkSuccess,
-            Runnable additionalChecks) {
-        mCmd = cmd;
-        mRevertCommand = revertCommand;
-        mCheckSuccess = checkSuccess;
-        mAdditionalChecks = additionalChecks;
-    }
 
     public ShellCommandRule(String cmd, @Nullable String revertCommand) {
-        this(cmd, revertCommand, false, null);
+        mCmd = cmd;
+        mRevertCommand = revertCommand;
     }
 
     @Override
@@ -63,27 +48,12 @@ public class ShellCommandRule implements TestRule {
         return new Statement() {
             @Override
             public void evaluate() throws Throwable {
-                final String result =
-                        UiDevice.getInstance(getInstrumentation()).executeShellCommand(mCmd);
-                if (mCheckSuccess) {
-                    Assert.assertTrue(
-                            "Failed command: " + mCmd + ", result: " + result,
-                            "Success".equals(result.replaceAll("\\s", "")));
-                }
-                if (mAdditionalChecks != null) mAdditionalChecks.run();
+                UiDevice.getInstance(getInstrumentation()).executeShellCommand(mCmd);
                 try {
                     base.evaluate();
                 } finally {
                     if (mRevertCommand != null) {
-                        final String revertResult = UiDevice.getInstance(
-                                getInstrumentation()).executeShellCommand(
-                                mRevertCommand);
-                        if (mCheckSuccess) {
-                            Assert.assertTrue(
-                                    "Failed command: " + mRevertCommand
-                                            + ", result: " + revertResult,
-                                    "Success".equals(result.replaceAll("\\s", "")));
-                        }
+                        UiDevice.getInstance(getInstrumentation()).executeShellCommand(mRevertCommand);
                     }
                 }
             }
@@ -102,15 +72,7 @@ public class ShellCommandRule implements TestRule {
      * Sets the target launcher as default launcher.
      */
     public static ShellCommandRule setDefaultLauncher() {
-        final ActivityInfo launcher = getLauncherInMyProcess();
-        Log.d("b/187080582", "Launcher: " + new ComponentName(launcher.packageName, launcher.name)
-                .flattenToString());
-        return new ShellCommandRule(getLauncherCommand(launcher), null, true, () ->
-                Assert.assertEquals("Setting default launcher failed",
-                        new ComponentName(launcher.packageName, launcher.name)
-                                .flattenToString(),
-                        PackageManagerWrapper.getInstance().getHomeActivities(new ArrayList<>())
-                                .flattenToString()));
+        return new ShellCommandRule(getLauncherCommand(getLauncherInMyProcess()), null);
     }
 
     public static String getLauncherCommand(ActivityInfo launcher) {

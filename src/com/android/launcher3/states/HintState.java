@@ -15,16 +15,11 @@
  */
 package com.android.launcher3.states;
 
-import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
-
 import android.content.Context;
-
-import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.R;
-import com.android.launcher3.util.Themes;
+import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 
 /**
  * Scale down workspace/hotseat to hint at going to either overview (on pause) or first home screen.
@@ -35,11 +30,7 @@ public class HintState extends LauncherState {
             | FLAG_HAS_SYS_UI_SCRIM;
 
     public HintState(int id) {
-        this(id, LAUNCHER_STATE_HOME);
-    }
-
-    public HintState(int id, int statsLogOrdinal) {
-        super(id, statsLogOrdinal, STATE_FLAGS);
+        super(id, ContainerType.DEFAULT_CONTAINERTYPE, STATE_FLAGS);
     }
 
     @Override
@@ -53,13 +44,18 @@ public class HintState extends LauncherState {
     }
 
     @Override
-    public int getWorkspaceScrimColor(Launcher launcher) {
-        return ColorUtils.setAlphaComponent(
-                Themes.getAttrColor(launcher, R.attr.overviewScrimColor), 100);
+    public float getOverviewScrimAlpha(Launcher launcher) {
+        return 0.4f;
     }
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         return new ScaleAndTranslation(0.92f, 0, 0);
+    }
+
+    @Override
+    public ScaleAndTranslation getQsbScaleAndTranslation(Launcher launcher) {
+        // Treat the QSB as part of the hotseat so they move together.
+        return getHotseatScaleAndTranslation(launcher);
     }
 }

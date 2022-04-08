@@ -17,7 +17,6 @@ package com.android.quickstep;
 
 import static com.android.launcher3.util.LauncherUIHelper.doLayout;
 
-import android.app.ActivityManager.RunningTaskInfo;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 
@@ -37,7 +36,6 @@ import org.robolectric.util.ReflectionHelpers;
 
 @RunWith(RobolectricTestRunner.class)
 @LooperMode(Mode.PAUSED)
-@org.junit.Ignore
 public class RecentsActivityTest {
 
     @Test
@@ -52,7 +50,7 @@ public class RecentsActivityTest {
     }
 
     @Test
-    public void testRecents_showCurrentTask() {
+    public void testRecets_showCurrentTask() {
         ActivityController<RecentsActivity> controller =
                 Robolectric.buildActivity(RecentsActivity.class);
 
@@ -60,10 +58,7 @@ public class RecentsActivityTest {
         doLayout(activity);
 
         FallbackRecentsView frv = activity.getOverviewPanel();
-
-        RunningTaskInfo placeholderTask = new RunningTaskInfo();
-        placeholderTask.taskId = 22;
-        frv.showCurrentTask(placeholderTask);
+        frv.showCurrentTask(22);
         doLayout(activity);
 
         ThumbnailData thumbnailData = new ThumbnailData();

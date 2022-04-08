@@ -31,21 +31,17 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.touch.BaseSwipeDetector;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Extension of {@link AbstractFloatingView} with common methods for sliding in from bottom.
- *
- * @param <T> Type of ActivityContext inflating this view.
+ * Extension of AbstractFloatingView with common methods for sliding in from bottom
  */
-public abstract class AbstractSlideInView<T extends Context & ActivityContext>
-        extends AbstractFloatingView implements SingleAxisSwipeDetector.Listener {
+public abstract class AbstractSlideInView extends AbstractFloatingView
+        implements SingleAxisSwipeDetector.Listener {
 
     protected static final Property<AbstractSlideInView, Float> TRANSLATION_SHIFT =
             new Property<AbstractSlideInView, Float>(Float.class, "translationShift") {
@@ -63,24 +59,22 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected static final float TRANSLATION_SHIFT_CLOSED = 1f;
     protected static final float TRANSLATION_SHIFT_OPENED = 0f;
 
-    protected final T mActivityContext;
-
+    protected final Launcher mLauncher;
     protected final SingleAxisSwipeDetector mSwipeDetector;
     protected final ObjectAnimator mOpenCloseAnimator;
 
     protected View mContent;
-    protected final View mColorScrim;
+    private final View mColorScrim;
     protected Interpolator mScrollInterpolator;
 
     // range [0, 1], 0=> completely open, 1=> completely closed
     protected float mTranslationShift = TRANSLATION_SHIFT_CLOSED;
 
     protected boolean mNoIntercept;
-    protected List<OnCloseListener> mOnCloseListeners = new ArrayList<>();
 
     public AbstractSlideInView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        mActivityContext = ActivityContext.lookupContext(context);
+        mLauncher = Launcher.getLauncher(context);
 
         mScrollInterpolator = Interpolators.SCROLL_CUBIC;
         mSwipeDetector = new SingleAxisSwipeDetector(context, this,
@@ -94,8 +88,8 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
                 announceAccessibilityChanges();
             }
         });
-        int scrimColor = getScrimColor(context);
-        mColorScrim = scrimColor != -1 ? createColorScrim(context, scrimColor) : null;
+        int scrimColor = getScrimColor(mLauncher);
+        mColorScrim = scrimColor != -1 ? createColorScrim(mLauncher, scrimColor) : null;
     }
 
     protected void attachToContainer() {
@@ -126,8 +120,8 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
             return false;
         }
 
-        int directionsToDetectScroll = mSwipeDetector.isIdleState()
-                ? SingleAxisSwipeDetector.DIRECTION_NEGATIVE : 0;
+        int directionsToDetectScroll = mSwipeDetector.isIdleState() ?
+                SingleAxisSwipeDetector.DIRECTION_NEGATIVE : 0;
         mSwipeDetector.setDetectableScrollConditions(
                 directionsToDetectScroll, false);
         mSwipeDetector.onTouchEvent(ev);
@@ -182,11 +176,6 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         }
     }
 
-    /** Registers an {@link OnCloseListener}. */
-    public void addOnCloseListener(OnCloseListener listener) {
-        mOnCloseListeners.add(listener);
-    }
-
     protected void handleClose(boolean animate, long defaultDuration) {
         if (!mIsOpen) {
             return;
@@ -221,14 +210,14 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         if (mColorScrim != null) {
             getPopupContainer().removeView(mColorScrim);
         }
-        mOnCloseListeners.forEach(OnCloseListener::onSlideInViewClosed);
     }
 
     protected BaseDragLayer getPopupContainer() {
-        return mActivityContext.getDragLayer();
+        return mLauncher.getDragLayer();
     }
 
-    protected View createColorScrim(Context context, int bgColor) {
+
+    protected static View createColorScrim(Context context, int bgColor) {
         View view = new View(context);
         view.forceHasOverlappingRendering(false);
         view.setBackgroundColor(bgColor);
@@ -238,16 +227,5 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         view.setLayoutParams(lp);
 
         return view;
-    }
-
-    /**
-     * Interface to report that the {@link AbstractSlideInView} has closed.
-     */
-    public interface OnCloseListener {
-
-        /**
-         * Called when {@link AbstractSlideInView} closes.
-         */
-        void onSlideInViewClosed();
     }
 }

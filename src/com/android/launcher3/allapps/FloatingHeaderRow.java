@@ -16,9 +16,10 @@
 package com.android.launcher3.allapps;
 
 import android.graphics.Rect;
-import android.view.View;
+import android.view.animation.Interpolator;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.anim.PropertySetter;
 
 /**
  * A abstract representation of a row in all-apps view
@@ -45,22 +46,13 @@ public interface FloatingHeaderRow {
      */
     boolean hasVisibleContent();
 
+    void setContentVisibility(boolean hasHeaderExtra, boolean hasAllAppsContent,
+            PropertySetter setter, Interpolator headerFade, Interpolator allAppsFade);
+
     /**
      * Scrolls the content vertically.
      */
     void setVerticalScroll(int scroll, boolean isScrolledOut);
 
     Class<? extends FloatingHeaderRow> getTypeClass();
-
-    /**
-     * Returns a child that has focus to be launched by the IME.
-     */
-    View getFocusedChild();
-
-    /**
-     * Returns true if view is currently visible
-     */
-    default boolean isVisible() {
-        return shouldDraw();
-    }
 }

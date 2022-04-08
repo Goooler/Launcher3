@@ -21,10 +21,11 @@ import static com.android.launcher3.model.data.AppInfo.EMPTY_ARRAY;
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.os.LocaleList;
+import android.os.Process;
 import android.os.UserHandle;
 import android.util.Log;
 
@@ -36,6 +37,7 @@ import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.model.data.PromiseAppInfo;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.util.FlagOp;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -136,7 +138,7 @@ public class AllAppsList {
         if (findAppInfo(info.componentName, info.user) != null) {
             return;
         }
-        mIconCache.getTitleAndIcon(info, activityInfo, false /* useLowResIcon */);
+        mIconCache.getTitleAndIcon(info, activityInfo, true /* useLowResIcon */);
         info.sectionName = mIndex.computeSectionName(info.title);
 
         data.add(info);
@@ -144,10 +146,11 @@ public class AllAppsList {
     }
 
     public void addPromiseApp(Context context, PackageInstallInfo installInfo) {
+        ApplicationInfo applicationInfo = new PackageManagerHelper(context)
+                .getApplicationInfo(installInfo.packageName, installInfo.user, 0);
         // only if not yet installed
-        if (!new PackageManagerHelper(context)
-                .isAppInstalled(installInfo.packageName, installInfo.user)) {
-            AppInfo info = new AppInfo(installInfo);
+        if (applicationInfo == null) {
+            PromiseAppInfo info = new PromiseAppInfo(installInfo);
             mIconCache.getTitleAndIcon(info, info.usingLowResIcon());
             info.sectionName = mIndex.computeSectionName(info.title);
 
@@ -156,31 +159,24 @@ public class AllAppsList {
         }
     }
 
-    /** Updates the given PackageInstallInfo's associated AppInfo's installation info. */
-    public List<AppInfo> updatePromiseInstallInfo(PackageInstallInfo installInfo) {
-        List<AppInfo> updatedAppInfos = new ArrayList<>();
-        UserHandle user = installInfo.user;
-        for (int i = data.size() - 1; i >= 0; i--) {
+    public PromiseAppInfo updatePromiseInstallInfo(PackageInstallInfo installInfo) {
+        UserHandle user = Process.myUserHandle();
+        for (int i=0; i < data.size(); i++) {
             final AppInfo appInfo = data.get(i);
             final ComponentName tgtComp = appInfo.getTargetComponent();
             if (tgtComp != null && tgtComp.getPackageName().equals(installInfo.packageName)
-                    && appInfo.user.equals(user)) {
-                if (installInfo.state == PackageInstallInfo.STATUS_INSTALLED_DOWNLOADING
-                        || installInfo.state == PackageInstallInfo.STATUS_INSTALLING) {
-                    if (appInfo.isAppStartable()
-                            && installInfo.state == PackageInstallInfo.STATUS_INSTALLING) {
-                        continue;
-                    }
-                    appInfo.setProgressLevel(installInfo);
-
-                    updatedAppInfos.add(appInfo);
-                } else if (installInfo.state == PackageInstallInfo.STATUS_FAILED
-                        && !appInfo.isAppStartable()) {
+                    && appInfo.user.equals(user)
+                    && appInfo instanceof PromiseAppInfo) {
+                final PromiseAppInfo promiseAppInfo = (PromiseAppInfo) appInfo;
+                if (installInfo.state == PackageInstallInfo.STATUS_INSTALLING) {
+                    promiseAppInfo.level = installInfo.progress;
+                    return promiseAppInfo;
+                } else if (installInfo.state == PackageInstallInfo.STATUS_FAILED) {
                     removeApp(i);
                 }
             }
         }
-        return updatedAppInfos;
+        return null;
     }
 
     private void removeApp(int index) {
@@ -201,16 +197,11 @@ public class AllAppsList {
     /**
      * Add the icons for the supplied apk called packageName.
      */
-    public List<LauncherActivityInfo> addPackage(
-            Context context, String packageName, UserHandle user) {
-        List<LauncherActivityInfo> activities = context.getSystemService(LauncherApps.class)
-                .getActivityList(packageName, user);
-
-        for (LauncherActivityInfo info : activities) {
+    public void addPackage(Context context, String packageName, UserHandle user) {
+        for (LauncherActivityInfo info : context.getSystemService(LauncherApps.class)
+                .getActivityList(packageName, user)) {
             add(new AppInfo(context, info, user), info);
         }
-
-        return activities;
     }
 
     /**
@@ -253,8 +244,7 @@ public class AllAppsList {
     /**
      * Add and remove icons for this package which has been updated.
      */
-    public List<LauncherActivityInfo> updatePackage(
-            Context context, String packageName, UserHandle user) {
+    public void updatePackage(Context context, String packageName, UserHandle user) {
         final List<LauncherActivityInfo> matches = context.getSystemService(LauncherApps.class)
                 .getActivityList(packageName, user);
         if (matches.size() > 0) {
@@ -278,14 +268,8 @@ public class AllAppsList {
                 if (applicationInfo == null) {
                     add(new AppInfo(context, info, user), info);
                 } else {
-                    Intent launchIntent = AppInfo.makeLaunchIntent(info);
-
-                    mIconCache.getTitleAndIcon(applicationInfo, info, false /* useLowResIcon */);
+                    mIconCache.getTitleAndIcon(applicationInfo, info, true /* useLowResIcon */);
                     applicationInfo.sectionName = mIndex.computeSectionName(applicationInfo.title);
-                    applicationInfo.setProgressLevel(
-                            PackageManagerHelper.getLoadingProgress(info),
-                            PackageInstallInfo.STATUS_INSTALLED_DOWNLOADING);
-                    applicationInfo.intent = launchIntent;
 
                     mDataChanged = true;
                 }
@@ -301,8 +285,6 @@ public class AllAppsList {
                 }
             }
         }
-
-        return matches;
     }
 
     /**
@@ -323,7 +305,7 @@ public class AllAppsList {
      *
      * @return the corresponding AppInfo or null
      */
-    public @Nullable AppInfo findAppInfo(@NonNull ComponentName componentName,
+    private @Nullable AppInfo findAppInfo(@NonNull ComponentName componentName,
                                           @NonNull UserHandle user) {
         for (AppInfo info: data) {
             if (componentName.equals(info.componentName) && user.equals(info.user)) {

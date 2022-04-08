@@ -5,12 +5,10 @@ public class ClippedFolderIconLayoutRule {
     public static final int MAX_NUM_ITEMS_IN_PREVIEW = 4;
     private static final int MIN_NUM_ITEMS_IN_PREVIEW = 2;
 
-    private static final float MIN_SCALE = 0.44f;
-    private static final float MAX_SCALE = 0.51f;
-    private static final float MAX_RADIUS_DILATION = 0.25f;
-    // The max amount of overlap the preview items can go outside of the background bounds.
-    public static final float ICON_OVERLAP_FACTOR = 1 + (MAX_RADIUS_DILATION / 2f);
-    private static final float ITEM_RADIUS_SCALE_FACTOR = 1.15f;
+    private static final float MIN_SCALE = 0.48f;
+    private static final float MAX_SCALE = 0.58f;
+    private static final float MAX_RADIUS_DILATION = 0.15f;
+    private static final float ITEM_RADIUS_SCALE_FACTOR = 1.33f;
 
     public static final int EXIT_INDEX = -2;
     public static final int ENTER_INDEX = -3;
@@ -36,6 +34,7 @@ public class ClippedFolderIconLayoutRule {
         float totalScale = scaleForItem(curNumItems);
         float transX;
         float transY;
+        float overlayAlpha = 0;
 
         if (index == EXIT_INDEX) {
             // 0 1 * <-- Exit position (row 0, col 2)
@@ -56,9 +55,10 @@ public class ClippedFolderIconLayoutRule {
         transY = mTmpPoint[1];
 
         if (params == null) {
-            params = new PreviewItemDrawingParams(transX, transY, totalScale);
+            params = new PreviewItemDrawingParams(transX, transY, totalScale, overlayAlpha);
         } else {
             params.update(transX, transY, totalScale);
+            params.overlayAlpha = overlayAlpha;
         }
         return params;
     }
@@ -97,7 +97,7 @@ public class ClippedFolderIconLayoutRule {
 
         double thetaShift = 0;
         if (curNumItems == 3) {
-            thetaShift = Math.PI / 2;
+            thetaShift = Math.PI / 6;
         } else if (curNumItems == 4) {
             thetaShift = Math.PI / 4;
         }
@@ -130,8 +130,10 @@ public class ClippedFolderIconLayoutRule {
     public float scaleForItem(int numItems) {
         // Scale is determined by the number of items in the preview.
         final float scale;
-        if (numItems <= 3) {
+        if (numItems <= 2) {
             scale = MAX_SCALE;
+        } else if (numItems == 3) {
+            scale = (MAX_SCALE + MIN_SCALE) / 2;
         } else {
             scale = MIN_SCALE;
         }

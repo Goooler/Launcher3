@@ -22,8 +22,6 @@ import android.content.res.Resources;
 
 import androidx.test.uiautomator.UiDevice;
 
-import org.junit.Assert;
-
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,10 +48,7 @@ public class TestUtil {
         in.close();
         out.close();
 
-        final String result = UiDevice.getInstance(getInstrumentation())
-                .executeShellCommand("pm install " + apkFilename);
-        Assert.assertTrue("Failed to install wellbeing test apk; make sure the device is rooted",
-                "Success".equals(result.replaceAll("\\s+", "")));
+        UiDevice.getInstance(getInstrumentation()).executeShellCommand("pm install " + apkFilename);
     }
 
     public static void uninstallDummyApp() throws IOException {

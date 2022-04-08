@@ -19,16 +19,13 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.UNSPECIFIED;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END;
-import static com.android.launcher3.util.UiThreadHelper.hideKeyboardAsync;
+import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
 
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
@@ -40,9 +37,11 @@ import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.allapps.AllAppsGridAdapter.AppsGridLayoutManager;
+import com.android.launcher3.logging.StatsLogUtils.LogContainerProvider;
+import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
+import com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 import java.util.ArrayList;
@@ -51,9 +50,7 @@ import java.util.List;
 /**
  * A RecyclerView with custom fast scroll support for the all apps view.
  */
-public class AllAppsRecyclerView extends BaseRecyclerView {
-    private static final String TAG = "AllAppsContainerView";
-    private static final boolean DEBUG = false;
+public class AllAppsRecyclerView extends BaseRecyclerView implements LogContainerProvider {
 
     private AlphabeticalAppsList mApps;
     private final int mNumAppsPerRow;
@@ -62,13 +59,6 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     private final SparseIntArray mViewHeights = new SparseIntArray();
     private final SparseIntArray mCachedScrollPositions = new SparseIntArray();
     private final AllAppsFastScrollHelper mFastScrollHelper;
-
-
-    private final AdapterDataObserver mObserver = new RecyclerView.AdapterDataObserver() {
-        public void onChanged() {
-            mCachedScrollPositions.clear();
-        }
-    };
 
     // The empty-search result background
     private AllAppsBackgroundDrawable mEmptySearchBackground;
@@ -116,13 +106,29 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_EMPTY_SEARCH, 1);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ALL_APPS_DIVIDER, 1);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_SEARCH_MARKET, 1);
-        pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ICON, approxRows
-                * (mNumAppsPerRow + 1));
+        pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ICON, approxRows * mNumAppsPerRow);
 
         mViewHeights.clear();
         mViewHeights.put(AllAppsGridAdapter.VIEW_TYPE_ICON, grid.allAppsCellHeightPx);
     }
 
+    /**
+     * Scrolls this recycler view to the top.
+     */
+    public void scrollToTop() {
+        // Ensure we reattach the scrollbar if it was previously detached while fast-scrolling
+        if (mScrollbar != null) {
+            mScrollbar.reattachThumbToScroll();
+        }
+        if (getLayoutManager() instanceof AppsGridLayoutManager) {
+            AppsGridLayoutManager layoutManager = (AppsGridLayoutManager) getLayoutManager();
+            if (layoutManager.findFirstCompletelyVisibleItemPosition() == 0) {
+                // We are at the top, so don't scrollToPosition (would cause unnecessary relayout).
+                return;
+            }
+        }
+        scrollToPosition(0);
+    }
 
     @Override
     public void onDraw(Canvas c) {
@@ -130,9 +136,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         if (mEmptySearchBackground != null && mEmptySearchBackground.getAlpha() > 0) {
             mEmptySearchBackground.draw(c);
         }
-        if (DEBUG) {
-            Log.d(TAG, "onDraw at = " + System.currentTimeMillis());
-        }
+
         super.onDraw(c);
     }
 
@@ -171,11 +175,18 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         mAutoSizedOverlays.clear();
     }
 
+    @Override
+    public void fillInLogContainerData(ItemInfo childInfo, Target child,
+            ArrayList<Target> parents) {
+        parents.add(newContainerTarget(
+                getApps().hasFilter() ? ContainerType.SEARCHRESULT : ContainerType.ALLAPPS));
+    }
+
     public void onSearchResultsChanged() {
         // Always scroll the view to the top so the user can see the changed results
         scrollToTop();
 
-        if (mApps.hasNoFilteredResults() && !FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+        if (mApps.hasNoFilteredResults()) {
             if (mEmptySearchBackground == null) {
                 mEmptySearchBackground = new AllAppsBackgroundDrawable(getContext());
                 mEmptySearchBackground.setAlpha(0);
@@ -191,32 +202,12 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     }
 
     @Override
-    public void onScrollStateChanged(int state) {
-        super.onScrollStateChanged(state);
-
-        StatsLogManager mgr = BaseDraggingActivity.fromContext(getContext()).getStatsLogManager();
-        switch (state) {
-            case SCROLL_STATE_DRAGGING:
-                requestFocus();
-                mgr.logger().sendToInteractionJankMonitor(
-                        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN, this);
-                break;
-            case SCROLL_STATE_IDLE:
-                mgr.logger().sendToInteractionJankMonitor(
-                        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END, this);
-                break;
-        }
-    }
-
-    @Override
     public boolean onInterceptTouchEvent(MotionEvent e) {
         boolean result = super.onInterceptTouchEvent(e);
         if (!result && e.getAction() == MotionEvent.ACTION_DOWN
                 && mEmptySearchBackground != null && mEmptySearchBackground.getAlpha() > 0) {
             mEmptySearchBackground.setHotspot(e.getX(), e.getY());
         }
-        hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
-                getApplicationWindowToken());
         return result;
     }
 
@@ -254,13 +245,12 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
 
     @Override
     public void setAdapter(Adapter adapter) {
-        if (getAdapter() != null) {
-            getAdapter().unregisterAdapterDataObserver(mObserver);
-        }
         super.setAdapter(adapter);
-        if (adapter != null) {
-            adapter.registerAdapterDataObserver(mObserver);
-        }
+        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            public void onChanged() {
+                mCachedScrollPositions.clear();
+            }
+        });
     }
 
     @Override
@@ -287,7 +277,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         if (mApps == null) {
             return;
         }
-        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
+        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
 
         // Skip early if there are no items or we haven't been measured
         if (items.isEmpty() || mNumAppsPerRow == 0) {
@@ -361,7 +351,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     @Override
     public int getCurrentScrollY() {
         // Return early if there are no items or we haven't been measured
-        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
+        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
         if (items.isEmpty() || mNumAppsPerRow == 0 || getChildCount() == 0) {
             return -1;
         }
@@ -377,14 +367,14 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     }
 
     public int getCurrentScrollY(int position, int offset) {
-        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
-        AllAppsGridAdapter.AdapterItem posItem = position < items.size()
-                ? items.get(position) : null;
+        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
+        AlphabeticalAppsList.AdapterItem posItem = position < items.size() ?
+                items.get(position) : null;
         int y = mCachedScrollPositions.get(position, -1);
         if (y < 0) {
             y = 0;
             for (int i = 0; i < position; i++) {
-                AllAppsGridAdapter.AdapterItem item = items.get(i);
+                AlphabeticalAppsList.AdapterItem item = items.get(i);
                 if (AllAppsGridAdapter.isIconViewType(item.viewType)) {
                     // Break once we reach the desired row
                     if (posItem != null && posItem.viewType == item.viewType &&
@@ -422,7 +412,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
 
     /**
      * Returns the available scroll height:
-     * AvailableScrollHeight = Total height of the all items - last page height
+     *   AvailableScrollHeight = Total height of the all items - last page height
      */
     @Override
     protected int getAvailableScrollHeight() {
@@ -457,15 +447,5 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     @Override
     public boolean hasOverlappingRendering() {
         return false;
-    }
-
-    /**
-     * Returns distance between left and right app icons
-     */
-    public int getTabWidth() {
-        DeviceProfile grid = BaseDraggingActivity.fromContext(getContext()).getDeviceProfile();
-        int totalWidth = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
-        int iconPadding = totalWidth / grid.numShownAllAppsColumns - grid.allAppsIconSizePx;
-        return totalWidth - iconPadding - grid.allAppsIconDrawablePaddingPx;
     }
 }

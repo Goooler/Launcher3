@@ -165,7 +165,7 @@ public class DbDowngradeHelperTest {
             @Override
             public void onOpen(SQLiteDatabase db) { }
         };
-        // Insert mock data
+        // Insert dummy data
         for (int i = 0; i < 10; i++) {
             ContentValues values = new ContentValues();
             values.put(Favorites._ID, i);

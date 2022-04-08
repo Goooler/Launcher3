@@ -100,7 +100,6 @@ public class StartLauncherViaGestureTests extends AbstractQuickStepTest {
             // The test action.
             mLauncher.getBackground().switchToOverview();
         }
-        closeLauncherActivity();
         mLauncher.pressHome();
     }
 }

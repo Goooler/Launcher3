@@ -27,7 +27,6 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel.CallbackTask;
 import com.android.launcher3.LauncherSettings;
-import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
@@ -35,7 +34,6 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
-import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.PackageManagerHelper;
@@ -47,8 +45,6 @@ import java.util.List;
  * Task to add auto-created workspace items.
  */
 public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
-
-    private static final String LOG = "AddWorkspaceItemsTask";
 
     private final List<Pair<ItemInfo, Object>> mItemList;
 
@@ -126,13 +122,6 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     }
                     SessionInfo sessionInfo = packageInstaller.getActiveSessionInfo(item.user,
                             packageName);
-
-                    if (!packageInstaller.verifySessionInfo(sessionInfo)) {
-                        FileLog.d(LOG, "Item info failed session info verification. "
-                                + "Skipping : " + workspaceInfo);
-                        continue;
-                    }
-
                     List<LauncherActivityInfo> activities = launcherApps
                             .getActivityList(packageName, item.user);
                     boolean hasActivity = activities != null && !activities.isEmpty();
@@ -143,9 +132,7 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                             continue;
                         }
                     } else {
-                        workspaceInfo.setProgressLevel(
-                                (int) (sessionInfo.getProgress() * 100),
-                                PackageInstallInfo.STATUS_INSTALLING);
+                        workspaceInfo.setInstallProgress((int) sessionInfo.getProgress());
                     }
 
                     if (hasActivity) {
@@ -177,9 +164,6 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
 
                 // Save the WorkspaceItemInfo for binding in the workspace
                 addedItemsFinal.add(itemInfo);
-
-                // log bitmap and label
-                FileLog.d(LOG, "Adding item info to workspace: " + itemInfo);
             }
         }
 

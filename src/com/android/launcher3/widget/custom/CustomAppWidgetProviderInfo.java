@@ -22,9 +22,8 @@ import android.content.pm.PackageManager;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import com.android.launcher3.InvariantDeviceProfile;
+import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 
 /**
  * Custom app widget provider info that can be used as a widget, but provide extra functionality
@@ -58,7 +57,7 @@ public class CustomAppWidgetProviderInfo extends LauncherAppWidgetProviderInfo
     }
 
     @Override
-    public void initSpans(Context context, InvariantDeviceProfile idp) { }
+    public void initSpans(Context context) { }
 
     @Override
     public String getLabel(PackageManager packageManager) {

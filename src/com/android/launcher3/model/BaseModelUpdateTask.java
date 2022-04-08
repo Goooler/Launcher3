@@ -22,20 +22,15 @@ import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherModel.CallbackTask;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
 import com.android.launcher3.model.BgDataModel.Callbacks;
-import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.ItemInfoMatcher;
-import com.android.launcher3.widget.model.WidgetsListBaseEntry;
+import com.android.launcher3.widget.WidgetListRowEntry;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 
 /**
  * Extension of {@link ModelUpdateTask} with some utility methods
@@ -93,27 +88,11 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
         return mModel.getWriter(false /* hasVerticalHotseat */, false /* verifyChanges */);
     }
 
-    public void bindUpdatedWorkspaceItems(List<WorkspaceItemInfo> allUpdates) {
-        // Bind workspace items
-        List<WorkspaceItemInfo> workspaceUpdates = allUpdates.stream()
-                .filter(info -> info.id != ItemInfo.NO_ID)
-                .collect(Collectors.toList());
-        if (!workspaceUpdates.isEmpty()) {
-            scheduleCallbackTask(c -> c.bindWorkspaceItemsChanged(workspaceUpdates));
+
+    public void bindUpdatedWorkspaceItems(final ArrayList<WorkspaceItemInfo> updatedShortcuts) {
+        if (!updatedShortcuts.isEmpty()) {
+            scheduleCallbackTask(c -> c.bindWorkspaceItemsChanged(updatedShortcuts));
         }
-
-        // Bind extra items if any
-        allUpdates.stream()
-                .mapToInt(info -> info.container)
-                .distinct()
-                .mapToObj(mDataModel.extraItems::get)
-                .filter(Objects::nonNull)
-                .forEach(this::bindExtraContainerItems);
-    }
-
-    public void bindExtraContainerItems(FixedContainerItems item) {
-        FixedContainerItems copy = item.clone();
-        scheduleCallbackTask(c -> c.bindExtraContainerItems(copy));
     }
 
     public void bindDeepShortcuts(BgDataModel dataModel) {
@@ -123,8 +102,8 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
     }
 
     public void bindUpdatedWidgets(BgDataModel dataModel) {
-        final ArrayList<WidgetsListBaseEntry> widgets =
-                dataModel.widgetsModel.getWidgetsListForPicker(mApp.getContext());
+        final ArrayList<WidgetListRowEntry> widgets =
+                dataModel.widgetsModel.getWidgetsList(mApp.getContext());
         scheduleCallbackTask(c -> c.bindAllWidgets(widgets));
     }
 

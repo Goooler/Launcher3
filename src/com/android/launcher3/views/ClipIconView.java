@@ -15,12 +15,9 @@
  */
 package com.android.launcher3.views;
 
-import static com.android.launcher3.Utilities.boundToRange;
 import static com.android.launcher3.Utilities.mapToRange;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
-
-import static java.lang.Math.max;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -39,7 +36,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.ViewGroup.MarginLayoutParams;
 import android.view.ViewOutlineProvider;
 
 import androidx.annotation.Nullable;
@@ -48,6 +44,8 @@ import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.InsettableFrameLayout.LayoutParams;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
@@ -96,6 +94,7 @@ public class ClipIconView extends View implements ClipPathView {
                 }
             };
 
+    private final Launcher mLauncher;
     private final int mBlurSizeOutline;
     private final boolean mIsRtl;
 
@@ -129,6 +128,7 @@ public class ClipIconView extends View implements ClipPathView {
 
     public ClipIconView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        mLauncher = Launcher.getLauncher(context);
         mBlurSizeOutline = getResources().getDimensionPixelSize(
                 R.dimen.blur_size_medium_outline);
         mIsRtl = Utilities.isRtl(getResources());
@@ -143,45 +143,10 @@ public class ClipIconView extends View implements ClipPathView {
                         .setStiffness(SpringForce.STIFFNESS_LOW));
     }
 
-    /**
-     * Update the icon UI to match the provided parameters during an animation frame
-     */
-    public void update(RectF rect, float progress, float shapeProgressStart, float cornerRadius,
-            int fgIconAlpha, boolean isOpening, View container, DeviceProfile dp,
+    void update(RectF rect, float progress, float shapeProgressStart, float cornerRadius,
+            boolean isOpening, float scale, float minSize, LayoutParams parentLp,
             boolean isVerticalBarLayout) {
-        MarginLayoutParams lp = (MarginLayoutParams) container.getLayoutParams();
-
-        float dX = mIsRtl
-                ? rect.left - (dp.widthPx - lp.getMarginStart() - lp.width)
-                : rect.left - lp.getMarginStart();
-        float dY = rect.top - lp.topMargin;
-        container.setTranslationX(dX);
-        container.setTranslationY(dY);
-
-        float minSize = Math.min(lp.width, lp.height);
-        float scaleX = rect.width() / minSize;
-        float scaleY = rect.height() / minSize;
-        float scale = Math.max(1f, Math.min(scaleX, scaleY));
-
-        if (Float.isNaN(scale)) {
-            // Views are no longer laid out, do not update.
-            return;
-        }
-
-        update(rect, progress, shapeProgressStart, cornerRadius, fgIconAlpha, isOpening, scale,
-                minSize, lp, isVerticalBarLayout, dp);
-
-        container.setPivotX(0);
-        container.setPivotY(0);
-        container.setScaleX(scale);
-        container.setScaleY(scale);
-
-        container.invalidate();
-    }
-
-    private void update(RectF rect, float progress, float shapeProgressStart, float cornerRadius,
-            int fgIconAlpha, boolean isOpening, float scale, float minSize,
-            MarginLayoutParams parentLp, boolean isVerticalBarLayout, DeviceProfile dp) {
+        DeviceProfile dp = mLauncher.getDeviceProfile();
         float dX = mIsRtl
                 ? rect.left - (dp.widthPx - parentLp.getMarginStart() - parentLp.width)
                 : rect.left - parentLp.getMarginStart();
@@ -189,9 +154,9 @@ public class ClipIconView extends View implements ClipPathView {
 
         // shapeRevealProgress = 1 when progress = shapeProgressStart + SHAPE_PROGRESS_DURATION
         float toMax = isOpening ? 1 / SHAPE_PROGRESS_DURATION : 1f;
-
-        float shapeRevealProgress = boundToRange(mapToRange(max(shapeProgressStart, progress),
-                shapeProgressStart, 1f, 0, toMax, LINEAR), 0, 1);
+        float shapeRevealProgress = Utilities.boundToRange(mapToRange(
+                Math.max(shapeProgressStart, progress), shapeProgressStart, 1f, 0, toMax,
+                LINEAR), 0, 1);
 
         if (isVerticalBarLayout) {
             mOutline.right = (int) (rect.width() / scale);
@@ -233,8 +198,6 @@ public class ClipIconView extends View implements ClipPathView {
                 sTmpRect.offset(diffX, diffY);
                 mForeground.setBounds(sTmpRect);
             } else {
-                mForeground.setAlpha(fgIconAlpha);
-
                 // Spring the foreground relative to the icon's movement within the DragLayer.
                 int diffX = (int) (dX / dp.availableWidthPx * FG_TRANS_X_FACTOR);
                 int diffY = (int) (dY / dp.availableHeightPx * FG_TRANS_Y_FACTOR);
@@ -265,11 +228,8 @@ public class ClipIconView extends View implements ClipPathView {
         }
     }
 
-    /**
-     * Sets the icon for this view as part of initial setup
-     */
-    public void setIcon(@Nullable Drawable drawable, int iconOffset, MarginLayoutParams lp,
-            boolean isOpening, boolean isVerticalBarLayout, DeviceProfile dp) {
+    void setIcon(@Nullable Drawable drawable, int iconOffset, LayoutParams lp, boolean isOpening,
+            boolean isVerticalBarLayout) {
         mIsAdaptiveIcon = drawable instanceof AdaptiveIconDrawable;
         if (mIsAdaptiveIcon) {
             boolean isFolderIcon = drawable instanceof FolderAdaptiveIcon;
@@ -304,14 +264,15 @@ public class ClipIconView extends View implements ClipPathView {
                 Utilities.scaleRectAboutCenter(mStartRevealRect, IconShape.getNormalizationScale());
             }
 
+            float aspectRatio = mLauncher.getDeviceProfile().aspectRatio;
             if (isVerticalBarLayout) {
-                lp.width = (int) Math.max(lp.width, lp.height * dp.aspectRatio);
+                lp.width = (int) Math.max(lp.width, lp.height * aspectRatio);
             } else {
-                lp.height = (int) Math.max(lp.height, lp.width * dp.aspectRatio);
+                lp.height = (int) Math.max(lp.height, lp.width * aspectRatio);
             }
 
             int left = mIsRtl
-                    ? dp.widthPx - lp.getMarginStart() - lp.width
+                    ? mLauncher.getDeviceProfile().widthPx - lp.getMarginStart() - lp.width
                     : lp.leftMargin;
             layout(left, lp.topMargin, left + lp.width, lp.topMargin + lp.height);
 

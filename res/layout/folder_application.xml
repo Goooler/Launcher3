@@ -21,5 +21,4 @@
     android:textColor="?attr/folderTextColor"
     android:includeFontPadding="false"
     android:hapticFeedbackEnabled="false"
-    launcher:iconDisplay="folder"
-    launcher:centerVertically="true" />
+    launcher:iconDisplay="folder" />

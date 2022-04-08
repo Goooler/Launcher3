@@ -71,13 +71,15 @@ public final class OverviewTask {
     public Background open() {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
             verifyActiveContainer();
-            mLauncher.executeAndWaitForEvent(
-                    () -> mLauncher.clickLauncherObject(mTask),
-                    event -> event.getEventType() == TYPE_WINDOW_STATE_CHANGED,
-                    () -> "Launching task didn't open a new window: "
-                            + mTask.getParent().getContentDescription(),
-                    "clicking an overview task");
-            mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, TASK_START_EVENT);
+            try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                    "clicking an overview task")) {
+                mLauncher.executeAndWaitForEvent(
+                        () -> mLauncher.clickLauncherObject(mTask),
+                        event -> event.getEventType() == TYPE_WINDOW_STATE_CHANGED,
+                        () -> "Launching task didn't open a new window: "
+                                + mTask.getParent().getContentDescription());
+                mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, TASK_START_EVENT);
+            }
             return new Background(mLauncher);
         }
     }

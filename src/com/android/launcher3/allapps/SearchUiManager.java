@@ -15,11 +15,16 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.LauncherState.ALL_APPS_HEADER;
+
+import android.graphics.Rect;
 import android.view.KeyEvent;
+import android.view.animation.Interpolator;
+import android.widget.EditText;
 
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.ExtendedEditText;
+import com.android.launcher3.anim.PropertySetter;
 
 /**
  * Interface for controlling the Apps search UI.
@@ -29,7 +34,7 @@ public interface SearchUiManager {
     /**
      * Initializes the search manager.
      */
-    void initializeSearch(AllAppsContainerView containerView);
+    void initialize(AllAppsContainerView containerView);
 
     /**
      * Notifies the search manager to close any active search session.
@@ -40,16 +45,33 @@ public interface SearchUiManager {
      * Called before dispatching a key event, in case the search manager wants to initialize
      * some UI beforehand.
      */
-    default void preDispatchKeyEvent(KeyEvent keyEvent) { };
+    void preDispatchKeyEvent(KeyEvent keyEvent);
 
     /**
-     * @return the edit text object
+     * Returns the vertical shift for the all-apps view, so that it aligns with the hotseat.
+     */
+    float getScrollRangeDelta(Rect insets);
+
+    /**
+     * Called as part of state transition to update the content UI
+     */
+    void setContentVisibility(int visibleElements, PropertySetter setter,
+            Interpolator interpolator);
+
+    /**
+     * Returns true if the QSB should be visible for the given set of visible elements
+     */
+    default boolean isQsbVisible(int visibleElements) {
+        return (visibleElements & ALL_APPS_HEADER) != 0;
+    }
+
+    /**
+     * Called to control how the search UI result should be handled.
+     *
+     * @param isEnabled when {@code true}, the search is all handled inside AOSP
+     *                  and is not overlayable.
+     * @return the searchbox edit text object
      */
     @Nullable
-    ExtendedEditText getEditText();
-
-    /**
-     * sets highlight result's title
-     */
-    default void setFocusedResultTitle(@Nullable  CharSequence title) { }
+    EditText setTextSearchEnabled(boolean isEnabled);
 }
