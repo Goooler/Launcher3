@@ -34,6 +34,10 @@
             android:visibility="gone" />
 
         <include
+            layout="@layout/search_results_rv_layout"
+            android:visibility="gone" />
+
+        <include
             layout="@layout/all_apps_rv_layout"
             android:visibility="gone" />
 
@@ -50,6 +54,12 @@
 
             <include layout="@layout/all_apps_personal_work_tabs" />
         </com.android.launcher3.allapps.FloatingHeaderView>
+
+        <com.android.launcher3.taskbar.allapps.TaskbarAllAppsFallbackSearchContainer
+            android:id="@+id/search_container_all_apps"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
         <include layout="@layout/all_apps_fast_scroller" />
     </com.android.launcher3.taskbar.allapps.TaskbarAllAppsContainerView>
