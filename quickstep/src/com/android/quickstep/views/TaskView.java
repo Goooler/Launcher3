@@ -20,7 +20,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
-import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -628,10 +627,7 @@ public class TaskView extends FrameLayout implements Reusable {
 
             // Reset the minimized state since we force-toggled the minimized state when entering
             // overview, but never actually finished the recents animation
-            SystemUiProxy p = SystemUiProxy.INSTANCE.getNoCreate();
-            if (p != null) {
-                p.setSplitScreenMinimized(false);
-            }
+            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
 
             mIsClickableAsLiveTile = false;
             RemoteAnimationTargets targets;
@@ -698,14 +694,10 @@ public class TaskView extends FrameLayout implements Reusable {
      *         second app. {@code false} otherwise
      */
     private boolean confirmSecondSplitSelectApp() {
-        boolean isSelectingSecondSplitApp = getRecentsView().isSplitSelectionActive();
-        if (isSelectingSecondSplitApp) {
-            int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
-            TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
-            getRecentsView().confirmSplitSelect(this, container.getTask(), container.getIconView(),
-                    container.getThumbnailView());
-        }
-        return isSelectingSecondSplitApp;
+        int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
+        TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
+        return getRecentsView().confirmSplitSelect(this, container.getTask(),
+                container.getIconView(), container.getThumbnailView());
     }
 
     /**
@@ -855,7 +847,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     private boolean showTaskMenu(IconView iconView) {
-        if (getRecentsView().mActivity.isInState(OVERVIEW_SPLIT_SELECT)) {
+        if (!getRecentsView().canLaunchFullscreenTask()) {
             // Don't show menu when selecting second split screen app
             return true;
         }
