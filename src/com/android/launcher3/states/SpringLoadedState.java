@@ -46,14 +46,22 @@ public class SpringLoadedState extends LauncherState {
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         DeviceProfile grid = launcher.getDeviceProfile();
-        Workspace ws = launcher.getWorkspace();
+        Workspace<?> ws = launcher.getWorkspace();
         if (ws.getChildCount() == 0) {
             return super.getWorkspaceScaleAndTranslation(launcher);
         }
 
         float shrunkTop = grid.getWorkspaceSpringLoadShrunkTop();
         float shrunkBottom = grid.getWorkspaceSpringLoadShrunkBottom();
-        float scale = (shrunkBottom - shrunkTop) / ws.getNormalChildHeight();
+        float scale = Math.min((shrunkBottom - shrunkTop) / ws.getNormalChildHeight(), 1f);
+
+        // Reduce scale if next pages would not be visible after scaling the workspace
+        float scaledWorkspaceWidth = ws.getWidth() * scale;
+        float maxAvailableWidth =
+                ws.getWidth() - (2 * grid.getWorkspaceSpringLoadedMinimumNextPageVisible());
+        if (scaledWorkspaceWidth > maxAvailableWidth) {
+            scale *= maxAvailableWidth / scaledWorkspaceWidth;
+        }
 
         float halfHeight = ws.getHeight() / 2;
         float myCenter = ws.getTop() + halfHeight;
