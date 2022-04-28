@@ -15,14 +15,14 @@
  */
 package com.android.quickstep.util;
 
+import static com.android.launcher3.LauncherAnimUtils.HOTSEAT_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_INDEX_UNFOLD_ANIMATION;
-import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY_FACTORY;
+import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.Utilities.comp;
 
 import android.annotation.Nullable;
 import android.util.FloatProperty;
 import android.util.MathUtils;
-import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 
@@ -30,6 +30,7 @@ import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.launcher3.Hotseat;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.Workspace;
 import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider.TransitionProgressListener;
@@ -44,16 +45,19 @@ public class LauncherUnfoldAnimationController {
     // Percentage of the width of the quick search bar that will be reduced
     // from the both sides of the bar when progress is 0
     private static final float MAX_WIDTH_INSET_FRACTION = 0.15f;
-    private static final FloatProperty<View> UNFOLD_SCALE_PROPERTY =
-            SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
+    private static final FloatProperty<Workspace<?>> WORKSPACE_SCALE_PROPERTY =
+            WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
+    private static final FloatProperty<Hotseat> HOTSEAT_SCALE_PROPERTY =
+            HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
 
     private final Launcher mLauncher;
+    private final ScopedUnfoldTransitionProgressProvider mProgressProvider;
+    private final NaturalRotationUnfoldProgressProvider mNaturalOrientationProgressProvider;
+    private final UnfoldMoveFromCenterHotseatAnimator mUnfoldMoveFromCenterHotseatAnimator;
+    private final UnfoldMoveFromCenterWorkspaceAnimator mUnfoldMoveFromCenterWorkspaceAnimator;
 
     @Nullable
     private HorizontalInsettableView mQsbInsettable;
-
-    private final ScopedUnfoldTransitionProgressProvider mProgressProvider;
-    private final NaturalRotationUnfoldProgressProvider mNaturalOrientationProgressProvider;
 
     public LauncherUnfoldAnimationController(
             Launcher launcher,
@@ -62,21 +66,21 @@ public class LauncherUnfoldAnimationController {
         mLauncher = launcher;
         mProgressProvider = new ScopedUnfoldTransitionProgressProvider(
                 unfoldTransitionProgressProvider);
+        mUnfoldMoveFromCenterHotseatAnimator = new UnfoldMoveFromCenterHotseatAnimator(launcher,
+                windowManager);
+        mUnfoldMoveFromCenterWorkspaceAnimator = new UnfoldMoveFromCenterWorkspaceAnimator(launcher,
+                windowManager);
         mNaturalOrientationProgressProvider = new NaturalRotationUnfoldProgressProvider(launcher,
                 WindowManagerGlobal.getWindowManagerService(), mProgressProvider);
         mNaturalOrientationProgressProvider.init();
 
         // Animated in all orientations
-        mProgressProvider.addCallback(new UnfoldMoveFromCenterWorkspaceAnimator(launcher,
-                windowManager));
-        mProgressProvider
-                .addCallback(new LauncherScaleAnimationListener());
+        mProgressProvider.addCallback(mUnfoldMoveFromCenterWorkspaceAnimator);
+        mProgressProvider.addCallback(new LauncherScaleAnimationListener());
 
         // Animated only in natural orientation
-        mNaturalOrientationProgressProvider
-                .addCallback(new QsbAnimationListener());
-        mNaturalOrientationProgressProvider
-                .addCallback(new UnfoldMoveFromCenterHotseatAnimator(launcher, windowManager));
+        mNaturalOrientationProgressProvider.addCallback(new QsbAnimationListener());
+        mNaturalOrientationProgressProvider.addCallback(mUnfoldMoveFromCenterHotseatAnimator);
     }
 
     /**
@@ -108,6 +112,12 @@ public class LauncherUnfoldAnimationController {
         mNaturalOrientationProgressProvider.destroy();
     }
 
+    /** Called when launcher finished binding its items. */
+    public void updateRegisteredViewsIfNeeded() {
+        mUnfoldMoveFromCenterHotseatAnimator.updateRegisteredViewsIfNeeded();
+        mUnfoldMoveFromCenterWorkspaceAnimator.updateRegisteredViewsIfNeeded();
+    }
+
     private class QsbAnimationListener implements TransitionProgressListener {
 
         @Override
@@ -134,6 +144,7 @@ public class LauncherUnfoldAnimationController {
 
         @Override
         public void onTransitionStarted() {
+            mLauncher.getWorkspace().setPivotToScaleWithSelf(mLauncher.getHotseat());
         }
 
         @Override
@@ -147,8 +158,8 @@ public class LauncherUnfoldAnimationController {
         }
 
         private void setScale(float value) {
-            UNFOLD_SCALE_PROPERTY.setValue(mLauncher.getWorkspace(), value);
-            UNFOLD_SCALE_PROPERTY.setValue(mLauncher.getHotseat(), value);
+            WORKSPACE_SCALE_PROPERTY.setValue(mLauncher.getWorkspace(), value);
+            HOTSEAT_SCALE_PROPERTY.setValue(mLauncher.getHotseat(), value);
         }
     }
 }
