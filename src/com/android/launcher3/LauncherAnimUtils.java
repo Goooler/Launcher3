@@ -38,6 +38,7 @@ public class LauncherAnimUtils {
 
     // Progress after which the transition is assumed to be a success
     public static final float SUCCESS_TRANSITION_PROGRESS = 0.5f;
+    public static final float TABLET_BOTTOM_SHEET_SUCCESS_TRANSITION_PROGRESS = 0.3f;
 
     public static final IntProperty<Drawable> DRAWABLE_ALPHA =
             new IntProperty<Drawable>("drawableAlpha") {
@@ -67,18 +68,16 @@ public class LauncherAnimUtils {
             };
 
     /**
-     * Property to set the scale of workspace and hotseat. The value is based on a combination
+     * Property to set the scale of workspace. The value is based on a combination
      * of all the ones set, to have a smooth experience even in the case of overlapping scaling
      * animation.
      */
-    public static final MultiScalePropertyFactory<View> SCALE_PROPERTY_FACTORY =
-            new MultiScalePropertyFactory<View>("scale_property") {
-                @Override
-                protected void apply(View view, float scale) {
-                    view.setScaleX(scale);
-                    view.setScaleY(scale);
-                }
-            };
+    public static final MultiScalePropertyFactory<Workspace<?>> WORKSPACE_SCALE_PROPERTY_FACTORY =
+            new MultiScalePropertyFactory<Workspace<?>>("workspace_scale_property");
+
+    /** Property to set the scale of hotseat. */
+    public static final MultiScalePropertyFactory<Hotseat> HOTSEAT_SCALE_PROPERTY_FACTORY =
+            new MultiScalePropertyFactory<Hotseat>("hotseat_scale_property");
 
     public static final int SCALE_INDEX_UNFOLD_ANIMATION = 1;
     public static final int SCALE_INDEX_UNLOCK_ANIMATION = 2;
