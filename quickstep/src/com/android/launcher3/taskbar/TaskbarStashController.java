@@ -28,10 +28,14 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.annotation.Nullable;
 import android.content.SharedPreferences;
+import android.util.Log;
 import android.view.ViewConfiguration;
+import android.view.WindowInsets;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.taskbar.allapps.TaskbarAllAppsSlideInView;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SystemUiProxy;
@@ -64,6 +68,9 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private static final int FLAGS_STASHED_IN_APP = FLAG_STASHED_IN_APP_MANUAL
             | FLAG_STASHED_IN_APP_PINNED | FLAG_STASHED_IN_APP_EMPTY | FLAG_STASHED_IN_APP_SETUP
             | FLAG_STASHED_IN_APP_IME | FLAG_STASHED_IN_APP_ALL_APPS;
+
+    private static final int FLAGS_STASHED_IN_APP_IGNORING_IME =
+            FLAGS_STASHED_IN_APP & ~FLAG_STASHED_IN_APP_IME;
 
     // If any of these flags are enabled, inset apps by our stashed height instead of our unstashed
     // height. This way the reported insets are consistent even during transitions out of the app.
@@ -239,6 +246,13 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     /**
+     * Returns whether the taskbar should be stashed in apps regardless of the IME visibility.
+     */
+    public boolean isStashedInAppIgnoringIme() {
+        return hasAnyFlag(FLAGS_STASHED_IN_APP_IGNORING_IME);
+    }
+
+    /**
      * Returns whether the taskbar should be stashed in the current LauncherState.
      */
     public boolean isInStashedLauncherState() {
@@ -267,6 +281,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /**
      * Returns the height that taskbar will inset when inside apps.
+     * @see WindowInsets.Type#navigationBars()
+     * @see WindowInsets.Type#systemBars()
      */
     public int getContentHeightToReportToApps() {
         if (supportsVisualStashing() && hasAnyFlag(FLAGS_REPORT_STASHED_INSETS_TO_APP)) {
@@ -289,6 +305,15 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             return mStashedHeight;
         }
         return mUnstashedHeight;
+    }
+
+    /**
+     * Returns the height that taskbar will inset when inside apps.
+     * @see WindowInsets.Type#tappableElement()
+     */
+    public int getTappableHeightToReportToApps() {
+        int contentHeight = getContentHeightToReportToApps();
+        return contentHeight <= mStashedHeight ? 0 : contentHeight;
     }
 
     public int getStashedHeight() {
@@ -429,7 +454,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             @Override
             public void onAnimationStart(Animator animation) {
                 mIsStashed = isStashed;
-                onIsStashed(mIsStashed);
+                onIsStashedChanged(mIsStashed);
             }
 
             @Override
@@ -476,8 +501,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 .setDuration(TASKBAR_HINT_STASH_DURATION).start();
     }
 
-    private void onIsStashed(boolean isStashed) {
-        mControllers.stashedHandleViewController.onIsStashed(isStashed);
+    private void onIsStashedChanged(boolean isStashed) {
+        mControllers.runAfterInit(() -> {
+            mControllers.stashedHandleViewController.onIsStashedChanged(isStashed);
+            mControllers.taskbarInsetsController.onTaskbarWindowHeightOrInsetsChanged();
+        });
     }
 
     public void applyState() {
@@ -506,10 +534,37 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void setSystemGestureInProgress(boolean inProgress) {
         mIsSystemGestureInProgress = inProgress;
-        // Only update FLAG_STASHED_IN_APP_IME when system gesture is not in progress.
-        if (!mIsSystemGestureInProgress) {
+        if (mIsSystemGestureInProgress) {
+            return;
+        }
+
+        // Only update the following flags when system gesture is not in progress.
+        maybeResetStashedInAppAllApps(hasAnyFlag(FLAG_STASHED_IN_APP_IME) == mIsImeShowing);
+        if (hasAnyFlag(FLAG_STASHED_IN_APP_IME) != mIsImeShowing) {
             updateStateForFlag(FLAG_STASHED_IN_APP_IME, mIsImeShowing);
             applyState(TASKBAR_STASH_DURATION_FOR_IME, getTaskbarStashStartDelayForIme());
+        }
+    }
+
+    /**
+     * Reset stashed in all apps only if no system gesture is in progress.
+     * <p>
+     * Otherwise, the reset should be deferred until after the gesture is finished.
+     *
+     * @see #setSystemGestureInProgress
+     */
+    public void maybeResetStashedInAppAllApps() {
+        maybeResetStashedInAppAllApps(true);
+    }
+
+    private void maybeResetStashedInAppAllApps(boolean applyState) {
+        if (mIsSystemGestureInProgress) {
+            return;
+        }
+
+        updateStateForFlag(FLAG_STASHED_IN_APP_ALL_APPS, false);
+        if (applyState) {
+            applyState(TaskbarAllAppsSlideInView.DEFAULT_CLOSE_DURATION);
         }
     }
 
@@ -556,6 +611,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      *                unstashed.
      */
     public void updateStateForFlag(int flag, boolean enabled) {
+        if (flag == FLAG_IN_APP && TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.TASKBAR_IN_APP_STATE, String.format(
+                    "setting flag FLAG_IN_APP to: %b", enabled), new Exception());
+        }
         if (enabled) {
             mState |= flag;
         } else {
@@ -586,7 +645,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     private void notifyStashChange(boolean visible, boolean stashed) {
         mSystemUiProxy.notifyTaskbarStatus(visible, stashed);
-        mControllers.taskbarActivityContext.updateInsetRoundedCornerFrame(visible && !stashed);
+        // If stashing taskbar is caused by IME visibility, we could just skip updating rounded
+        // corner insets since the rounded corners will be covered by IME during IME is showing and
+        // taskbar will be restored back to unstashed when IME is hidden.
+        mControllers.taskbarActivityContext.updateInsetRoundedCornerFrame(
+                    visible && !isStashedInAppIgnoringIme());
         mControllers.rotationButtonController.onTaskbarStateChange(visible, stashed);
     }
 
@@ -653,6 +716,14 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             }
             boolean isStashed = mStashCondition.test(flags);
             if (mIsStashed != isStashed) {
+                if (TestProtocol.sDebugTracing) {
+                    Log.d(TestProtocol.TASKBAR_IN_APP_STATE, String.format(
+                            "setState: mIsStashed=%b, isStashed=%b, duration=%d, start=:%b",
+                            mIsStashed,
+                            isStashed,
+                            duration,
+                            start));
+                }
                 mIsStashed = isStashed;
 
                 // This sets mAnimator.

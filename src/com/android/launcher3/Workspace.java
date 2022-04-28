@@ -50,7 +50,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
-import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -92,7 +91,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.pageindicators.WorkspacePageIndicator;
+import com.android.launcher3.pageindicators.PageIndicator;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
@@ -123,7 +122,6 @@ import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlay;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
@@ -134,8 +132,9 @@ import java.util.stream.Collectors;
  * The workspace is a wide area with a wallpaper and a finite number of pages.
  * Each page contains a number of icons, folders or widgets the user can
  * interact with. A workspace is meant to be used with a fixed width only.
+ * @param <T> Class that extends View and PageIndicator
  */
-public class Workspace extends PagedView<WorkspacePageIndicator>
+public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         implements DropTarget, DragSource, View.OnTouchListener,
         DragController.DragListener, Insettable, StateHandler<LauncherState>,
         WorkspaceLayoutManager, LauncherBindableItemsContainer {
@@ -147,6 +146,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     /** The value that {@link #mTransitionProgress} must be greater than for
      * {@link #isFinishedSwitchingState()} ()} to return true. */
     private static final float FINISHED_SWITCHING_STATE_TRANSITION_PROGRESS = 0.5f;
+
+    private static final float SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE = 0.15f;
 
     private static final boolean ENFORCE_DRAG_EVENT_ORDER = false;
 
@@ -325,37 +326,14 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
             setPageSpacing(Math.max(maxInsets, maxPadding));
         }
 
-        updateWorkspaceScreensPadding();
+        updateCellLayoutPadding();
         updateWorkspaceWidgetsSizes();
     }
 
-    private void updateWorkspaceScreensPadding() {
-        DeviceProfile grid = mLauncher.getDeviceProfile();
-        int paddingLeftRight = grid.cellLayoutPaddingLeftRightPx;
-        int paddingBottom = grid.cellLayoutBottomPaddingPx;
-
-        int panelCount = getPanelCount();
-        int rightPanelModulus = mIsRtl ? 0 : panelCount - 1;
-        int leftPanelModulus = mIsRtl ? panelCount - 1 : 0;
-        int numberOfScreens = mScreenOrder.size();
-        for (int i = 0; i < numberOfScreens; i++) {
-            int paddingLeft = paddingLeftRight;
-            int paddingRight = paddingLeftRight;
-            // Add missing cellLayout border in-between panels.
-            if (panelCount > 1) {
-                if (i % panelCount == leftPanelModulus) {
-                    paddingRight += grid.cellLayoutBorderSpacePx.x / 2;
-                } else if (i % panelCount == rightPanelModulus) { // right side panel
-                    paddingLeft += grid.cellLayoutBorderSpacePx.x / 2;
-                } else { // middle panel
-                    paddingLeft += grid.cellLayoutBorderSpacePx.x / 2;
-                    paddingRight += grid.cellLayoutBorderSpacePx.x / 2;
-                }
-            }
-            // SparseArrayMap doesn't keep the order
-            mWorkspaceScreens.get(mScreenOrder.get(i))
-                    .setPadding(paddingLeft, 0, paddingRight, paddingBottom);
-        }
+    private void updateCellLayoutPadding() {
+        Rect padding = mLauncher.getDeviceProfile().cellLayoutPaddingPx;
+        mWorkspaceScreens.forEach(
+                s -> s.setPadding(padding.left, padding.top, padding.right, padding.bottom));
     }
 
     private void updateWorkspaceWidgetsSizes() {
@@ -653,7 +631,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                 mLauncher.getStateManager().getState(), newScreen, insertIndex);
 
         updatePageScrollValues();
-        updateWorkspaceScreensPadding();
+        updateCellLayoutPadding();
         return newScreen;
     }
 
@@ -2775,6 +2753,12 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                         info = ((AppInfo) info).makeWorkspaceItem();
                         d.dragInfo = info;
                     }
+                    if (info instanceof WorkspaceItemInfo
+                            && info.container == LauncherSettings.Favorites.CONTAINER_PREDICTION) {
+                        // Came from all apps prediction row -- make a copy
+                        info = new WorkspaceItemInfo((WorkspaceItemInfo) info);
+                        d.dragInfo = info;
+                    }
                     if (info instanceof SearchActionItemInfo) {
                         info = ((SearchActionItemInfo) info).createWorkspaceItem(
                                 mLauncher.getModel());
@@ -3311,9 +3295,12 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         }
     }
 
-    public void removeAbandonedPromise(String packageName, UserHandle user) {
-        ItemInfoMatcher matcher = ItemInfoMatcher.ofPackages(
-                Collections.singleton(packageName), user);
+    /**
+     * Remove workspace icons & widget information related to items in matcher.
+     *
+     * @param matcher  the matcher generated by the caller.
+     */
+    public void persistRemoveItemsByMatcher(ItemInfoMatcher matcher) {
         mLauncher.getModelWriter().deleteItemsFromDatabase(matcher);
         removeItemsByMatcher(matcher);
     }
@@ -3424,6 +3411,17 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         int currentPage = (page / panelCount) + 1;
         int totalPages = nScreens / panelCount + nScreens % panelCount;
         return getContext().getString(R.string.workspace_scroll_format, currentPage, totalPages);
+    }
+
+    @Override
+    protected boolean isSignificantMove(float absoluteDelta, int pageOrientedSize) {
+        DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
+        if (!deviceProfile.isTablet) {
+            return super.isSignificantMove(absoluteDelta, pageOrientedSize);
+        }
+
+        return absoluteDelta
+                > deviceProfile.availableWidthPx * SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE;
     }
 
     /**
