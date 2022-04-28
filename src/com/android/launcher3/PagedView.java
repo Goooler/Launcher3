@@ -775,7 +775,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                     pageScrollChanged = true;
                     outPageScrolls[i] = pageScroll;
                 }
-                childStart += primaryDimension + getChildGap();
+                childStart += primaryDimension + getChildGap(i, i + delta);
 
                 // This makes sure that the space is added after the page, not after each panel
                 int lastPanel = mIsRtl ? 0 : panelCount - 1;
@@ -799,7 +799,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         return pageScrollChanged;
     }
 
-    protected int getChildGap() {
+    protected int getChildGap(int fromIndex, int toIndex) {
         return 0;
     }
 
@@ -1195,8 +1195,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         mAllowOverScroll = enable;
     }
 
-    protected float getSignificantMoveThreshold() {
-        return SIGNIFICANT_MOVE_THRESHOLD;
+    protected boolean isSignificantMove(float absoluteDelta, int pageOrientedSize) {
+        return absoluteDelta > pageOrientedSize * SIGNIFICANT_MOVE_THRESHOLD;
     }
 
     @Override
@@ -1322,13 +1322,12 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                 velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
 
                 int velocity = (int) mOrientationHandler.getPrimaryVelocity(velocityTracker,
-                    mActivePointerId);
+                        mActivePointerId);
                 float delta = primaryDirection - mDownMotionPrimary;
-                delta /= mOrientationHandler.getPrimaryScale(this);
-                int pageOrientedSize = mOrientationHandler.getMeasuredSize(getPageAt(mCurrentPage));
-
-                boolean isSignificantMove = Math.abs(delta)
-                        > pageOrientedSize * getSignificantMoveThreshold();
+                int pageOrientedSize = (int) (mOrientationHandler.getMeasuredSize(
+                        getPageAt(mCurrentPage))
+                        * mOrientationHandler.getPrimaryScale(this));
+                boolean isSignificantMove = isSignificantMove(Math.abs(delta), pageOrientedSize);
 
                 mTotalMotion += Math.abs(mLastMotion + mLastMotionRemainder - primaryDirection);
                 boolean passedSlop = mAllowEasyFling || mTotalMotion > mPageSlop;
@@ -1441,7 +1440,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         return Math.abs(velocity) > threshold;
     }
 
-    private void resetTouchState() {
+    protected void resetTouchState() {
         releaseVelocityTracker();
         mIsBeingDragged = false;
         mActivePointerId = INVALID_POINTER;
