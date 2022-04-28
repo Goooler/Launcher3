@@ -113,6 +113,7 @@ public final class LauncherInstrumentation {
 
     static final Pattern EVENT_TOUCH_DOWN_TIS = getTouchEventPatternTIS("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP_TIS = getTouchEventPatternTIS("ACTION_UP");
+    static final Pattern EVENT_TOUCH_CANCEL_TIS = getTouchEventPatternTIS("ACTION_CANCEL");
 
     static final Pattern EVENT_KEY_BACK_DOWN = getKeyEventPattern("ACTION_DOWN", "KEYCODE_BACK");
     static final Pattern EVENT_KEY_BACK_UP = getKeyEventPattern("ACTION_UP", "KEYCODE_BACK");
@@ -135,6 +136,8 @@ public final class LauncherInstrumentation {
     public enum GestureScope {
         OUTSIDE_WITHOUT_PILFER, OUTSIDE_WITH_PILFER, INSIDE, INSIDE_TO_OUTSIDE,
         INSIDE_TO_OUTSIDE_WITHOUT_PILFER,
+        INSIDE_TO_OUTSIDE_WITH_KEYCODE, // For gestures that will trigger a keycode from TIS.
+        OUTSIDE_WITH_KEYCODE,
     }
 
     // Base class for launcher containers.
@@ -224,11 +227,6 @@ public final class LauncherInstrumentation {
     public LauncherInstrumentation(Instrumentation instrumentation) {
         mInstrumentation = instrumentation;
         mDevice = UiDevice.getInstance(instrumentation);
-        try {
-            mDevice.executeShellCommand("am wait-for-broadcast-idle");
-        } catch (IOException e) {
-            log("Failed to wait for broadcast idle");
-        }
 
         // Launcher should run in test harness so that custom accessibility protocol between
         // Launcher and TAPL is enabled. In-process tests enable this protocol with a direct call
@@ -877,10 +875,9 @@ public final class LauncherInstrumentation {
     }
 
     /**
+     * @return the Workspace object.
      * @deprecated use goHome().
      * Presses nav bar home button.
-     *
-     * @return the Workspace object.
      */
     @Deprecated
     public Workspace pressHome() {
@@ -968,9 +965,11 @@ public final class LauncherInstrumentation {
             if (getNavigationModel() == NavigationModel.ZERO_BUTTON) {
                 final Point displaySize = getRealDisplaySize();
                 final GestureScope gestureScope =
-                        launcherVisible ? GestureScope.INSIDE_TO_OUTSIDE_WITHOUT_PILFER
-                                : GestureScope.OUTSIDE_WITHOUT_PILFER;
-                linearGesture(0, displaySize.y / 2, displaySize.x / 2, displaySize.y / 2,
+                        launcherVisible ? GestureScope.INSIDE_TO_OUTSIDE_WITH_KEYCODE
+                                : GestureScope.OUTSIDE_WITH_KEYCODE;
+                // TODO(b/225505986): change startY and endY back to displaySize.y / 2 once the
+                //  issue is solved.
+                linearGesture(0, displaySize.y / 4, displaySize.x / 2, displaySize.y / 4,
                         10, false, gestureScope);
             } else {
                 waitForNavigationUiObject("back").click();
@@ -1506,7 +1505,8 @@ public final class LauncherInstrumentation {
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 if (gestureScope != GestureScope.OUTSIDE_WITH_PILFER
-                        && gestureScope != GestureScope.OUTSIDE_WITHOUT_PILFER) {
+                        && gestureScope != GestureScope.OUTSIDE_WITHOUT_PILFER
+                        && gestureScope != GestureScope.OUTSIDE_WITH_KEYCODE) {
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_DOWN);
                 }
                 if (notLauncher3 && getNavigationModel() != NavigationModel.THREE_BUTTON) {
@@ -1521,14 +1521,18 @@ public final class LauncherInstrumentation {
                     expectEvent(TestProtocol.SEQUENCE_PILFER, EVENT_PILFER_POINTERS);
                 }
                 if (gestureScope != GestureScope.OUTSIDE_WITH_PILFER
-                        && gestureScope != GestureScope.OUTSIDE_WITHOUT_PILFER) {
+                        && gestureScope != GestureScope.OUTSIDE_WITHOUT_PILFER
+                        && gestureScope != GestureScope.OUTSIDE_WITH_KEYCODE) {
                     expectEvent(TestProtocol.SEQUENCE_MAIN,
                             gestureScope == GestureScope.INSIDE
                                     || gestureScope == GestureScope.OUTSIDE_WITHOUT_PILFER
                                     ? EVENT_TOUCH_UP : EVENT_TOUCH_CANCEL);
                 }
                 if (notLauncher3 && getNavigationModel() != NavigationModel.THREE_BUTTON) {
-                    expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_UP_TIS);
+                    expectEvent(TestProtocol.SEQUENCE_TIS,
+                            gestureScope == GestureScope.INSIDE_TO_OUTSIDE_WITH_KEYCODE
+                                    || gestureScope == GestureScope.OUTSIDE_WITH_KEYCODE
+                                    ? EVENT_TOUCH_CANCEL_TIS : EVENT_TOUCH_UP_TIS);
                 }
                 break;
         }
@@ -1651,9 +1655,10 @@ public final class LauncherInstrumentation {
     }
 
     Point getRealDisplaySize() {
-        final Point size = new Point();
-        getContext().getSystemService(WindowManager.class).getDefaultDisplay().getRealSize(size);
-        return size;
+        final Rect displayBounds = getContext().getSystemService(WindowManager.class)
+                .getMaximumWindowMetrics()
+                .getBounds();
+        return new Point(displayBounds.width(), displayBounds.height());
     }
 
     public void enableDebugTracing() {
