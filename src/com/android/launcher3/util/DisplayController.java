@@ -26,7 +26,6 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
-import static com.android.launcher3.util.window.WindowManagerProxy.MIN_LARGE_TABLET_WIDTH;
 import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
@@ -243,7 +242,9 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             change |= CHANGE_SUPPORTED_BOUNDS;
 
             Point currentS = newInfo.currentSize;
-            Point expectedS = oldInfo.mPerDisplayBounds.get(newInfo.displayId).first.size;
+            Pair<CachedDisplayInfo, WindowBounds[]> cachedBounds =
+                    oldInfo.mPerDisplayBounds.get(newInfo.displayId);
+            Point expectedS = cachedBounds == null ? null : cachedBounds.first.size;
             if (newInfo.supportedBounds.size() != oldInfo.supportedBounds.size()) {
                 Log.e("b/198965093",
                         "Inconsistent number of displays"
@@ -251,10 +252,12 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                                 + "\noldInfo.supportedBounds: " + oldInfo.supportedBounds
                                 + "\nnewInfo.supportedBounds: " + newInfo.supportedBounds);
             }
-            if ((Math.min(currentS.x, currentS.y) != Math.min(expectedS.x, expectedS.y)
+            if (expectedS != null
+                    && (Math.min(currentS.x, currentS.y) != Math.min(expectedS.x, expectedS.y)
                     || Math.max(currentS.x, currentS.y) != Math.max(expectedS.x, expectedS.y))
                     && display.getState() == Display.STATE_OFF) {
-                Log.e("b/198965093", "Display size changed while display is off, ignoring change");
+                Log.e("b/198965093",
+                        "Display size changed while display is off, ignoring change");
                 return;
             }
         }
@@ -306,7 +309,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         public Info(Context context, Display display,
                 WindowManagerProxy wmProxy,
                 ArrayMap<String, Pair<CachedDisplayInfo, WindowBounds[]>> perDisplayBoundsCache) {
-            CachedDisplayInfo displayInfo = wmProxy.getDisplayInfo(display);
+            CachedDisplayInfo displayInfo = wmProxy.getDisplayInfo(context, display);
             rotation = displayInfo.rotation;
             currentSize = displayInfo.size;
             displayId = displayInfo.id;
@@ -349,13 +352,6 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         }
 
         /**
-         * Returns {@code true} if the bounds represent a large tablet.
-         */
-        public boolean isLargeTablet(WindowBounds bounds) {
-            return smallestSizeDp(bounds) >= MIN_LARGE_TABLET_WIDTH;
-        }
-
-        /**
          * Returns smallest size in dp for given bounds.
          */
         public float smallestSizeDp(WindowBounds bounds) {
@@ -372,7 +368,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         pw.println("  id=" + info.displayId);
         pw.println("  rotation=" + info.rotation);
         pw.println("  fontScale=" + info.fontScale);
-        pw.println("  densityDpi=" + info.displayId);
+        pw.println("  densityDpi=" + info.densityDpi);
         pw.println("  navigationMode=" + info.navigationMode.name());
         pw.println("  currentSize=" + info.currentSize);
         pw.println("  supportedBounds=" + info.supportedBounds);
