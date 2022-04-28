@@ -80,7 +80,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         OnClickListener marketSearchClickListener = (v) -> mActivityContext.startActivitySafely(v,
                 marketSearchIntent, null);
         for (int i = 0; i < mAH.size(); i++) {
-            mAH.get(i).adapter.setLastSearchQuery(query, marketSearchClickListener);
+            mAH.get(i).mAdapter.setLastSearchQuery(query, marketSearchClickListener);
         }
         mIsSearching = true;
         rebindAdapters();
@@ -142,7 +142,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
 
     @Override
     public String getDescription() {
-        if (!mUsingTabs && mIsSearching) {
+        if (!mUsingTabs && isSearching()) {
             return getContext().getString(R.string.all_apps_search_results);
         } else {
             return super.getDescription();
@@ -150,8 +150,13 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected boolean showTabs() {
-        return super.showTabs() && !mIsSearching;
+    protected boolean shouldShowTabs() {
+        return super.shouldShowTabs() && !isSearching();
+    }
+
+    @Override
+    public boolean isSearching() {
+        return mIsSearching;
     }
 
     @Override
@@ -173,24 +178,33 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected View replaceRVContainer(boolean showTabs) {
-        View rvContainer = super.replaceRVContainer(showTabs);
+    protected View replaceAppsRVContainer(boolean showTabs) {
+        View rvContainer = super.replaceAppsRVContainer(showTabs);
+
+        removeCustomRules(rvContainer);
+        removeCustomRules(getSearchRecyclerView());
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
-            alignParentTop(rvContainer);
+            alignParentTop(rvContainer, showTabs);
+            alignParentTop(getSearchRecyclerView(), showTabs);
             layoutAboveSearchContainer(rvContainer);
+            layoutAboveSearchContainer(getSearchRecyclerView());
         } else {
-            layoutBelowSearchContainer(rvContainer);
+            layoutBelowSearchContainer(rvContainer, showTabs);
+            layoutBelowSearchContainer(getSearchRecyclerView(), showTabs);
         }
+
         return rvContainer;
     }
 
     @Override
     void setupHeader() {
         super.setupHeader();
+
+        removeCustomRules(mHeader);
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
-            alignParentTop(mHeader);
+            alignParentTop(mHeader, false /* includeTabsMargin */);
         } else {
-            layoutBelowSearchContainer(mHeader);
+            layoutBelowSearchContainer(mHeader, false /* includeTabsMargin */);
         }
     }
 
@@ -203,7 +217,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
 
         float prog = Utilities.boundToRange((float) scrolledOffset / mHeaderThreshold, 0f, 1f);
         boolean bgVisible = mSearchUiManager.getBackgroundVisibility();
-        if (scrolledOffset == 0 && !mIsSearching) {
+        if (scrolledOffset == 0 && !isSearching()) {
             bgVisible = true;
         } else if (scrolledOffset > mHeaderThreshold) {
             bgVisible = false;
@@ -226,37 +240,61 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         return super.getHeaderBottom() + mSearchContainer.getBottom();
     }
 
-    private void layoutBelowSearchContainer(View v) {
+    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
-        layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
-        layoutParams.removeRule(RelativeLayout.ABOVE);
-        layoutParams.addRule(RelativeLayout.BELOW, R.id.search_container_all_apps);
+        layoutParams.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
+
+        int topMargin = getContext().getResources().getDimensionPixelSize(
+                R.dimen.all_apps_header_top_margin);
+        if (includeTabsMargin) {
+            topMargin += getContext().getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_header_pill_height);
+        }
+        layoutParams.topMargin = topMargin;
     }
 
     private void layoutAboveSearchContainer(View v) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
         layoutParams.addRule(RelativeLayout.ABOVE, R.id.search_container_all_apps);
     }
 
-    private void alignParentTop(View v) {
+    private void alignParentTop(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
-        layoutParams.removeRule(RelativeLayout.BELOW);
         layoutParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        layoutParams.topMargin =
+                includeTabsMargin
+                        ? getContext().getResources().getDimensionPixelSize(
+                                R.dimen.all_apps_header_pill_height)
+                        : 0;
+    }
+
+    private void removeCustomRules(View v) {
+        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
+            return;
+        }
+
+        RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
+        layoutParams.removeRule(RelativeLayout.ABOVE);
+        layoutParams.removeRule(RelativeLayout.ALIGN_TOP);
+        layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
     }
 
     @Override
-    protected BaseAllAppsAdapter getAdapter(AlphabeticalAppsList<T> mAppsList,
+    protected BaseAllAppsAdapter<T> createAdapter(AlphabeticalAppsList<T> appsList,
             BaseAdapterProvider[] adapterProviders) {
-        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), mAppsList,
+        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), appsList,
                 adapterProviders);
     }
 }

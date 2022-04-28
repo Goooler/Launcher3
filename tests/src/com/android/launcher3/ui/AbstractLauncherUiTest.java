@@ -68,6 +68,7 @@ import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.WidgetUtils;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.launcher3.util.rule.LauncherActivityRule;
+import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.util.rule.TestStabilityRule;
@@ -227,7 +228,8 @@ public abstract class AbstractLauncherUiTest {
 
     @Rule
     public TestRule mOrderSensitiveRules = RuleChain
-            .outerRule(new TestStabilityRule())
+            .outerRule(new SamplerRule())
+            .around(new TestStabilityRule())
             .around(mActivityMonitor)
             .around(getRulesInsideActivityMonitor());
 
@@ -523,7 +525,7 @@ public abstract class AbstractLauncherUiTest {
     }
 
     protected int getAllAppsScroll(Launcher launcher) {
-        return launcher.getAppsView().getActiveRecyclerView().getCurrentScrollY();
+        return launcher.getAppsView().getActiveAppsRecyclerView().getCurrentScrollY();
     }
 
     private void checkLauncherIntegrity(
