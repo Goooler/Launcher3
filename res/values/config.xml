@@ -88,6 +88,7 @@
     <string name="custom_activity_picker" translatable="false">
         com.android.customization.picker.CustomizationPickerActivity</string>
     <string name="local_colors_extraction_class" translatable="false"></string>
+    <string name="search_session_manager_class" translatable="false"></string>
 
     <!-- Accessibility actions -->
     <item type="id" name="action_remove" />
@@ -165,6 +166,6 @@
 
     <!-- Swipe back to home related -->
     <dimen name="swipe_back_window_scale_x_margin">10dp</dimen>
-    <dimen name="swipe_back_window_scale_y_margin">80dp</dimen>
+    <dimen name="swipe_back_window_max_delta_y">160dp</dimen>
     <dimen name="swipe_back_window_corner_radius">40dp</dimen>
 </resources>
