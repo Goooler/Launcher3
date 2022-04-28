@@ -64,8 +64,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testDragIconToRightPanel() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -79,8 +78,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testSinglePageDragIconWhenMultiplePageScrollingIsPossible() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -134,8 +132,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testDragIconToPage2() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -151,8 +148,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testDragIconToPage3() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -168,8 +164,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testMultiplePageDragIcon() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -215,8 +210,7 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testEmptyPageDoesNotGetRemovedIfPagePairIsNotEmpty() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -256,36 +250,34 @@ public class TwoPanelWorkspaceTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testEmptyPagesGetRemovedIfBothPagesAreEmpty() {
         Workspace workspace = mLauncher.getWorkspace();
 
         workspace.dragIcon(workspace.getWorkspaceAppIcon("Play Store"), 2);
-        workspace.dragIcon(workspace.getHotseatAppIcon("Camera"), 1);
+        workspace.dragIcon(workspace.getHotseatAppIcon("Chrome"), 1);
 
         executeOnLauncher(launcher -> {
             assertPagesExist(launcher, 0, 1, 2, 3);
             assertItemsOnPage(launcher, 0, "Maps");
             assertPageEmpty(launcher, 1);
             assertItemsOnPage(launcher, 2, "Play Store");
-            assertItemsOnPage(launcher, 3, "Camera");
+            assertItemsOnPage(launcher, 3, "Chrome");
         });
 
-        workspace.dragIcon(workspace.getWorkspaceAppIcon("Camera"), -1);
+        workspace.dragIcon(workspace.getWorkspaceAppIcon("Chrome"), -1);
         workspace.flingForward();
         workspace.dragIcon(workspace.getWorkspaceAppIcon("Play Store"), -2);
 
         executeOnLauncher(launcher -> {
             assertPagesExist(launcher, 0, 1);
             assertItemsOnPage(launcher, 0, "Play Store", "Maps");
-            assertItemsOnPage(launcher, 1, "Camera");
+            assertItemsOnPage(launcher, 1, "Chrome");
         });
     }
 
     @Test
-    // TODO(b/197631877) Enable in portrait.
-    // @PortraitLandscape
+    @PortraitLandscape
     public void testMiddleEmptyPagesGetRemoved() {
         Workspace workspace = mLauncher.getWorkspace();
 
