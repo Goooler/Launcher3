@@ -22,6 +22,7 @@ import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.DisplayController.CHANGE_ROTATION;
+import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
 import static com.android.launcher3.util.DisplayController.NavigationMode.THREE_BUTTONS;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
@@ -73,7 +74,6 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
 
         @Override
         public void onActivityRotation(int displayId) {
-            super.onActivityRotation(displayId);
             // This always gets called before onDisplayInfoChanged() so we know how to process
             // the rotation in that method. This is done to avoid having a race condition between
             // the sensor readings and onDisplayInfoChanged() call
@@ -250,7 +250,8 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
     }
 
     private void onDisplayInfoChangedInternal(Info info, int flags, boolean forceRegister) {
-        if ((flags & (CHANGE_ROTATION | CHANGE_ACTIVE_SCREEN | CHANGE_NAVIGATION_MODE)) != 0) {
+        if ((flags & (CHANGE_ROTATION | CHANGE_ACTIVE_SCREEN | CHANGE_NAVIGATION_MODE
+                | CHANGE_SUPPORTED_BOUNDS)) != 0) {
             mDisplayRotation = info.rotation;
 
             if (mMode.hasGestures) {
