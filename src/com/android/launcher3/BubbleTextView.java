@@ -55,7 +55,6 @@ import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.FolderIcon;
-import com.android.launcher3.graphics.IconPalette;
 import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.graphics.PreloadIconDrawable;
 import com.android.launcher3.icons.DotRenderer;
@@ -97,7 +96,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private static final int MAX_SEARCH_LOOP_COUNT = 20;
 
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
-    private static final float HIGHLIGHT_SCALE = 1.16f;
 
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
@@ -260,6 +258,12 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mDotParams.scale = 0f;
         mForceHideDot = false;
         setBackground(null);
+
+        setTag(null);
+        if (mIconLoadRequest != null) {
+            mIconLoadRequest.cancel();
+            mIconLoadRequest = null;
+        }
     }
 
     private void cancelDotScaleAnim() {
@@ -364,8 +368,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
-    public void setBubbleTextHolder(
-            BubbleTextHolder bubbleTextHolder) {
+    public void setBubbleTextHolder(BubbleTextHolder bubbleTextHolder) {
         mBubbleTextHolder = bubbleTextHolder;
     }
 
@@ -378,8 +381,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             flags |= FLAG_NO_BADGE;
         }
         FastBitmapDrawable iconDrawable = info.newIcon(getContext(), flags);
-        mDotParams.color = IconPalette.getMutedColor(iconDrawable.getIconColor(), 0.54f);
-
+        mDotParams.color = iconDrawable.getIconColor();
         setIcon(iconDrawable);
         applyLabel(info);
     }
@@ -1022,19 +1024,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         getIconBounds(mIconSize, bounds);
     }
 
-    private int getIconSizeForDisplay(int display) {
-        DeviceProfile grid = mActivity.getDeviceProfile();
-        switch (display) {
-            case DISPLAY_ALL_APPS:
-                return grid.allAppsIconSizePx;
-            case DISPLAY_FOLDER:
-                return grid.folderChildIconSizePx;
-            case DISPLAY_WORKSPACE:
-            default:
-                return grid.iconSizePx;
-        }
-    }
-
     public void getSourceVisualDragBounds(Rect bounds) {
         getIconBounds(mIconSize, bounds);
     }
@@ -1047,8 +1036,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void resetIconScale() {
-        if (mIcon instanceof FastBitmapDrawable) {
-            ((FastBitmapDrawable) mIcon).resetScale();
+        if (mIcon != null) {
+            mIcon.resetScale();
         }
     }
 

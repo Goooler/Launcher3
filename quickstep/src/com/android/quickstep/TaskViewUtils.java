@@ -38,7 +38,6 @@ import static com.android.launcher3.anim.Interpolators.clampToProgress;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
 import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_CLOSING;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_OPENING;
 
@@ -170,11 +169,9 @@ public final class TaskViewUtils {
         boolean isQuickSwitch = v.isEndQuickswitchCuj();
         v.setEndQuickswitchCuj(false);
 
-        boolean inLiveTileMode =
-                ENABLE_QUICKSTEP_LIVE_TILE.get() && v.getRecentsView().getRunningTaskIndex() != -1;
         final RemoteAnimationTargets targets =
                 new RemoteAnimationTargets(appTargets, wallpaperTargets, nonAppTargets,
-                        !ENABLE_SHELL_TRANSITIONS && inLiveTileMode ? MODE_CLOSING : MODE_OPENING);
+                        MODE_OPENING);
         final RemoteAnimationTargetCompat navBarTarget = targets.getNavBarRemoteAnimationTarget();
 
         SurfaceTransactionApplier applier = new SurfaceTransactionApplier(v);
@@ -276,7 +273,7 @@ public final class TaskViewUtils {
                         }
                     }
                 });
-            } else if (inLiveTileMode) {
+            } else {
                 // There is no transition animation for app launch from recent in live tile mode so
                 // we have to trigger the navigation bar animation from system here.
                 final RecentsAnimationController controller =
@@ -503,7 +500,7 @@ public final class TaskViewUtils {
         }
 
         for (int i = 0; i < nonAppTargets.length; ++i) {
-            final SurfaceControl leash = appTargets[i].leash;
+            final SurfaceControl leash = nonAppTargets[i].leash;
             if (nonAppTargets[i].windowType == TYPE_DOCK_DIVIDER && leash != null) {
                 openingTargets.add(leash);
             }
