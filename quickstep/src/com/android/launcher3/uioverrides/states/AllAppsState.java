@@ -38,7 +38,7 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getTransitionDuration(Context context) {
-        return 320;
+        return 150;
     }
 
     @Override
@@ -53,15 +53,17 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        ScaleAndTranslation scaleAndTranslation = LauncherState.OVERVIEW
-                .getWorkspaceScaleAndTranslation(launcher);
-        scaleAndTranslation.scale = 1;
+        ScaleAndTranslation scaleAndTranslation =
+                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
+        if (launcher.getDeviceProfile().isTablet) {
+            scaleAndTranslation.scale = 0.97f;
+        } else {
+            ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
+                    .getWorkspaceScaleAndTranslation(launcher);
+            scaleAndTranslation.translationX = overviewScaleAndTranslation.translationX;
+            scaleAndTranslation.translationY = overviewScaleAndTranslation.translationY;
+        }
         return scaleAndTranslation;
-    }
-
-    @Override
-    public boolean isTaskbarStashed(Launcher launcher) {
-        return true;
     }
 
     @Override
@@ -86,7 +88,7 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return ALL_APPS_CONTENT;
+        return ALL_APPS_CONTENT | HOTSEAT_ICONS;
     }
 
     @Override
