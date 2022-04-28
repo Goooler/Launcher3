@@ -27,6 +27,7 @@ import android.view.TaskTransitionSpec;
 import android.view.WindowManagerGlobal;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
@@ -34,7 +35,6 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
@@ -116,6 +116,24 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     public void setShouldDelayLauncherStateAnim(boolean shouldDelayLauncherStateAnim) {
         mTaskbarLauncherStateController.setShouldDelayLauncherStateAnim(
                 shouldDelayLauncherStateAnim);
+    }
+
+    /**
+     * Enables manual taskbar stashing. This method should only be used for tests that need to
+     * stash/unstash the taskbar.
+     */
+    @VisibleForTesting
+    public void enableManualStashingForTests(boolean enableManualStashing) {
+        mControllers.taskbarStashController.enableManualStashingForTests(enableManualStashing);
+    }
+
+    /**
+     * Unstashes the Taskbar if it is stashed. This method should only be used to unstash the
+     * taskbar at the end of a test.
+     */
+    @VisibleForTesting
+    public void unstashTaskbarIfStashed() {
+        mControllers.taskbarStashController.onLongPressToUnstashTaskbar();
     }
 
     /**
@@ -228,8 +246,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * Whether the taskbar education should be shown.
      */
     public boolean shouldShowEdu() {
-        return FeatureFlags.ENABLE_TASKBAR_EDU.get()
-                && !Utilities.IS_RUNNING_IN_TEST_HARNESS
+        return !Utilities.IS_RUNNING_IN_TEST_HARNESS
                 && !mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN);
     }
 
@@ -237,10 +254,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * Manually ends the taskbar education flow.
      */
     public void hideEdu() {
-        if (!FeatureFlags.ENABLE_TASKBAR_EDU.get()) {
-            return;
-        }
-
         mControllers.taskbarEduController.hideEdu();
     }
 
