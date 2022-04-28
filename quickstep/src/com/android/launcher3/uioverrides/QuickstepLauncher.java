@@ -220,8 +220,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
                     (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
                     && (willUserBeActive || isUserActive())
-                    && !profile.isVerticalBarLayout()
-                    && profile.isPhone && !profile.isLandscape;
+                    && !profile.isVerticalBarLayout();
             UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
                     profile.hotseatBarSizePx);
         }
@@ -263,7 +262,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
 
         switch (state.ordinal) {
             case HINT_STATE_ORDINAL: {
-                Workspace workspace = getWorkspace();
+                Workspace<?> workspace = getWorkspace();
                 getStateManager().goToState(NORMAL);
                 if (workspace.getNextPage() != Workspace.DEFAULT_PAGE) {
                     workspace.post(workspace::moveToDefaultScreen);

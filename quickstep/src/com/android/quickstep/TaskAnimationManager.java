@@ -35,6 +35,7 @@ import androidx.annotation.UiThread;
 
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -49,9 +50,9 @@ import java.util.HashMap;
 
 public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAnimationListener {
     public static final boolean ENABLE_SHELL_TRANSITIONS =
-            SystemProperties.getBoolean("persist.debug.shell_transit", false);
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit", false);
     public static final boolean SHELL_TRANSITIONS_ROTATION = ENABLE_SHELL_TRANSITIONS
-            && SystemProperties.getBoolean("persist.debug.shell_transit_rotate", false);
+            && SystemProperties.getBoolean("persist.wm.debug.shell_transit_rotate", false);
 
     private RecentsAnimationController mController;
     private RecentsAnimationCallbacks mCallbacks;
@@ -176,9 +177,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     ((RecentsActivity) activityInterface.getCreatedActivity()).startHome();
                     return;
                 }
-                RemoteAnimationTarget[] nonAppTargets =
-                        SystemUiProxy.INSTANCE.getNoCreate()
-                                .onGoingToRecentsLegacy(false, nonHomeApps);
+                RemoteAnimationTarget[] nonAppTargets = SystemUiProxy.INSTANCE.get(mCtx)
+                        .onGoingToRecentsLegacy(false, nonHomeApps);
 
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && activityInterface.isInLiveTileMode()
                         && activityInterface.getCreatedActivity() != null) {
@@ -203,6 +203,24 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     }
                 }
             }
+
+            @Override
+            public boolean onSwitchToScreenshot(Runnable onFinished) {
+                if (!ENABLE_QUICKSTEP_LIVE_TILE.get() || !activityInterface.isInLiveTileMode()
+                        || activityInterface.getCreatedActivity() == null) {
+                    // No need to switch since tile is already a screenshot.
+                    onFinished.run();
+                } else {
+                    final RecentsView recentsView =
+                            activityInterface.getCreatedActivity().getOverviewPanel();
+                    if (recentsView != null) {
+                        recentsView.switchToScreenshot(onFinished);
+                    } else {
+                        onFinished.run();
+                    }
+                }
+                return true;
+            }
         });
         final long eventTime = gestureState.getSwipeUpStartTimeMs();
         mCallbacks.addListener(gestureState);
@@ -216,9 +234,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             // Allowing to pause Home if Home is top activity and Recents is not Home. So when user
             // start home when recents animation is playing, the home activity can be resumed again
             // to let the transition controller collect Home activity.
-            ActivityManager.RunningTaskInfo rti = gestureState.getRunningTask();
-            boolean homeIsOnTop = rti != null && rti.topActivity != null
-                    && rti.topActivity.equals(gestureState.getHomeIntent().getComponent());
+            CachedTaskInfo cti = gestureState.getRunningTask();
+            boolean homeIsOnTop = cti != null && cti.isHomeTask();
             if (!homeIsOnTop) {
                 options.setTransientLaunch();
             }

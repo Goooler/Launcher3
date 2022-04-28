@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import android.content.Intent;
 import android.graphics.Point;
 
 import androidx.test.filters.LargeTest;
@@ -50,7 +51,6 @@ import com.android.launcher3.widget.picker.WidgetsFullSheet;
 import com.android.launcher3.widget.picker.WidgetsRecyclerView;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -109,7 +109,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 launcher -> assertNotNull("Launcher internal state didn't switch to Showing Menu",
                         launcher.getOptionsPopup()));
         // Check that pressHome works when the menu is shown.
-        mLauncher.pressHome();
+        mLauncher.goHome();
     }
 
     @Test
@@ -121,7 +121,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         } finally {
             allApps.unfreeze();
         }
-        mLauncher.pressHome();
+        mLauncher.goHome();
     }
 
     public static void runAllAppsTest(AbstractLauncherUiTest test, AllApps allApps) {
@@ -273,7 +273,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         executeOnLauncher(launcher -> assertTrue("Flinging backward didn't scroll widgets",
                 getWidgetsScroll(launcher) < flingForwardY));
 
-        mLauncher.pressHome();
+        mLauncher.goHome();
         waitForLauncherCondition("Widgets were not closed",
                 launcher -> getWidgetsView(launcher) == null);
     }
@@ -391,7 +391,6 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         folder.close();
     }
 
-    @Ignore("b/205027405")
     @Test
     @PortraitLandscape
     public void testPressBack() throws Exception {
@@ -400,14 +399,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         mLauncher.getWorkspace();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
 
-        HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
-        allApps.freeze();
-        try {
-            allApps.getAppIcon(APP_NAME).dragToWorkspace(false, false);
-        } finally {
-            allApps.unfreeze();
-        }
-        mLauncher.getWorkspace().getWorkspaceAppIcon(APP_NAME).launch(getAppPackageName());
+        startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
         mLauncher.pressBack();
         mLauncher.getWorkspace();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
