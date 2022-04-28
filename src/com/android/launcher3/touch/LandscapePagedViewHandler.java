@@ -399,7 +399,8 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
         // In fake land/seascape, the placeholder always needs to go to the "top" of the device,
         // which is the same bounds as 0 rotation.
         int width = dp.widthPx;
-        out.set(0, 0, width, placeholderHeight);
+        int insetThickness = dp.getInsets().top;
+        out.set(0, 0, width, placeholderHeight + insetThickness);
         out.inset(placeholderInset, 0);
 
         // Adjust the top to account for content off screen. This will help to animate the view in
@@ -409,6 +410,18 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
         int totalHeight = (int) (1.0f * screenHeight / 2 * (screenWidth - 2 * placeholderInset)
                 / screenWidth);
         out.top -= (totalHeight - placeholderHeight);
+    }
+
+    @Override
+    public void updateStagedSplitIconParams(View out, float onScreenRectCenterX,
+            float onScreenRectCenterY, float fullscreenScaleX, float fullscreenScaleY,
+            int drawableWidth, int drawableHeight, DeviceProfile dp,
+            @StagePosition int stagePosition) {
+        float inset = dp.getInsets().top;
+        out.setX(Math.round(onScreenRectCenterX / fullscreenScaleX
+                - 1.0f * drawableWidth / 2));
+        out.setY(Math.round((onScreenRectCenterY + (inset / 2f)) / fullscreenScaleY
+                - 1.0f * drawableHeight / 2));
     }
 
     @Override
@@ -440,8 +453,8 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public void measureGroupedTaskViewThumbnailBounds(View primarySnapshot, View secondarySnapshot,
-            int parentWidth, int parentHeight,
-            StagedSplitBounds splitBoundsConfig, DeviceProfile dp) {
+            int parentWidth, int parentHeight, StagedSplitBounds splitBoundsConfig,
+            DeviceProfile dp, boolean isRtl) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
         int dividerBar = splitBoundsConfig.appsStackedVertically
