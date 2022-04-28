@@ -41,7 +41,6 @@ import com.android.systemui.plugins.AllAppsRow.OnHeightUpdatedListener;
 import com.android.systemui.plugins.PluginListener;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 public class FloatingHeaderView extends LinearLayout implements
@@ -83,6 +82,9 @@ public class FloatingHeaderView extends LinearLayout implements
     protected final Map<AllAppsRow, PluginHeaderRow> mPluginRows = new ArrayMap<>();
 
     private final int mHeaderTopPadding;
+    // These two values are necessary to ensure that the header protection is drawn correctly.
+    private final int mHeaderTopAdjustment;
+    private final int mHeaderBottomAdjustment;
     private final boolean mHeaderProtectionSupported;
 
     protected ViewGroup mTabLayout;
@@ -119,6 +121,10 @@ public class FloatingHeaderView extends LinearLayout implements
         super(context, attrs);
         mHeaderTopPadding = context.getResources()
                 .getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
+        mHeaderTopAdjustment = context.getResources()
+                .getDimensionPixelSize(R.dimen.all_apps_header_top_adjustment);
+        mHeaderBottomAdjustment = context.getResources()
+                .getDimensionPixelSize(R.dimen.all_apps_header_bottom_adjustment);
         mHeaderProtectionSupported = context.getResources().getBoolean(
                 R.bool.config_header_protection_supported)
                 // TODO(b/208599118) Support header protection for bottom sheet.
@@ -226,8 +232,7 @@ public class FloatingHeaderView extends LinearLayout implements
         return super.getFocusedChild();
     }
 
-    <T extends Context & ActivityContext> void setup(
-            List<BaseAllAppsContainerView<T>.AdapterHolder> mAH, boolean tabsHidden) {
+    void setup(AllAppsRecyclerView mainRV, AllAppsRecyclerView workRV, boolean tabsHidden) {
         for (FloatingHeaderRow row : mAllRows) {
             row.setup(this, mAllRows, tabsHidden);
         }
@@ -235,10 +240,8 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabsHidden = tabsHidden;
         mTabLayout.setVisibility(tabsHidden ? View.GONE : View.VISIBLE);
-        mMainRV = setupRV(mMainRV,
-                mAH.get(BaseAllAppsContainerView.AdapterHolder.MAIN).mRecyclerView);
-        mWorkRV = setupRV(mWorkRV,
-                mAH.get(BaseAllAppsContainerView.AdapterHolder.WORK).mRecyclerView);
+        mMainRV = setupRV(mMainRV, mainRV);
+        mWorkRV = setupRV(mWorkRV, workRV);
         mParent = (ViewGroup) mMainRV.getParent();
         setMainActive(mMainRVActive || mWorkRV == null);
         reset(false);
@@ -258,6 +261,9 @@ public class FloatingHeaderView extends LinearLayout implements
         }
         for (FloatingHeaderRow row : mAllRows) {
             mMaxTranslation += row.getExpectedHeight();
+        }
+        if (!mTabsHidden) {
+            mMaxTranslation += mHeaderBottomAdjustment;
         }
     }
 
@@ -321,9 +327,9 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabLayout.setTranslationY(mTranslationY);
 
-        int clipHeight = mHeaderTopPadding - getPaddingBottom();
-        mRVClip.top = mTabsHidden ? clipHeight : 0;
-        mHeaderClip.top = clipHeight;
+        int clipTop = mHeaderTopPadding - mHeaderTopAdjustment;
+        mRVClip.top = mTabsHidden ? clipTop : 0;
+        mHeaderClip.top = clipTop;
         // clipping on a draw might cause additional redraw
         setClipBounds(mHeaderClip);
         mMainRV.setClipBounds(mRVClip);
@@ -451,5 +457,3 @@ public class FloatingHeaderView extends LinearLayout implements
         return Math.max(getHeight() - getPaddingTop() + mTranslationY, 0);
     }
 }
-
-

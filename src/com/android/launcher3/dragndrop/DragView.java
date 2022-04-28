@@ -98,6 +98,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
     final ValueAnimator mAnim;
     // Whether mAnim has started. Unlike mAnim.isStarted(), this is true even after mAnim ends.
     private boolean mAnimStarted;
+    private Runnable mOnAnimEndCallback = null;
 
     private int mLastTouchX;
     private int mLastTouchY;
@@ -180,6 +181,14 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             public void onAnimationStart(Animator animation) {
                 mAnimStarted = true;
             }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                if (mOnAnimEndCallback != null) {
+                    mOnAnimEndCallback.run();
+                }
+            }
         });
 
         setDragRegion(new Rect(0, 0, width, height));
@@ -199,6 +208,10 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         setWillNotDraw(false);
     }
 
+    public void setOnAnimationEndCallback(Runnable callback) {
+        mOnAnimEndCallback = callback;
+    }
+
     /**
      * Initialize {@code #mIconDrawable} if the item can be represented using
      * an {@link AdaptiveIconDrawable} or {@link FolderAdaptiveIcon}.
@@ -216,7 +229,8 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             Object[] outObj = new Object[1];
             int w = mWidth;
             int h = mHeight;
-            Drawable dr = Utilities.getFullDrawable(mActivity, info, w, h, outObj);
+            Drawable dr = Utilities.getFullDrawable(mActivity, info, w, h,
+                    true /* shouldThemeIcon */, outObj);
 
             if (dr instanceof AdaptiveIconDrawable) {
                 int blurMargin = (int) mActivity.getResources()
@@ -563,20 +577,5 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         ImageView iv = new ImageView(context);
         iv.setImageDrawable(drawable);
         return iv;
-    }
-
-    /**
-     * Removes any stray DragView from the DragLayer.
-     */
-    public static void removeAllViews(ActivityContext activity) {
-        BaseDragLayer dragLayer = activity.getDragLayer();
-        // Iterate in reverse order. DragView is added later to the dragLayer,
-        // and will be one of the last views.
-        for (int i = dragLayer.getChildCount() - 1; i >= 0; i--) {
-            View child = dragLayer.getChildAt(i);
-            if (child instanceof DragView) {
-                dragLayer.removeView(child);
-            }
-        }
     }
 }

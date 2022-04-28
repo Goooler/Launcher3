@@ -28,27 +28,34 @@ import android.widget.FrameLayout;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
+import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.AllAppsButton;
+import com.android.launcher3.views.DoubleShadowBubbleTextView;
 
 /**
  * Hosts the Taskbar content such as Hotseat and Recent Apps. Drawn on top of other apps.
  */
 public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconParent, Insettable {
 
-    private final int[] mTempOutLocation = new int[2];
+    private static final float TASKBAR_BACKGROUND_LUMINANCE = 0.30f;
+    public int mThemeIconsBackground;
 
+    private final int[] mTempOutLocation = new int[2];
     private final Rect mIconLayoutBounds = new Rect();
     private final int mIconTouchSize;
     private final int mItemMarginLeftRight;
@@ -101,12 +108,29 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // Needed to draw folder leave-behind when opening one.
         setWillNotDraw(false);
 
+        mThemeIconsBackground = calculateThemeIconsBackground();
+
         if (FeatureFlags.ENABLE_ALL_APPS_IN_TASKBAR.get()) {
             mAllAppsButton = new AllAppsButton(context);
             mAllAppsButton.setLayoutParams(
                     new ViewGroup.LayoutParams(mIconTouchSize, mIconTouchSize));
             mAllAppsButton.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
         }
+    }
+
+    private int getColorWithGivenLuminance(int color, float luminance) {
+        float[] colorHSL = new float[3];
+        ColorUtils.colorToHSL(color, colorHSL);
+        colorHSL[2] = luminance;
+        return ColorUtils.HSLToColor(colorHSL);
+    }
+
+    private int calculateThemeIconsBackground() {
+        int color = ThemedIconDrawable.getColors(mContext)[0];
+        if (Utilities.isDarkTheme(mContext)) {
+            return getColorWithGivenLuminance(color, TASKBAR_BACKGROUND_LUMINANCE);
+        }
+        return color;
     }
 
     protected void init(TaskbarViewController.TaskbarViewCallbacks callbacks) {
@@ -214,7 +238,26 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
 
         if (mAllAppsButton != null) {
-            addView(mAllAppsButton);
+            int index = Utilities.isRtl(getResources()) ? 0 : getChildCount();
+            addView(mAllAppsButton, index);
+        }
+
+        mThemeIconsBackground = calculateThemeIconsBackground();
+        setThemedIconsBackgroundColor(mThemeIconsBackground);
+    }
+
+    /**
+     * Traverse all the child views and change the background of themeIcons
+     **/
+    public void setThemedIconsBackgroundColor(int color) {
+        for (View icon : getIconViews()) {
+            if (icon instanceof DoubleShadowBubbleTextView) {
+                DoubleShadowBubbleTextView textView = ((DoubleShadowBubbleTextView) icon);
+                if (textView.getIcon() != null
+                        && textView.getIcon() instanceof ThemedIconDrawable) {
+                    ((ThemedIconDrawable) textView.getIcon()).changeBackgroundColor(color);
+                }
+            }
         }
     }
 
@@ -269,8 +312,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (!mTouchEnabled) {
             return true;
         }
-        if (mIconLayoutBounds.contains((int) event.getX(), (int) event.getY())) {
-            // Don't allow long pressing between icons.
+        if (mIconLayoutBounds.left <= event.getX() && event.getX() <= mIconLayoutBounds.right) {
+            // Don't allow long pressing between icons, or above/below them.
             return true;
         }
         if (mControllerCallbacks.onTouchEvent(event)) {
@@ -316,6 +359,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         return icons;
     }
 
+    /**
+     * Returns the all apps button in the taskbar.
+     */
+    public View getAllAppsButtonView() {
+        return mAllAppsButton;
+    }
+
     // FolderIconParent implemented methods.
 
     @Override
@@ -357,7 +407,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         return getVisibility() == VISIBLE;
     }
 
-    protected void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
+    /**
+     * Maps {@code op} over all the child views.
+     */
+    public void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
         // map over all the shortcuts on the taskbar
         for (int i = 0; i < getChildCount(); i++) {
             View item = getChildAt(i);
@@ -365,5 +418,26 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 return;
             }
         }
+    }
+
+    /**
+     * Finds the first icon to match one of the given matchers, from highest to lowest priority.
+     * @return The first match, or All Apps button if no match was found.
+     */
+    public View getFirstMatch(ItemInfoMatcher... matchers) {
+        for (ItemInfoMatcher matcher : matchers) {
+            for (int i = 0; i < getChildCount(); i++) {
+                View item = getChildAt(i);
+                if (!(item.getTag() instanceof ItemInfo)) {
+                    // Should only happen for All Apps button.
+                    continue;
+                }
+                ItemInfo info = (ItemInfo) item.getTag();
+                if (matcher.matchesInfo(info)) {
+                    return item;
+                }
+            }
+        }
+        return mAllAppsButton;
     }
 }
