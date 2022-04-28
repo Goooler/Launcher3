@@ -31,6 +31,7 @@ android_library {
         "androidx.test.uiautomator_uiautomator",
         "androidx.preference_preference",
         "SystemUISharedLib",
+        "SystemUIAnimationLib",
     ],
     srcs: [
         "tests/tapl/**/*.java",
@@ -196,6 +197,7 @@ android_library {
         "lottie",
         "SystemUISharedLib",
         "SystemUI-statsd",
+        "SystemUIAnimationLib",
     ],
     manifest: "quickstep/AndroidManifest.xml",
     min_sdk_version: "current",
@@ -208,6 +210,8 @@ filegroup {
     srcs: [
         "ext_tests/src/**/*.java",
         "ext_tests/src/**/*.kt",
+        "quickstep/ext_tests/src/**/*.java",
+        "quickstep/ext_tests/src/**/*.kt",
     ],
 }
 
@@ -221,6 +225,19 @@ filegroup {
         "src_shortcuts_overrides/**/*.kt",
         "quickstep/src/**/*.java",
         "quickstep/src/**/*.kt",
+    ],
+}
+
+// Common source files used to build go launcher except go/src files
+filegroup {
+    name: "launcher-go-src-no-build-config",
+    srcs: [
+        "src/**/*.java",
+        "src/**/*.kt",
+        "quickstep/src/**/*.java",
+        "quickstep/src/**/*.kt",
+        "go/quickstep/src/**/*.java",
+        "go/quickstep/src/**/*.kt",
     ],
 }
 
@@ -287,6 +304,7 @@ android_library {
         "SystemUISharedLib",
         "Launcher3CommonDepsLib",
         "QuickstepResLib",
+        "SystemUIAnimationLib",
     ],
     manifest: "quickstep/AndroidManifest.xml",
     platform_apis: true,

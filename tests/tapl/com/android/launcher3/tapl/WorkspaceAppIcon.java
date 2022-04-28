@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 /**
  * App icon in workspace.
  */
-final class WorkspaceAppIcon extends AppIcon {
+final class WorkspaceAppIcon extends HomeAppIcon {
 
     WorkspaceAppIcon(LauncherInstrumentation launcher, UiObject2 icon) {
         super(launcher, icon);

@@ -23,6 +23,8 @@ import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
+import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
+import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
 
@@ -126,9 +128,12 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
     private StateAnimationConfig getNormalToAllAppsAnimation() {
         StateAnimationConfig builder = new StateAnimationConfig();
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, Interpolators.clampToProgress(ACCEL,
-                ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD,
-                ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD));
+        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
+        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
+                ? INSTANT
+                : Interpolators.clampToProgress(ACCEL,
+                        ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD,
+                        ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD));
         builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(ACCEL,
                 ALL_APPS_SCRIM_VISIBLE_THRESHOLD,
                 ALL_APPS_SCRIM_OPAQUE_THRESHOLD));
@@ -137,9 +142,12 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
     private StateAnimationConfig getAllAppsToNormalAnimation() {
         StateAnimationConfig builder = new StateAnimationConfig();
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, Interpolators.clampToProgress(DEACCEL,
-                1 - ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD,
-                1 - ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD));
+        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
+        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
+                ? FINAL_FRAME
+                : Interpolators.clampToProgress(DEACCEL,
+                        1 - ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD,
+                        1 - ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD));
         builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(DEACCEL,
                 1 - ALL_APPS_SCRIM_OPAQUE_THRESHOLD,
                 1 - ALL_APPS_SCRIM_VISIBLE_THRESHOLD));
@@ -221,13 +229,9 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
      * @return true if the event is over the hotseat
      */
     static boolean isTouchOverHotseat(Launcher launcher, MotionEvent ev) {
-        return (ev.getY() >= getHotseatTop(launcher));
-    }
-
-    public static int getHotseatTop(Launcher launcher) {
         DeviceProfile dp = launcher.getDeviceProfile();
         int hotseatHeight = dp.hotseatBarSizePx + dp.getInsets().bottom;
-        return launcher.getDragLayer().getHeight() - hotseatHeight;
+        return (ev.getY() >= (launcher.getDragLayer().getHeight() - hotseatHeight));
     }
 
     @Override

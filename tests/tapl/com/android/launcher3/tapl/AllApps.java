@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 /**
  * Operations on AllApps opened from Home. Also a parent for All Apps opened from Overview.
  */
-public class AllApps extends LauncherInstrumentation.VisibleContainer {
+public abstract class AllApps extends LauncherInstrumentation.VisibleContainer {
     private static final int MAX_SCROLL_ATTEMPTS = 40;
 
     private final int mHeight;
@@ -53,11 +53,6 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
         verifyNotFrozen("All apps freeze flags upon opening all apps");
         mIconHeight = mLauncher.getTestInfo(TestProtocol.REQUEST_ICON_HEIGHT)
                 .getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
-    }
-
-    @Override
-    protected LauncherInstrumentation.ContainerType getContainerType() {
-        return LauncherInstrumentation.ContainerType.ALL_APPS;
     }
 
     private boolean hasClickableIcon(UiObject2 allAppsContainer, UiObject2 appListRecycler,
@@ -79,7 +74,7 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
             LauncherInstrumentation.log("hasClickableIcon: icon has insufficient height");
             return false;
         }
-        if (iconCenterInSearchBox(allAppsContainer, icon)) {
+        if (hasSearchBox() && iconCenterInSearchBox(allAppsContainer, icon)) {
             LauncherInstrumentation.log("hasClickableIcon: icon center is under search box");
             return false;
         }
@@ -112,7 +107,7 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
             final UiObject2 allAppsContainer = verifyActiveContainer();
             final UiObject2 appListRecycler = mLauncher.waitForObjectInContainer(allAppsContainer,
                     "apps_list_view");
-            final UiObject2 searchBox = getSearchBox(allAppsContainer);
+            final UiObject2 searchBox = hasSearchBox() ? getSearchBox(allAppsContainer) : null;
 
             int deviceHeight = mLauncher.getRealDisplaySize().y;
             int bottomGestureStartOnScreen = mLauncher.getBottomGestureStartOnScreen();
@@ -133,8 +128,10 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
                                                 mLauncher.getVisibleBounds(icon).top
                                                         < bottomGestureStartOnScreen)
                                         .collect(Collectors.toList()),
-                                mLauncher.getVisibleBounds(searchBox).bottom
-                                        - mLauncher.getVisibleBounds(allAppsContainer).top);
+                                hasSearchBox()
+                                        ? mLauncher.getVisibleBounds(searchBox).bottom
+                                        - mLauncher.getVisibleBounds(allAppsContainer).top
+                                        : 0);
                         verifyActiveContainer();
                         final int newScroll = getAllAppsScroll();
                         mLauncher.assertTrue(
@@ -157,7 +154,7 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
 
                 final UiObject2 appIcon = mLauncher.waitForObjectInContainer(appListRecycler,
                         appIconSelector);
-                return new AllAppsAppIcon(mLauncher, appIcon);
+                return createAppIcon(appIcon);
             } else {
                 return null;
             }
@@ -178,16 +175,21 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
         return appIcon;
     }
 
+    @NonNull
+    protected abstract AppIcon createAppIcon(UiObject2 icon);
+
+    protected abstract boolean hasSearchBox();
+
     private void scrollBackToBeginning() {
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                 "want to scroll back in all apps")) {
             LauncherInstrumentation.log("Scrolling to the beginning");
             final UiObject2 allAppsContainer = verifyActiveContainer();
-            final UiObject2 searchBox = getSearchBox(allAppsContainer);
+            final UiObject2 searchBox = hasSearchBox() ? getSearchBox(allAppsContainer) : null;
 
             int attempts = 0;
-            final Rect margins =
-                    new Rect(0, mLauncher.getVisibleBounds(searchBox).bottom + 1, 0, 5);
+            final Rect margins = new Rect(
+                    0, hasSearchBox() ? mLauncher.getVisibleBounds(searchBox).bottom + 1 : 0, 0, 5);
 
             for (int scroll = getAllAppsScroll();
                     scroll != 0;
@@ -199,7 +201,11 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
                         ++attempts <= MAX_SCROLL_ATTEMPTS);
 
                 mLauncher.scroll(
-                        allAppsContainer, Direction.UP, margins, 12, false);
+                        allAppsContainer,
+                        Direction.UP,
+                        margins,
+                        /* steps= */ 12,
+                        /* slowDown= */ false);
             }
 
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer("scrolled up")) {
@@ -228,7 +234,11 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
             final UiObject2 allAppsContainer = verifyActiveContainer();
             // Start the gesture in the center to avoid starting at elements near the top.
             mLauncher.scroll(
-                    allAppsContainer, Direction.DOWN, new Rect(0, 0, 0, mHeight / 2), 10, false);
+                    allAppsContainer,
+                    Direction.DOWN,
+                    new Rect(0, 0, 0, mHeight / 2),
+                    /* steps= */ 10,
+                    /* slowDown= */ false);
             verifyActiveContainer();
         }
     }
@@ -243,7 +253,11 @@ public class AllApps extends LauncherInstrumentation.VisibleContainer {
             final UiObject2 allAppsContainer = verifyActiveContainer();
             // Start the gesture in the center, for symmetry with forward.
             mLauncher.scroll(
-                    allAppsContainer, Direction.UP, new Rect(0, mHeight / 2, 0, 0), 10, false);
+                    allAppsContainer,
+                    Direction.UP,
+                    new Rect(0, mHeight / 2, 0, 0),
+                    /* steps= */ 10,
+                    /*slowDown= */ false);
             verifyActiveContainer();
         }
     }
