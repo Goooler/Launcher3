@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 import static com.android.quickstep.AnimatedFloat.VALUE;
 
 import android.annotation.NonNull;
@@ -200,15 +201,23 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     }
 
     /**
+     * Creates the icon alignment controller if it does not already exist.
+     * @param launcherDp Launcher device profile.
+     */
+    public void createIconAlignmentControllerIfNotExists(DeviceProfile launcherDp) {
+        if (mIconAlignControllerLazy == null) {
+            mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
+        }
+    }
+
+    /**
      * Sets the taskbar icon alignment relative to Launcher hotseat icons
      * @param alignmentRatio [0, 1]
      *                       0 => not aligned
      *                       1 => fully aligned
      */
     public void setLauncherIconAlignment(float alignmentRatio, DeviceProfile launcherDp) {
-        if (mIconAlignControllerLazy == null) {
-            mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
-        }
+        createIconAlignmentControllerIfNotExists(launcherDp);
         mIconAlignControllerLazy.setPlayFraction(alignmentRatio);
         if (alignmentRatio <= 0 || alignmentRatio >= 1) {
             // Cleanup lazy controller so that it is created again in next animation
@@ -333,7 +342,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
 
         public View.OnClickListener getAllAppsButtonClickListener() {
-            return v -> mControllers.taskbarAllAppsController.show();
+            return v -> {
+                mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP);
+                mControllers.taskbarAllAppsController.show();
+            };
         }
 
         public View.OnLongClickListener getIconOnLongClickListener() {
