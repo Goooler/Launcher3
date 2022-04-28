@@ -90,7 +90,7 @@
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"ဤအပ်ပလီကေးရှင်းမှာ စစ်စတန်ပိုင်းဆိုင်ရာ အပ်ပလီကေးရှင်းဖြစ်ပါသည်။ ထုတ်ပစ်၍ မရပါ"</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"အမည်ကို တည်းဖြတ်ပါ"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"<xliff:g id="APP_NAME">%1$s</xliff:g> ကို ပိတ်ထားသည်"</string>
-    <string name="dotted_app_label" msgid="1704091277755818896">"{count,plural,offset:1 =1{{app_name} တွင် အကြောင်းကြားချက် # ခု ရှိသည်}other{{app_name} တွင် အကြောင်းကြားချက် # ခု ရှိသည်}}"</string>
+    <string name="dotted_app_label" msgid="1865617679843363410">"{count,plural, =1{{app_name} တွင် အကြောင်းကြားချက် # ခု ရှိသည်}other{{app_name} တွင် အကြောင်းကြားချက် # ခု ရှိသည်}}"</string>
     <string name="default_scroll_format" msgid="7475544710230993317">"စာမျက်နှာ %1$d မှ %2$d"</string>
     <string name="workspace_scroll_format" msgid="8458889198184077399">"ပင်မစာမျက်နှာ %1$d မှ %2$d"</string>
     <string name="workspace_new_page" msgid="257366611030256142">"ပင်မမျက်နှာပြင် စာမျက်နှာသစ်"</string>
@@ -124,6 +124,14 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ကို ထည့်သွင်းနေသည်၊ <xliff:g id="PROGRESS">%2$s</xliff:g> ပြီးပါပြီ"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> ဒေါင်းလုဒ်လုပ်နေသည်၊ <xliff:g id="PROGRESS">%2$s</xliff:g> ပြီးပါပြီ"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ကိုထည့်သွင်းရန်စောင့်နေသည်"</string>
+    <!-- no translation found for dialog_update_title (114234265740994042) -->
+    <skip />
+    <!-- no translation found for dialog_update_message (4176784553982226114) -->
+    <skip />
+    <!-- no translation found for dialog_update (2178028071796141234) -->
+    <skip />
+    <!-- no translation found for dialog_remove (6510806469849709407) -->
+    <skip />
     <string name="widgets_list" msgid="796804551140113767">"ဝိဂျက်စာရင်း"</string>
     <string name="widgets_list_closed" msgid="6141506579418771922">"ဝိဂျက်စာရင်းကို ပိတ်ထားသည်"</string>
     <string name="action_add_to_workspace" msgid="215894119683164916">"ပင်မစာမျက်နှာတွင် ထည့်ရန်"</string>

@@ -90,7 +90,7 @@
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"Ovo je sistemska aplikacija i ne može se deinstalirati."</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"Uređivanje naziva"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"Aplikacija <xliff:g id="APP_NAME">%1$s</xliff:g> je onemogućena"</string>
-    <string name="dotted_app_label" msgid="1704091277755818896">"{count,plural,offset:1 =1{{app_name} ima # obavještenje}one{{app_name} ima # obavještenje}few{{app_name} ima # obavještenja}other{{app_name} ima # obavještenja}}"</string>
+    <string name="dotted_app_label" msgid="1865617679843363410">"{count,plural, =1{Aplikacija {app_name} ima # obavještenje}one{Aplikacija {app_name} ima # obavještenje}few{Aplikacija {app_name} ima # obavještenja}other{Aplikacija {app_name} ima # obavještenja}}"</string>
     <string name="default_scroll_format" msgid="7475544710230993317">"Strana %1$d od %2$d"</string>
     <string name="workspace_scroll_format" msgid="8458889198184077399">"Početni ekran %1$d od %2$d"</string>
     <string name="workspace_new_page" msgid="257366611030256142">"Nova stranica početnog ekrana"</string>
@@ -105,7 +105,7 @@
     <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"Pozadinska slika i stil"</string>
     <string name="settings_button_text" msgid="8873672322605444408">"Postavke početnog ekrana"</string>
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Onemogućio vaš administrator"</string>
-    <string name="allow_rotation_title" msgid="7222049633713050106">"Dozvolite rotiranje početnog ekrana"</string>
+    <string name="allow_rotation_title" msgid="7222049633713050106">"Dozvoli rotiranje početnog ekrana"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Kada se telefon zarotira"</string>
     <string name="notification_dots_title" msgid="9062440428204120317">"Tačke za obavještenja"</string>
     <string name="notification_dots_desc_on" msgid="1679848116452218908">"Uključeno"</string>
@@ -124,6 +124,14 @@
     <string name="app_installing_title" msgid="5864044122733792085">"Instaliranje aplikacije <xliff:g id="NAME">%1$s</xliff:g>, završeno je <xliff:g id="PROGRESS">%2$s</xliff:g>"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> se preuzima, završeno <xliff:g id="PROGRESS">%2$s</xliff:g>"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> čeka da se instalira"</string>
+    <!-- no translation found for dialog_update_title (114234265740994042) -->
+    <skip />
+    <!-- no translation found for dialog_update_message (4176784553982226114) -->
+    <skip />
+    <!-- no translation found for dialog_update (2178028071796141234) -->
+    <skip />
+    <!-- no translation found for dialog_remove (6510806469849709407) -->
+    <skip />
     <string name="widgets_list" msgid="796804551140113767">"Spisak vidžeta"</string>
     <string name="widgets_list_closed" msgid="6141506579418771922">"Spisak vidžeta je zatvoren"</string>
     <string name="action_add_to_workspace" msgid="215894119683164916">"Dodavanje na početni ekran"</string>

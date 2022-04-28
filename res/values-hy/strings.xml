@@ -90,7 +90,7 @@
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"Սա համակարգային ծրագիր է և չի կարող ապատեղադրվել:"</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"Փոխել անունը"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"<xliff:g id="APP_NAME">%1$s</xliff:g> հավելվածն անջատված է"</string>
-    <string name="dotted_app_label" msgid="1704091277755818896">"{count,plural,offset:1 =1{«{app_name}» հավելվածն ունի # ծանուցում}one{«{app_name}» հավելվածն ունի # ծանուցում}other{«{app_name}» հավելվածն ունի # ծանուցում}}"</string>
+    <string name="dotted_app_label" msgid="1865617679843363410">"{count,plural, =1{«{app_name}» հավելվածն ունի # ծանուցում}one{«{app_name}» հավելվածն ունի # ծանուցում}other{«{app_name}» հավելվածն ունի # ծանուցում}}"</string>
     <string name="default_scroll_format" msgid="7475544710230993317">"Էջ %1$d՝ %2$d-ից"</string>
     <string name="workspace_scroll_format" msgid="8458889198184077399">"Հիմնական էկրան %1$d` %2$d-ից"</string>
     <string name="workspace_new_page" msgid="257366611030256142">"Հիմնական էկրանի նոր էջ"</string>
@@ -124,6 +124,14 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> հավելվածը տեղադրվում է, կատարված է <xliff:g id="PROGRESS">%2$s</xliff:g>-ը"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g>–ի ներբեռնում (<xliff:g id="PROGRESS">%2$s</xliff:g>)"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g>-ի տեղադրման սպասում"</string>
+    <!-- no translation found for dialog_update_title (114234265740994042) -->
+    <skip />
+    <!-- no translation found for dialog_update_message (4176784553982226114) -->
+    <skip />
+    <!-- no translation found for dialog_update (2178028071796141234) -->
+    <skip />
+    <!-- no translation found for dialog_remove (6510806469849709407) -->
+    <skip />
     <string name="widgets_list" msgid="796804551140113767">"Վիջեթների ցանկ"</string>
     <string name="widgets_list_closed" msgid="6141506579418771922">"Վիջեթների ցանկը փակվեց"</string>
     <string name="action_add_to_workspace" msgid="215894119683164916">"Ավելացնել հիմնական էկրանին"</string>

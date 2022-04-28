@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.launcher3.allapps;
 
-public class DecorationInfo {
+package com.android.launcher3.taskbar;
+
+import java.util.StringJoiner;
+
+/**
+ * Various utilities shared amongst the Taskbar's classes.
+ */
+public final class Utilities {
+
+    private Utilities() {}
+
+    static void appendFlag(StringJoiner str, int flags, int flag, String flagName) {
+        if ((flags & flag) != 0) {
+            str.add(flagName);
+        }
+    }
 }

@@ -102,7 +102,6 @@ import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.InputConsumerProxy;
 import com.android.quickstep.util.InputProxyHandlerFactory;
-import com.android.quickstep.util.LauncherSplitScreenListener;
 import com.android.quickstep.util.MotionPauseDetector;
 import com.android.quickstep.util.ProtoTracer;
 import com.android.quickstep.util.RecentsOrientedState;
@@ -114,6 +113,7 @@ import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.VibratorWrapper;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InputConsumerController;
@@ -564,26 +564,14 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     protected void notifyGestureAnimationStartToRecents() {
-        ActivityManager.RunningTaskInfo[] runningTasks;
+        Task[] runningTasks;
         if (mIsSwipeForStagedSplit) {
-            int[] splitTaskIds =
-                    LauncherSplitScreenListener.INSTANCE.getNoCreate().getRunningSplitTaskIds();
-            runningTasks = new ActivityManager.RunningTaskInfo[splitTaskIds.length];
-            for (int i = 0; i < splitTaskIds.length; i++) {
-                int taskId = splitTaskIds[i];
-                // Order matters here, we want first indexed RunningTaskInfo to be leftTop task
-                for (ActivityManager.RunningTaskInfo rti : mGestureState.getRunningTasks()) {
-                    if (taskId == rti.taskId) {
-                        runningTasks[i] = rti;
-                        break;
-                    }
-
-                }
-            }
+            int[] splitTaskIds = TopTaskTracker.INSTANCE.get(mContext).getRunningSplitTaskIds();
+            runningTasks = mGestureState.getRunningTask().getPlaceholderTasks(splitTaskIds);
         } else {
-            runningTasks = new ActivityManager.RunningTaskInfo[]{mGestureState.getRunningTask()};
+            runningTasks = mGestureState.getRunningTask().getPlaceholderTasks();
         }
-        mRecentsView.onGestureAnimationStart(runningTasks);
+        mRecentsView.onGestureAnimationStart(runningTasks, mDeviceState.getRotationTouchHelper());
     }
 
     private void launcherFrameDrawn() {
@@ -782,7 +770,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             // We will handle the sysui flags based on the centermost task view.
             mRecentsAnimationController.setUseLauncherSystemBarFlags(swipeUpThresholdPassed
                     ||  (quickswitchThresholdPassed && centermostTaskFlags != 0));
-            mRecentsAnimationController.setSplitScreenMinimized(swipeUpThresholdPassed);
+            mRecentsAnimationController.setSplitScreenMinimized(mContext, swipeUpThresholdPassed);
             // Provide a hint to WM the direction that we will be settling in case the animation
             // needs to be canceled
             mRecentsAnimationController.setWillFinishToHome(swipeUpThresholdPassed);
@@ -801,7 +789,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             RecentsAnimationTargets targets) {
         super.onRecentsAnimationStart(controller, targets);
         ActiveGestureLog.INSTANCE.addLog("startRecentsAnimationCallback", targets.apps.length);
-        mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(targets);
+        mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(mContext, targets);
         mRecentsAnimationController = controller;
         mRecentsAnimationTargets = targets;
 
@@ -1018,35 +1006,41 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         return false;
     }
 
-    private GestureEndTarget calculateEndTarget(PointF velocity, float endVelocity, boolean isFling,
-            boolean isCancel) {
+    private GestureEndTarget calculateEndTarget(PointF velocity, float endVelocity,
+            boolean isFlingY, boolean isCancel) {
         if (mGestureState.isHandlingAtomicEvent()) {
             // Button mode, this is only used to go to recents
             return RECENTS;
         }
         final GestureEndTarget endTarget;
-        final boolean goingToNewTask;
+        final boolean canGoToNewTask;
         if (mRecentsView != null) {
             if (!hasTargets()) {
                 // If there are no running tasks, then we can assume that this is a continuation of
                 // the last gesture, but after the recents animation has finished
-                goingToNewTask = true;
+                canGoToNewTask = true;
             } else {
                 final int runningTaskIndex = mRecentsView.getRunningTaskIndex();
                 final int taskToLaunch = mRecentsView.getNextPage();
-                goingToNewTask = runningTaskIndex >= 0 && taskToLaunch != runningTaskIndex;
+                canGoToNewTask = runningTaskIndex >= 0 && taskToLaunch != runningTaskIndex;
             }
         } else {
-            goingToNewTask = false;
+            canGoToNewTask = false;
         }
         final boolean reachedOverviewThreshold = mCurrentShift.value >= MIN_PROGRESS_FOR_OVERVIEW;
-        if (!isFling) {
+        final boolean isFlingX = Math.abs(velocity.x) > mContext.getResources()
+                .getDimension(R.dimen.quickstep_fling_threshold_speed);
+        if (!isFlingY) {
             if (isCancel) {
                 endTarget = LAST_TASK;
             } else if (mDeviceState.isFullyGesturalNavMode()) {
-                if (mIsMotionPaused) {
+                if (canGoToNewTask && isFlingX) {
+                    // Flinging towards new task takes precedence over mIsMotionPaused (which only
+                    // checks y-velocity).
+                    endTarget = NEW_TASK;
+                } else if (mIsMotionPaused) {
                     endTarget = RECENTS;
-                } else if (goingToNewTask) {
+                } else if (canGoToNewTask) {
                     endTarget = NEW_TASK;
                 } else {
                     endTarget = !reachedOverviewThreshold ? LAST_TASK : HOME;
@@ -1054,26 +1048,22 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             } else {
                 endTarget = reachedOverviewThreshold && mGestureStarted
                         ? RECENTS
-                        : goingToNewTask
+                        : canGoToNewTask
                                 ? NEW_TASK
                                 : LAST_TASK;
             }
         } else {
             // If swiping at a diagonal, base end target on the faster velocity.
             boolean isSwipeUp = endVelocity < 0;
-            boolean willGoToNewTaskOnSwipeUp =
-                    goingToNewTask && Math.abs(velocity.x) > Math.abs(endVelocity);
+            boolean willGoToNewTask =
+                    canGoToNewTask && Math.abs(velocity.x) > Math.abs(endVelocity);
 
-            if (mDeviceState.isFullyGesturalNavMode() && isSwipeUp && !willGoToNewTaskOnSwipeUp) {
-                endTarget = HOME;
-            } else if (mDeviceState.isFullyGesturalNavMode() && isSwipeUp) {
-                // If swiping at a diagonal, base end target on the faster velocity.
-                endTarget = NEW_TASK;
+            if (mDeviceState.isFullyGesturalNavMode() && isSwipeUp) {
+                endTarget = willGoToNewTask ? NEW_TASK : HOME;
             } else if (isSwipeUp) {
-                endTarget = !reachedOverviewThreshold && willGoToNewTaskOnSwipeUp
-                        ? NEW_TASK : RECENTS;
+                endTarget = (!reachedOverviewThreshold && willGoToNewTask) ? NEW_TASK : RECENTS;
             } else {
-                endTarget = goingToNewTask ? NEW_TASK : LAST_TASK;
+                endTarget = willGoToNewTask ? NEW_TASK : LAST_TASK; // Swipe is downward.
             }
         }
 
@@ -1151,6 +1141,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     duration = Math.max(duration, mRecentsView.getScroller().getDuration());
                 }
             }
+        } else if (endTarget == LAST_TASK && mRecentsView != null) {
+            mRecentsView.snapToPage(mRecentsView.getCurrentPage(), Math.toIntExact(duration));
         }
 
         // Let RecentsView handle the scrolling to the task, which we launch in startNewTask()
@@ -1380,7 +1372,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     private SwipePipToHomeAnimator createWindowAnimationToPip(HomeAnimationFactory homeAnimFactory,
             RemoteAnimationTargetCompat runningTaskTarget, float startProgress) {
         // Directly animate the app to PiP (picture-in-picture) mode
-        final ActivityManager.RunningTaskInfo taskInfo = mGestureState.getRunningTask();
+        final ActivityManager.RunningTaskInfo taskInfo = runningTaskTarget.taskInfo;
         final RecentsOrientedState orientationState = mRemoteTargetHandles[0].getTaskViewSimulator()
                 .getOrientationState();
         final int windowRotation = calculateWindowRotation(runningTaskTarget, orientationState);
@@ -1782,8 +1774,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     new PictureInPictureSurfaceTransaction.Builder()
                             .setAlpha(0f)
                             .build();
-            int[] taskIds =
-                        LauncherSplitScreenListener.INSTANCE.getNoCreate().getRunningSplitTaskIds();
+            int[] taskIds = TopTaskTracker.INSTANCE.get(mContext).getRunningSplitTaskIds();
             for (int taskId : taskIds) {
                 mRecentsAnimationController.setFinishTaskTransaction(taskId,
                         tx, null /* overlay */);
