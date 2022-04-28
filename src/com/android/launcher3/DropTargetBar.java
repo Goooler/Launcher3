@@ -140,9 +140,22 @@ public class DropTargetBar extends FrameLayout
         if (visibleCount > 0) {
             int availableWidth = width / visibleCount;
             boolean textVisible = true;
-            for (ButtonDropTarget buttons : mDropTargets) {
-                if (buttons.getVisibility() != GONE) {
-                    textVisible = textVisible && !buttons.isTextTruncated(availableWidth);
+            boolean textResized = false;
+            float textSize = mDropTargets[0].getTextSize();
+            for (ButtonDropTarget button : mDropTargets) {
+                if (button.getVisibility() == GONE) {
+                    continue;
+                }
+                if (button.isTextTruncated(availableWidth)) {
+                    textSize = Math.min(textSize, button.resizeTextToFit(availableWidth));
+                    textResized = true;
+                }
+                textVisible = textVisible && !button.isTextTruncated(availableWidth);
+            }
+
+            if (textResized) {
+                for (ButtonDropTarget button : mDropTargets) {
+                    button.setTextSize(textSize);
                 }
             }
 
@@ -166,7 +179,7 @@ public class DropTargetBar extends FrameLayout
         }
 
         Launcher launcher = Launcher.getLauncher(getContext());
-        Workspace workspace = launcher.getWorkspace();
+        Workspace<?> workspace = launcher.getWorkspace();
         DeviceProfile dp = launcher.getDeviceProfile();
         int buttonHorizontalPadding = dp.dropTargetHorizontalPaddingPx;
         int buttonVerticalPadding = dp.dropTargetVerticalPaddingPx;
@@ -239,8 +252,7 @@ public class DropTargetBar extends FrameLayout
                 int overlap = start + leftButton.getMeasuredWidth() + rightButton.getMeasuredWidth()
                         - end;
                 if (overlap > 0) {
-                    start -= overlap / 2;
-                    end += overlap / 2;
+                    end += overlap;
                 }
 
                 leftButton.layout(start, 0, start + leftButton.getMeasuredWidth(),
