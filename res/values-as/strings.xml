@@ -90,7 +90,7 @@
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"এইটো এটা ছিষ্টেম এপ আৰু ইয়াক আনইনষ্টল কৰিব নোৱৰি"</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"নাম সম্পাদনা কৰক"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"<xliff:g id="APP_NAME">%1$s</xliff:g> অক্ষম কৰা হ’ল"</string>
-    <string name="dotted_app_label" msgid="1704091277755818896">"{count,plural,offset:1 =1{{app_name}ৰ # টা জাননী আছে}one{{app_name}ৰ # টা জাননী আছে}other{{app_name}ৰ # টা জাননী আছে}}"</string>
+    <string name="dotted_app_label" msgid="1865617679843363410">"{count,plural, =1{{app_name}ৰ # টা জাননী আছে}one{{app_name}ৰ # টা জাননী আছে}other{{app_name}ৰ # টা জাননী আছে}}"</string>
     <string name="default_scroll_format" msgid="7475544710230993317">"%2$dৰ %1$d পৃষ্ঠা"</string>
     <string name="workspace_scroll_format" msgid="8458889198184077399">"গৃহ স্ক্ৰীন %2$dৰ %1$d"</string>
     <string name="workspace_new_page" msgid="257366611030256142">"গৃহ স্ক্ৰীনৰ নতুন পৃষ্ঠা"</string>
@@ -124,6 +124,14 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ইনষ্টল কৰি থকা হৈছে, <xliff:g id="PROGRESS">%2$s</xliff:g> সম্পূৰ্ণ হৈছে"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> ডাউনল’ড কৰি থকা হৈছে, <xliff:g id="PROGRESS">%2$s</xliff:g> সম্পূৰ্ণ হ’ল"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ইনষ্টল হোৱালৈ অপেক্ষা কৰি থকা হৈছে"</string>
+    <!-- no translation found for dialog_update_title (114234265740994042) -->
+    <skip />
+    <!-- no translation found for dialog_update_message (4176784553982226114) -->
+    <skip />
+    <!-- no translation found for dialog_update (2178028071796141234) -->
+    <skip />
+    <!-- no translation found for dialog_remove (6510806469849709407) -->
+    <skip />
     <string name="widgets_list" msgid="796804551140113767">"ৱিজেটৰ তালিকা"</string>
     <string name="widgets_list_closed" msgid="6141506579418771922">"ৱিজেটৰ তালিকা বন্ধ কৰা হ’ল"</string>
     <string name="action_add_to_workspace" msgid="215894119683164916">"গৃহ স্ক্ৰীনত যোগ কৰক"</string>

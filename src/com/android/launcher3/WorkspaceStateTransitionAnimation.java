@@ -25,6 +25,7 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.LauncherState.FLAG_HAS_SYS_UI_SCRIM;
+import static com.android.launcher3.LauncherState.FLAG_HOTSEAT_INACCESSIBLE;
 import static com.android.launcher3.LauncherState.HINT_STATE;
 import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -67,18 +68,18 @@ import com.android.systemui.plugins.ResourceProvider;
  */
 public class WorkspaceStateTransitionAnimation {
 
-    private static final FloatProperty<Workspace> WORKSPACE_SCALE_PROPERTY =
+    private static final FloatProperty<Workspace<?>> WORKSPACE_SCALE_PROPERTY =
             WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WORKSPACE_STATE);
 
     private static final FloatProperty<Hotseat> HOTSEAT_SCALE_PROPERTY =
             HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WORKSPACE_STATE);
 
     private final Launcher mLauncher;
-    private final Workspace mWorkspace;
+    private final Workspace<?> mWorkspace;
 
     private float mNewScale;
 
-    public WorkspaceStateTransitionAnimation(Launcher launcher, Workspace workspace) {
+    public WorkspaceStateTransitionAnimation(Launcher launcher, Workspace<?> workspace) {
         mLauncher = launcher;
         mWorkspace = workspace;
     }
@@ -150,6 +151,12 @@ public class WorkspaceStateTransitionAnimation {
         float workspacePageIndicatorAlpha = (elements & WORKSPACE_PAGE_INDICATOR) != 0 ? 1 : 0;
         propertySetter.setViewAlpha(mLauncher.getWorkspace().getPageIndicator(),
                 workspacePageIndicatorAlpha, fadeInterpolator);
+
+        // Update the accessibility flags for hotseat based on launcher state.
+        hotseat.setImportantForAccessibility(
+                state.hasFlag(FLAG_HOTSEAT_INACCESSIBLE)
+                        ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                        : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
 
         Interpolator translationInterpolator =
                 config.getInterpolator(ANIM_WORKSPACE_TRANSLATE, ZOOM_OUT);
@@ -224,7 +231,7 @@ public class WorkspaceStateTransitionAnimation {
      * Returns a spring based animator for the scale property of {@param workspace}.
      */
     public static ValueAnimator getWorkspaceSpringScaleAnimator(Launcher launcher,
-            Workspace workspace, float scale) {
+            Workspace<?> workspace, float scale) {
         return getSpringScaleAnimator(launcher, workspace, scale, WORKSPACE_SCALE_PROPERTY);
     }
 
