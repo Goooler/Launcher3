@@ -21,17 +21,18 @@ import android.content.Context;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.util.ItemInfoMatcher;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.LabelComparator;
 import com.android.launcher3.views.ActivityContext;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The alphabetically sorted list of applications.
@@ -82,7 +83,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     private AppInfoComparator mAppNameComparator;
     private final int mNumAppsPerRowAllApps;
     private int mNumAppRowsInAdapter;
-    private ItemInfoMatcher mItemFilter;
+    private Predicate<ItemInfo> mItemFilter;
 
     public AlphabeticalAppsList(Context context, AllAppsStore appsStore,
             WorkAdapterProvider adapterProvider) {
@@ -94,7 +95,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         mAllAppsStore.addUpdateListener(this);
     }
 
-    public void updateItemFilter(ItemInfoMatcher itemFilter) {
+    public void updateItemFilter(Predicate<ItemInfo> itemFilter) {
         this.mItemFilter = itemFilter;
         onAppsUpdated();
     }
@@ -192,27 +193,6 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         return true;
     }
 
-    public boolean appendSearchResults(ArrayList<AdapterItem> results) {
-        if (hasFilter() && results != null && results.size() > 0) {
-            updateSearchAdapterItems(results, mSearchResults.size());
-            refreshRecyclerView();
-            return true;
-        }
-        return false;
-    }
-
-    void updateSearchAdapterItems(ArrayList<AdapterItem> list, int offset) {
-        for (int i = 0; i < list.size(); i++) {
-            AdapterItem adapterItem = list.get(i);
-            adapterItem.position = offset + i;
-            mAdapterItems.add(adapterItem);
-
-            if (adapterItem.isCountedForAccessibility()) {
-                mAccessibilityResultsCount++;
-            }
-        }
-    }
-
     /**
      * Updates internals when the set of apps are updated.
      */
@@ -221,13 +201,11 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         // Sort the list of apps
         mApps.clear();
 
-        for (AppInfo app : mAllAppsStore.getApps()) {
-            if (mItemFilter == null || mItemFilter.matches(app, null) || hasFilter()) {
-                mApps.add(app);
-            }
+        Stream<AppInfo> appSteam = Stream.of(mAllAppsStore.getApps());
+        if (!hasFilter() && mItemFilter != null) {
+            appSteam = appSteam.filter(mItemFilter);
         }
-
-        Collections.sort(mApps, mAppNameComparator);
+        appSteam = appSteam.sorted(mAppNameComparator);
 
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
@@ -236,27 +214,16 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         if (localeRequiresSectionSorting) {
             // Compute the section headers. We use a TreeMap with the section name comparator to
             // ensure that the sections are ordered when we iterate over it later
-            TreeMap<String, ArrayList<AppInfo>> sectionMap = new TreeMap<>(new LabelComparator());
-            for (AppInfo info : mApps) {
-                // Add the section to the cache
-                String sectionName = info.sectionName;
-
-                // Add it to the mapping
-                ArrayList<AppInfo> sectionApps = sectionMap.get(sectionName);
-                if (sectionApps == null) {
-                    sectionApps = new ArrayList<>();
-                    sectionMap.put(sectionName, sectionApps);
-                }
-                sectionApps.add(info);
-            }
-
-            // Add each of the section apps to the list in order
-            mApps.clear();
-            for (Map.Entry<String, ArrayList<AppInfo>> entry : sectionMap.entrySet()) {
-                mApps.addAll(entry.getValue());
-            }
+            appSteam = appSteam.collect(Collectors.groupingBy(
+                    info -> info.sectionName,
+                    () -> new TreeMap<>(new LabelComparator()),
+                    Collectors.toCollection(ArrayList::new)))
+                    .values()
+                    .stream()
+                    .flatMap(ArrayList::stream);
         }
 
+        appSteam.forEachOrdered(mApps::add);
         // Recompose the set of adapter items from the current set of apps
         if (mSearchResults.isEmpty()) {
             updateAdapterItems();
@@ -282,7 +249,6 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         String lastSectionName = null;
         FastScrollSectionInfo lastFastScrollerSectionInfo = null;
         int position = 0;
-        int appIndex = 0;
 
         // Prepare to update the list of sections, filtered apps, etc.
         mAccessibilityResultsCount = 0;
@@ -319,7 +285,16 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 mAdapterItems.add(appItem);
             }
         } else {
-            updateSearchAdapterItems(mSearchResults, 0);
+            int count = mSearchResults.size();
+            for (int i = 0; i < count; i++) {
+                AdapterItem adapterItem = mSearchResults.get(i);
+                adapterItem.position = i;
+                mAdapterItems.add(adapterItem);
+
+                if (adapterItem.isCountedForAccessibility()) {
+                    mAccessibilityResultsCount++;
+                }
+            }
             if (!FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
                 // Append the search market item
                 if (hasNoFilteredResults()) {
