@@ -50,7 +50,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
-import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -92,7 +91,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.pageindicators.WorkspacePageIndicator;
+import com.android.launcher3.pageindicators.PageIndicator;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
@@ -103,7 +102,6 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.IntSparseArrayMap;
-import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.OverlayEdgeEffect;
 import com.android.launcher3.util.PackageUserKey;
@@ -123,7 +121,6 @@ import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlay;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
@@ -134,8 +131,9 @@ import java.util.stream.Collectors;
  * The workspace is a wide area with a wallpaper and a finite number of pages.
  * Each page contains a number of icons, folders or widgets the user can
  * interact with. A workspace is meant to be used with a fixed width only.
+ * @param <T> Class that extends View and PageIndicator
  */
-public class Workspace extends PagedView<WorkspacePageIndicator>
+public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         implements DropTarget, DragSource, View.OnTouchListener,
         DragController.DragListener, Insettable, StateHandler<LauncherState>,
         WorkspaceLayoutManager, LauncherBindableItemsContainer {
@@ -147,6 +145,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     /** The value that {@link #mTransitionProgress} must be greater than for
      * {@link #isFinishedSwitchingState()} ()} to return true. */
     private static final float FINISHED_SWITCHING_STATE_TRANSITION_PROGRESS = 0.5f;
+
+    private static final float SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE = 0.15f;
 
     private static final boolean ENFORCE_DRAG_EVENT_ORDER = false;
 
@@ -199,6 +199,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     private final int[] mTempXY = new int[2];
     private final float[] mTempFXY = new float[2];
+    private final Rect mTempRect = new Rect();
     @Thunk float[] mDragViewVisualCenter = new float[2];
 
     private SpringLoadedDragController mSpringLoadedDragController;
@@ -905,7 +906,11 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
      * two panel UI is enabled.
      */
     public int getScreenPair(int screenId) {
-        if (screenId % 2 == 0) {
+        if (screenId == EXTRA_EMPTY_SCREEN_ID) {
+            return EXTRA_EMPTY_SCREEN_SECOND_ID;
+        } else if (screenId == EXTRA_EMPTY_SCREEN_SECOND_ID) {
+            return EXTRA_EMPTY_SCREEN_ID;
+        } else if (screenId % 2 == 0) {
             return screenId + 1;
         } else {
             return screenId - 1;
@@ -1729,7 +1734,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         // If it's an external drop (e.g. from All Apps), check if it should be accepted
         CellLayout dropTargetLayout = mDropToLayout;
         if (d.dragSource != this) {
-            // Don't accept the drop if we're not over a screen at time of drop
+            // Don't accept the drop if we're not over a valid drop target at time of drop
             if (dropTargetLayout == null) {
                 return false;
             }
@@ -2112,7 +2117,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                     final Runnable onCompleteCallback = onCompleteRunnable;
                     mLauncher.getDragController().animateDragViewToOriginalPosition(
                             /* onComplete= */ callbackList::executeAllAndDestroy, cell,
-                            SPRING_LOADED.getTransitionDuration(mLauncher));
+                            SPRING_LOADED.getTransitionDuration(mLauncher, true /* isToState */));
                     mLauncher.getStateManager().goToState(NORMAL, /* delay= */ 0,
                             onCompleteCallback == null
                                     ? null
@@ -2330,17 +2335,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         xy[1] = xy[1] - v.getTop();
     }
 
-    boolean isPointInSelfOverHotseat(int x, int y) {
-        mTempFXY[0] = x;
-        mTempFXY[1] = y;
-        mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, mTempFXY, true);
-        View hotseat = mLauncher.getHotseat();
-        return mTempFXY[0] >= hotseat.getLeft()
-                && mTempFXY[0] <= hotseat.getRight()
-                && mTempFXY[1] >= hotseat.getTop()
-                && mTempFXY[1] <= hotseat.getBottom();
-    }
-
     /**
      * Updates the point in {@param xy} to point to the co-ordinate space of {@param layout}
      * @param layout either hotseat of a page in workspace
@@ -2378,7 +2372,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
         final View child = (mDragInfo == null) ? null : mDragInfo.cell;
         if (setDropLayoutForDragObject(d, mDragViewVisualCenter[0], mDragViewVisualCenter[1])) {
-            if (mLauncher.isHotseatLayout(mDragTargetLayout)) {
+            if (mDragTargetLayout == null || mLauncher.isHotseatLayout(mDragTargetLayout)) {
                 mSpringLoadedDragController.cancel();
             } else {
                 mSpringLoadedDragController.setAlarm(mDragTargetLayout);
@@ -2457,58 +2451,94 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
      */
     private boolean setDropLayoutForDragObject(DragObject d, float centerX, float centerY) {
         CellLayout layout = null;
-        // Test to see if we are over the hotseat first
-        if (mLauncher.getHotseat() != null && !isDragWidget(d)) {
-            if (isPointInSelfOverHotseat(d.x, d.y)) {
-                layout = mLauncher.getHotseat();
+        if (shouldUseHotseatAsDropLayout(d)) {
+            layout = mLauncher.getHotseat();
+        } else if (!isDragObjectOverSmartSpace(d)) {
+            // If the object is over qsb/smartspace, we don't want to highlight anything.
+
+            // Check neighbour pages
+            layout = checkDragObjectIsOverNeighbourPages(d, centerX);
+
+            if (layout == null) {
+                // Check visible pages
+                IntSet visiblePageIndices = getVisiblePageIndices();
+                for (int visiblePageIndex : visiblePageIndices) {
+                    layout = verifyInsidePage(visiblePageIndex, d.x, d.y);
+                    if (layout != null) break;
+                }
             }
         }
 
-        // Note, centerX represents the center of the object that is being dragged, visually. d.x
-        // represents the location of the finger within the dragged item.
-        float touchX;
-        float touchY = d.y;
-
-        // Go through the pages and check if the dragged item is inside one of them. This block
-        // is responsible for  determining whether we need to snap to a different screen.
-        int nextPage = getNextPage();
-        IntSet pageIndexesToVerify = IntSet.wrap(nextPage - 1, nextPage
-                + (isTwoPanelEnabled() ? 2 : 1));
-        for (int pageIndex : pageIndexesToVerify) {
-            if (layout != null || isPageInTransition()) {
-                break;
-            }
-
-            // When deciding whether to perform a page switch, we need to consider the most extreme
-            // X coordinate between the finger location and the center of the object being dragged.
-            // This is either the max or the min of the two depending on whether dragging to the
-            // left / right, respectively.
-            touchX = ((((pageIndex < nextPage) && !mIsRtl) || pageIndex > nextPage && mIsRtl)
-                    ? Math.min(d.x, centerX) : Math.max(d.x, centerX));
-            layout = verifyInsidePage(pageIndex, touchX, touchY);
-        }
-
-        // If the dragged item isn't located in one of the pages above, the icon will stay on the
-        // current screen. For two panel pick the closest panel on the current screen,
-        // on one panel just choose the current page.
-        if (layout == null && nextPage >= 0 && nextPage < getPageCount()) {
-            if (isTwoPanelEnabled()) {
-                // When determining which panel to use within a single screen, we always use
-                // the centroid of the object rather than the finger.
-                touchX = centerX;
-                nextPage = getScreenCenter(getScrollX()) > touchX
-                        ? (mIsRtl ? nextPage + 1 : nextPage) // left side
-                        : (mIsRtl ? nextPage : nextPage + 1); // right side
-            }
-            layout = (CellLayout) getChildAt(nextPage);
-        }
-
+        // Update the current drop layout if the target changed
         if (layout != mDragTargetLayout) {
             setCurrentDropLayout(layout);
             setCurrentDragOverlappingLayout(layout);
             return true;
         }
         return false;
+    }
+
+    private boolean shouldUseHotseatAsDropLayout(DragObject dragObject) {
+        if (mLauncher.getHotseat() == null
+                || mLauncher.getHotseat().getShortcutsAndWidgets() == null
+                || isDragWidget(dragObject)) {
+            return false;
+        }
+        View hotseatShortcuts = mLauncher.getHotseat().getShortcutsAndWidgets();
+        getViewBoundsRelativeToWorkspace(hotseatShortcuts, mTempRect);
+        return mTempRect.contains(dragObject.x, dragObject.y);
+    }
+
+    private boolean isDragObjectOverSmartSpace(DragObject dragObject) {
+        if (mQsb == null) {
+            return false;
+        }
+        getViewBoundsRelativeToWorkspace(mQsb, mTempRect);
+        return mTempRect.contains(dragObject.x, dragObject.y);
+    }
+
+    private CellLayout checkDragObjectIsOverNeighbourPages(DragObject d, float centerX) {
+        if (isPageInTransition()) {
+            return null;
+        }
+
+        // Check the workspace pages whether the object is over any of them
+
+        // Note, centerX represents the center of the object that is being dragged, visually.
+        // d.x represents the location of the finger within the dragged item.
+        float touchX;
+        float touchY = d.y;
+
+        // Go through the pages and check if the dragged item is inside one of them. This block
+        // is responsible for determining whether we need to snap to a different screen.
+        int nextPage = getNextPage();
+        IntSet pageIndexesToVerify = IntSet.wrap(nextPage - 1,
+                nextPage + (isTwoPanelEnabled() ? 2 : 1));
+
+        for (int pageIndex : pageIndexesToVerify) {
+            // When deciding whether to perform a page switch, we need to consider the most
+            // extreme X coordinate between the finger location and the center of the object
+            // being dragged. This is either the max or the min of the two depending on whether
+            // dragging to the left / right, respectively.
+            touchX = (((pageIndex < nextPage) && !mIsRtl) || (pageIndex > nextPage && mIsRtl))
+                    ? Math.min(d.x, centerX) : Math.max(d.x, centerX);
+            CellLayout layout = verifyInsidePage(pageIndex, touchX, touchY);
+            if (layout != null) {
+                return layout;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gets the given view's bounds relative to Workspace
+     */
+    private void getViewBoundsRelativeToWorkspace(View view, Rect outRect) {
+        mLauncher.getDragLayer()
+                .getDescendantRectRelativeToSelf(view, mTempRect);
+        // map draglayer relative bounds to workspace
+        mLauncher.getDragLayer().mapRectInSelfToDescendant(this, mTempRect);
+        outRect.set(mTempRect);
     }
 
     /**
@@ -3204,7 +3234,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
      * as a part of an update, this is called to ensure that other widgets and application
      * shortcuts are not removed.
      */
-    public void removeItemsByMatcher(final ItemInfoMatcher matcher) {
+    public void removeItemsByMatcher(final Predicate<ItemInfo> matcher) {
         for (CellLayout layout : getWorkspaceAndHotseatCellLayouts()) {
             ShortcutAndWidgetContainer container = layout.getShortcutsAndWidgets();
             // Iterate in reverse order as we are removing items
@@ -3212,7 +3242,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                 View child = container.getChildAt(i);
                 ItemInfo info = (ItemInfo) child.getTag();
 
-                if (matcher.matchesInfo(info)) {
+                if (matcher.test(info)) {
                     layout.removeViewInLayout(child);
                     if (child instanceof DropTarget) {
                         mDragController.removeDropTarget((DropTarget) child);
@@ -3220,7 +3250,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                 } else if (child instanceof FolderIcon) {
                     FolderInfo folderInfo = (FolderInfo) info;
                     List<WorkspaceItemInfo> matches = folderInfo.contents.stream()
-                            .filter(matcher::matchesInfo)
+                            .filter(matcher)
                             .collect(Collectors.toList());
                     if (!matches.isEmpty()) {
                         folderInfo.removeAll(matches, false);
@@ -3294,9 +3324,12 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         }
     }
 
-    public void removeAbandonedPromise(String packageName, UserHandle user) {
-        ItemInfoMatcher matcher = ItemInfoMatcher.ofPackages(
-                Collections.singleton(packageName), user);
+    /**
+     * Remove workspace icons & widget information related to items in matcher.
+     *
+     * @param matcher  the matcher generated by the caller.
+     */
+    public void persistRemoveItemsByMatcher(Predicate<ItemInfo> matcher) {
         mLauncher.getModelWriter().deleteItemsFromDatabase(matcher);
         removeItemsByMatcher(matcher);
     }
@@ -3407,6 +3440,17 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         int currentPage = (page / panelCount) + 1;
         int totalPages = nScreens / panelCount + nScreens % panelCount;
         return getContext().getString(R.string.workspace_scroll_format, currentPage, totalPages);
+    }
+
+    @Override
+    protected boolean isSignificantMove(float absoluteDelta, int pageOrientedSize) {
+        DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
+        if (!deviceProfile.isTablet) {
+            return super.isSignificantMove(absoluteDelta, pageOrientedSize);
+        }
+
+        return absoluteDelta
+                > deviceProfile.availableWidthPx * SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE;
     }
 
     /**

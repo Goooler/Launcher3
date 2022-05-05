@@ -36,7 +36,6 @@ import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.R;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.views.ActivityContext;
 
 import java.util.Arrays;
@@ -89,71 +88,46 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
      */
     public static class AdapterItem {
         /** Common properties */
-        // The index of this adapter item in the list
-        public int position;
         // The type of this item
-        public int viewType;
+        public final int viewType;
 
-        // The section name of this item.  Note that there can be multiple items with different
-        // sectionNames in the same section
-        public String sectionName = null;
         // The row that this item shows up on
         public int rowIndex;
         // The index of this app in the row
         public int rowAppIndex;
         // The associated ItemInfoWithIcon for the item
-        public ItemInfoWithIcon itemInfo = null;
-        // The index of this app not including sections
-        public int appIndex = -1;
-        // Search section associated to result
-        public DecorationInfo decorationInfo = null;
+        public AppInfo itemInfo = null;
+
+        public AdapterItem(int viewType) {
+            this.viewType = viewType;
+        }
 
         /**
          * Factory method for AppIcon AdapterItem
          */
-        public static AdapterItem asApp(int pos, String sectionName, AppInfo appInfo,
-                int appIndex) {
-            AdapterItem item = new AdapterItem();
-            item.viewType = VIEW_TYPE_ICON;
-            item.position = pos;
-            item.sectionName = sectionName;
+        public static AdapterItem asApp(AppInfo appInfo) {
+            AdapterItem item = new AdapterItem(VIEW_TYPE_ICON);
             item.itemInfo = appInfo;
-            item.appIndex = appIndex;
-            return item;
-        }
-
-        /**
-         * Factory method for empty search results view
-         */
-        public static AdapterItem asEmptySearch(int pos) {
-            AdapterItem item = new AdapterItem();
-            item.viewType = VIEW_TYPE_EMPTY_SEARCH;
-            item.position = pos;
-            return item;
-        }
-
-        /**
-         * Factory method for a dividerView in AllAppsSearch
-         */
-        public static AdapterItem asAllAppsDivider(int pos) {
-            AdapterItem item = new AdapterItem();
-            item.viewType = VIEW_TYPE_ALL_APPS_DIVIDER;
-            item.position = pos;
-            return item;
-        }
-
-        /**
-         * Factory method for a market search button
-         */
-        public static AdapterItem asMarketSearch(int pos) {
-            AdapterItem item = new AdapterItem();
-            item.viewType = VIEW_TYPE_SEARCH_MARKET;
-            item.position = pos;
             return item;
         }
 
         protected boolean isCountedForAccessibility() {
             return viewType == VIEW_TYPE_ICON || viewType == VIEW_TYPE_SEARCH_MARKET;
+        }
+
+        /**
+         * Returns true if the items represent the same object
+         */
+        public boolean isSameAs(AdapterItem other) {
+            return (other.viewType != viewType) && (other.getClass() == getClass());
+        }
+
+        /**
+         * This is called only if {@link #isSameAs} returns true to check if the contents are same
+         * as well. Returning true will prevent redrawing of thee item.
+         */
+        public boolean isContentSame(AdapterItem other) {
+            return itemInfo == null && other.itemInfo == null;
         }
     }
 
@@ -267,11 +241,7 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                 AdapterItem adapterItem = mApps.getAdapterItems().get(position);
                 BubbleTextView icon = (BubbleTextView) holder.itemView;
                 icon.reset();
-                if (adapterItem.itemInfo instanceof AppInfo) {
-                    icon.applyFromApplicationInfo((AppInfo) adapterItem.itemInfo);
-                } else {
-                    icon.applyFromItemInfoWithIcon(adapterItem.itemInfo);
-                }
+                icon.applyFromApplicationInfo(adapterItem.itemInfo);
                 break;
             case VIEW_TYPE_EMPTY_SEARCH:
                 TextView emptyViewText = (TextView) holder.itemView;

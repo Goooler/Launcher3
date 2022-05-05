@@ -34,11 +34,12 @@ import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.R;
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.util.ItemInfoMatcher;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.function.Predicate;
 
 /**
  * Companion class for {@link BaseAllAppsContainerView} to manage work tab and personal tab
@@ -69,7 +70,7 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
 
     private final BaseAllAppsContainerView<?> mAllApps;
     private final WorkAdapterProvider mAdapterProvider;
-    private final ItemInfoMatcher mMatcher;
+    private final Predicate<ItemInfo> mMatcher;
 
     private WorkModeSwitch mWorkModeSwitch;
 
@@ -147,6 +148,9 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
             workFabMarginBottom +=
                     mWorkModeSwitch.getResources().getDimensionPixelSize(R.dimen.qsb_widget_height);
         }
+        if (!mAllApps.mActivityContext.getDeviceProfile().isGestureMode){
+            workFabMarginBottom += mAllApps.mActivityContext.getDeviceProfile().getInsets().bottom;
+        }
         ((ViewGroup.MarginLayoutParams) mWorkModeSwitch.getLayoutParams()).bottomMargin =
                 workFabMarginBottom;
         if (mWorkModeSwitch.getParent() != mAllApps) {
@@ -158,7 +162,6 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
         mWorkModeSwitch.updateCurrentState(mCurrentState == STATE_ENABLED);
         return true;
     }
-
     /**
      * Removes work profile toggle button from {@link BaseAllAppsContainerView}
      */
@@ -173,7 +176,7 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
         return mAdapterProvider;
     }
 
-    public ItemInfoMatcher getMatcher() {
+    public Predicate<ItemInfo> getMatcher() {
         return mMatcher;
     }
 

@@ -33,17 +33,22 @@ final class BackGestureTutorialController extends TutorialController {
     }
 
     @Override
-    public Integer getIntroductionTitle() {
+    public int getIntroductionTitle() {
         return R.string.back_gesture_intro_title;
     }
 
     @Override
-    public Integer getIntroductionSubtitle() {
+    public int getIntroductionSubtitle() {
         return R.string.back_gesture_intro_subtitle;
     }
 
     @Override
-    public Integer getSuccessFeedbackSubtitle() {
+    public int getSpokenIntroductionSubtitle() {
+        return R.string.back_gesture_spoken_intro_subtitle;
+    }
+
+    @Override
+    public int getSuccessFeedbackSubtitle() {
         return mTutorialFragment.isAtFinalStep()
                 ? R.string.back_gesture_feedback_complete_without_follow_up
                 : R.string.back_gesture_feedback_complete_with_overview_follow_up;
@@ -117,7 +122,22 @@ final class BackGestureTutorialController extends TutorialController {
                 mTutorialFragment.closeTutorial();
             }
         } else if (mTutorialType == BACK_NAVIGATION) {
-            showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
+            switch (result) {
+                case HOME_NOT_STARTED_TOO_FAR_FROM_EDGE:
+                case OVERVIEW_NOT_STARTED_TOO_FAR_FROM_EDGE:
+                case HOME_OR_OVERVIEW_CANCELLED:
+                    showFeedback(R.string.back_gesture_feedback_swipe_too_far_from_edge);
+                    break;
+                case HOME_GESTURE_COMPLETED:
+                case OVERVIEW_GESTURE_COMPLETED:
+                case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
+                case ASSISTANT_COMPLETED:
+                case ASSISTANT_NOT_STARTED_BAD_ANGLE:
+                case ASSISTANT_NOT_STARTED_SWIPE_TOO_SHORT:
+                default:
+                    showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
+
+            }
         }
     }
 }

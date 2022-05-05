@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static android.app.PendingIntent.FLAG_IMMUTABLE;
+import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_UI_MODE;
@@ -40,7 +42,6 @@ import static com.android.launcher3.LauncherState.NO_SCALE;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
-import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_LAUNCHER_LOAD;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -63,7 +64,6 @@ import static com.android.launcher3.util.ItemInfoMatcher.forFolderMatch;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.app.Notification;
@@ -107,7 +107,7 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
+import android.view.ViewTreeObserver.OnPreDrawListener;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
@@ -128,7 +128,6 @@ import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.BaseAllAppsContainerView;
 import com.android.launcher3.allapps.DiscoveryBounce;
-import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PropertyListBuilder;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
@@ -183,9 +182,6 @@ import com.android.launcher3.util.ActivityTracker;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
-import com.android.launcher3.util.ItemInfoMatcher;
-import com.android.launcher3.util.MultiValueAlpha;
-import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
@@ -237,8 +233,8 @@ import java.util.stream.Stream;
 /**
  * Default launcher application.
  */
-public class Launcher extends StatefulActivity<LauncherState> implements LauncherExterns,
-        Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
+public class Launcher extends StatefulActivity<LauncherState>
+        implements LauncherExterns, Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
         PluginListener<LauncherOverlayPlugin>, LauncherOverlayCallbacks {
     public static final String TAG = "Launcher";
 
@@ -304,7 +300,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     private Configuration mOldConfig;
 
     @Thunk
-    Workspace mWorkspace;
+    Workspace<?> mWorkspace;
     @Thunk
     DragLayer mDragLayer;
     private DragController mDragController;
@@ -339,6 +335,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     private Runnable mOnDeferredActivityLaunchCallback;
 
     private ViewOnDrawExecutor mPendingExecutor;
+    private OnPreDrawListener mOnInitialBindListener;
 
     private LauncherModel mModel;
     private ModelWriter mModelWriter;
@@ -434,8 +431,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 shareIntent.putExtra(Intent.EXTRA_TEXT, stackTrace);
                 shareIntent = Intent.createChooser(shareIntent, null);
                 PendingIntent sharePendingIntent = PendingIntent.getActivity(
-                        this, 0, shareIntent, PendingIntent.FLAG_UPDATE_CURRENT
-                );
+                        this, 0, shareIntent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE);
 
                 Notification notification = new Notification.Builder(this, notificationChannelId)
                         .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
@@ -502,11 +498,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
         if (!mModel.addCallbacksAndLoad(this)) {
             if (!internalStateHandled) {
-                Log.d(BAD_STATE, "Launcher onCreate not binding sync, setting DragLayer alpha "
-                        + "ALPHA_INDEX_LAUNCHER_LOAD to 0");
-                // If we are not binding synchronously, show a fade in animation when
-                // the first page bind completes.
-                mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD).setValue(0);
+                Log.d(BAD_STATE, "Launcher onCreate not binding sync, prevent drawing");
+                // If we are not binding synchronously, pause drawing until initial bind complete,
+                // so that the system could continue to show the device loading prompt
+                mOnInitialBindListener = Boolean.FALSE::booleanValue;
             }
         }
 
@@ -514,25 +509,9 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
 
         setContentView(getRootView());
-        getRootView().getViewTreeObserver().addOnPreDrawListener(
-                new ViewTreeObserver.OnPreDrawListener() {
-                    @Override
-                    public boolean onPreDraw() {
-                        // Checks the status of fade in animation.
-                        final AlphaProperty property =
-                                mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD);
-                        if (property.getValue() == 0) {
-                            Log.d(BAD_STATE, "Launcher onPreDraw ALPHA_INDEX_LAUNCHER_LOAD not"
-                                    + " started yet, cancelling draw.");
-                            // Animation haven't started yet; suspend.
-                            return false;
-                        } else {
-                            // The animation is started; start drawing.
-                            getRootView().getViewTreeObserver().removeOnPreDrawListener(this);
-                            return true;
-                        }
-                    }
-                });
+        if (mOnInitialBindListener != null) {
+            getRootView().getViewTreeObserver().addOnPreDrawListener(mOnInitialBindListener);
+        }
         getRootView().dispatchInsets();
 
         // Listen for broadcasts
@@ -1189,6 +1168,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             mOverlayManager.onActivityResumed(this);
         }
 
+        AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
         TraceHelper.INSTANCE.endSection(traceToken);
     }
 
@@ -1526,7 +1506,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return mAppsView;
     }
 
-    public Workspace getWorkspace() {
+    public Workspace<?> getWorkspace() {
         return mWorkspace;
     }
 
@@ -1692,9 +1672,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             outState.remove(RUNTIME_STATE_WIDGET_PANEL);
         }
 
-        // We close any open folders and shortcut containers that are not safe for rebind,
-        // and we need to make sure this state is reflected.
-        AbstractFloatingView.closeOpenViews(this, false, TYPE_ALL & ~TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
 
         if (mPendingRequestArgs != null) {
@@ -2362,7 +2339,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // Get the list of added items and intersect them with the set of items here
         final Collection<Animator> bounceAnims = new ArrayList<>();
         boolean canAnimatePageChange = canAnimatePageChange();
-        Workspace workspace = mWorkspace;
+        Workspace<?> workspace = mWorkspace;
         int newItemsScreenId = -1;
         int end = items.size();
         View newView = null;
@@ -2693,36 +2670,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                     AllAppsStore.DEFER_UPDATES_NEXT_DRAW));
         }
 
-        AlphaProperty property = mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD);
-        if (property.getValue() < 1) {
-            ObjectAnimator anim = ObjectAnimator.ofFloat(property, MultiValueAlpha.VALUE, 1);
-
-            Log.d(BAD_STATE, "Launcher onInitialBindComplete toAlpha=" + 1);
-            anim.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    Log.d(BAD_STATE, "Launcher onInitialBindComplete onStart");
-                }
-
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    float alpha = mDragLayer == null
-                            ? -1
-                            : mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD).getValue();
-                    Log.d(BAD_STATE, "Launcher onInitialBindComplete onCancel, alpha=" + alpha);
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    Log.d(BAD_STATE, "Launcher onInitialBindComplete onEnd");
-                }
-            });
-
-            anim.addListener(AnimatorListeners.forEndCallback(executor::onLoadAnimationCompleted));
-            anim.start();
-        } else {
-            executor.onLoadAnimationCompleted();
+        if (mOnInitialBindListener != null) {
+            getRootView().getViewTreeObserver().removeOnPreDrawListener(mOnInitialBindListener);
+            mOnInitialBindListener = null;
         }
+
+        executor.onLoadAnimationCompleted();
         executor.attachTo(this);
         if (Utilities.ATLEAST_S) {
             Trace.endAsyncSection(DISPLAY_WORKSPACE_TRACE_METHOD_NAME,
@@ -2785,9 +2738,9 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      */
     public View getFirstMatchForAppClose(int preferredItemId, String packageName, UserHandle user,
             boolean supportsAllAppsState) {
-        final ItemInfoMatcher preferredItem = (info, cn) ->
+        final Predicate<ItemInfo> preferredItem = info ->
                 info != null && info.id == preferredItemId;
-        final ItemInfoMatcher packageAndUserAndApp = (info, cn) ->
+        final Predicate<ItemInfo> packageAndUserAndApp = info ->
                 info != null
                         && info.itemType == ITEM_TYPE_APPLICATION
                         && info.user.equals(user)
@@ -2816,8 +2769,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * @param operators List of operators, in order starting from best matching operator.
      */
     private static View getFirstMatch(Iterable<ViewGroup> containers,
-            final ItemInfoMatcher... operators) {
-        for (ItemInfoMatcher operator : operators) {
+            final Predicate<ItemInfo>... operators) {
+        for (Predicate<ItemInfo> operator : operators) {
             for (ViewGroup container : containers) {
                 View match = mapOverViewGroup(container, operator);
                 if (match != null) {
@@ -2832,11 +2785,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * Returns the first view matching the operator in the given ViewGroups, or null if none.
      * Forward iteration matters.
      */
-    private static View mapOverViewGroup(ViewGroup container, ItemInfoMatcher op) {
+    private static View mapOverViewGroup(ViewGroup container, Predicate<ItemInfo> op) {
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
             View item = container.getChildAt(itemIdx);
-            if (op.matchesInfo((ItemInfo) item.getTag())) {
+            if (op.test((ItemInfo) item.getTag())) {
                 return item;
             }
         }
@@ -2933,7 +2886,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * package-removal should clear all items by package name.
      */
     @Override
-    public void bindWorkspaceComponentsRemoved(final ItemInfoMatcher matcher) {
+    public void bindWorkspaceComponentsRemoved(Predicate<ItemInfo> matcher) {
         mWorkspace.removeItemsByMatcher(matcher);
         mDragController.onAppsRemoved(matcher);
         PopupContainerWithArrow.dismissInvalidPopup(this);
@@ -3214,6 +3167,24 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return new DragOptions();
     }
 
+    /**
+     * Animates Launcher elements during a transition to the All Apps page.
+     *
+     * @param progress Transition progress from 0 to 1; where 0 => home and 1 => all apps.
+     */
+    public void onAllAppsTransition(float progress) {
+        // No-Op
+    }
+
+    /**
+     * Animates Launcher elements during a transition to the Widgets pages.
+     *
+     * @param progress Transition progress from 0 to 1; where 0 => home and 1 => widgets.
+     */
+    public void onWidgetsTransition(float progress) {
+        // No-Op
+    }
+
     private static class NonConfigInstance {
         public Configuration config;
         public Bitmap snapshot;
@@ -3243,4 +3214,5 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     public void resumeExpensiveViewUpdates() {
         getWorkspace().getPageIndicator().skipAnimationsToEnd();
     }
+
 }

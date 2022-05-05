@@ -29,7 +29,6 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
-import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
 
 import android.content.res.Resources;
 import android.graphics.Matrix;
@@ -48,7 +47,6 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
@@ -56,7 +54,6 @@ import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
 import com.android.launcher3.views.BaseDragLayer;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class PortraitPagedViewHandler implements PagedOrientationHandler {
@@ -406,33 +403,7 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
-        List<SplitPositionOption> options = new ArrayList<>(1);
-        // Add both left and right options if we're in tablet mode
-        if (dp.isTablet && dp.isLandscape) {
-            options.add(new SplitPositionOption(
-                    R.drawable.ic_split_left, R.string.split_screen_position_left,
-                    STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
-            options.add(new SplitPositionOption(
-                    R.drawable.ic_split_right, R.string.split_screen_position_right,
-                    STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
-        } else {
-            if (dp.isSeascape()) {
-                // Add left/right options
-                options.add(new SplitPositionOption(
-                        R.drawable.ic_split_right, R.string.split_screen_position_right,
-                        STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
-            } else if (dp.isLandscape) {
-                options.add(new SplitPositionOption(
-                        R.drawable.ic_split_left, R.string.split_screen_position_left,
-                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
-            } else {
-                // Only add top option
-                options.add(new SplitPositionOption(
-                        R.drawable.ic_split_top, R.string.split_screen_position_top,
-                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
-            }
-        }
-        return options;
+        return Utilities.getSplitPositionOptions(dp);
     }
 
     @Override
@@ -487,29 +458,29 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void updateStagedSplitIconParams(FrameLayout.LayoutParams out, float onScreenRectCenterX,
+    public void updateStagedSplitIconParams(View out, float onScreenRectCenterX,
             float onScreenRectCenterY, float fullscreenScaleX, float fullscreenScaleY,
             int drawableWidth, int drawableHeight, DeviceProfile dp,
             @StagePosition int stagePosition) {
         boolean pinToRight = stagePosition == STAGE_POSITION_BOTTOM_OR_RIGHT;
         if (!dp.isLandscape) {
             float inset = dp.getInsets().top;
-            out.leftMargin = Math.round(onScreenRectCenterX / fullscreenScaleX
-                    - 1.0f * drawableWidth / 2);
-            out.topMargin = Math.round((onScreenRectCenterY + (inset / 2f)) / fullscreenScaleY
-                    - 1.0f * drawableHeight / 2);
+            out.setX(Math.round(onScreenRectCenterX / fullscreenScaleX
+                    - 1.0f * drawableWidth / 2));
+            out.setY(Math.round((onScreenRectCenterY + (inset / 2f)) / fullscreenScaleY
+                    - 1.0f * drawableHeight / 2));
         } else {
             if (pinToRight) {
                 float inset = dp.getInsets().right;
-                out.leftMargin = Math.round((onScreenRectCenterX - (inset / 2f)) / fullscreenScaleX
-                        - 1.0f * drawableWidth / 2);
+                out.setX(Math.round((onScreenRectCenterX - (inset / 2f)) / fullscreenScaleX
+                        - 1.0f * drawableWidth / 2));
             } else {
                 float inset = dp.getInsets().left;
-                out.leftMargin = Math.round((onScreenRectCenterX + (inset / 2f)) / fullscreenScaleX
-                        - 1.0f * drawableWidth / 2);
+                out.setX(Math.round((onScreenRectCenterX + (inset / 2f)) / fullscreenScaleX
+                        - 1.0f * drawableWidth / 2));
             }
-            out.topMargin = Math.round(onScreenRectCenterY / fullscreenScaleY
-                    - 1.0f * drawableHeight / 2);
+            out.setY(Math.round(onScreenRectCenterY / fullscreenScaleY
+                    - 1.0f * drawableHeight / 2));
         }
     }
 
