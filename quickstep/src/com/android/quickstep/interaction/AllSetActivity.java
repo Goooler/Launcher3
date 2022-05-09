@@ -21,7 +21,6 @@ import static com.android.launcher3.anim.Interpolators.LINEAR;
 
 import android.animation.Animator;
 import android.app.Activity;
-import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -52,6 +51,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 
+import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.quickstep.AnimatedFloat;
@@ -109,6 +109,12 @@ public class AllSetActivity extends Activity {
         findViewById(R.id.root_view).setBackground(mBackground);
         mContentView = findViewById(R.id.content_view);
         mSwipeUpShift = getResources().getDimension(R.dimen.allset_swipe_up_shift);
+
+        boolean isTablet = InvariantDeviceProfile.INSTANCE.get(getApplicationContext())
+                .getDeviceProfile(this).isTablet;
+        TextView subtitle = findViewById(R.id.subtitle);
+        subtitle.setText(isTablet
+                ? R.string.allset_description_tablet : R.string.allset_description);
 
         TextView tv = findViewById(R.id.navigation_settings);
         tv.setTextColor(accentColor);
@@ -217,8 +223,7 @@ public class AllSetActivity extends Activity {
         if (!state.getHomeIntent().getComponent().getPackageName().equals(getPackageName())) {
             return null;
         }
-        RunningTaskInfo rti = state.getRunningTask();
-        if (rti == null || !rti.topActivity.equals(getComponentName())) {
+        if (state.getRunningTaskId() != getTaskId()) {
             return null;
         }
         mSwipeProgress.updateValue(0);
