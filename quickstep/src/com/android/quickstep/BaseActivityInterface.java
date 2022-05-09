@@ -21,7 +21,6 @@ import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.quickstep.AbsSwipeUpHandler.RECENTS_ATTACH_DURATION;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
-import static com.android.quickstep.SysUINavigationMode.getMode;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_FADE_ANIM;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_X_ANIM;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
@@ -55,19 +54,20 @@ import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.touch.PagedOrientationHandler;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.DisplayController.NavigationMode;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.views.ScrimView;
-import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.SplitScreenBounds;
-import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -83,6 +83,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     private final STATE_TYPE mBackgroundState;
 
     private STATE_TYPE mTargetState;
+
+    @Nullable private Runnable mOnInitBackgroundStateUICallback = null;
 
     protected BaseActivityInterface(boolean rotationSupportedByActivity,
             STATE_TYPE overviewState, STATE_TYPE backgroundState) {
@@ -192,7 +194,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         activity.getStateManager().moveToRestState();
     }
 
-    public void closeOverlay() { }
+    /**
+     * Closes any overlays.
+     */
+    public void closeOverlay() {
+        Optional.ofNullable(getTaskbarController()).ifPresent(TaskbarUIController::hideAllApps);
+    }
 
     public void switchRunningTaskViewToScreenshot(HashMap<Integer, ThumbnailData> thumbnailDatas,
             Runnable runnable) {
@@ -217,7 +224,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         Resources res = context.getResources();
         if (dp.isTablet) {
             Rect gridRect = new Rect();
-            calculateGridSize(context, dp, gridRect);
+            calculateGridSize(dp, gridRect);
 
             PointF taskDimension = getTaskDimension(context, dp);
             float scale = gridRect.height() / taskDimension.y;
@@ -231,15 +238,15 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             int taskMargin = dp.overviewTaskMarginPx;
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
-                    getOverviewActionsHeight(context, dp),
+                    dp.getOverviewActionsClaimedSpace(),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
+                    Gravity.CENTER,
                     outRect);
         }
     }
 
-    private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
-            int claimedSpaceAbove, int claimedSpaceBelow, int minimumHorizontalPadding,
-            Rect outRect) {
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp, int claimedSpaceAbove,
+            int claimedSpaceBelow, int minimumHorizontalPadding, int gravity, Rect outRect) {
         PointF taskDimension = getTaskDimension(context, dp);
         Rect insets = dp.getInsets();
 
@@ -257,7 +264,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
-        Gravity.apply(Gravity.CENTER, outWidth, outHeight, potentialTaskRect, outRect);
+        Gravity.apply(gravity, outWidth, outHeight, potentialTaskRect, outRect);
     }
 
     private static PointF getTaskDimension(Context context, DeviceProfile dp) {
@@ -307,10 +314,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     /**
      * Calculates the overview grid size for the provided device configuration.
      */
-    public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
+    public final void calculateGridSize(DeviceProfile dp, Rect outRect) {
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
-        int bottomMargin = getOverviewActionsHeight(context, dp);
+        int bottomMargin = dp.getOverviewActionsClaimedSpace();
         int sideMargin = dp.overviewGridSideMargin;
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
@@ -345,20 +352,15 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Calculates the modal taskView size for the provided device configuration
      */
     public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect) {
+        calculateTaskSize(context, dp, outRect);
+        float maxScale = context.getResources().getFloat(R.dimen.overview_modal_max_scale);
         calculateTaskSizeInternal(
                 context, dp,
                 dp.overviewTaskMarginPx,
-                getOverviewActionsHeight(context, dp),
-                dp.overviewTaskMarginPx,
+                dp.heightPx - outRect.bottom - dp.getInsets().bottom,
+                Math.round((dp.availableWidthPx - outRect.width() * maxScale) / 2),
+                Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM,
                 outRect);
-    }
-
-    /** Gets the space that the overview actions will take, including bottom margin. */
-    private int getOverviewActionsHeight(Context context, DeviceProfile dp) {
-        Resources res = context.getResources();
-        return OverviewActionsView.getOverviewActionsBottomMarginPx(getMode(context), dp)
-                + OverviewActionsView.getOverviewActionsTopMarginPx(getMode(context), dp)
-                + res.getDimensionPixelSize(R.dimen.overview_actions_height);
     }
 
     /**
@@ -408,6 +410,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         return null;
     }
 
+    protected void runOnInitBackgroundStateUI(Runnable callback) {
+        mOnInitBackgroundStateUICallback = callback;
+        ACTIVITY_TYPE activity = getCreatedActivity();
+        if (activity != null && activity.getStateManager().getState() == mBackgroundState) {
+            onInitBackgroundStateUI();
+        }
+    }
+
+    private void onInitBackgroundStateUI() {
+        if (mOnInitBackgroundStateUICallback != null) {
+            mOnInitBackgroundStateUICallback.run();
+            mOnInitBackgroundStateUICallback = null;
+        }
+    }
+
     public interface AnimationFactory {
 
         void createActivityInterface(long transitionLength);
@@ -447,13 +464,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             mStartState = mActivity.getStateManager().getState();
         }
 
-        protected ACTIVITY_TYPE initUI() {
+        protected ACTIVITY_TYPE initBackgroundStateUI() {
             STATE_TYPE resetState = mStartState;
             if (mStartState.shouldDisableRestore()) {
                 resetState = mActivity.getStateManager().getRestState();
             }
             mActivity.getStateManager().setRestState(resetState);
             mActivity.getStateManager().goToState(mBackgroundState, false);
+            onInitBackgroundStateUI();
             return mActivity;
         }
 
@@ -480,7 +498,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             // Creating the activity controller animation sometimes reapplies the launcher state
             // (because we set the animation as the current state animation), so we reapply the
             // attached state here as well to ensure recents is shown/hidden appropriately.
-            if (SysUINavigationMode.getMode(mActivity) == Mode.NO_BUTTON) {
+            if (DisplayController.getNavigationMode(mActivity) == NavigationMode.NO_BUTTON) {
                 setRecentsAttachedToAppWindow(mIsAttachedToWindow, false);
             }
         }
