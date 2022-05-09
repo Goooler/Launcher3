@@ -44,7 +44,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.ColorUtils;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.DeviceProfile;
@@ -59,7 +58,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.model.StringCache;
-import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
@@ -70,6 +69,8 @@ import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePag
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Base all apps view container.
@@ -92,7 +93,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     /** Context of an activity or window that is inflating this container. */
     protected final T mActivityContext;
     protected final List<AdapterHolder> mAH;
-    protected final ItemInfoMatcher mPersonalMatcher = ItemInfoMatcher.ofUser(
+    protected final Predicate<ItemInfo> mPersonalMatcher = ItemInfoMatcher.ofUser(
             Process.myUserHandle());
     private final SearchAdapterProvider<?> mMainAdapterProvider;
     private final AllAppsStore mAllAppsStore = new AllAppsStore();
@@ -141,7 +142,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         mWorkManager = new WorkProfileManager(
                 mActivityContext.getSystemService(UserManager.class),
                 this,
-                Utilities.getPrefs(mActivityContext));
+                Utilities.getPrefs(mActivityContext), mActivityContext.getDeviceProfile());
         mAH = Arrays.asList(null, null);
         mAH.set(AdapterHolder.MAIN, new AdapterHolder(false /* isWork */));
         mAH.set(AdapterHolder.WORK, new AdapterHolder(true /* isWork */));
@@ -230,17 +231,10 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     }
 
     private void onAppsUpdated() {
-        boolean hasWorkApps = false;
-        for (AppInfo app : mAllAppsStore.getApps()) {
-            if (mWorkManager.getMatcher().matches(app, null)) {
-                hasWorkApps = true;
-                break;
-            }
-        }
-        mHasWorkApps = hasWorkApps;
+        mHasWorkApps = Stream.of(mAllAppsStore.getApps()).anyMatch(mWorkManager.getMatcher());
         if (!mAH.get(AdapterHolder.MAIN).mAppsList.hasFilter()) {
             rebindAdapters();
-            if (hasWorkApps) {
+            if (mHasWorkApps) {
                 mWorkManager.reset();
             }
         }
@@ -408,7 +402,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (grid.isVerticalBarLayout()) {
             setPadding(grid.workspacePadding.left, 0, grid.workspacePadding.right, 0);
         } else {
-            setPadding(0, grid.isTablet ? insets.top : 0, 0, 0);
+            setPadding(0, grid.allAppsTopPadding, 0, 0);
         }
 
         InsettableFrameLayout.dispatchInsets(this, insets);
@@ -443,8 +437,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (showTabs == mUsingTabs && !force) {
             return;
         }
-        replaceRVContainer(showTabs);
         mUsingTabs = showTabs;
+        replaceRVContainer(mUsingTabs);
 
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.MAIN).mRecyclerView);
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.WORK).mRecyclerView);
@@ -598,13 +592,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         }
     }
 
-    /** @see View#setVerticalFadingEdgeEnabled(boolean). */
-    public void setRecyclerViewVerticalFadingEdgeEnabled(boolean enabled) {
-        for (int i = 0; i < mAH.size(); i++) {
-            mAH.get(i).applyVerticalFadingEdgeEnabled(enabled);
-        }
-    }
-
     public boolean isHeaderVisible() {
         return mHeader != null && mHeader.getVisibility() == View.VISIBLE;
     }
@@ -697,22 +684,24 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         return ColorUtils.blendARGB(mScrimColor, mHeaderProtectionColor, blendRatio);
     }
 
+    protected abstract BaseAllAppsAdapter getAdapter(AlphabeticalAppsList<T> mAppsList,
+            BaseAdapterProvider[] adapterProviders);
+
     protected int getHeaderBottom() {
         return (int) getTranslationY();
     }
 
-    /** Holds a {@link AllAppsGridAdapter} and related fields. */
+    /** Holds a {@link BaseAllAppsAdapter} and related fields. */
     public class AdapterHolder {
         public static final int MAIN = 0;
         public static final int WORK = 1;
 
         private final boolean mIsWork;
-        public final AllAppsGridAdapter<T> adapter;
-        final LinearLayoutManager mLayoutManager;
+        public final BaseAllAppsAdapter<T> adapter;
+        final RecyclerView.LayoutManager mLayoutManager;
         final AlphabeticalAppsList<T> mAppsList;
         final Rect mPadding = new Rect();
         AllAppsRecyclerView mRecyclerView;
-        boolean mVerticalFadingEdge;
 
         AdapterHolder(boolean isWork) {
             mIsWork = isWork;
@@ -724,13 +713,12 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                             mWorkManager.getAdapterProvider()}
                             : new BaseAdapterProvider[]{mMainAdapterProvider};
 
-            adapter = new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), mAppsList,
-                    adapterProviders);
+            adapter = getAdapter(mAppsList, adapterProviders);
             mAppsList.setAdapter(adapter);
             mLayoutManager = adapter.getLayoutManager();
         }
 
-        void setup(@NonNull View rv, @Nullable ItemInfoMatcher matcher) {
+        void setup(@NonNull View rv, @Nullable Predicate<ItemInfo> matcher) {
             mAppsList.updateItemFilter(matcher);
             mRecyclerView = (AllAppsRecyclerView) rv;
             mRecyclerView.setEdgeEffectFactory(createEdgeEffectFactory());
@@ -744,7 +732,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
             FocusedItemDecorator focusedItemDecorator = new FocusedItemDecorator(mRecyclerView);
             mRecyclerView.addItemDecoration(focusedItemDecorator);
             adapter.setIconFocusListener(focusedItemDecorator.getFocusListener());
-            applyVerticalFadingEdgeEnabled(mVerticalFadingEdge);
             applyPadding();
         }
 
@@ -758,11 +745,12 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                         mPadding.bottom + bottomOffset);
             }
         }
+    }
 
-        private void applyVerticalFadingEdgeEnabled(boolean enabled) {
-            mVerticalFadingEdge = enabled;
-            mAH.get(AdapterHolder.MAIN).mRecyclerView.setVerticalFadingEdgeEnabled(!mUsingTabs
-                    && mVerticalFadingEdge);
-        }
+    /**
+     * Returns a view that denotes the visible part of all apps container view.
+     */
+    public View getVisibleContainerView() {
+        return mActivityContext.getDeviceProfile().isTablet ? mBottomSheetBackground : this;
     }
 }

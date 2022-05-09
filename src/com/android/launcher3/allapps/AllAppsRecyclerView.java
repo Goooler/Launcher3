@@ -19,6 +19,7 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.UNSPECIFIED;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SCROLLED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END;
 import static com.android.launcher3.util.LogConfig.SEARCH_LOGGING;
@@ -69,6 +70,26 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     private final AdapterDataObserver mObserver = new RecyclerView.AdapterDataObserver() {
         public void onChanged() {
             mCachedScrollPositions.clear();
+        }
+
+        @Override
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+            onChanged();
         }
     };
 
@@ -203,6 +224,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         StatsLogManager mgr = ActivityContext.lookupContext(getContext()).getStatsLogManager();
         switch (state) {
             case SCROLL_STATE_DRAGGING:
+                mgr.logger().log(LAUNCHER_ALLAPPS_SCROLLED);
                 requestFocus();
                 mgr.logger().sendToInteractionJankMonitor(
                         LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN, this);
@@ -239,17 +261,14 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         // Find the fastscroll section that maps to this touch fraction
         List<AlphabeticalAppsList.FastScrollSectionInfo> fastScrollSections =
                 mApps.getFastScrollerSections();
-        AlphabeticalAppsList.FastScrollSectionInfo lastInfo = fastScrollSections.get(0);
-        for (int i = 1; i < fastScrollSections.size(); i++) {
-            AlphabeticalAppsList.FastScrollSectionInfo info = fastScrollSections.get(i);
-            if (info.touchFraction > touchFraction) {
-                break;
-            }
-            lastInfo = info;
+        int count = fastScrollSections.size();
+        if (count == 0) {
+            return "";
         }
-
-        mFastScrollHelper.smoothScrollToSection(lastInfo);
-        return lastInfo.sectionName;
+        int index = Utilities.boundToRange((int) (touchFraction * count), 0, count - 1);
+        AlphabeticalAppsList.FastScrollSectionInfo section = fastScrollSections.get(index);
+        mFastScrollHelper.smoothScrollToSection(section);
+        return section.sectionName;
     }
 
     @Override
@@ -267,12 +286,6 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         if (adapter != null) {
             adapter.registerAdapterDataObserver(mObserver);
         }
-    }
-
-    @Override
-    protected float getBottomFadingEdgeStrength() {
-        // No bottom fading edge.
-        return 0;
     }
 
     @Override
