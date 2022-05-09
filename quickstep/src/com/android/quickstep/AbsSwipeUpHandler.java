@@ -22,6 +22,7 @@ import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_STATE_HANDLER;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
+import static com.android.launcher3.PagedView.INVALID_PAGE;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_1_2;
@@ -66,6 +67,7 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnApplyWindowInsetsListener;
@@ -163,7 +165,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     if (mActivity != activity) {
                         return;
                     }
+                    if (mTaskAnimationManager != null) {
+                        mTaskAnimationManager.finishRunningRecentsAnimation(true);
+                    }
                     mRecentsView = null;
+                    mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
                     mActivity = null;
                 }
             };
@@ -922,7 +928,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             mLogDirectionUpOrLeft = velocity.x < 0;
         }
         mDownPos = downPos;
-        handleNormalGestureEnd(endVelocity, isFling, velocity, false /* isCancel */);
+        Runnable handleNormalGestureEndCallback = () ->
+                handleNormalGestureEnd(endVelocity, isFling, velocity, /* isCancel= */ false);
+        if (mRecentsView != null) {
+            mRecentsView.runOnPageScrollsInitialized(handleNormalGestureEndCallback);
+        } else {
+            handleNormalGestureEndCallback.run();
+        }
     }
 
     private void endRunningWindowAnim(boolean cancel) {
@@ -1126,6 +1138,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         } else if (endTarget == RECENTS) {
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getDestinationPage();
+                if (nearestPage == INVALID_PAGE) {
+                    // Allow the snap to invalid page to catch future error cases.
+                    Log.e(TAG,
+                            "RecentsView destination page is invalid",
+                            new IllegalStateException());
+                }
+
                 boolean isScrolling = false;
                 if (mRecentsView.getNextPage() != nearestPage) {
                     // We shouldn't really scroll to the next page when swiping up to recents.
@@ -1571,9 +1590,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
-        if (mActivity != null) {
-            mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
-        }
     }
 
     /**

@@ -70,7 +70,6 @@ import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchT
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.NavigationMode;
-import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.UiThreadHelper;
@@ -86,6 +85,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 public class QuickstepLauncher extends BaseQuickstepLauncher {
@@ -220,8 +220,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
                     (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
                     && (willUserBeActive || isUserActive())
-                    && !profile.isVerticalBarLayout()
-                    && profile.isPhone && !profile.isLandscape;
+                    && !profile.isVerticalBarLayout();
             UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
                     profile.hotseatBarSizePx);
         }
@@ -246,7 +245,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     }
 
     @Override
-    public void bindWorkspaceComponentsRemoved(ItemInfoMatcher matcher) {
+    public void bindWorkspaceComponentsRemoved(Predicate<ItemInfo> matcher) {
         super.bindWorkspaceComponentsRemoved(matcher);
         mHotseatPredictionController.onModelItemsRemoved(matcher);
     }
