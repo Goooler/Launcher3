@@ -20,6 +20,7 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAP
 
 import android.content.Context;
 
+import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
@@ -34,20 +35,16 @@ public class AllAppsState extends LauncherState {
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE;
 
-    private static final PageAlphaProvider PAGE_ALPHA_PROVIDER = new PageAlphaProvider(DEACCEL_2) {
-        @Override
-        public float getPageAlpha(int pageIndex) {
-            return 0;
-        }
-    };
-
     public AllAppsState(int id) {
         super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
     }
 
     @Override
-    public int getTransitionDuration(Context context) {
-        return 320;
+    public <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfileListenable>
+    int getTransitionDuration(DEVICE_PROFILE_CONTEXT context, boolean isToState) {
+        return !context.getDeviceProfile().isTablet && isToState
+                ? 600
+                : isToState ? 500 : 300;
     }
 
     @Override
@@ -62,13 +59,28 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        return new ScaleAndTranslation(1f, 0,
-                -launcher.getAllAppsController().getShiftRange() * PARALLAX_COEFFICIENT);
+        ScaleAndTranslation scaleAndTranslation =
+                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
+        if (launcher.getDeviceProfile().isTablet) {
+            scaleAndTranslation.scale = 0.97f;
+        } else {
+            scaleAndTranslation.translationY =
+                    -launcher.getAllAppsController().getShiftRange() * PARALLAX_COEFFICIENT;
+        }
+        return scaleAndTranslation;
     }
 
     @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
-        return PAGE_ALPHA_PROVIDER;
+        PageAlphaProvider superPageAlphaProvider = super.getWorkspacePageAlphaProvider(launcher);
+        return new PageAlphaProvider(DEACCEL_2) {
+            @Override
+            public float getPageAlpha(int pageIndex) {
+                return launcher.getDeviceProfile().isTablet
+                        ? superPageAlphaProvider.getPageAlpha(pageIndex)
+                        : 0;
+            }
+        };
     }
 
     @Override
@@ -78,6 +90,8 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
-        return Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
+        return launcher.getDeviceProfile().isTablet
+                ? launcher.getResources().getColor(R.color.widgets_picker_scrim)
+                : Themes.getAttrColor(launcher, R.attr.allAppsScrimColor);
     }
 }
