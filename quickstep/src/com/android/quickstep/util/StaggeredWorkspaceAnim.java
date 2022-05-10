@@ -92,7 +92,7 @@ public class StaggeredWorkspaceAnim {
 
         if (staggerWorkspace) {
             DeviceProfile grid = launcher.getDeviceProfile();
-            Workspace workspace = launcher.getWorkspace();
+            Workspace<?> workspace = launcher.getWorkspace();
             Hotseat hotseat = launcher.getHotseat();
 
             // Hotseat and QSB takes up two additional rows.
@@ -197,7 +197,7 @@ public class StaggeredWorkspaceAnim {
         launcher.getStateManager().createAtomicAnimation(BACKGROUND_APP, NORMAL, config).start();
 
         // Stop scrolling so that it doesn't interfere with the translation offscreen.
-        launcher.<RecentsView>getOverviewPanel().getScroller().forceFinished(true);
+        launcher.<RecentsView>getOverviewPanel().forceFinishScroller();
 
         if (animateOverviewScrim) {
             launcher.getWorkspace().getStateTransitionAnimation()
