@@ -3,6 +3,17 @@
 
     <issue
         id="NewApi"
+        message="Call requires API level 28 (current min is 26): `android.os.UserManager#requestQuietModeEnabled`"
+        errorLine1="            showConfirm |= !userManager.requestQuietModeEnabled(!toState, userProfile);"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/apps/Launcher3/src/com/android/launcher3/allapps/WorkModeSwitch.java"
+            line="110"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="NewApi"
         message="Call requires API level R (current min is 26): `android.view.View#getWindowInsetsController`"
         errorLine1="        getWindowInsetsController().hide(WindowInsets.Type.ime());"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -571,6 +582,28 @@
             file="packages/apps/Launcher3/src/com/android/launcher3/model/data/WorkspaceItemInfo.java"
             line="178"
             column="42"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 31 (current min is 26): `android.appwidget.AppWidgetHostView#setColorResources`"
+        errorLine1="                setColorResources(mWallpaperColorResources);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/apps/Launcher3/src/com/android/launcher3/graphics/LauncherPreviewRenderer.java"
+            line="528"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 27 (current min is 26): `android.app.WallpaperManager#getWallpaperColors`"
+        errorLine1="                    : WallpaperManager.getInstance(context).getWallpaperColors(FLAG_SYSTEM);"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/apps/Launcher3/src/com/android/launcher3/graphics/LauncherPreviewRenderer.java"
+            line="288"
+            column="61"/>
     </issue>
 
 </issues>
