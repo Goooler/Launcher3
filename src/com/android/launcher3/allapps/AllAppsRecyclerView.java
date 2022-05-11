@@ -19,8 +19,10 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.UNSPECIFIED;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SCROLLED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END;
+import static com.android.launcher3.util.LogConfig.SEARCH_LOGGING;
 import static com.android.launcher3.util.UiThreadHelper.hideKeyboardAsync;
 
 import android.content.Context;
@@ -35,11 +37,11 @@ import android.view.View;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.views.ActivityContext;
@@ -54,8 +56,9 @@ import java.util.List;
 public class AllAppsRecyclerView extends BaseRecyclerView {
     private static final String TAG = "AllAppsContainerView";
     private static final boolean DEBUG = false;
+    private static final boolean DEBUG_LATENCY = Utilities.isPropertyEnabled(SEARCH_LOGGING);
 
-    private AlphabeticalAppsList mApps;
+    private AlphabeticalAppsList<?> mApps;
     private final int mNumAppsPerRow;
 
     // The specific view heights that we use to calculate scroll
@@ -67,6 +70,26 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     private final AdapterDataObserver mObserver = new RecyclerView.AdapterDataObserver() {
         public void onChanged() {
             mCachedScrollPositions.clear();
+        }
+
+        @Override
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+            onChanged();
         }
     };
 
@@ -101,16 +124,16 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     /**
      * Sets the list of apps in this view, used to determine the fastscroll position.
      */
-    public void setApps(AlphabeticalAppsList apps) {
+    public void setApps(AlphabeticalAppsList<?> apps) {
         mApps = apps;
     }
 
-    public AlphabeticalAppsList getApps() {
+    public AlphabeticalAppsList<?> getApps() {
         return mApps;
     }
 
     private void updatePoolSize() {
-        DeviceProfile grid = BaseDraggingActivity.fromContext(getContext()).getDeviceProfile();
+        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
         RecyclerView.RecycledViewPool pool = getRecycledViewPool();
         int approxRows = (int) Math.ceil(grid.availableHeightPx / grid.allAppsIconSizePx);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_EMPTY_SEARCH, 1);
@@ -132,6 +155,10 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         }
         if (DEBUG) {
             Log.d(TAG, "onDraw at = " + System.currentTimeMillis());
+        }
+        if (DEBUG_LATENCY) {
+            Log.d(SEARCH_LOGGING,
+                    "-- Recycle view onDraw, time stamp = " + System.currentTimeMillis());
         }
         super.onDraw(c);
     }
@@ -194,9 +221,10 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
     public void onScrollStateChanged(int state) {
         super.onScrollStateChanged(state);
 
-        StatsLogManager mgr = BaseDraggingActivity.fromContext(getContext()).getStatsLogManager();
+        StatsLogManager mgr = ActivityContext.lookupContext(getContext()).getStatsLogManager();
         switch (state) {
             case SCROLL_STATE_DRAGGING:
+                mgr.logger().log(LAUNCHER_ALLAPPS_SCROLLED);
                 requestFocus();
                 mgr.logger().sendToInteractionJankMonitor(
                         LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN, this);
@@ -233,17 +261,14 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         // Find the fastscroll section that maps to this touch fraction
         List<AlphabeticalAppsList.FastScrollSectionInfo> fastScrollSections =
                 mApps.getFastScrollerSections();
-        AlphabeticalAppsList.FastScrollSectionInfo lastInfo = fastScrollSections.get(0);
-        for (int i = 1; i < fastScrollSections.size(); i++) {
-            AlphabeticalAppsList.FastScrollSectionInfo info = fastScrollSections.get(i);
-            if (info.touchFraction > touchFraction) {
-                break;
-            }
-            lastInfo = info;
+        int count = fastScrollSections.size();
+        if (count == 0) {
+            return "";
         }
-
-        mFastScrollHelper.smoothScrollToSection(lastInfo);
-        return lastInfo.sectionName;
+        int index = Utilities.boundToRange((int) (touchFraction * count), 0, count - 1);
+        AlphabeticalAppsList.FastScrollSectionInfo section = fastScrollSections.get(index);
+        mFastScrollHelper.smoothScrollToSection(section);
+        return section.sectionName;
     }
 
     @Override
@@ -261,12 +286,6 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         if (adapter != null) {
             adapter.registerAdapterDataObserver(mObserver);
         }
-    }
-
-    @Override
-    protected float getBottomFadingEdgeStrength() {
-        // No bottom fading edge.
-        return 0;
     }
 
     @Override
@@ -463,7 +482,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
      * Returns distance between left and right app icons
      */
     public int getTabWidth() {
-        DeviceProfile grid = BaseDraggingActivity.fromContext(getContext()).getDeviceProfile();
+        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
         int totalWidth = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
         int iconPadding = totalWidth / grid.numShownAllAppsColumns - grid.allAppsIconSizePx;
         return totalWidth - iconPadding - grid.allAppsIconDrawablePaddingPx;
