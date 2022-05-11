@@ -16,9 +16,11 @@
 
 package com.android.quickstep;
 
-import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 
 import static org.junit.Assert.assertTrue;
+
+import android.os.SystemProperties;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.tapl.LauncherInstrumentation;
@@ -33,6 +35,8 @@ import org.junit.rules.TestRule;
  * Base class for all instrumentation tests that deal with Quickstep.
  */
 public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
+    static final boolean ENABLE_SHELL_TRANSITIONS =
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit", false);
     @Override
     protected TestRule getRulesInsideActivityMonitor() {
         return RuleChain.
@@ -44,14 +48,14 @@ public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
     protected void onLauncherActivityClose(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
         if (recentsView != null) {
-            recentsView.finishRecentsAnimation(true, null);
+            recentsView.finishRecentsAnimation(false /* toRecents */, null);
         }
     }
 
     @Override
     protected void checkLauncherState(Launcher launcher, ContainerType expectedContainerType,
             boolean isResumed, boolean isStarted) {
-        if (!isInLiveTileMode(launcher, expectedContainerType)) {
+        if (ENABLE_SHELL_TRANSITIONS || !isInLiveTileMode(launcher, expectedContainerType)) {
             super.checkLauncherState(launcher, expectedContainerType, isResumed, isStarted);
         } else {
             assertTrue("[Live Tile] hasBeenResumed() == isStarted(), hasBeenResumed(): "
@@ -62,7 +66,7 @@ public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
     @Override
     protected void checkLauncherStateInOverview(Launcher launcher,
             ContainerType expectedContainerType, boolean isStarted, boolean isResumed) {
-        if (!isInLiveTileMode(launcher, expectedContainerType)) {
+        if (ENABLE_SHELL_TRANSITIONS || !isInLiveTileMode(launcher, expectedContainerType)) {
             super.checkLauncherStateInOverview(launcher, expectedContainerType, isStarted,
                     isResumed);
         } else {
@@ -75,13 +79,13 @@ public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
 
     private boolean isInLiveTileMode(Launcher launcher,
             LauncherInstrumentation.ContainerType expectedContainerType) {
-        if (!LIVE_TILE.get()
+        if (!ENABLE_QUICKSTEP_LIVE_TILE.get()
                 || expectedContainerType != LauncherInstrumentation.ContainerType.OVERVIEW) {
             return false;
         }
 
         RecentsView recentsView = launcher.getOverviewPanel();
         return recentsView.getSizeStrategy().isInLiveTileMode()
-                && recentsView.getRunningTaskId() != -1;
+                && recentsView.getRunningTaskViewId() != -1;
     }
 }

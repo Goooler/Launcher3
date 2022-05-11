@@ -45,9 +45,20 @@ public final class WidgetsTableUtils {
         return item.spanX > otherItem.spanX ? 1 : -1;
     };
 
+    /**
+     * Groups {@code widgetItems} items into a 2D array which matches their appearance in a UI
+     * table. This takes liberty to rearrange widgets to make the table visually appealing.
+     */
+    public static List<ArrayList<WidgetItem>> groupWidgetItemsIntoTableWithReordering(
+            List<WidgetItem> widgetItems, final int maxSpansPerRow) {
+        List<WidgetItem> sortedWidgetItems = widgetItems.stream().sorted(WIDGET_SHORTCUT_COMPARATOR)
+                .collect(Collectors.toList());
+        return groupWidgetItemsIntoTableWithoutReordering(sortedWidgetItems, maxSpansPerRow);
+    }
 
     /**
-     * Groups widgets items into a 2D array which matches their appearance in a UI table.
+     * Groups {@code widgetItems} into a 2D array which matches their appearance in a UI table while
+     * maintaining their order.
      *
      * <p>Grouping:
      * 1. Widgets and shortcuts never group together in the same row.
@@ -56,14 +67,20 @@ public final class WidgetsTableUtils {
      * 3. The order shortcuts are grouped together in the same row until their total horizontal
      *    spans exceed the {@code maxSpansPerRow} - 1.
      * 4. If there is only one widget in a row, its width may exceed the {@code maxSpansPerRow}.
+     *
+     * <p>Let's say the {@code maxSpansPerRow} is set to 6. Widgets can be grouped in the same row
+     * if their total horizontal spans added don't exceed 5.
+     * Example 1: Row 1: 2x2, 2x3, 1x1. Total horizontal spans is 5. This is okay.
+     * Example 2: Row 1: 2x2, 4x3, 1x1. the total horizontal spans is 7. This is wrong. 4x3 and 1x1
+     * should be moved to a new row.
+     * Example 3: Row 1: 6x4. This is okay because this is the only item in the row.
      */
-    public static List<ArrayList<WidgetItem>> groupWidgetItemsIntoTable(
+    public static List<ArrayList<WidgetItem>> groupWidgetItemsIntoTableWithoutReordering(
             List<WidgetItem> widgetItems, final int maxSpansPerRow) {
-        List<WidgetItem> sortedWidgetItems = widgetItems.stream().sorted(WIDGET_SHORTCUT_COMPARATOR)
-                .collect(Collectors.toList());
+
         List<ArrayList<WidgetItem>> widgetItemsTable = new ArrayList<>();
         ArrayList<WidgetItem> widgetItemsAtRow = null;
-        for (WidgetItem widgetItem : sortedWidgetItems) {
+        for (WidgetItem widgetItem : widgetItems) {
             if (widgetItemsAtRow == null) {
                 widgetItemsAtRow = new ArrayList<>();
                 widgetItemsTable.add(widgetItemsAtRow);

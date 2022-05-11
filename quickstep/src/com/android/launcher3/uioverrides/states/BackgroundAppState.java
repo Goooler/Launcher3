@@ -19,11 +19,11 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKG
 
 import android.content.Context;
 import android.graphics.Color;
-import android.os.SystemProperties;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.R;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
@@ -74,8 +74,7 @@ public class BackgroundAppState extends OverviewState {
         return super.getVisibleElements(launcher)
                 & ~OVERVIEW_ACTIONS
                 & ~CLEAR_ALL_BUTTON
-                & ~VERTICAL_SWIPE_INDICATOR
-                | TASKBAR;
+                & ~VERTICAL_SWIPE_INDICATOR;
     }
 
     @Override
@@ -85,12 +84,15 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     protected float getDepthUnchecked(Context context) {
-        //TODO revert when b/178661709 is fixed
-        return SystemProperties.getBoolean("ro.launcher.depth.appLaunch", true) ? 1 : 0;
+        return 1;
     }
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
+        DeviceProfile dp = launcher.getDeviceProfile();
+        if (dp.isTaskbarPresentInApps) {
+            return launcher.getColor(R.color.taskbar_background);
+        }
         return Color.TRANSPARENT;
     }
 

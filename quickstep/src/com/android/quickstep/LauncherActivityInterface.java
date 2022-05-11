@@ -21,6 +21,7 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.QUICK_SWITCH;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.animation.Animator;
@@ -43,8 +44,9 @@ import com.android.launcher3.statehandlers.DepthController.ClampedDepthProperty;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.touch.PagedOrientationHandler;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.DisplayController.NavigationMode;
 import com.android.quickstep.GestureState.GestureEndTarget;
-import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.LayoutUtils;
@@ -70,8 +72,9 @@ public final class LauncherActivityInterface extends
     @Override
     public int getSwipeUpDestinationAndLength(DeviceProfile dp, Context context, Rect outRect,
             PagedOrientationHandler orientationHandler) {
-        calculateTaskSize(context, dp, outRect, orientationHandler);
-        if (dp.isVerticalBarLayout() && SysUINavigationMode.getMode(context) != Mode.NO_BUTTON) {
+        calculateTaskSize(context, dp, outRect);
+        if (dp.isVerticalBarLayout()
+                && DisplayController.getNavigationMode(context) != NavigationMode.NO_BUTTON) {
             return dp.isSeascape() ? outRect.left : (dp.widthPx - outRect.right);
         } else {
             return LayoutUtils.getShelfTrackingDistance(context, dp, orientationHandler);
@@ -129,11 +132,10 @@ public final class LauncherActivityInterface extends
                 pa.addFloat(getDepthController(),
                         new ClampedDepthProperty(fromDepthRatio, toDepthRatio),
                         fromDepthRatio, toDepthRatio, LINEAR);
-
             }
         };
 
-        BaseQuickstepLauncher launcher = factory.initUI();
+        BaseQuickstepLauncher launcher = factory.initBackgroundStateUI();
         // Since all apps is not visible, we can safely reset the scroll position.
         // This ensures then the next swipe up to all-apps starts from scroll 0.
         launcher.getAppsView().reset(false /* animate */);
@@ -172,7 +174,8 @@ public final class LauncherActivityInterface extends
     }
 
     @Nullable
-    private LauncherTaskbarUIController getTaskbarController() {
+    @Override
+    public LauncherTaskbarUIController getTaskbarController() {
         BaseQuickstepLauncher launcher = getCreatedActivity();
         if (launcher == null) {
             return null;
@@ -184,16 +187,24 @@ public final class LauncherActivityInterface extends
     @Override
     public RecentsView getVisibleRecentsView() {
         Launcher launcher = getVisibleLauncher();
-        return launcher != null && launcher.getStateManager().getState().overviewUi
-                ? launcher.getOverviewPanel() : null;
+        RecentsView recentsView =
+                launcher != null && launcher.getStateManager().getState().overviewUi
+                        ? launcher.getOverviewPanel() : null;
+        if (recentsView == null || (!launcher.hasBeenResumed()
+                && recentsView.getRunningTaskViewId() == -1)) {
+            // If live tile has ended, return null.
+            return null;
+        }
+        return recentsView;
     }
 
     @Nullable
     @UiThread
     private Launcher getVisibleLauncher() {
         Launcher launcher = getCreatedActivity();
-        return (launcher != null) && launcher.isStarted() && launcher.hasBeenResumed()
-                ? launcher : null;
+        return (launcher != null) && launcher.isStarted()
+                && ((ENABLE_QUICKSTEP_LIVE_TILE.get() && isInLiveTileMode())
+                || launcher.hasBeenResumed()) ? launcher : null;
     }
 
     @Override
@@ -201,6 +212,12 @@ public final class LauncherActivityInterface extends
         Launcher launcher = getVisibleLauncher();
         if (launcher == null) {
             return false;
+        }
+        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isInLiveTileMode()) {
+            RecentsView recentsView = getVisibleRecentsView();
+            if (recentsView == null) {
+                return false;
+            }
         }
 
         closeOverlay();
@@ -263,6 +280,7 @@ public final class LauncherActivityInterface extends
 
     @Override
     public void closeOverlay() {
+        super.closeOverlay();
         Launcher launcher = getCreatedActivity();
         if (launcher == null) {
             return;
@@ -273,25 +291,23 @@ public final class LauncherActivityInterface extends
         } else {
             om.hideOverlay(150);
         }
-    }
-
-    @Override
-    void onOverviewServiceBound() {
-        final BaseQuickstepLauncher activity = getCreatedActivity();
-        if (activity == null) return;
-        activity.getAppTransitionManager().registerRemoteTransitions();
+        LauncherTaskbarUIController taskbarController = getTaskbarController();
+        if (taskbarController != null) {
+            taskbarController.hideEdu();
+        }
     }
 
     @Override
     public @Nullable Animator getParallelAnimationToLauncher(GestureEndTarget endTarget,
-            long duration) {
+            long duration, RecentsAnimationCallbacks callbacks) {
         LauncherTaskbarUIController uiController = getTaskbarController();
-        Animator superAnimator = super.getParallelAnimationToLauncher(endTarget, duration);
-        if (uiController == null) {
+        Animator superAnimator = super.getParallelAnimationToLauncher(
+                endTarget, duration, callbacks);
+        if (uiController == null || callbacks == null) {
             return superAnimator;
         }
         LauncherState toState = stateFromGestureEndTarget(endTarget);
-        Animator taskbarAnimator = uiController.createAnimToLauncher(toState, duration);
+        Animator taskbarAnimator = uiController.createAnimToLauncher(toState, callbacks, duration);
         if (superAnimator == null) {
             return taskbarAnimator;
         } else {
@@ -313,7 +329,8 @@ public final class LauncherActivityInterface extends
         if (uiController == null) {
             return super.deferStartingActivity(deviceState, ev);
         }
-        return uiController.isEventOverAnyTaskbarItem(ev);
+        return uiController.isEventOverAnyTaskbarItem(ev)
+                || super.deferStartingActivity(deviceState, ev);
     }
 
     @Override

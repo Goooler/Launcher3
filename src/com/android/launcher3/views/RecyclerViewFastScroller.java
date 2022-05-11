@@ -18,6 +18,8 @@ package com.android.launcher3.views;
 
 import static android.view.HapticFeedbackConstants.CLOCK_TICK;
 
+import static androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE;
+
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.res.Resources;
@@ -30,6 +32,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Property;
 import android.view.MotionEvent;
 import android.view.View;
@@ -37,7 +40,6 @@ import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -54,9 +56,14 @@ import java.util.List;
  * The track and scrollbar that shows when you scroll the list.
  */
 public class RecyclerViewFastScroller extends View {
-
-    private static final int FASTSCROLL_THRESHOLD_MILLIS = 200;
+    private static final String TAG = "RecyclerViewFastScroller";
+    private static final boolean DEBUG = false;
+    private static final int FASTSCROLL_THRESHOLD_MILLIS = 40;
     private static final int SCROLL_DELTA_THRESHOLD_DP = 4;
+
+    // Track is very narrow to target and correctly. This is especially the case if a user is
+    // using a hardware case. Even if x is offset by following amount, we consider it to be valid.
+    private static final int SCROLLBAR_LEFT_OFFSET_TOUCH_DELEGATE_DP = 5;
     private static final Rect sTempRect = new Rect();
 
     private static final Property<RecyclerViewFastScroller, Integer> TRACK_WIDTH =
@@ -86,6 +93,7 @@ public class RecyclerViewFastScroller extends View {
     /** Keeps the last known scrolling delta/velocity along y-axis. */
     private int mDy = 0;
     private final float mDeltaThreshold;
+    private final float mScrollbarLeftOffsetTouchDelegate;
 
     private final ViewConfiguration mConfig;
 
@@ -105,7 +113,6 @@ public class RecyclerViewFastScroller extends View {
     private boolean mIsThumbDetached;
     private final boolean mCanThumbDetach;
     private boolean mIgnoreDragGesture;
-    private boolean mIsRecyclerViewFirstChildInParent = true;
     private long mDownTimeStampMillis;
 
     // This is the offset from the top of the scrollbar when the user first starts touching.  To
@@ -122,7 +129,6 @@ public class RecyclerViewFastScroller extends View {
 
     protected BaseRecyclerView mRv;
     private RecyclerView.OnScrollListener mOnScrollListener;
-    @Nullable private OnFastScrollChangeListener mOnFastScrollChangeListener;
 
     private int mDownX;
     private int mDownY;
@@ -157,6 +163,8 @@ public class RecyclerViewFastScroller extends View {
 
         mConfig = ViewConfiguration.get(context);
         mDeltaThreshold = res.getDisplayMetrics().density * SCROLL_DELTA_THRESHOLD_DP;
+        mScrollbarLeftOffsetTouchDelegate = res.getDisplayMetrics().density
+                * SCROLLBAR_LEFT_OFFSET_TOUCH_DELEGATE_DP;
 
         TypedArray ta =
                 context.obtainStyledAttributes(attrs, R.styleable.RecyclerViewFastScroller, defStyleAttr, 0);
@@ -197,7 +205,6 @@ public class RecyclerViewFastScroller extends View {
             int rvCurrentOffsetY = mRv.getCurrentScrollY();
             if (mRvOffsetY != rvCurrentOffsetY) {
                 mRvOffsetY = mRv.getCurrentScrollY();
-                notifyScrollChanged();
             }
             return;
         }
@@ -205,7 +212,6 @@ public class RecyclerViewFastScroller extends View {
         mThumbOffsetY = y;
         invalidate();
         mRvOffsetY = mRv.getCurrentScrollY();
-        notifyScrollChanged();
     }
 
     public int getThumbOffsetY() {
@@ -239,6 +245,7 @@ public class RecyclerViewFastScroller extends View {
     public boolean handleTouchEvent(MotionEvent ev, Point offset) {
         int x = (int) ev.getX() - offset.x;
         int y = (int) ev.getY() - offset.y;
+
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 // Keep track of the down positions
@@ -247,7 +254,7 @@ public class RecyclerViewFastScroller extends View {
                 mDownTimeStampMillis = ev.getDownTime();
 
                 if ((Math.abs(mDy) < mDeltaThreshold &&
-                        mRv.getScrollState() != RecyclerView.SCROLL_STATE_IDLE)) {
+                        mRv.getScrollState() != SCROLL_STATE_IDLE)) {
                     // now the touch events are being passed to the {@link WidgetCell} until the
                     // touch sequence goes over the touch slop.
                     mRv.stopScroll();
@@ -266,12 +273,7 @@ public class RecyclerViewFastScroller extends View {
                 mIgnoreDragGesture |= absDeltaY > mConfig.getScaledPagingTouchSlop();
 
                 if (!mIsDragging && !mIgnoreDragGesture && mRv.supportsFastScrolling()) {
-                    // condition #1: triggering thumb is distance, angle based
-                    if ((isNearThumb(mDownX, mLastY)
-                            && absDeltaY > mConfig.getScaledPagingTouchSlop()
-                            && absDeltaY > absDeltaX)
-                            // condition#2: Fastscroll function is now time based
-                            || (isNearScrollBar(mDownX) && ev.getEventTime() - mDownTimeStampMillis
+                    if ((isNearThumb(mDownX, mLastY) && ev.getEventTime() - mDownTimeStampMillis
                                     > FASTSCROLL_THRESHOLD_MILLIS)) {
                         calcTouchOffsetAndPrepToFastScroll(mDownY, mLastY);
                     }
@@ -292,6 +294,13 @@ public class RecyclerViewFastScroller extends View {
                     showActiveScrollbar(false);
                 }
                 break;
+        }
+        if (DEBUG) {
+            Log.d(TAG, (ev.getAction() == MotionEvent.ACTION_DOWN ? "\n" : "")
+                    + "handleTouchEvent " + MotionEvent.actionToString(ev.getAction())
+                    + " (" + x + "," + y + ")" + " isDragging=" + mIsDragging
+                    + " mIgnoreDragGesture=" + mIgnoreDragGesture);
+
         }
         return mIsDragging;
     }
@@ -401,7 +410,8 @@ public class RecyclerViewFastScroller extends View {
      * Returns whether the specified x position is near the scroll bar.
      */
     public boolean isNearScrollBar(int x) {
-        return x >= (getWidth() - mMaxWidth) / 2 && x <= (getWidth() + mMaxWidth) / 2;
+        return x >= (getWidth() - mMaxWidth) / 2 - mScrollbarLeftOffsetTouchDelegate
+                && x <= (getWidth() + mMaxWidth) / 2;
     }
 
     private void animatePopupVisibility(boolean visible) {
@@ -413,9 +423,6 @@ public class RecyclerViewFastScroller extends View {
     }
 
     private void updatePopupY(int lastTouchY) {
-        if (!mPopupVisible) {
-            return;
-        }
         int height = mPopupView.getHeight();
         // Aligns the rounded corner of the pop up with the top of the thumb.
         float top = mRv.getScrollBarTop() + lastTouchY + (getScrollThumbRadius() / 2f)
@@ -430,9 +437,7 @@ public class RecyclerViewFastScroller extends View {
             return false;
         }
         getHitRect(sTempRect);
-        if (mIsRecyclerViewFirstChildInParent) {
-            sTempRect.top += mRv.getScrollBarTop();
-        }
+        sTempRect.top += mRv.getScrollBarTop();
         if (outOffset != null) {
             outOffset.set(sTempRect.left, sTempRect.top);
         }
@@ -444,28 +449,5 @@ public class RecyclerViewFastScroller extends View {
         // There is actually some overlap between the track and the thumb. But since the track
         // alpha is so low, it does not matter.
         return false;
-    }
-
-    public void setIsRecyclerViewFirstChildInParent(boolean isRecyclerViewFirstChildInParent) {
-        mIsRecyclerViewFirstChildInParent = isRecyclerViewFirstChildInParent;
-    }
-
-    public void setOnFastScrollChangeListener(
-            @Nullable OnFastScrollChangeListener onFastScrollChangeListener) {
-        mOnFastScrollChangeListener = onFastScrollChangeListener;
-    }
-
-    private void notifyScrollChanged() {
-        if (mOnFastScrollChangeListener != null) {
-            mOnFastScrollChangeListener.onScrollChanged();
-        }
-    }
-
-    /**
-     * A callback that is invoked when there is a scroll change in {@link RecyclerViewFastScroller}.
-     */
-    public interface OnFastScrollChangeListener {
-        /** Called when the recycler view scroll has changed. */
-        void onScrollChanged();
     }
 }

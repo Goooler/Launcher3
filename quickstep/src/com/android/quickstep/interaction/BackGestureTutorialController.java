@@ -15,13 +15,11 @@
  */
 package com.android.quickstep.interaction;
 
+import static com.android.quickstep.interaction.TutorialController.TutorialType.BACK_NAVIGATION;
 import static com.android.quickstep.interaction.TutorialController.TutorialType.BACK_NAVIGATION_COMPLETE;
-import static com.android.quickstep.interaction.TutorialController.TutorialType.LEFT_EDGE_BACK_NAVIGATION;
-import static com.android.quickstep.interaction.TutorialController.TutorialType.RIGHT_EDGE_BACK_NAVIGATION;
 
+import android.annotation.LayoutRes;
 import android.graphics.PointF;
-
-import androidx.appcompat.content.res.AppCompatResources;
 
 import com.android.launcher3.R;
 import com.android.quickstep.interaction.EdgeBackGestureHandler.BackGestureResult;
@@ -35,34 +33,54 @@ final class BackGestureTutorialController extends TutorialController {
     }
 
     @Override
-    public Integer getIntroductionTitle() {
-        return mTutorialType == LEFT_EDGE_BACK_NAVIGATION
-                ? R.string.back_left_gesture_intro_title : R.string.back_right_gesture_intro_title;
+    public int getIntroductionTitle() {
+        return R.string.back_gesture_intro_title;
     }
 
     @Override
-    public Integer getIntroductionSubtitle() {
-        return mTutorialType == LEFT_EDGE_BACK_NAVIGATION
-                ? R.string.back_left_gesture_intro_subtitle
-                : R.string.back_right_gesture_intro_subtitle;
+    public int getIntroductionSubtitle() {
+        return R.string.back_gesture_intro_subtitle;
     }
 
     @Override
-    protected int getMockAppTaskThumbnailResId(boolean forDarkMode) {
-        return R.drawable.mock_conversation;
+    public int getSpokenIntroductionSubtitle() {
+        return R.string.back_gesture_spoken_intro_subtitle;
+    }
+
+    @Override
+    public int getSuccessFeedbackSubtitle() {
+        return mTutorialFragment.isAtFinalStep()
+                ? R.string.back_gesture_feedback_complete_without_follow_up
+                : R.string.back_gesture_feedback_complete_with_overview_follow_up;
+    }
+
+    @Override
+    protected int getMockAppTaskLayoutResId() {
+        return getMockAppTaskCurrentPageLayoutResId();
+    }
+
+    @LayoutRes
+    int getMockAppTaskCurrentPageLayoutResId() {
+        return mTutorialFragment.isLargeScreen()
+                ? R.layout.gesture_tutorial_tablet_mock_conversation
+                : R.layout.gesture_tutorial_mock_conversation;
+    }
+
+    @LayoutRes
+    int getMockAppTaskPreviousPageLayoutResId() {
+        return mTutorialFragment.isLargeScreen()
+                ? R.layout.gesture_tutorial_tablet_mock_conversation_list
+                : R.layout.gesture_tutorial_mock_conversation_list;
     }
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (mGestureCompleted) {
+        if (isGestureCompleted()) {
             return;
         }
         switch (mTutorialType) {
-            case RIGHT_EDGE_BACK_NAVIGATION:
-                handleAttemptFromRight(result);
-                break;
-            case LEFT_EDGE_BACK_NAVIGATION:
-                handleAttemptFromLeft(result);
+            case BACK_NAVIGATION:
+                handleBackAttempt(result);
                 break;
             case BACK_NAVIGATION_COMPLETE:
                 if (result == BackGestureResult.BACK_COMPLETED_FROM_LEFT
@@ -73,51 +91,20 @@ final class BackGestureTutorialController extends TutorialController {
         }
     }
 
-    private void handleAttemptFromRight(BackGestureResult result) {
-        switch (result) {
-            case BACK_COMPLETED_FROM_RIGHT:
-                mTutorialFragment.releaseGestureVideoView();
-                hideFeedback(true);
-                mFakeTaskView.setBackground(AppCompatResources.getDrawable(mContext,
-                        R.drawable.mock_conversations_list));
-                int subtitleResId = mTutorialFragment.isAtFinalStep()
-                        ? R.string.back_gesture_feedback_complete_without_follow_up
-                        : R.string.back_gesture_feedback_complete_with_overview_follow_up;
-                showFeedback(subtitleResId, true);
-                break;
-            case BACK_CANCELLED_FROM_RIGHT:
-                showFeedback(R.string.back_gesture_feedback_cancelled_right_edge);
-                break;
-            case BACK_COMPLETED_FROM_LEFT:
-            case BACK_CANCELLED_FROM_LEFT:
-            case BACK_NOT_STARTED_TOO_FAR_FROM_EDGE:
-                showFeedback(R.string.back_gesture_feedback_swipe_too_far_from_right_edge);
-                break;
-            case BACK_NOT_STARTED_IN_NAV_BAR_REGION:
-                showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
-                break;
-        }
-    }
-
-    private void handleAttemptFromLeft(BackGestureResult result) {
+    private void handleBackAttempt(BackGestureResult result) {
         switch (result) {
             case BACK_COMPLETED_FROM_LEFT:
-                mTutorialFragment.releaseGestureVideoView();
-                hideFeedback(true);
-                mFakeTaskView.setBackground(AppCompatResources.getDrawable(mContext,
-                        R.drawable.mock_conversations_list));
-                int subtitleResId = mTutorialFragment.isAtFinalStep()
-                        ? R.string.back_gesture_feedback_complete_without_follow_up
-                        : R.string.back_gesture_feedback_complete_with_back_right_follow_up;
-                showFeedback(subtitleResId, true);
+            case BACK_COMPLETED_FROM_RIGHT:
+                mTutorialFragment.releaseFeedbackAnimation();
+                updateFakeAppTaskViewLayout(getMockAppTaskPreviousPageLayoutResId());
+                showSuccessFeedback();
                 break;
             case BACK_CANCELLED_FROM_LEFT:
-                showFeedback(R.string.back_gesture_feedback_cancelled_left_edge);
-                break;
-            case BACK_COMPLETED_FROM_RIGHT:
             case BACK_CANCELLED_FROM_RIGHT:
+                showFeedback(R.string.back_gesture_feedback_cancelled);
+                break;
             case BACK_NOT_STARTED_TOO_FAR_FROM_EDGE:
-                showFeedback(R.string.back_gesture_feedback_swipe_too_far_from_left_edge);
+                showFeedback(R.string.back_gesture_feedback_swipe_too_far_from_edge);
                 break;
             case BACK_NOT_STARTED_IN_NAV_BAR_REGION:
                 showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
@@ -127,16 +114,30 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (mGestureCompleted) {
+        if (isGestureCompleted()) {
             return;
         }
         if (mTutorialType == BACK_NAVIGATION_COMPLETE) {
             if (result == NavBarGestureResult.HOME_GESTURE_COMPLETED) {
                 mTutorialFragment.closeTutorial();
             }
-        } else if (mTutorialType == LEFT_EDGE_BACK_NAVIGATION
-                || mTutorialType == RIGHT_EDGE_BACK_NAVIGATION) {
-            showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
+        } else if (mTutorialType == BACK_NAVIGATION) {
+            switch (result) {
+                case HOME_NOT_STARTED_TOO_FAR_FROM_EDGE:
+                case OVERVIEW_NOT_STARTED_TOO_FAR_FROM_EDGE:
+                case HOME_OR_OVERVIEW_CANCELLED:
+                    showFeedback(R.string.back_gesture_feedback_swipe_too_far_from_edge);
+                    break;
+                case HOME_GESTURE_COMPLETED:
+                case OVERVIEW_GESTURE_COMPLETED:
+                case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
+                case ASSISTANT_COMPLETED:
+                case ASSISTANT_NOT_STARTED_BAD_ANGLE:
+                case ASSISTANT_NOT_STARTED_SWIPE_TOO_SHORT:
+                default:
+                    showFeedback(R.string.back_gesture_feedback_swipe_in_nav_bar);
+
+            }
         }
     }
 }

@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.widget.picker;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_PREDICTION;
+
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -30,7 +32,6 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.widget.WidgetCell;
@@ -51,7 +52,6 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
     private float mRecommendationTableMaxHeight = Float.MAX_VALUE;
     @Nullable private OnLongClickListener mWidgetCellOnLongClickListener;
     @Nullable private OnClickListener mWidgetCellOnClickListener;
-    @Nullable private OnTouchListener mWidgetCellOnTouchListener;
 
     public WidgetsRecommendationTableLayout(Context context) {
         this(context, /* attrs= */ null);
@@ -75,11 +75,6 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
     /** Sets a {@link android.view.View.OnClickListener} for all widget cells in this table. */
     public void setWidgetCellOnClickListener(OnClickListener widgetCellOnClickListener) {
         mWidgetCellOnClickListener = widgetCellOnClickListener;
-    }
-
-    /** Sets a {@link android.view.View.OnTouchListener} for all widget cells in this table. */
-    public void setWidgetCellOnTouchListener(OnTouchListener widgetCellOnTouchListener) {
-        mWidgetCellOnTouchListener = widgetCellOnTouchListener;
     }
 
     /**
@@ -113,10 +108,8 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
 
             for (WidgetItem widgetItem : widgetItems) {
                 WidgetCell widgetCell = addItemCell(tableRow);
-                widgetCell.setPreviewSize(widgetItem.spanX, widgetItem.spanY, data.mPreviewScale);
-                widgetCell.applyFromCellItem(widgetItem,
-                        LauncherAppState.getInstance(getContext()).getWidgetCache());
-                widgetCell.ensurePreview();
+                widgetCell.applyFromCellItem(widgetItem, data.mPreviewScale);
+                widgetCell.showBadge();
             }
             addView(tableRow);
         }
@@ -127,11 +120,11 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
         WidgetCell widget = (WidgetCell) LayoutInflater.from(
                 getContext()).inflate(R.layout.widget_cell, parent, false);
 
-        widget.setOnTouchListener(mWidgetCellOnTouchListener);
         View previewContainer = widget.findViewById(R.id.widget_preview_container);
         previewContainer.setOnClickListener(mWidgetCellOnClickListener);
         previewContainer.setOnLongClickListener(mWidgetCellOnLongClickListener);
         widget.setAnimatePreview(false);
+        widget.setSourceContainer(CONTAINER_WIDGETS_PREDICTION);
 
         parent.addView(widget);
         return widget;
@@ -152,8 +145,8 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
             float rowHeight = 0;
             for (int j = 0; j < widgetItems.size(); j++) {
                 WidgetItem widgetItem = widgetItems.get(j);
-                Size widgetSize = WidgetSizes.getWidgetSizePx(
-                        deviceProfile, widgetItem.spanX, widgetItem.spanY);
+                Size widgetSize = WidgetSizes.getWidgetItemSizePx(getContext(), deviceProfile,
+                        widgetItem);
                 float previewHeight = widgetSize.getHeight() * previewScale;
                 rowHeight = Math.max(rowHeight,
                         previewHeight + mWidgetCellTextViewsHeight + mWidgetCellVerticalPadding);

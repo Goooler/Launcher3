@@ -2,6 +2,7 @@ package com.android.launcher3;
 
 import static android.appwidget.AppWidgetHostView.getDefaultPaddingForWidget;
 
+import static com.android.launcher3.CellLayout.SPRING_LOADED_PROGRESS;
 import static com.android.launcher3.LauncherAnimUtils.LAYOUT_HEIGHT;
 import static com.android.launcher3.LauncherAnimUtils.LAYOUT_WIDTH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_RESIZE_COMPLETED;
@@ -9,6 +10,8 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.views.BaseDragLayer.LAYOUT_X;
 import static com.android.launcher3.views.BaseDragLayer.LAYOUT_Y;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
@@ -29,6 +32,7 @@ import androidx.annotation.Px;
 
 import com.android.launcher3.accessibility.DragViewStateAnnouncer;
 import com.android.launcher3.dragndrop.DragLayer;
+import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
@@ -49,12 +53,14 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     private static final String KEY_RECONFIGURABLE_WIDGET_EDUCATION_TIP_SEEN =
             "launcher.reconfigurable_widget_education_tip_seen";
     private static final Rect sTmpRect = new Rect();
+    private static final Rect sTmpRect2 = new Rect();
 
     private static final int HANDLE_COUNT = 4;
     private static final int INDEX_LEFT = 0;
     private static final int INDEX_TOP = 1;
     private static final int INDEX_RIGHT = 2;
     private static final int INDEX_BOTTOM = 3;
+    private static final float MIN_OPACITY_FOR_CELL_LAYOUT_DURING_INVALID_RESIZE = 0.5f;
 
     private final Launcher mLauncher;
     private final DragViewStateAnnouncer mStateAnnouncer;
@@ -103,12 +109,23 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
     private final InstanceId logInstanceId = new InstanceIdSequence().newInstanceId();
 
+    private final ViewGroupFocusHelper mDragLayerRelativeCoordinateHelper;
+
+    /**
+     * In the two panel UI, it is not possible to resize a widget to cross its host
+     * {@link CellLayout}'s sibling. When this happens, we gradually reduce the opacity of the
+     * sibling {@link CellLayout} from 1f to
+     * {@link #MIN_OPACITY_FOR_CELL_LAYOUT_DURING_INVALID_RESIZE}.
+     */
+    private final float mDragAcrossTwoPanelOpacityMargin;
+
     private boolean mLeftBorderActive;
     private boolean mRightBorderActive;
     private boolean mTopBorderActive;
     private boolean mBottomBorderActive;
 
-    private int mResizeMode;
+    private boolean mHorizontalResizeActive;
+    private boolean mVerticalResizeActive;
 
     private int mRunningHInc;
     private int mRunningVInc;
@@ -148,6 +165,10 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         for (int i = 0; i < HANDLE_COUNT; i++) {
             mSystemGestureExclusionRects.add(new Rect());
         }
+
+        mDragAcrossTwoPanelOpacityMargin = mLauncher.getResources().getDimensionPixelSize(
+                R.dimen.resize_frame_invalid_drag_across_two_panel_opacity_margin);
+        mDragLayerRelativeCoordinateHelper = new ViewGroupFocusHelper(mLauncher.getDragLayer());
     }
 
     @Override
@@ -194,7 +215,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
         dl.addView(frame);
         frame.mIsOpen = true;
-        frame.snapToWidget(false);
+        frame.post(() -> frame.snapToWidget(false));
     }
 
     private void setupForWidget(LauncherAppWidgetHostView widgetView, CellLayout cellLayout,
@@ -207,7 +228,6 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         mWidgetView.addOnAttachStateChangeListener(mWidgetViewAttachStateChangeListener);
         LauncherAppWidgetProviderInfo info = (LauncherAppWidgetProviderInfo)
                 widgetView.getAppWidgetInfo();
-        mResizeMode = info.resizeMode;
         mDragLayer = dragLayer;
 
         mMinHSpan = info.minSpanX;
@@ -218,10 +238,19 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         mWidgetPadding = getDefaultPaddingForWidget(getContext(),
                 widgetView.getAppWidgetInfo().provider, null);
 
-        if (mResizeMode == AppWidgetProviderInfo.RESIZE_HORIZONTAL) {
+        // Only show resize handles for the directions in which resizing is possible.
+        InvariantDeviceProfile idp = LauncherAppState.getIDP(cellLayout.getContext());
+        mVerticalResizeActive = (info.resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0
+                && mMinVSpan < idp.numRows && mMaxVSpan > 1
+                && mMinVSpan < mMaxVSpan;
+        if (!mVerticalResizeActive) {
             mDragHandles[INDEX_TOP].setVisibility(GONE);
             mDragHandles[INDEX_BOTTOM].setVisibility(GONE);
-        } else if (mResizeMode == AppWidgetProviderInfo.RESIZE_VERTICAL) {
+        }
+        mHorizontalResizeActive = (info.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0
+                && mMinHSpan < idp.numColumns && mMaxHSpan > 1
+                && mMinHSpan < mMaxHSpan;
+        if (!mHorizontalResizeActive) {
             mDragHandles[INDEX_LEFT].setVisibility(GONE);
             mDragHandles[INDEX_RIGHT].setVisibility(GONE);
         }
@@ -255,6 +284,14 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             }
         }
 
+        CellLayout.LayoutParams lp = (CellLayout.LayoutParams) mWidgetView.getLayoutParams();
+        ItemInfo widgetInfo = (ItemInfo) mWidgetView.getTag();
+        lp.cellX = lp.tmpCellX = widgetInfo.cellX;
+        lp.cellY = lp.tmpCellY = widgetInfo.cellY;
+        lp.cellHSpan = widgetInfo.spanX;
+        lp.cellVSpan = widgetInfo.spanY;
+        lp.isLockedToGrid = true;
+
         // When we create the resize frame, we first mark all cells as unoccupied. The appropriate
         // cells (same if not resized, or different) will be marked as occupied when the resize
         // frame is dismissed.
@@ -263,21 +300,19 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         mLauncher.getStatsLogManager()
                 .logger()
                 .withInstanceId(logInstanceId)
-                .withItemInfo((ItemInfo) mWidgetView.getTag())
+                .withItemInfo(widgetInfo)
                 .log(LAUNCHER_WIDGET_RESIZE_STARTED);
 
         setOnKeyListener(this);
     }
 
     public boolean beginResizeIfPointInRegion(int x, int y) {
-        boolean horizontalActive = (mResizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0;
-        boolean verticalActive = (mResizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0;
-
-        mLeftBorderActive = (x < mTouchTargetWidth) && horizontalActive;
-        mRightBorderActive = (x > getWidth() - mTouchTargetWidth) && horizontalActive;
-        mTopBorderActive = (y < mTouchTargetWidth + mTopTouchRegionAdjustment) && verticalActive;
+        mLeftBorderActive = (x < mTouchTargetWidth) && mHorizontalResizeActive;
+        mRightBorderActive = (x > getWidth() - mTouchTargetWidth) && mHorizontalResizeActive;
+        mTopBorderActive = (y < mTouchTargetWidth + mTopTouchRegionAdjustment)
+                && mVerticalResizeActive;
         mBottomBorderActive = (y > getHeight() - mTouchTargetWidth + mBottomTouchRegionAdjustment)
-                && verticalActive;
+                && mVerticalResizeActive;
 
         boolean anyBordersActive = mLeftBorderActive || mRightBorderActive
                 || mTopBorderActive || mBottomBorderActive;
@@ -346,6 +381,37 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             lp.y = sTmpRect.top;
         }
 
+        // Handle invalid resize across CellLayouts in the two panel UI.
+        if (mCellLayout.getParent() instanceof Workspace) {
+            Workspace<?> workspace = (Workspace<?>) mCellLayout.getParent();
+            CellLayout pairedCellLayout = workspace.getScreenPair(mCellLayout);
+            if (pairedCellLayout != null) {
+                Rect focusedCellLayoutBound = sTmpRect;
+                mDragLayerRelativeCoordinateHelper.viewToRect(mCellLayout, focusedCellLayoutBound);
+                Rect resizeFrameBound = sTmpRect2;
+                findViewById(R.id.widget_resize_frame).getGlobalVisibleRect(resizeFrameBound);
+                float progress = 1f;
+                if (workspace.indexOfChild(pairedCellLayout) < workspace.indexOfChild(mCellLayout)
+                        && mDeltaX < 0
+                        && resizeFrameBound.left < focusedCellLayoutBound.left) {
+                    // Resize from right to left.
+                    progress = (mDragAcrossTwoPanelOpacityMargin + mDeltaX)
+                            / mDragAcrossTwoPanelOpacityMargin;
+                } else if (workspace.indexOfChild(pairedCellLayout)
+                                > workspace.indexOfChild(mCellLayout)
+                        && mDeltaX > 0
+                        && resizeFrameBound.right > focusedCellLayoutBound.right) {
+                    // Resize from left to right.
+                    progress = (mDragAcrossTwoPanelOpacityMargin - mDeltaX)
+                            / mDragAcrossTwoPanelOpacityMargin;
+                }
+                float alpha = Math.max(MIN_OPACITY_FOR_CELL_LAYOUT_DURING_INVALID_RESIZE, progress);
+                float springLoadedProgress = Math.min(1f, 1f - progress);
+                updateInvalidResizeEffect(mCellLayout, pairedCellLayout, alpha,
+                        springLoadedProgress);
+            }
+        }
+
         requestLayout();
     }
 
@@ -358,8 +424,8 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
      */
     private void resizeWidgetIfNeeded(boolean onDismiss) {
         DeviceProfile dp = mLauncher.getDeviceProfile();
-        float xThreshold = mCellLayout.getCellWidth() + dp.cellLayoutBorderSpacingPx;
-        float yThreshold = mCellLayout.getCellHeight() + dp.cellLayoutBorderSpacingPx;
+        float xThreshold = mCellLayout.getCellWidth() + dp.cellLayoutBorderSpacePx.x;
+        float yThreshold = mCellLayout.getCellHeight() + dp.cellLayoutBorderSpacePx.y;
 
         int hSpanInc = getSpanIncrement((mDeltaX + mDeltaXAddOn) / xThreshold - mRunningHInc);
         int vSpanInc = getSpanIncrement((mDeltaY + mDeltaYAddOn) / yThreshold - mRunningVInc);
@@ -444,8 +510,8 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
     private void onTouchUp() {
         DeviceProfile dp = mLauncher.getDeviceProfile();
-        int xThreshold = mCellLayout.getCellWidth() + dp.cellLayoutBorderSpacingPx;
-        int yThreshold = mCellLayout.getCellHeight() + dp.cellLayoutBorderSpacingPx;
+        int xThreshold = mCellLayout.getCellWidth() + dp.cellLayoutBorderSpacePx.x;
+        int yThreshold = mCellLayout.getCellHeight() + dp.cellLayoutBorderSpacePx.y;
 
         mDeltaXAddOn = mRunningHInc * xThreshold;
         mDeltaYAddOn = mRunningVInc * yThreshold;
@@ -502,13 +568,24 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         }
 
         final DragLayer.LayoutParams lp = (DragLayer.LayoutParams) getLayoutParams();
+        final CellLayout pairedCellLayout;
+        if (mCellLayout.getParent() instanceof Workspace) {
+            Workspace<?> workspace = (Workspace<?>) mCellLayout.getParent();
+            pairedCellLayout = workspace.getScreenPair(mCellLayout);
+        } else {
+            pairedCellLayout = null;
+        }
         if (!animate) {
             lp.width = newWidth;
             lp.height = newHeight;
             lp.x = newX;
             lp.y = newY;
             for (int i = 0; i < HANDLE_COUNT; i++) {
-                mDragHandles[i].setAlpha(1.0f);
+                mDragHandles[i].setAlpha(1f);
+            }
+            if (pairedCellLayout != null) {
+                updateInvalidResizeEffect(mCellLayout, pairedCellLayout, /* alpha= */ 1f,
+                        /* springLoadedProgress= */ 0f);
             }
             requestLayout();
         } else {
@@ -524,6 +601,10 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             for (int i = 0; i < HANDLE_COUNT; i++) {
                 set.play(mFirstFrameAnimatorHelper.addTo(
                         ObjectAnimator.ofFloat(mDragHandles[i], ALPHA, 1f)));
+            }
+            if (pairedCellLayout != null) {
+                updateInvalidResizeEffect(mCellLayout, pairedCellLayout, /* alpha= */ 1f,
+                        /* springLoadedProgress= */ 0f, /* animatorSet= */ set);
             }
             set.setDuration(SNAP_DURATION);
             set.start();
@@ -608,6 +689,52 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         mDragLayer.removeView(this);
         if (mWidgetView != null) {
             mWidgetView.removeOnAttachStateChangeListener(mWidgetViewAttachStateChangeListener);
+        }
+    }
+
+    private void updateInvalidResizeEffect(CellLayout cellLayout, CellLayout pairedCellLayout,
+            float alpha, float springLoadedProgress) {
+        updateInvalidResizeEffect(cellLayout, pairedCellLayout, alpha,
+                springLoadedProgress, /* animatorSet= */ null);
+    }
+
+    private void updateInvalidResizeEffect(CellLayout cellLayout, CellLayout pairedCellLayout,
+            float alpha, float springLoadedProgress, @Nullable AnimatorSet animatorSet) {
+        int childCount = pairedCellLayout.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            View child = pairedCellLayout.getChildAt(i);
+            if (animatorSet != null) {
+                animatorSet.play(
+                        mFirstFrameAnimatorHelper.addTo(
+                                ObjectAnimator.ofFloat(child, ALPHA, alpha)));
+            } else {
+                child.setAlpha(alpha);
+            }
+        }
+        if (animatorSet != null) {
+            animatorSet.play(mFirstFrameAnimatorHelper.addTo(
+                    ObjectAnimator.ofFloat(cellLayout, SPRING_LOADED_PROGRESS,
+                            springLoadedProgress)));
+            animatorSet.play(mFirstFrameAnimatorHelper.addTo(
+                    ObjectAnimator.ofFloat(pairedCellLayout, SPRING_LOADED_PROGRESS,
+                            springLoadedProgress)));
+        } else {
+            cellLayout.setSpringLoadedProgress(springLoadedProgress);
+            pairedCellLayout.setSpringLoadedProgress(springLoadedProgress);
+        }
+
+        boolean shouldShowCellLayoutBorder = springLoadedProgress > 0f;
+        if (animatorSet != null) {
+            animatorSet.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animator) {
+                    cellLayout.setIsDragOverlapping(shouldShowCellLayoutBorder);
+                    pairedCellLayout.setIsDragOverlapping(shouldShowCellLayoutBorder);
+                }
+            });
+        } else {
+            cellLayout.setIsDragOverlapping(shouldShowCellLayoutBorder);
+            pairedCellLayout.setIsDragOverlapping(shouldShowCellLayoutBorder);
         }
     }
 

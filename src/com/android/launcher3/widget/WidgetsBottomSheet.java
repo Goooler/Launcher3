@@ -16,6 +16,7 @@
 
 package com.android.launcher3.widget;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_BOTTOM_WIDGETS_TRAY;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
 
 import android.animation.PropertyValuesHolder;
@@ -35,9 +36,6 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
-import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Insettable;
-import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.model.WidgetItem;
@@ -50,7 +48,8 @@ import java.util.List;
 /**
  * Bottom sheet for the "Widgets" system shortcut in the long-press popup.
  */
-public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
+public class WidgetsBottomSheet extends BaseWidgetSheet {
+    private static final String TAG = "WidgetsBottomSheet";
 
     private static final IntProperty<View> PADDING_BOTTOM =
             new IntProperty<View>("paddingBottom") {
@@ -70,9 +69,8 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
     private static final long EDUCATION_TIP_DELAY_MS = 300;
 
     private ItemInfo mOriginalItemInfo;
-    private final Rect mInsets;
-    private final int mMaxTableHeight;
-    private int mMaxHorizontalSpan = 4;
+    private int mMaxHorizontalSpan = DEFAULT_MAX_HORIZONTAL_SPANS;
+    private final int mWidgetCellHorizontalPadding;
 
     private final OnLayoutChangeListener mLayoutChangeListenerToShowTips =
             new OnLayoutChangeListener() {
@@ -110,14 +108,11 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
     public WidgetsBottomSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setWillNotDraw(false);
-        mInsets = new Rect();
-        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
-        // Set the max table height to 2 / 3 of the grid height so that the bottom picker won't
-        // take over the entire view vertically.
-        mMaxTableHeight = deviceProfile.inv.numRows * 2 / 3  * deviceProfile.cellHeightPx;
         if (!hasSeenEducationTip()) {
             addOnLayoutChangeListener(mLayoutChangeListenerToShowTips);
         }
+        mWidgetCellHorizontalPadding = getResources().getDimensionPixelSize(
+                R.dimen.widget_cell_horizontal_padding);
     }
 
     @Override
@@ -128,32 +123,24 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
-        int widthUsed;
-        if (mInsets.bottom > 0) {
-            widthUsed = mInsets.left + mInsets.right;
-        } else {
-            Rect padding = deviceProfile.workspacePadding;
-            widthUsed = Math.max(padding.left + padding.right,
-                    2 * (mInsets.left + mInsets.right));
+        doMeasure(widthMeasureSpec, heightMeasureSpec);
+        if (updateMaxSpansPerRow()) {
+            doMeasure(widthMeasureSpec, heightMeasureSpec);
         }
+    }
 
-        int heightUsed = mInsets.top + deviceProfile.edgeMarginPx;
-        measureChildWithMargins(mContent, widthMeasureSpec,
-                widthUsed, heightMeasureSpec, heightUsed);
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec),
-                MeasureSpec.getSize(heightMeasureSpec));
+    /** Returns {@code true} if the max spans have been updated. */
+    private boolean updateMaxSpansPerRow() {
+        if (getMeasuredWidth() == 0) return false;
 
-        int paddingPx = 2 * getResources().getDimensionPixelOffset(
-                R.dimen.widget_cell_horizontal_padding);
-        int maxHorizontalSpan = findViewById(R.id.widgets_table).getMeasuredWidth()
-                / (mActivityContext.getDeviceProfile().cellWidthPx + paddingPx);
-
+        int maxHorizontalSpan = computeMaxHorizontalSpans(mContent, mWidgetCellHorizontalPadding);
         if (mMaxHorizontalSpan != maxHorizontalSpan) {
             // Ensure the table layout is showing widgets in the right column after measure.
             mMaxHorizontalSpan = maxHorizontalSpan;
             onWidgetsBound();
+            return true;
         }
+        return false;
     }
 
     @Override
@@ -169,13 +156,9 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
 
         setTranslationShift(mTranslationShift);
 
-        // Ensure the scroll view height is not larger than mMaxTableHeight, which is a value
-        // smaller than the entire screen height.
         ScrollView widgetsTableScrollView = findViewById(R.id.widgets_table_scroll_view);
-        if (widgetsTableScrollView.getMeasuredHeight() > mMaxTableHeight) {
-            ViewGroup.LayoutParams layoutParams = widgetsTableScrollView.getLayoutParams();
-            layoutParams.height = mMaxTableHeight;
-            widgetsTableScrollView.setLayoutParams(layoutParams);
+        TableLayout widgetsTable = findViewById(R.id.widgets_table);
+        if (widgetsTable.getMeasuredHeight() > widgetsTableScrollView.getMeasuredHeight()) {
             findViewById(R.id.collapse_handle).setVisibility(VISIBLE);
         }
     }
@@ -200,19 +183,16 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
         TableLayout widgetsTable = findViewById(R.id.widgets_table);
         widgetsTable.removeAllViews();
 
-        WidgetsTableUtils.groupWidgetItemsIntoTable(widgets, mMaxHorizontalSpan).forEach(row -> {
-            TableRow tableRow = new TableRow(getContext());
-            tableRow.setGravity(Gravity.TOP);
-            row.forEach(widgetItem -> {
-                WidgetCell widget = addItemCell(tableRow);
-                widget.setPreviewSize(widgetItem.spanX, widgetItem.spanY);
-                widget.applyFromCellItem(widgetItem, LauncherAppState.getInstance(mActivityContext)
-                        .getWidgetCache());
-                widget.ensurePreview();
-                widget.setVisibility(View.VISIBLE);
-            });
-            widgetsTable.addView(tableRow);
-        });
+        WidgetsTableUtils.groupWidgetItemsIntoTableWithReordering(widgets, mMaxHorizontalSpan)
+                .forEach(row -> {
+                    TableRow tableRow = new TableRow(getContext());
+                    tableRow.setGravity(Gravity.TOP);
+                    row.forEach(widgetItem -> {
+                        WidgetCell widget = addItemCell(tableRow);
+                        widget.applyFromCellItem(widgetItem);
+                    });
+                    widgetsTable.addView(tableRow);
+                });
     }
 
     @Override
@@ -236,6 +216,7 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
         previewContainer.setOnClickListener(this);
         previewContainer.setOnLongClickListener(this);
         widget.setAnimatePreview(false);
+        widget.setSourceContainer(CONTAINER_BOTTOM_WIDGETS_TRAY);
 
         parent.addView(widget);
         return widget;
@@ -265,7 +246,8 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
 
     @Override
     public void setInsets(Rect insets) {
-        mInsets.set(insets);
+        super.setInsets(insets);
+
         mContent.setPadding(mContent.getPaddingStart(),
                 mContent.getPaddingTop(), mContent.getPaddingEnd(), insets.bottom);
         if (insets.bottom > 0) {
@@ -273,6 +255,14 @@ public class WidgetsBottomSheet extends BaseWidgetSheet implements Insettable {
         } else {
             clearNavBarColor();
         }
+    }
+
+    @Override
+    protected void onContentHorizontalMarginChanged(int contentHorizontalMarginInPx) {
+        ViewGroup.MarginLayoutParams layoutParams =
+                ((ViewGroup.MarginLayoutParams) findViewById(R.id.widgets_table).getLayoutParams());
+        layoutParams.setMarginStart(contentHorizontalMarginInPx);
+        layoutParams.setMarginEnd(contentHorizontalMarginInPx);
     }
 
     @Override

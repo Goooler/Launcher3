@@ -20,15 +20,12 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 import static com.android.launcher3.LauncherState.NORMAL;
 
-import android.animation.AnimatorSet;
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.util.Property;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -40,6 +37,7 @@ import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.dragndrop.DragOptions;
+import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.model.data.ItemInfo;
 
 /**
@@ -47,20 +45,6 @@ import com.android.launcher3.model.data.ItemInfo;
  */
 public abstract class ButtonDropTarget extends TextView
         implements DropTarget, DragController.DragListener, OnClickListener {
-
-    private static final Property<ButtonDropTarget, Integer> TEXT_COLOR =
-            new Property<ButtonDropTarget, Integer>(Integer.TYPE, "textColor") {
-
-                @Override
-                public Integer get(ButtonDropTarget target) {
-                    return target.getTextColor();
-                }
-
-                @Override
-                public void set(ButtonDropTarget target, Integer value) {
-                    target.setTextColor(value);
-                }
-            };
 
     private static final int[] sTempCords = new int[2];
     private static final int DRAG_VIEW_DROP_DURATION = 285;
@@ -82,16 +66,15 @@ public abstract class ButtonDropTarget extends TextView
     private final int mDragDistanceThreshold;
     /** The size of the drawable shown in the drop target. */
     private final int mDrawableSize;
+    /** The padding, in pixels, between the text and drawable. */
+    private final int mDrawablePadding;
 
     protected CharSequence mText;
-    protected ColorStateList mOriginalTextColor;
     protected Drawable mDrawable;
     private boolean mTextVisible = true;
 
     private PopupWindow mToolTip;
     private int mToolTipLocation;
-
-    private AnimatorSet mCurrentColorAnim;
 
     public ButtonDropTarget(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
@@ -104,13 +87,14 @@ public abstract class ButtonDropTarget extends TextView
         Resources resources = getResources();
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
         mDrawableSize = resources.getDimensionPixelSize(R.dimen.drop_target_text_size);
+        mDrawablePadding = resources.getDimensionPixelSize(
+                R.dimen.drop_target_button_drawable_padding);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
         mText = getText();
-        mOriginalTextColor = getTextColors();
         setContentDescription(mText);
     }
 
@@ -124,7 +108,8 @@ public abstract class ButtonDropTarget extends TextView
         // We do not set the drawable in the xml as that inflates two drawables corresponding to
         // drawableLeft and drawableStart.
         mDrawable = getContext().getDrawable(resId).mutate();
-        mDrawable.setBounds(0, 0, mDrawableSize, mDrawableSize);
+        mDrawable.setTintList(getTextColors());
+        centerIcon();
         setCompoundDrawablesRelative(mDrawable, null, null, null);
     }
 
@@ -155,7 +140,7 @@ public abstract class ButtonDropTarget extends TextView
                 y = -getMeasuredHeight();
                 message.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
                 if (mToolTipLocation == TOOLTIP_LEFT) {
-                    x = - getMeasuredWidth() - message.getMeasuredWidth() / 2;
+                    x = -getMeasuredWidth() - message.getMeasuredWidth() / 2;
                 } else {
                     x = getMeasuredWidth() / 2 + message.getMeasuredWidth() / 2;
                 }
@@ -191,12 +176,6 @@ public abstract class ButtonDropTarget extends TextView
     @Override
     public void onDragStart(DropTarget.DragObject dragObject, DragOptions options) {
         mActive = !options.isKeyboardDrag && supportsDrop(dragObject.dragInfo);
-        mDrawable.setColorFilter(null);
-        if (mCurrentColorAnim != null) {
-            mCurrentColorAnim.cancel();
-            mCurrentColorAnim = null;
-        }
-        setTextColor(mOriginalTextColor);
         setVisibility(mActive ? View.VISIBLE : View.GONE);
 
         mAccessibleDrag = options.isAccessibleDrag;
@@ -235,12 +214,11 @@ public abstract class ButtonDropTarget extends TextView
             return;
         }
         final DragLayer dragLayer = mLauncher.getDragLayer();
-        final Rect from = new Rect();
-        dragLayer.getViewRectRelativeToSelf(d.dragView, from);
-
+        final DragView dragView = d.dragView;
         final Rect to = getIconRect(d);
-        final float scale = (float) to.width() / from.width();
-        d.dragView.detachContentView(/* reattachToPreviousParent= */ true);
+        final float scale = (float) to.width() / dragView.getMeasuredWidth();
+        dragView.detachContentView(/* reattachToPreviousParent= */ true);
+
         mDropTargetBar.deferOnDragEnd();
 
         Runnable onAnimationEndRunnable = () -> {
@@ -249,9 +227,9 @@ public abstract class ButtonDropTarget extends TextView
             mLauncher.getStateManager().goToState(NORMAL);
         };
 
-        dragLayer.animateView(d.dragView, from, to, scale, 1f, 1f, 0.1f, 0.1f,
+        dragLayer.animateView(d.dragView, to, scale, 0.1f, 0.1f,
                 DRAG_VIEW_DROP_DURATION,
-                Interpolators.DEACCEL_2, Interpolators.LINEAR, onAnimationEndRunnable,
+                Interpolators.DEACCEL_2, onAnimationEndRunnable,
                 DragLayer.ANIMATION_END_DISAPPEAR, null);
     }
 
@@ -300,7 +278,7 @@ public abstract class ButtonDropTarget extends TextView
         }
 
         final int top = to.top + (getMeasuredHeight() - height) / 2;
-        final int bottom = top +  height;
+        final int bottom = top + height;
 
         to.set(left, top, right, bottom);
 
@@ -312,13 +290,15 @@ public abstract class ButtonDropTarget extends TextView
         return to;
     }
 
+    private void centerIcon() {
+        int x = mTextVisible ? 0
+                : (getWidth() - getPaddingLeft() - getPaddingRight()) / 2 - mDrawableSize / 2;
+        mDrawable.setBounds(x, 0, x + mDrawableSize, mDrawableSize);
+    }
+
     @Override
     public void onClick(View v) {
         mLauncher.getAccessibilityDelegate().handleAccessibleDrop(this, null, null);
-    }
-
-    public int getTextColor() {
-        return getTextColors().getDefaultColor();
     }
 
     public void setTextVisible(boolean isVisible) {
@@ -326,13 +306,56 @@ public abstract class ButtonDropTarget extends TextView
         if (mTextVisible != isVisible || !TextUtils.equals(newText, getText())) {
             mTextVisible = isVisible;
             setText(newText);
+            centerIcon();
             setCompoundDrawablesRelative(mDrawable, null, null, null);
+            int drawablePadding = mTextVisible ? mDrawablePadding : 0;
+            setCompoundDrawablePadding(drawablePadding);
         }
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        centerIcon();
     }
 
     public void setToolTipLocation(int location) {
         mToolTipLocation = location;
         hideTooltip();
+    }
+
+
+    /**
+     * Reduce the size of the text until it fits or reaches a minimum.
+     *
+     * The minimum size is defined by {@code R.dimen.button_drop_target_min_text_size} and
+     * it diminishes by intervals defined by
+     * {@code R.dimen.button_drop_target_resize_text_increment}
+     * This functionality is very similar to the option
+     * {@link TextView#setAutoSizeTextTypeWithDefaults(int)} but can't be used in this view because
+     * the layout width is {@code WRAP_CONTENT}.
+     *
+     * @param availableWidth Available width in the button to fit the text, used in
+     *        {@code ButtonDropTarget#isTextTruncated(int)}
+     * @return The biggest text size in SP that makes the text fit or if the text can't fit returns
+     *         the min available value
+     */
+    public float resizeTextToFit(int availableWidth) {
+        float minSize = Utilities.pxToSp(getResources()
+                .getDimensionPixelSize(R.dimen.button_drop_target_min_text_size));
+        float step = Utilities.pxToSp(getResources()
+                .getDimensionPixelSize(R.dimen.button_drop_target_resize_text_increment));
+        float textSize = Utilities.pxToSp(getTextSize());
+
+        while (textSize > minSize) {
+            if (isTextTruncated(availableWidth)) {
+                textSize -= step;
+                setTextSize(textSize);
+            } else {
+                return textSize;
+            }
+        }
+        return minSize;
     }
 
     public boolean isTextTruncated(int availableWidth) {

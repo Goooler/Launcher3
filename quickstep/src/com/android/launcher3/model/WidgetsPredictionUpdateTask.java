@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.model;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_PREDICTION;
+
 import android.app.prediction.AppTarget;
 import android.content.ComponentName;
 import android.text.TextUtils;
@@ -57,8 +59,8 @@ public final class WidgetsPredictionUpdateTask extends BaseModelUpdateTask {
         Map<PackageUserKey, List<WidgetItem>> allWidgets =
                 dataModel.widgetsModel.getAllWidgetsWithoutShortcuts();
 
-        FixedContainerItems fixedContainerItems = mPredictorState.items;
-        fixedContainerItems.items.clear();
+        FixedContainerItems fixedContainerItems =
+                new FixedContainerItems(mPredictorState.containerId);
 
         if (FeatureFlags.ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER.get()) {
             for (AppTarget app : mTargets) {
@@ -73,13 +75,15 @@ public final class WidgetsPredictionUpdateTask extends BaseModelUpdateTask {
                     if (notAddedWidgets.size() > 0) {
                         // Even an apps have more than one widgets, we only include one widget.
                         fixedContainerItems.items.add(
-                                new PendingAddWidgetInfo(notAddedWidgets.get(0).widgetInfo));
+                                new PendingAddWidgetInfo(
+                                        notAddedWidgets.get(0).widgetInfo,
+                                        CONTAINER_WIDGETS_PREDICTION));
                     }
                 }
             }
         } else {
             Map<ComponentKey, WidgetItem> widgetItems =
-                    allWidgets.values().stream().flatMap(List::stream)
+                    allWidgets.values().stream().flatMap(List::stream).distinct()
                             .collect(Collectors.toMap(widget -> (ComponentKey) widget,
                                     widget -> widget));
             for (AppTarget app : mTargets) {
@@ -90,10 +94,13 @@ public final class WidgetsPredictionUpdateTask extends BaseModelUpdateTask {
                         new ComponentName(app.getPackageName(), app.getClassName()), app.getUser());
                 if (widgetItems.containsKey(targetWidget)) {
                     fixedContainerItems.items.add(
-                            new PendingAddWidgetInfo(widgetItems.get(targetWidget).widgetInfo));
+                            new PendingAddWidgetInfo(widgetItems.get(
+                                    targetWidget).widgetInfo,
+                                    CONTAINER_WIDGETS_PREDICTION));
                 }
             }
         }
+        dataModel.extraItems.put(mPredictorState.containerId, fixedContainerItems);
         bindExtraContainerItems(fixedContainerItems);
 
         // Don't store widgets prediction to disk because it is not used frequently.
