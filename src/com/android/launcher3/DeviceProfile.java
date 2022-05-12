@@ -501,7 +501,7 @@ public class DeviceProfile {
      */
     private int calculateQsbWidth() {
         if (isQsbInline) {
-            int columns = getPanelCount() * inv.numColumns;
+            int columns = isTwoPanels ? inv.numColumns * 2 : inv.numColumns;
             return getIconToIconWidthForColumns(columns)
                     - iconSizePx * numShownHotseatIcons
                     - hotseatBorderSpace * numShownHotseatIcons;
@@ -901,10 +901,14 @@ public class DeviceProfile {
             result = new Point();
         }
 
-        result.x = calculateCellWidth(getShortcutAndWidgetContainerWidth(),
-                cellLayoutBorderSpacePx.x, inv.numColumns);
-        result.y = calculateCellHeight(getShortcutAndWidgetContainerHeight(),
-                cellLayoutBorderSpacePx.y, inv.numRows);
+        int shortcutAndWidgetContainerWidth =
+                getCellLayoutWidth() - (cellLayoutPaddingPx.left + cellLayoutPaddingPx.right);
+        result.x = calculateCellWidth(shortcutAndWidgetContainerWidth, cellLayoutBorderSpacePx.x,
+                inv.numColumns);
+        int shortcutAndWidgetContainerHeight =
+                getCellLayoutHeight() - (cellLayoutPaddingPx.top + cellLayoutPaddingPx.bottom);
+        result.y = calculateCellHeight(shortcutAndWidgetContainerHeight, cellLayoutBorderSpacePx.y,
+                inv.numRows);
         return result;
     }
 
@@ -966,7 +970,7 @@ public class DeviceProfile {
         scale = Math.min(scale, 1f);
 
         // Reduce scale if next pages would not be visible after scaling the workspace
-        int workspaceWidth = getWorkspaceWidth();
+        int workspaceWidth = availableWidthPx;
         float scaledWorkspaceWidth = workspaceWidth * scale;
         float maxAvailableWidth =
                 workspaceWidth - (2 * getWorkspaceSpringLoadedMinimumNextPageVisible());
@@ -977,27 +981,13 @@ public class DeviceProfile {
     }
 
     /**
-     * Gets the width of the Workspace, aka a scrollable page of the homescreen.
-     */
-    public int getWorkspaceWidth() {
-        return availableWidthPx;
-    }
-
-    /**
-     * Gets the height of the Workspace, aka a scrollable page of the homescreen.
-     */
-    public int getWorkspaceHeight() {
-        return availableHeightPx;
-    }
-
-    /**
      * Gets the width of a single Cell Layout, aka a single panel within a Workspace.
      *
      * <p>This is the width of a Workspace, less its horizontal padding. Note that two-panel
      * layouts have two Cell Layouts per workspace.
      */
     public int getCellLayoutWidth() {
-        return (getWorkspaceWidth() - getTotalWorkspacePadding().x) / getPanelCount();
+        return (availableWidthPx - getTotalWorkspacePadding().x) / getPanelCount();
     }
 
     /**
@@ -1006,25 +996,7 @@ public class DeviceProfile {
      * <p>This is the height of a Workspace, less its vertical padding.
      */
     public int getCellLayoutHeight() {
-        return getWorkspaceHeight() - getTotalWorkspacePadding().y;
-    }
-
-    /**
-     * Gets the width of the container holding the shortcuts and widgets.
-     *
-     * <p>This is the width of one Cell Layout less its horizontal padding.
-     */
-    public int getShortcutAndWidgetContainerWidth() {
-        return getCellLayoutWidth() - (cellLayoutPaddingPx.left + cellLayoutPaddingPx.right);
-    }
-
-    /**
-     * Gets the height of the container holding the shortcuts and widgets.
-     *
-     * <p>This is the height of one Cell Layout less its vertical padding.
-     */
-    public int getShortcutAndWidgetContainerHeight() {
-        return getCellLayoutHeight() - (cellLayoutPaddingPx.top + cellLayoutPaddingPx.bottom);
+        return availableHeightPx - getTotalWorkspacePadding().y;
     }
 
     public Point getTotalWorkspacePadding() {
@@ -1196,7 +1168,7 @@ public class DeviceProfile {
             return  ((taskbarSize - overviewActionsHeight) / 2) + getTaskbarOffsetY();
         }
 
-        return 0;
+        return isTaskbarPresent ? stashedTaskbarSize : mInsets.bottom;
     }
 
     /** Gets the space that the overview actions will take, including bottom margin. */
