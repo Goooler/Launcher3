@@ -372,6 +372,7 @@ import java.util.function.Supplier;
 
         // If we're already animating to the value, just leave it be instead of restarting it.
         if (!mIconAlignmentForLauncherState.isAnimatingToValue(toAlignment)) {
+            mIconAlignmentForLauncherState.finishAnimation();
             animatorSet.play(mIconAlignmentForLauncherState.animateToValue(toAlignment)
                     .setDuration(duration));
         }
@@ -427,6 +428,7 @@ import java.util.function.Supplier;
 
         // Switch taskbar and hotseat in last frame
         setTaskbarViewVisible(alignment < 1);
+        mControllers.navbarButtonsViewController.updateTaskbarAlignment(alignment);
     }
 
     private float getCurrentIconAlignmentRatioBetweenAppAndHome() {
