@@ -17,6 +17,7 @@ package com.android.launcher3.allapps;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB;
+import static com.android.launcher3.util.UiThreadHelper.hideKeyboardAsync;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -437,8 +438,12 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (showTabs == mUsingTabs && !force) {
             return;
         }
+
+        // replaceRVcontainer() needs to use both mUsingTabs value to remove the old view AND
+        // showTabs value to create new view. Hence the mUsingTabs new value assignment MUST happen
+        // after this call.
+        replaceRVContainer(showTabs);
         mUsingTabs = showTabs;
-        replaceRVContainer(mUsingTabs);
 
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.MAIN).mRecyclerView);
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.WORK).mRecyclerView);
@@ -454,6 +459,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                             mActivityContext.getStatsLogManager().logger()
                                     .log(LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB);
                         }
+                        hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
+                                getApplicationWindowToken());
                     });
             findViewById(R.id.tab_work)
                     .setOnClickListener((View view) -> {
@@ -461,6 +468,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                             mActivityContext.getStatsLogManager().logger()
                                     .log(LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB);
                         }
+                        hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
+                                getApplicationWindowToken());
                     });
             setDeviceManagementResources();
             onActivePageChanged(mViewPager.getNextPage());

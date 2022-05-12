@@ -35,42 +35,6 @@ import org.mockito.Mockito.`when` as whenever
 class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
 
     @Test
-    fun getWorkspaceWidth_twoPanelLandscapeScalable4By4GridTablet_workspaceWidthIsFullPage() {
-        val tabletWidth = 2560
-        val tabletHeight = 1600
-        val availableWidth = 2560
-        val availableHeight = 1500
-        windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
-        useTwoPanels = true
-        whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
-
-        val dp = newDP()
-
-        val expectedWorkspaceWidth = availableWidth
-        assertThat(dp.workspaceWidth).isEqualTo(expectedWorkspaceWidth)
-    }
-
-    @Test
-    fun getWorkspaceHeight_twoPanelLandscapeScalable4By4GridTablet_workspaceHeightIsFullPage() {
-        val tabletWidth = 2560
-        val tabletHeight = 1600
-        val availableWidth = 2560
-        val availableHeight = 1500
-        windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
-        useTwoPanels = true
-        whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
-
-        val dp = newDP()
-
-        val expectedWorkspaceHeight = availableHeight
-        assertThat(dp.workspaceHeight).isEqualTo(expectedWorkspaceHeight)
-    }
-
-    @Test
     fun getCellLayoutWidth_twoPanelLandscapeScalable4By4GridTablet_equalsSinglePanelWidth() {
         val tabletWidth = 2560
         val tabletHeight = 1600
@@ -79,8 +43,8 @@ class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
         windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
         useTwoPanels = true
         whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
+        whenever(info.densityDpi).thenReturn(320)
+        inv = newScalableInvariantDeviceProfile()
 
         val dp = newDP()
 
@@ -100,8 +64,8 @@ class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
         windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
         useTwoPanels = true
         whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
+        whenever(info.densityDpi).thenReturn(320)
+        inv = newScalableInvariantDeviceProfile()
 
         val dp = newDP()
 
@@ -109,52 +73,6 @@ class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
         val expectedCellLayoutHeight =
                 expectedWorkspaceHeight - (dp.workspacePadding.top + dp.workspacePadding.bottom)
         assertThat(dp.cellLayoutHeight).isEqualTo(expectedCellLayoutHeight)
-    }
-
-    @Test
-    fun getShortcutAndWidgetContainerWidth_twoPanelLandscapeScalable4By4GridTablet_equalsIconsPlusBorderSpacesWidth() {
-        val tabletWidth = 2560
-        val tabletHeight = 1600
-        val availableWidth = 2560
-        val availableHeight = 1500
-        windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
-        useTwoPanels = true
-        whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
-
-        val dp = newDP()
-
-        val expectedWorkspaceWidth = availableWidth
-        val expectedCellLayoutWidth =
-                (expectedWorkspaceWidth - (dp.workspacePadding.right + dp.workspacePadding.left)) /
-                        dp.panelCount
-        val expectedShortcutAndWidgetContainerWidth = expectedCellLayoutWidth -
-                (dp.cellLayoutPaddingPx.left + dp.cellLayoutPaddingPx.right)
-        assertThat(dp.shortcutAndWidgetContainerWidth).isEqualTo(expectedShortcutAndWidgetContainerWidth)
-    }
-
-    @Test
-    fun getShortcutAndWidgetContainerHeight_twoPanelLandscapeScalable4By4GridTablet_equalsIconsPlusBorderSpacesHeight() {
-        val tabletWidth = 2560
-        val tabletHeight = 1600
-        val availableWidth = 2560
-        val availableHeight = 1500
-        windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
-        useTwoPanels = true
-        whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
-
-        val dp = newDP()
-
-        val expectedWorkspaceHeight = availableHeight
-        val expectedCellLayoutHeight =
-                expectedWorkspaceHeight - (dp.workspacePadding.top + dp.workspacePadding.bottom)
-        val expectedShortcutAndWidgetContainerHeight = expectedCellLayoutHeight -
-                (dp.cellLayoutPaddingPx.top + dp.cellLayoutPaddingPx.bottom)
-        assertThat(dp.shortcutAndWidgetContainerHeight).isEqualTo(
-                expectedShortcutAndWidgetContainerHeight)
     }
 
     @Test
@@ -166,8 +84,8 @@ class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
         windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
         useTwoPanels = true
         whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
+        whenever(info.densityDpi).thenReturn(320)
+        inv = newScalableInvariantDeviceProfile()
 
         val dp = newDP()
 
@@ -200,59 +118,11 @@ class DeviceProfileGridDimensionsTest : DeviceProfileBaseTest() {
         windowBounds = WindowBounds(tabletWidth, tabletHeight, availableWidth, availableHeight, 0)
         useTwoPanels = true
         whenever(info.isTablet(ArgumentMatchers.any())).thenReturn(true)
-        whenever(info.getDensityDpi()).thenReturn(320)
-        inv = getScalable4By4InvariantDeviceProfile()
+        whenever(info.densityDpi).thenReturn(320)
+        inv = newScalableInvariantDeviceProfile()
 
         val dp = newDP()
 
         assertThat(dp.panelCount).isEqualTo(2)
-    }
-
-    fun getScalable4By4InvariantDeviceProfile(): InvariantDeviceProfile {
-        return InvariantDeviceProfile().apply {
-            isScalable = true
-            numColumns = 4
-            numRows = 4
-            numShownHotseatIcons = 4
-            numDatabaseHotseatIcons = 6
-            numShrunkenHotseatIcons = 5
-            horizontalMargin = FloatArray(4) { 22f }
-            borderSpaces = listOf(
-                    PointF(16f, 16f),
-                    PointF(16f, 16f),
-                    PointF(16f, 16f),
-                    PointF(16f, 16f)
-            ).toTypedArray()
-            allAppsBorderSpaces = listOf(
-                    PointF(16f, 16f),
-                    PointF(16f, 16f),
-                    PointF(16f, 16f),
-                    PointF(16f, 16f)
-            ).toTypedArray()
-            hotseatBorderSpaces = FloatArray(4) { 16f }
-            hotseatColumnSpan = IntArray(4) { 4 }
-            iconSize = FloatArray(4) { 56f }
-            allAppsIconSize = FloatArray(4) { 56f }
-            iconTextSize = FloatArray(4) { 14f }
-            allAppsIconTextSize = FloatArray(4) { 14f }
-            minCellSize = listOf(
-                    PointF(64f, 83f),
-                    PointF(64f, 83f),
-                    PointF(64f, 83f),
-                    PointF(64f, 83f)
-            ).toTypedArray()
-            allAppsCellSize = listOf(
-                    PointF(64f, 83f),
-                    PointF(64f, 83f),
-                    PointF(64f, 83f),
-                    PointF(64f, 83f)
-            ).toTypedArray()
-            inlineQsb = booleanArrayOf(
-                    false,
-                    false,
-                    false,
-                    false
-            )
-        }
     }
 }
