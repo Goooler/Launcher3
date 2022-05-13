@@ -84,6 +84,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     private STATE_TYPE mTargetState;
 
+    @Nullable private Runnable mOnInitBackgroundStateUICallback = null;
+
     protected BaseActivityInterface(boolean rotationSupportedByActivity,
             STATE_TYPE overviewState, STATE_TYPE backgroundState) {
         this.rotationSupportedByActivity = rotationSupportedByActivity;
@@ -220,32 +222,27 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      */
     public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect) {
         Resources res = context.getResources();
+        float maxScale = res.getFloat(R.dimen.overview_max_scale);
         if (dp.isTablet) {
             Rect gridRect = new Rect();
             calculateGridSize(dp, gridRect);
 
-            PointF taskDimension = getTaskDimension(context, dp);
-            float scale = gridRect.height() / taskDimension.y;
-            scale = Math.min(scale, res.getFloat(R.dimen.overview_max_scale));
-            int outWidth = Math.round(scale * taskDimension.x);
-            int outHeight = Math.round(scale * taskDimension.y);
-
-            int gravity = Gravity.CENTER;
-            Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
+            calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
         } else {
             int taskMargin = dp.overviewTaskMarginPx;
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
                     dp.getOverviewActionsClaimedSpace(),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
+                    maxScale,
                     Gravity.CENTER,
                     outRect);
         }
     }
 
     private void calculateTaskSizeInternal(Context context, DeviceProfile dp, int claimedSpaceAbove,
-            int claimedSpaceBelow, int minimumHorizontalPadding, int gravity, Rect outRect) {
-        PointF taskDimension = getTaskDimension(context, dp);
+            int claimedSpaceBelow, int minimumHorizontalPadding, float maxScale, int gravity,
+            Rect outRect) {
         Rect insets = dp.getInsets();
 
         Rect potentialTaskRect = new Rect(0, 0, dp.widthPx, dp.heightPx);
@@ -256,9 +253,17 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 minimumHorizontalPadding,
                 claimedSpaceBelow);
 
+        calculateTaskSizeInternal(context, dp, potentialTaskRect, maxScale, gravity, outRect);
+    }
+
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
+            Rect potentialTaskRect, float maxScale, int gravity, Rect outRect) {
+        PointF taskDimension = getTaskDimension(context, dp);
+
         float scale = Math.min(
                 potentialTaskRect.width() / taskDimension.x,
                 potentialTaskRect.height() / taskDimension.y);
+        scale = Math.min(scale, maxScale);
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
@@ -357,6 +362,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 dp.overviewTaskMarginPx,
                 dp.heightPx - outRect.bottom - dp.getInsets().bottom,
                 Math.round((dp.availableWidthPx - outRect.width() * maxScale) / 2),
+                1f /*maxScale*/,
                 Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM,
                 outRect);
     }
@@ -408,6 +414,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         return null;
     }
 
+    protected void runOnInitBackgroundStateUI(Runnable callback) {
+        mOnInitBackgroundStateUICallback = callback;
+        ACTIVITY_TYPE activity = getCreatedActivity();
+        if (activity != null && activity.getStateManager().getState() == mBackgroundState) {
+            onInitBackgroundStateUI();
+        }
+    }
+
+    private void onInitBackgroundStateUI() {
+        if (mOnInitBackgroundStateUICallback != null) {
+            mOnInitBackgroundStateUICallback.run();
+            mOnInitBackgroundStateUICallback = null;
+        }
+    }
+
     public interface AnimationFactory {
 
         void createActivityInterface(long transitionLength);
@@ -447,13 +468,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             mStartState = mActivity.getStateManager().getState();
         }
 
-        protected ACTIVITY_TYPE initUI() {
+        protected ACTIVITY_TYPE initBackgroundStateUI() {
             STATE_TYPE resetState = mStartState;
             if (mStartState.shouldDisableRestore()) {
                 resetState = mActivity.getStateManager().getRestState();
             }
             mActivity.getStateManager().setRestState(resetState);
             mActivity.getStateManager().goToState(mBackgroundState, false);
+            onInitBackgroundStateUI();
             return mActivity;
         }
 

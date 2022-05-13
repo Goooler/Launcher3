@@ -22,6 +22,7 @@ import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_STATE_HANDLER;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
+import static com.android.launcher3.PagedView.INVALID_PAGE;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_1_2;
@@ -66,6 +67,7 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnApplyWindowInsetsListener;
@@ -926,7 +928,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             mLogDirectionUpOrLeft = velocity.x < 0;
         }
         mDownPos = downPos;
-        handleNormalGestureEnd(endVelocity, isFling, velocity, false /* isCancel */);
+        Runnable handleNormalGestureEndCallback = () ->
+                handleNormalGestureEnd(endVelocity, isFling, velocity, /* isCancel= */ false);
+        if (mRecentsView != null) {
+            mRecentsView.runOnPageScrollsInitialized(handleNormalGestureEndCallback);
+        } else {
+            handleNormalGestureEndCallback.run();
+        }
     }
 
     private void endRunningWindowAnim(boolean cancel) {
@@ -1057,10 +1065,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                                 : LAST_TASK;
             }
         } else {
-            // If swiping at a diagonal, base end target on the faster velocity.
+            // If swiping at a diagonal on the current task, base end target on the faster velocity.
             boolean isSwipeUp = endVelocity < 0;
-            boolean willGoToNewTask =
-                    canGoToNewTask && Math.abs(velocity.x) > Math.abs(endVelocity);
+            boolean willGoToNewTask = canGoToNewTask && (
+                    mRecentsView.getDestinationPage() != mRecentsView.getCurrentPage()
+                            || Math.abs(velocity.x) > Math.abs(endVelocity));
 
             if (mDeviceState.isFullyGesturalNavMode() && isSwipeUp) {
                 endTarget = willGoToNewTask ? NEW_TASK : HOME;
@@ -1130,6 +1139,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         } else if (endTarget == RECENTS) {
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getDestinationPage();
+                if (nearestPage == INVALID_PAGE) {
+                    // Allow the snap to invalid page to catch future error cases.
+                    Log.e(TAG,
+                            "RecentsView destination page is invalid",
+                            new IllegalStateException());
+                }
+
                 boolean isScrolling = false;
                 if (mRecentsView.getNextPage() != nearestPage) {
                     // We shouldn't really scroll to the next page when swiping up to recents.
@@ -1162,6 +1178,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private void doLogGesture(GestureEndTarget endTarget, @Nullable TaskView targetTask) {
+        if (mDp == null || !mDp.isGestureMode || mDownPos == null) {
+            // We probably never received an animation controller, skip logging.
+            return;
+        }
+
         StatsLogManager.EventEnum event;
         switch (endTarget) {
             case HOME:
@@ -1185,11 +1206,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             logger.withItemInfo(targetTask.getItemInfo());
         }
 
-        DeviceProfile dp = mDp;
-        if (dp == null || mDownPos == null) {
-            // We probably never received an animation controller, skip logging.
-            return;
-        }
         int pageIndex = endTarget == LAST_TASK || mRecentsView == null
                 ? LOG_NO_OP_PAGE_INDEX
                 : mRecentsView.getNextPage();
