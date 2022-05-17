@@ -43,6 +43,7 @@ import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.testing.WorkspaceCellCenterRequest;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -107,6 +108,18 @@ public final class Workspace extends Home {
                     "swiped to all apps")) {
                 return new HomeAllApps(mLauncher);
             }
+        }
+    }
+
+    /**
+     * Returns the home qsb.
+     *
+     * The qsb must already be visible when calling this method.
+     */
+    public HomeQsb getQsb() {
+        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                "want to get the home qsb")) {
+            return new HomeQsb(mLauncher);
         }
     }
 
@@ -222,6 +235,21 @@ public final class Workspace extends Home {
                 mHotseat, AppIcon.getAppIconSelector(appName, mLauncher)));
     }
 
+    /**
+     * @return map of text -> center of the view. In case of icons with the same name, the one with
+     *     lower x coordinate is selected.
+     */
+    public Map<String, Point> getWorkspaceIconsPositions() {
+        final UiObject2 workspace = verifyActiveContainer();
+        List<UiObject2> workspaceIcons =
+                mLauncher.waitForObjectsInContainer(workspace, AppIcon.getAnyAppIconSelector());
+        return workspaceIcons.stream()
+                .collect(
+                        Collectors.toMap(
+                                /* keyMapper= */ UiObject2::getText,
+                                /* valueMapper= */ UiObject2::getVisibleCenter,
+                                /* mergeFunction= */ (p1, p2) -> p1.x < p2.x ? p1 : p2));
+    }
     /*
      * Get the center point of the delete/uninstall icon in the drop target bar.
      */
@@ -389,8 +417,7 @@ public final class Workspace extends Home {
             // Since the destination can be on another page, we need to drag to the edge first
             // until we reach the target page
             while (targetDest.x > displayX || targetDest.x < 0) {
-                // TODO: b/219919285
-                int edgeX = targetDest.x > 0 ? displayX - 1 : 1;
+                int edgeX = targetDest.x > 0 ? displayX : 0;
                 Point screenEdge = new Point(edgeX, targetDest.y);
                 Point finalDragStart = dragStart;
                 executeAndWaitForPageScroll(launcher,

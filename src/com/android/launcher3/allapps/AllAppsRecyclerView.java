@@ -37,8 +37,8 @@ import android.view.View;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.FastScrollRecyclerView;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -53,13 +53,13 @@ import java.util.List;
 /**
  * A RecyclerView with custom fast scroll support for the all apps view.
  */
-public class AllAppsRecyclerView extends FastScrollRecyclerView {
-    protected static final String TAG = "AllAppsRecyclerView";
+public class AllAppsRecyclerView extends BaseRecyclerView {
+    private static final String TAG = "AllAppsContainerView";
     private static final boolean DEBUG = false;
     private static final boolean DEBUG_LATENCY = Utilities.isPropertyEnabled(SEARCH_LOGGING);
 
-    protected AlphabeticalAppsList<?> mApps;
-    protected final int mNumAppsPerRow;
+    private AlphabeticalAppsList<?> mApps;
+    private final int mNumAppsPerRow;
 
     // The specific view heights that we use to calculate scroll
     private final SparseIntArray mViewHeights = new SparseIntArray();
@@ -71,11 +71,31 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         public void onChanged() {
             mCachedScrollPositions.clear();
         }
+
+        @Override
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+            onChanged();
+        }
+
+        @Override
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+            onChanged();
+        }
     };
 
     // The empty-search result background
-    protected AllAppsBackgroundDrawable mEmptySearchBackground;
-    protected int mEmptySearchBackgroundTopOffset;
+    private AllAppsBackgroundDrawable mEmptySearchBackground;
+    private int mEmptySearchBackgroundTopOffset;
 
     private ArrayList<View> mAutoSizedOverlays = new ArrayList<>();
 
@@ -112,7 +132,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         return mApps;
     }
 
-    protected void updatePoolSize() {
+    private void updatePoolSize() {
         DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
         RecyclerView.RecycledViewPool pool = getRecycledViewPool();
         int approxRows = (int) Math.ceil(grid.availableHeightPx / grid.allAppsIconSizePx);
@@ -137,8 +157,8 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
             Log.d(TAG, "onDraw at = " + System.currentTimeMillis());
         }
         if (DEBUG_LATENCY) {
-            Log.d(SEARCH_LOGGING,  getClass().getSimpleName() + " onDraw; time stamp = "
-                    + System.currentTimeMillis());
+            Log.d(SEARCH_LOGGING,
+                    "-- Recycle view onDraw, time stamp = " + System.currentTimeMillis());
         }
         super.onDraw(c);
     }
@@ -208,6 +228,8 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
                 requestFocus();
                 mgr.logger().sendToInteractionJankMonitor(
                         LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN, this);
+                hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
+                        getApplicationWindowToken());
                 break;
             case SCROLL_STATE_IDLE:
                 mgr.logger().sendToInteractionJankMonitor(
@@ -223,7 +245,6 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
                 && mEmptySearchBackground != null && mEmptySearchBackground.getAlpha() > 0) {
             mEmptySearchBackground.setHotspot(e.getX(), e.getY());
         }
-        hideKeyboardAsync(ActivityContext.lookupContext(getContext()), getApplicationWindowToken());
         return result;
     }
 
@@ -240,17 +261,14 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         // Find the fastscroll section that maps to this touch fraction
         List<AlphabeticalAppsList.FastScrollSectionInfo> fastScrollSections =
                 mApps.getFastScrollerSections();
-        AlphabeticalAppsList.FastScrollSectionInfo lastInfo = fastScrollSections.get(0);
-        for (int i = 1; i < fastScrollSections.size(); i++) {
-            AlphabeticalAppsList.FastScrollSectionInfo info = fastScrollSections.get(i);
-            if (info.touchFraction > touchFraction) {
-                break;
-            }
-            lastInfo = info;
+        int count = fastScrollSections.size();
+        if (count == 0) {
+            return "";
         }
-
-        mFastScrollHelper.smoothScrollToSection(lastInfo);
-        return lastInfo.sectionName;
+        int index = Utilities.boundToRange((int) (touchFraction * count), 0, count - 1);
+        AlphabeticalAppsList.FastScrollSectionInfo section = fastScrollSections.get(index);
+        mFastScrollHelper.smoothScrollToSection(section);
+        return section.sectionName;
     }
 
     @Override
@@ -268,12 +286,6 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         if (adapter != null) {
             adapter.registerAdapterDataObserver(mObserver);
         }
-    }
-
-    @Override
-    protected float getBottomFadingEdgeStrength() {
-        // No bottom fading edge.
-        return 0;
     }
 
     @Override
@@ -359,6 +371,13 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
     }
 
     @Override
+    public boolean supportsFastScrolling() {
+        // Only allow fast scrolling when the user is not searching, since the results are not
+        // grouped in a meaningful order
+        return !mApps.hasFilter();
+    }
+
+    @Override
     public int getCurrentScrollY() {
         // Return early if there are no items or we haven't been measured
         List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
@@ -368,7 +387,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
 
         // Calculate the y and offset for the item
         View child = getChildAt(0);
-        int position = getChildAdapterPosition(child);
+        int position = getChildPosition(child);
         if (position == NO_POSITION) {
             return -1;
         }
