@@ -16,22 +16,18 @@
 package com.android.launcher3.allapps;
 
 import android.content.Context;
-import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.WindowInsets;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.Utilities;
 
 /**
  * AllAppsContainerView with launcher specific callbacks
  */
-public class LauncherAllAppsContainerView extends AllAppsContainerView {
-
-    private final Launcher mLauncher;
-
-    private StateListener<LauncherState> mWorkTabListener;
+public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<Launcher> {
 
     public LauncherAllAppsContainerView(Context context) {
         this(context, null);
@@ -43,14 +39,13 @@ public class LauncherAllAppsContainerView extends AllAppsContainerView {
 
     public LauncherAllAppsContainerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        mLauncher = Launcher.getLauncher(context);
     }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         // The AllAppsContainerView houses the QSB and is hence visible from the Workspace
         // Overview states. We shouldn't intercept for the scrubber in these cases.
-        if (!mLauncher.isInState(LauncherState.ALL_APPS)) {
+        if (!mActivityContext.isInState(LauncherState.ALL_APPS)) {
             mTouchHandler = null;
             return false;
         }
@@ -60,30 +55,18 @@ public class LauncherAllAppsContainerView extends AllAppsContainerView {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
-        if (!mLauncher.isInState(LauncherState.ALL_APPS)) {
+        if (!mActivityContext.isInState(LauncherState.ALL_APPS)) {
             return false;
         }
         return super.onTouchEvent(ev);
     }
 
     @Override
-    public void setInsets(Rect insets) {
-        super.setInsets(insets);
-        int allAppsStartingPositionY = mLauncher.getDeviceProfile().availableHeightPx
-                - mLauncher.getDeviceProfile().allAppsOpenVerticalTranslate;
-        mLauncher.getAllAppsController().setScrollRangeDelta(allAppsStartingPositionY);
-    }
-
-    @Override
-    public void setupHeader() {
-        super.setupHeader();
-        if (mWorkTabListener != null && !mUsingTabs) {
-            mLauncher.getStateManager().removeStateListener(mWorkTabListener);
+    protected int getNavBarScrimHeight(WindowInsets insets) {
+        if (Utilities.ATLEAST_Q) {
+            return insets.getTappableElementInsets().bottom;
+        } else {
+            return insets.getStableInsetBottom();
         }
-    }
-
-    @Override
-    public void onActivePageChanged(int currentActivePage) {
-        super.onActivePageChanged(currentActivePage);
     }
 }
