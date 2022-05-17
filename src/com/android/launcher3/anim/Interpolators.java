@@ -47,13 +47,6 @@ public class Interpolators {
     public static final Interpolator DEACCEL_2_5 = new DecelerateInterpolator(2.5f);
     public static final Interpolator DEACCEL_3 = new DecelerateInterpolator(3f);
 
-    /**
-     * The decelerating emphasized interpolator. Used for hero / emphasized movement of content that
-     * is appearing e.g. when coming from off screen
-     */
-    public static final Interpolator EMPHASIZED_DECELERATE = new PathInterpolator(
-            0.05f, 0.7f, 0.1f, 1f);
-
     public static final Interpolator ACCEL_DEACCEL = new AccelerateDecelerateInterpolator();
 
     public static final Interpolator FAST_OUT_SLOW_IN = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
@@ -63,6 +56,11 @@ public class Interpolators {
 
     public static final Interpolator DECELERATED_EASE = new PathInterpolator(0, 0, .2f, 1f);
     public static final Interpolator ACCELERATED_EASE = new PathInterpolator(0.4f, 0, 1f, 1f);
+
+    public static final Interpolator EMPHASIZED_ACCELERATE = new PathInterpolator(
+            0.3f, 0f, 0.8f, 0.15f);
+    public static final Interpolator EMPHASIZED_DECELERATE = new PathInterpolator(
+            0.05f, 0.7f, 0.1f, 1f);
 
     public static final Interpolator EXAGGERATED_EASE;
 
@@ -163,14 +161,18 @@ public class Interpolators {
                     String.format("upperBound (%f) must be greater than lowerBound (%f)",
                             upperBound, lowerBound));
         }
-        return t -> clampToProgress(t, lowerBound, upperBound);
+        return t -> clampToProgress(interpolator, t, lowerBound, upperBound);
     }
 
     /**
      * Returns the progress value's progress between the lower and upper bounds. That is, the
      * progress will be 0f from 0f to lowerBound, and reach 1f by upperBound.
+     *
+     * Between lowerBound and upperBound, the progress value will be interpolated using the provided
+     * interpolator.
      */
-    public static float clampToProgress(float progress, float lowerBound, float upperBound) {
+    public static float clampToProgress(
+            Interpolator interpolator, float progress, float lowerBound, float upperBound) {
         if (upperBound < lowerBound) {
             throw new IllegalArgumentException(
                     String.format("upperBound (%f) must be greater than lowerBound (%f)",
@@ -186,7 +188,15 @@ public class Interpolators {
         if (progress > upperBound) {
             return 1;
         }
-        return (progress - lowerBound) / (upperBound - lowerBound);
+        return interpolator.getInterpolation((progress - lowerBound) / (upperBound - lowerBound));
+    }
+
+    /**
+     * Returns the progress value's progress between the lower and upper bounds. That is, the
+     * progress will be 0f from 0f to lowerBound, and reach 1f by upperBound.
+     */
+    public static float clampToProgress(float progress, float lowerBound, float upperBound) {
+        return clampToProgress(Interpolators.LINEAR, progress, lowerBound, upperBound);
     }
 
     /**

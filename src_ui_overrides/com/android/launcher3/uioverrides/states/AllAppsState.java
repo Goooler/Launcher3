@@ -20,6 +20,7 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAP
 
 import android.content.Context;
 
+import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
@@ -39,8 +40,11 @@ public class AllAppsState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context) {
-        return 320;
+    public <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfileListenable>
+    int getTransitionDuration(DEVICE_PROFILE_CONTEXT context, boolean isToState) {
+        return !context.getDeviceProfile().isTablet && isToState
+                ? 600
+                : isToState ? 500 : 300;
     }
 
     @Override
@@ -55,15 +59,21 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        ScaleAndTranslation scaleAndTranslation =
-                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
+        return new ScaleAndTranslation(0.97f, NO_OFFSET, NO_OFFSET);
+    }
+
+    @Override
+    public ScaleAndTranslation getHotseatScaleAndTranslation(Launcher launcher) {
         if (launcher.getDeviceProfile().isTablet) {
-            scaleAndTranslation.scale = 0.97f;
+            return getWorkspaceScaleAndTranslation(launcher);
         } else {
-            scaleAndTranslation.translationY =
-                    -launcher.getAllAppsController().getShiftRange() * PARALLAX_COEFFICIENT;
+            ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
+                    .getWorkspaceScaleAndTranslation(launcher);
+            return new ScaleAndTranslation(
+                    NO_SCALE,
+                    overviewScaleAndTranslation.translationX,
+                    overviewScaleAndTranslation.translationY);
         }
-        return scaleAndTranslation;
     }
 
     @Override
