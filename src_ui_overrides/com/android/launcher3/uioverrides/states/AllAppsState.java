@@ -32,6 +32,7 @@ import com.android.launcher3.util.Themes;
 public class AllAppsState extends LauncherState {
 
     private static final float PARALLAX_COEFFICIENT = .125f;
+    private static final float WORKSPACE_SCALE_FACTOR = 0.97f;
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE;
 
@@ -59,15 +60,21 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        ScaleAndTranslation scaleAndTranslation =
-                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
+        return new ScaleAndTranslation(WORKSPACE_SCALE_FACTOR, NO_OFFSET, NO_OFFSET);
+    }
+
+    @Override
+    public ScaleAndTranslation getHotseatScaleAndTranslation(Launcher launcher) {
         if (launcher.getDeviceProfile().isTablet) {
-            scaleAndTranslation.scale = 0.97f;
+            return getWorkspaceScaleAndTranslation(launcher);
         } else {
-            scaleAndTranslation.translationY =
-                    -launcher.getAllAppsController().getShiftRange() * PARALLAX_COEFFICIENT;
+            ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
+                    .getWorkspaceScaleAndTranslation(launcher);
+            return new ScaleAndTranslation(
+                    WORKSPACE_SCALE_FACTOR,
+                    overviewScaleAndTranslation.translationX,
+                    overviewScaleAndTranslation.translationY);
         }
-        return scaleAndTranslation;
     }
 
     @Override
