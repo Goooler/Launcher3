@@ -66,9 +66,9 @@ public class OverviewState extends LauncherState {
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
-        float workspacePageWidth = launcher.getDeviceProfile().getWorkspaceWidth();
+        float workspacePageHeight = launcher.getDeviceProfile().getCellLayoutHeight();
         recentsView.getTaskSize(sTempRect);
-        float scale = (float) sTempRect.width() / workspacePageWidth;
+        float scale = (float) sTempRect.height() / workspacePageHeight;
         float parallaxFactor = 0.5f;
         return new ScaleAndTranslation(scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor);
     }
@@ -133,7 +133,7 @@ public class OverviewState extends LauncherState {
     public void onBackPressed(Launcher launcher) {
         TaskView taskView = launcher.<RecentsView>getOverviewPanel().getRunningTaskView();
         if (taskView != null) {
-            taskView.launchTaskAnimated();
+            taskView.launchTasks();
         } else {
             super.onBackPressed(launcher);
         }

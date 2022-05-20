@@ -100,8 +100,7 @@ public class ItemClickHandler {
                 onClickFolderIcon(v);
             }
         } else if (tag instanceof AppInfo) {
-            startAppShortcutOrInfoActivity(v, (AppInfo) tag, launcher
-            );
+            startAppShortcutOrInfoActivity(v, (AppInfo) tag, launcher);
         } else if (tag instanceof LauncherAppWidgetInfo) {
             if (v instanceof PendingAppWidgetHostView) {
                 onClickPendingWidget((PendingAppWidgetHostView) v, launcher);
@@ -177,7 +176,8 @@ public class ItemClickHandler {
                 .setNeutralButton(R.string.abandoned_clean_this,
                         (d, i) -> launcher.getWorkspace()
                                 .persistRemoveItemsByMatcher(ItemInfoMatcher.ofPackages(
-                                        Collections.singleton(packageName), user)))
+                                        Collections.singleton(packageName), user),
+                                        "user explicitly removes the promise app icon"))
                 .create().show();
     }
 
@@ -260,7 +260,8 @@ public class ItemClickHandler {
                             // Remove the icon if launcher is successfully initialized
                             launcher.getWorkspace().persistRemoveItemsByMatcher(ItemInfoMatcher
                                     .ofShortcutKeys(Collections.singleton(ShortcutKey
-                                            .fromItemInfo(shortcut))));
+                                            .fromItemInfo(shortcut))),
+                                    "user explicitly removes disabled shortcut");
                         })
                         .create()
                         .show();
