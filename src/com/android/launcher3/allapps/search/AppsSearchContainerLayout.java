@@ -38,7 +38,6 @@ import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
-import com.android.launcher3.allapps.AlphabeticalAppsList;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.search.SearchCallback;
@@ -57,7 +56,6 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     private final AllAppsSearchBarController mSearchBarController;
     private final SpannableStringBuilder mSearchQueryBuilder;
 
-    private AlphabeticalAppsList<?> mSearchResultsList;
     private ActivityAllAppsContainerView<?> mAppsView;
 
     // The amount of pixels to shift down and overlap with the rest of the content.
@@ -102,8 +100,8 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         // Update the width to match the grid padding
         DeviceProfile dp = mLauncher.getDeviceProfile();
         int myRequestedWidth = getSize(widthMeasureSpec);
-        int rowWidth = myRequestedWidth - mAppsView.getActiveAppsRecyclerView().getPaddingLeft()
-                - mAppsView.getActiveAppsRecyclerView().getPaddingRight();
+        int rowWidth = myRequestedWidth - mAppsView.getActiveRecyclerView().getPaddingLeft()
+                - mAppsView.getActiveRecyclerView().getPaddingRight();
 
         int cellWidth = DeviceProfile.calculateCellWidth(rowWidth,
                 dp.cellLayoutBorderSpacePx.x, dp.numShownHotseatIcons);
@@ -131,7 +129,6 @@ public class AppsSearchContainerLayout extends ExtendedEditText
 
     @Override
     public void initializeSearch(ActivityAllAppsContainerView<?> appsView) {
-        mSearchResultsList = appsView.getSearchResultList();
         mAppsView = appsView;
         mSearchBarController.initialize(
                 new DefaultAppSearchAlgorithm(getContext()),
@@ -170,35 +167,20 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     @Override
     public void onSearchResult(String query, ArrayList<AdapterItem> items) {
         if (items != null) {
-            mSearchResultsList.setSearchResults(items);
-            notifyResultChanged();
+            mAppsView.setSearchResults(items);
             mAppsView.setLastSearchQuery(query);
         }
     }
 
     @Override
-    public void onAppendSearchResult(String query, ArrayList<AdapterItem> items) {
-        if (items != null) {
-            mSearchResultsList.appendSearchResults(items);
-            notifyResultChanged();
-        }
-    }
-
-    @Override
     public void clearSearchResult() {
-        if (mSearchResultsList.setSearchResults(null)) {
-            notifyResultChanged();
-        }
+        mAppsView.setSearchResults(null);
 
         // Clear the search query
         mSearchQueryBuilder.clear();
         mSearchQueryBuilder.clearSpans();
         Selection.setSelection(mSearchQueryBuilder, 0);
         mAppsView.onClearSearchResult();
-    }
-
-    private void notifyResultChanged() {
-        mAppsView.onSearchResultsChanged();
     }
 
     @Override

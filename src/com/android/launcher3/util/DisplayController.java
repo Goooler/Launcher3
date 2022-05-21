@@ -242,7 +242,9 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             change |= CHANGE_SUPPORTED_BOUNDS;
 
             Point currentS = newInfo.currentSize;
-            Point expectedS = oldInfo.mPerDisplayBounds.get(newInfo.displayId).first.size;
+            Pair<CachedDisplayInfo, WindowBounds[]> cachedBounds =
+                    oldInfo.mPerDisplayBounds.get(newInfo.displayId);
+            Point expectedS = cachedBounds == null ? null : cachedBounds.first.size;
             if (newInfo.supportedBounds.size() != oldInfo.supportedBounds.size()) {
                 Log.e("b/198965093",
                         "Inconsistent number of displays"
@@ -250,10 +252,12 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                                 + "\noldInfo.supportedBounds: " + oldInfo.supportedBounds
                                 + "\nnewInfo.supportedBounds: " + newInfo.supportedBounds);
             }
-            if ((Math.min(currentS.x, currentS.y) != Math.min(expectedS.x, expectedS.y)
+            if (expectedS != null
+                    && (Math.min(currentS.x, currentS.y) != Math.min(expectedS.x, expectedS.y)
                     || Math.max(currentS.x, currentS.y) != Math.max(expectedS.x, expectedS.y))
                     && display.getState() == Display.STATE_OFF) {
-                Log.e("b/198965093", "Display size changed while display is off, ignoring change");
+                Log.e("b/198965093",
+                        "Display size changed while display is off, ignoring change");
                 return;
             }
         }
@@ -286,7 +290,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
         // Configuration property
         public final float fontScale;
-        public final int densityDpi;
+        private final int densityDpi;
         public final NavigationMode navigationMode;
 
         private final PortraitSize mScreenSizeDp;
@@ -352,6 +356,10 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
          */
         public float smallestSizeDp(WindowBounds bounds) {
             return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()), densityDpi);
+        }
+
+        public int getDensityDpi() {
+            return densityDpi;
         }
     }
 
