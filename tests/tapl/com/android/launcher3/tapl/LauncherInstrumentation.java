@@ -84,7 +84,6 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -92,7 +91,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * The main tapl object. The only object that can be explicitly constructed by the using code. It
@@ -501,29 +499,16 @@ public final class LauncherInstrumentation {
         }
     }
 
-    void checkPackagesVisible(String[] expectedVisiblePackages) {
-        Set<String> actualVisiblePackages =
-                getVisiblePackagesStream().collect(Collectors.toSet());
-
-        for (String expectedVisible : expectedVisiblePackages) {
-            assertTrue("Expected package not visible: " + expectedVisible,
-                    actualVisiblePackages.contains(expectedVisible));
-        }
-    }
-
     private String getVisiblePackages() {
-        final String apps = getVisiblePackagesStream().collect(Collectors.joining(", "));
-        return !apps.isEmpty()
-                ? "active app: " + apps
-                : "the test doesn't see views from any app, including Launcher";
-    }
-
-    private Stream<String> getVisiblePackagesStream() {
-        return mDevice.findObjects(getAnyObjectSelector())
+        final String apps = mDevice.findObjects(getAnyObjectSelector())
                 .stream()
                 .map(LauncherInstrumentation::getApplicationPackageSafe)
                 .distinct()
-                .filter(pkg -> pkg != null && !SYSTEMUI_PACKAGE.equals(pkg));
+                .filter(pkg -> pkg != null && !SYSTEMUI_PACKAGE.equals(pkg))
+                .collect(Collectors.joining(", "));
+        return !apps.isEmpty()
+                ? "active app: " + apps
+                : "the test doesn't see views from any app, including Launcher";
     }
 
     private static String getApplicationPackageSafe(UiObject2 object) {
@@ -1499,9 +1484,14 @@ public final class LauncherInstrumentation {
                 0, 0, 1.0f, 1.0f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0);
     }
 
+    private boolean hasTIS() {
+        return getTestInfo(TestProtocol.REQUEST_HAS_TIS).getBoolean(TestProtocol.REQUEST_HAS_TIS);
+    }
+
+
     public void sendPointer(long downTime, long currentTime, int action, Point point,
             GestureScope gestureScope) {
-        final boolean notLauncher3 = !isLauncher3();
+        final boolean hasTIS = hasTIS();
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 if (gestureScope != GestureScope.OUTSIDE_WITH_PILFER
@@ -1509,12 +1499,12 @@ public final class LauncherInstrumentation {
                         && gestureScope != GestureScope.OUTSIDE_WITH_KEYCODE) {
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_DOWN);
                 }
-                if (notLauncher3 && getNavigationModel() != NavigationModel.THREE_BUTTON) {
+                if (hasTIS && getNavigationModel() != NavigationModel.THREE_BUTTON) {
                     expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_DOWN_TIS);
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                if (notLauncher3 && gestureScope != GestureScope.INSIDE
+                if (hasTIS && gestureScope != GestureScope.INSIDE
                         && gestureScope != GestureScope.INSIDE_TO_OUTSIDE_WITHOUT_PILFER
                         && (gestureScope == GestureScope.OUTSIDE_WITH_PILFER
                         || gestureScope == GestureScope.INSIDE_TO_OUTSIDE)) {
@@ -1528,7 +1518,7 @@ public final class LauncherInstrumentation {
                                     || gestureScope == GestureScope.OUTSIDE_WITHOUT_PILFER
                                     ? EVENT_TOUCH_UP : EVENT_TOUCH_CANCEL);
                 }
-                if (notLauncher3 && getNavigationModel() != NavigationModel.THREE_BUTTON) {
+                if (hasTIS && getNavigationModel() != NavigationModel.THREE_BUTTON) {
                     expectEvent(TestProtocol.SEQUENCE_TIS,
                             gestureScope == GestureScope.INSIDE_TO_OUTSIDE_WITH_KEYCODE
                                     || gestureScope == GestureScope.OUTSIDE_WITH_KEYCODE
@@ -1562,11 +1552,11 @@ public final class LauncherInstrumentation {
 
             // vx0: initial speed at the x-dimension, set as twice the avg speed
             // dx: the constant deceleration at the x-dimension
-            double vx0 = 2 * (to.x - from.x) / duration;
+            double vx0 = 2.0 * (to.x - from.x) / duration;
             double dx = vx0 / duration;
             // vy0: initial speed at the y-dimension, set as twice the avg speed
             // dy: the constant deceleration at the y-dimension
-            double vy0 = 2 * (to.y - from.y) / duration;
+            double vy0 = 2.0 * (to.y - from.y) / duration;
             double dy = vy0 / duration;
 
             for (long i = 0; i < steps; ++i) {

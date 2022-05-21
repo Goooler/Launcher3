@@ -23,7 +23,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.compat.AccessibilityManagerCompat;
@@ -37,19 +36,19 @@ import com.android.launcher3.views.RecyclerViewFastScroller;
  *   <li> Enable fast scroller.
  * </ul>
  */
-public abstract class FastScrollRecyclerView extends RecyclerView  {
+public abstract class BaseRecyclerView extends RecyclerView  {
 
     protected RecyclerViewFastScroller mScrollbar;
 
-    public FastScrollRecyclerView(Context context) {
+    public BaseRecyclerView(Context context) {
         this(context, null);
     }
 
-    public FastScrollRecyclerView(Context context, AttributeSet attrs) {
+    public BaseRecyclerView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public FastScrollRecyclerView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public BaseRecyclerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
 
@@ -196,13 +195,6 @@ public abstract class FastScrollRecyclerView extends RecyclerView  {
     public void scrollToTop() {
         if (mScrollbar != null) {
             mScrollbar.reattachThumbToScroll();
-        }
-        if (getLayoutManager() instanceof LinearLayoutManager) {
-            LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
-            if (layoutManager.findFirstCompletelyVisibleItemPosition() == 0) {
-                // We are at the top, so don't scrollToPosition (would cause unnecessary relayout).
-                return;
-            }
         }
         scrollToPosition(0);
     }
