@@ -35,6 +35,7 @@ import androidx.annotation.UiThread;
 
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -176,9 +177,9 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     ((RecentsActivity) activityInterface.getCreatedActivity()).startHome();
                     return;
                 }
+
                 RemoteAnimationTarget[] nonAppTargets =
-                        SystemUiProxy.INSTANCE.getNoCreate()
-                                .onGoingToRecentsLegacy(false, nonHomeApps);
+                        SystemUiProxy.INSTANCE.getNoCreate().onStartingSplitLegacy(nonHomeApps);
 
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && activityInterface.isInLiveTileMode()
                         && activityInterface.getCreatedActivity() != null) {
@@ -191,6 +192,10 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                                 RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */);
                         return;
                     }
+                } else if (nonAppTargets != null && nonAppTargets.length > 0) {
+                    TaskViewUtils.createSplitAuxiliarySurfacesAnimator(
+                            RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */,
+                            true /*shown*/, dividerAnimator -> dividerAnimator.start());
                 }
                 if (mController != null) {
                     if (mLastAppearedTaskTarget == null
@@ -234,9 +239,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             // Allowing to pause Home if Home is top activity and Recents is not Home. So when user
             // start home when recents animation is playing, the home activity can be resumed again
             // to let the transition controller collect Home activity.
-            ActivityManager.RunningTaskInfo rti = gestureState.getRunningTask();
-            boolean homeIsOnTop = rti != null && rti.topActivity != null
-                    && rti.topActivity.equals(gestureState.getHomeIntent().getComponent());
+            CachedTaskInfo cti = gestureState.getRunningTask();
+            boolean homeIsOnTop = cti != null && cti.isHomeTask();
             if (!homeIsOnTop) {
                 options.setTransientLaunch();
             }

@@ -17,6 +17,7 @@ package com.android.launcher3.allapps;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB;
+import static com.android.launcher3.util.UiThreadHelper.hideKeyboardAsync;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -58,7 +59,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.model.StringCache;
-import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
@@ -69,6 +70,8 @@ import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePag
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Base all apps view container.
@@ -91,7 +94,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     /** Context of an activity or window that is inflating this container. */
     protected final T mActivityContext;
     protected final List<AdapterHolder> mAH;
-    protected final ItemInfoMatcher mPersonalMatcher = ItemInfoMatcher.ofUser(
+    protected final Predicate<ItemInfo> mPersonalMatcher = ItemInfoMatcher.ofUser(
             Process.myUserHandle());
     private final SearchAdapterProvider<?> mMainAdapterProvider;
     private final AllAppsStore mAllAppsStore = new AllAppsStore();
@@ -140,7 +143,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         mWorkManager = new WorkProfileManager(
                 mActivityContext.getSystemService(UserManager.class),
                 this,
-                Utilities.getPrefs(mActivityContext));
+                Utilities.getPrefs(mActivityContext), mActivityContext.getDeviceProfile());
         mAH = Arrays.asList(null, null);
         mAH.set(AdapterHolder.MAIN, new AdapterHolder(false /* isWork */));
         mAH.set(AdapterHolder.WORK, new AdapterHolder(true /* isWork */));
@@ -229,17 +232,10 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     }
 
     private void onAppsUpdated() {
-        boolean hasWorkApps = false;
-        for (AppInfo app : mAllAppsStore.getApps()) {
-            if (mWorkManager.getMatcher().matches(app, null)) {
-                hasWorkApps = true;
-                break;
-            }
-        }
-        mHasWorkApps = hasWorkApps;
+        mHasWorkApps = Stream.of(mAllAppsStore.getApps()).anyMatch(mWorkManager.getMatcher());
         if (!mAH.get(AdapterHolder.MAIN).mAppsList.hasFilter()) {
             rebindAdapters();
-            if (hasWorkApps) {
+            if (mHasWorkApps) {
                 mWorkManager.reset();
             }
         }
@@ -330,7 +326,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     }
 
     protected boolean isPersonalTab() {
-        return mViewPager.getNextPage() == 0;
+        return mViewPager == null || mViewPager.getNextPage() == 0;
     }
 
     /**
@@ -392,34 +388,34 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         mInsets.set(insets);
         DeviceProfile grid = mActivityContext.getDeviceProfile();
 
-        for (int i = 0; i < mAH.size(); i++) {
-            mAH.get(i).mPadding.bottom = insets.bottom;
-            mAH.get(i).mPadding.left = mAH.get(i).mPadding.right = grid.allAppsLeftRightPadding;
-            mAH.get(i).applyPadding();
-        }
+        applyAdapterPaddings(grid);
 
         MarginLayoutParams mlp = (MarginLayoutParams) getLayoutParams();
-        int leftRightMargin = grid.allAppsLeftRightMargin;
-        mlp.leftMargin = insets.left + leftRightMargin;
-        mlp.rightMargin = insets.right + leftRightMargin;
+        mlp.leftMargin = insets.left;
+        mlp.rightMargin = insets.right;
         setLayoutParams(mlp);
 
         if (grid.isVerticalBarLayout()) {
             setPadding(grid.workspacePadding.left, 0, grid.workspacePadding.right, 0);
         } else {
-            setPadding(0, grid.allAppsTopPadding, 0, 0);
+            setPadding(grid.allAppsLeftRightMargin, grid.allAppsTopPadding,
+                    grid.allAppsLeftRightMargin, 0);
         }
 
         InsettableFrameLayout.dispatchInsets(this, insets);
     }
 
+    /**
+     * Returns a padding in case a scrim is shown on the bottom of the view and a padding is needed.
+     */
+    protected int getNavBarScrimHeight(WindowInsets insets) {
+        return 0;
+    }
+
     @Override
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
-        if (Utilities.ATLEAST_Q) {
-            mNavBarScrimHeight = insets.getTappableElementInsets().bottom;
-        } else {
-            mNavBarScrimHeight = insets.getStableInsetBottom();
-        }
+        mNavBarScrimHeight = getNavBarScrimHeight(insets);
+        applyAdapterPaddings(mActivityContext.getDeviceProfile());
         return super.dispatchApplyWindowInsets(insets);
     }
 
@@ -442,8 +438,12 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (showTabs == mUsingTabs && !force) {
             return;
         }
+
+        // replaceRVcontainer() needs to use both mUsingTabs value to remove the old view AND
+        // showTabs value to create new view. Hence the mUsingTabs new value assignment MUST happen
+        // after this call.
+        replaceRVContainer(showTabs);
         mUsingTabs = showTabs;
-        replaceRVContainer(mUsingTabs);
 
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.MAIN).mRecyclerView);
         mAllAppsStore.unregisterIconContainer(mAH.get(AdapterHolder.WORK).mRecyclerView);
@@ -459,6 +459,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                             mActivityContext.getStatsLogManager().logger()
                                     .log(LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB);
                         }
+                        hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
+                                getApplicationWindowToken());
                     });
             findViewById(R.id.tab_work)
                     .setOnClickListener((View view) -> {
@@ -466,6 +468,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                             mActivityContext.getStatsLogManager().logger()
                                     .log(LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB);
                         }
+                        hideKeyboardAsync(ActivityContext.lookupContext(getContext()),
+                                getApplicationWindowToken());
                     });
             setDeviceManagementResources();
             onActivePageChanged(mViewPager.getNextPage());
@@ -477,6 +481,15 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
 
         mAllAppsStore.registerIconContainer(mAH.get(AdapterHolder.MAIN).mRecyclerView);
         mAllAppsStore.registerIconContainer(mAH.get(AdapterHolder.WORK).mRecyclerView);
+    }
+
+    private void applyAdapterPaddings(DeviceProfile grid) {
+        int bottomPadding = Math.max(mInsets.bottom, mNavBarScrimHeight);
+        for (int i = 0; i < mAH.size(); i++) {
+            mAH.get(i).mPadding.bottom = bottomPadding;
+            mAH.get(i).mPadding.left = mAH.get(i).mPadding.right = grid.allAppsLeftRightPadding;
+            mAH.get(i).applyPadding();
+        }
     }
 
     private void setDeviceManagementResources() {
@@ -597,13 +610,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         }
     }
 
-    /** @see View#setVerticalFadingEdgeEnabled(boolean). */
-    public void setRecyclerViewVerticalFadingEdgeEnabled(boolean enabled) {
-        for (int i = 0; i < mAH.size(); i++) {
-            mAH.get(i).applyVerticalFadingEdgeEnabled(enabled);
-        }
-    }
-
     public boolean isHeaderVisible() {
         return mHeader != null && mHeader.getVisibility() == View.VISIBLE;
     }
@@ -714,7 +720,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         final AlphabeticalAppsList<T> mAppsList;
         final Rect mPadding = new Rect();
         AllAppsRecyclerView mRecyclerView;
-        boolean mVerticalFadingEdge;
 
         AdapterHolder(boolean isWork) {
             mIsWork = isWork;
@@ -731,7 +736,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
             mLayoutManager = adapter.getLayoutManager();
         }
 
-        void setup(@NonNull View rv, @Nullable ItemInfoMatcher matcher) {
+        void setup(@NonNull View rv, @Nullable Predicate<ItemInfo> matcher) {
             mAppsList.updateItemFilter(matcher);
             mRecyclerView = (AllAppsRecyclerView) rv;
             mRecyclerView.setEdgeEffectFactory(createEdgeEffectFactory());
@@ -745,7 +750,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
             FocusedItemDecorator focusedItemDecorator = new FocusedItemDecorator(mRecyclerView);
             mRecyclerView.addItemDecoration(focusedItemDecorator);
             adapter.setIconFocusListener(focusedItemDecorator.getFocusListener());
-            applyVerticalFadingEdgeEnabled(mVerticalFadingEdge);
             applyPadding();
         }
 
@@ -758,12 +762,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                 mRecyclerView.setPadding(mPadding.left, mPadding.top, mPadding.right,
                         mPadding.bottom + bottomOffset);
             }
-        }
-
-        private void applyVerticalFadingEdgeEnabled(boolean enabled) {
-            mVerticalFadingEdge = enabled;
-            mAH.get(AdapterHolder.MAIN).mRecyclerView.setVerticalFadingEdgeEnabled(!mUsingTabs
-                    && mVerticalFadingEdge);
         }
     }
 

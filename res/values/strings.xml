@@ -217,7 +217,7 @@
     <string name="disabled_app_label">Disabled <xliff:g id="app_name" example="Messenger">%1$s</xliff:g></string>
     <!-- The format string for when an app has a notification dot (meaning it has associated notifications). [ICU_FORMAT]-->
     <string name="dotted_app_label">
-        {count, plural, offset:1
+        {count, plural,
             =1      {{app_name} has # notification}
             other   {{app_name} has # notifications}
         }
@@ -277,6 +277,9 @@
     <!-- Summary for Notification dots setting. Tapping this will link enable/disable notification dots feature on the home screen. [CHAR LIMIT=50] -->
     <string name="notification_dots_service_title">Show notification dots</string>
 
+    <!-- Title for Developer Options setting. [CHAR LIMIT=50] -->
+    <string name="developer_options_title">Developer Options</string>
+
     <!-- Label for the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=60] -->
     <string name="auto_add_shortcuts_label">Add app icons to home screen</string>
     <!-- Text description of the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=NONE] -->
@@ -302,6 +305,17 @@
     <string name="app_downloading_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> downloading, <xliff:g id="progress" example="30%">%2$s</xliff:g> complete</string>
     <!-- Title for an app whose download has been started. -->
     <string name="app_waiting_download_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> waiting to install</string>
+
+
+    <!-- Title shown on the alert dialog prompting the user to update the application in market
+     in order to re-enable the disabled shortcuts -->
+    <string name="dialog_update_title">App update required</string>
+    <!-- Message shown on the alert dialog prompting the user to update the application -->
+    <string name="dialog_update_message">The app for this icon isn\'t updated. You can update manually to re-enable this shortcut, or remove the icon.</string>
+    <!-- Message for the update button in the alert dialog, will bring the user to market -->
+    <string name="dialog_update">Update</string>
+    <!-- Message for the remove button in the alert dialog -->
+    <string name="dialog_remove">Remove</string>
 
     <!-- Strings for widgets & more in the popup container/bottom sheet -->
 
@@ -417,13 +431,17 @@
     <string name="work_apps_paused_edu_accept">Got it</string>
 
     <!-- button string shown pause work profile -->
-    <string name="work_apps_pause_btn_text">Turn off work apps</string>
+    <string name="work_apps_pause_btn_text">Pause work apps</string>
     <!-- button string shown enable work profile -->
     <string name="work_apps_enable_btn_text">Turn on work apps</string>
 
     <!-- A hint shown in launcher settings develop options filter box -->
     <string name="developer_options_filter_hint">Filter</string>
 
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title">Search your phone</string>
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title_tablet">Search your tablet</string>
     <!-- Failed action error message: e.g. Failed: Pause -->
     <string name="remote_action_failed">Failed: <xliff:g id="what" example="Pause">%1$s</xliff:g></string>
 </resources>

@@ -41,7 +41,7 @@ public class Hotseat extends CellLayout implements Insettable {
 
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mHasVerticalHotseat;
-    private Workspace mWorkspace;
+    private Workspace<?> mWorkspace;
     private boolean mSendTouchToWorkspace;
     @Nullable
     private Consumer<Boolean> mOnVisibilityAggregatedCallback;
@@ -122,7 +122,7 @@ public class Hotseat extends CellLayout implements Insettable {
         InsettableFrameLayout.dispatchInsets(this, insets);
     }
 
-    public void setWorkspace(Workspace w) {
+    public void setWorkspace(Workspace<?> w) {
         mWorkspace = w;
     }
 
@@ -173,17 +173,9 @@ public class Hotseat extends CellLayout implements Insettable {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        int width;
-        if (mActivity.getDeviceProfile().isQsbInline) {
-            width = mActivity.getDeviceProfile().qsbWidth;
-        } else {
-            MarginLayoutParams qsbParams = (MarginLayoutParams) mQsb.getLayoutParams();
-            width = getShortcutsAndWidgets().getMeasuredWidth()
-                    - qsbParams.getMarginStart()
-                    - qsbParams.getMarginEnd();
-        }
+        int qsbWidth = mActivity.getDeviceProfile().qsbWidth;
 
-        mQsb.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+        mQsb.measure(MeasureSpec.makeMeasureSpec(qsbWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(mQsbHeight, MeasureSpec.EXACTLY));
     }
 
@@ -195,7 +187,8 @@ public class Hotseat extends CellLayout implements Insettable {
         int left;
         if (mActivity.getDeviceProfile().isQsbInline) {
             int qsbSpace = mActivity.getDeviceProfile().hotseatBorderSpace;
-            left = l + getPaddingLeft() - qsbWidth - qsbSpace;
+            left = Utilities.isRtl(getResources()) ? r - getPaddingRight() + qsbSpace
+                    : l + getPaddingLeft() - qsbWidth - qsbSpace;
         } else {
             left = (r - l - qsbWidth) / 2;
         }

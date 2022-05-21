@@ -100,6 +100,9 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
         setOverviewStateEnabled(toState.overviewUi);
         setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
         setOverviewFullscreenEnabled(toState.getOverviewFullscreenProgress() == 1);
+        if (toState == OVERVIEW_MODAL_TASK) {
+            setOverviewSelectEnabled(true);
+        }
         Log.d(BAD_STATE, "LRV onStateTransitionStart setFreezeVisibility=true, toState=" + toState);
         setFreezeViewVisibility(true);
     }
@@ -115,6 +118,9 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
         Log.d(BAD_STATE, "LRV onStateTransitionComplete setFreezeVisibility=false, finalState="
                 + finalState);
         setFreezeViewVisibility(false);
+        if (finalState != OVERVIEW_MODAL_TASK) {
+            setOverviewSelectEnabled(false);
+        }
 
         if (isOverlayEnabled) {
             runActionOnRemoteHandles(remoteTargetHandle ->
@@ -180,5 +186,10 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
     public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
         super.initiateSplitSelect(splitSelectSource);
         mActivity.getStateManager().goToState(LauncherState.OVERVIEW_SPLIT_SELECT);
+    }
+
+    @Override
+    protected boolean canLaunchFullscreenTask() {
+        return !mActivity.isInState(OVERVIEW_SPLIT_SELECT);
     }
 }
