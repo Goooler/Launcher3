@@ -19,6 +19,7 @@ import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
+import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 
 import android.content.ComponentCallbacks;
@@ -38,10 +39,10 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
 import com.android.launcher3.util.DisplayController;
-import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.RecentsActivity;
@@ -55,7 +56,7 @@ import java.io.PrintWriter;
 /**
  * Class to manage taskbar lifecycle
  */
-public class TaskbarManager implements DisplayController.DisplayInfoChangeListener {
+public class TaskbarManager {
 
     private static final Uri USER_SETUP_COMPLETE_URI = Settings.Secure.getUriFor(
             Settings.Secure.USER_SETUP_COMPLETE);
@@ -91,8 +92,15 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      * navigation mode, that callback gets called too soon, before it's internal navigation mode
      * reflects the current one.
      * DisplayController's callback is delayed enough to get the correct nav mode value
+     *
+     * We also use density change here because DeviceProfile has had a chance to update it's state
+     * whereas density for component callbacks registered in this class don't update DeviceProfile.
+     * Confused? Me too. Make it less confusing (TODO: b/227669780)
+     *
+     * Flags used with {@link #mDispInfoChangeListener}
      */
-    private static final int CHANGE_FLAGS = CHANGE_NAVIGATION_MODE;
+    private static final int CHANGE_FLAGS = CHANGE_NAVIGATION_MODE | CHANGE_DENSITY;
+    private final DisplayController.DisplayInfoChangeListener mDispInfoChangeListener;
 
     private boolean mUserUnlocked = false;
 
@@ -105,6 +113,7 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
                 SystemUiProxy.INSTANCE.get(mContext), new Handler());
         mUserSetupCompleteListener = isUserSetupComplete -> recreateTaskbar();
         mNavBarKidsModeListener = isNavBarKidsMode -> recreateTaskbar();
+        // TODO(b/227669780): Consolidate this w/ DisplayController callbacks
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
 
@@ -116,7 +125,7 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
                 int configDiff = mOldConfig.diff(newConfig);
                 int configsRequiringRecreate = ActivityInfo.CONFIG_ASSETS_PATHS
                         | ActivityInfo.CONFIG_LAYOUT_DIRECTION | ActivityInfo.CONFIG_UI_MODE
-                        | ActivityInfo.CONFIG_DENSITY | ActivityInfo.CONFIG_SCREEN_SIZE;
+                        | ActivityInfo.CONFIG_SCREEN_SIZE;
                 boolean requiresRecreate = (configDiff & configsRequiringRecreate) != 0;
                 if ((configDiff & ActivityInfo.CONFIG_SCREEN_SIZE) != 0
                         && mTaskbarActivityContext != null && dp != null) {
@@ -151,8 +160,12 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
             public void onLowMemory() { }
         };
         mShutdownReceiver = new SimpleBroadcastReceiver(i -> destroyExistingTaskbar());
-
-        mDisplayController.addChangeListener(this);
+        mDispInfoChangeListener = (context, info, flags) -> {
+            if ((flags & CHANGE_FLAGS) != 0) {
+                recreateTaskbar();
+            }
+        };
+        mDisplayController.addChangeListener(mDispInfoChangeListener);
         SettingsCache.INSTANCE.get(mContext).register(USER_SETUP_COMPLETE_URI,
                 mUserSetupCompleteListener);
         SettingsCache.INSTANCE.get(mContext).register(NAV_BAR_KIDS_MODE,
@@ -163,18 +176,22 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         recreateTaskbar();
     }
 
-    @Override
-    public void onDisplayInfoChanged(Context context, Info info, int flags) {
-        if ((flags & CHANGE_FLAGS) != 0) {
-            recreateTaskbar();
-        }
-    }
-
     private void destroyExistingTaskbar() {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.onDestroy();
             mTaskbarActivityContext = null;
         }
+    }
+
+    /**
+     * Displays a frame of the first Launcher reveal animation.
+     *
+     * This should be used to run a first Launcher reveal animation whose progress matches a swipe
+     * progress.
+     */
+    public AnimatorPlaybackController createLauncherStartFromSuwAnim(int duration) {
+        return mTaskbarActivityContext == null
+                ? null : mTaskbarActivityContext.createLauncherStartFromSuwAnim(duration);
     }
 
     /**
@@ -189,6 +206,9 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      * Sets a {@link StatefulActivity} to act as taskbar callback
      */
     public void setActivity(@NonNull StatefulActivity activity) {
+        if (mActivity == activity) {
+            return;
+        }
         mActivity = activity;
         mUnfoldProgressProvider.setSourceProvider(getUnfoldTransitionProgressProviderForActivity(
                 activity));
@@ -310,7 +330,7 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      */
     public void destroy() {
         destroyExistingTaskbar();
-        mDisplayController.removeChangeListener(this);
+        mDisplayController.removeChangeListener(mDispInfoChangeListener);
         SettingsCache.INSTANCE.get(mContext).unregister(USER_SETUP_COMPLETE_URI,
                 mUserSetupCompleteListener);
         SettingsCache.INSTANCE.get(mContext).unregister(NAV_BAR_KIDS_MODE,

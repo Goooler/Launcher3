@@ -39,21 +39,20 @@ public class SpringLoadedState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context) {
+    public int getTransitionDuration(Context context, boolean isToState) {
         return 150;
     }
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         DeviceProfile grid = launcher.getDeviceProfile();
-        Workspace ws = launcher.getWorkspace();
+        Workspace<?> ws = launcher.getWorkspace();
         if (ws.getChildCount() == 0) {
             return super.getWorkspaceScaleAndTranslation(launcher);
         }
 
-        float shrunkTop = grid.getWorkspaceSpringLoadShrunkTop();
-        float shrunkBottom = grid.getWorkspaceSpringLoadShrunkBottom();
-        float scale = (shrunkBottom - shrunkTop) / ws.getNormalChildHeight();
+        float shrunkTop = grid.getCellLayoutSpringLoadShrunkTop();
+        float scale = grid.getWorkspaceSpringLoadScale();
 
         float halfHeight = ws.getHeight() / 2;
         float myCenter = ws.getTop() + halfHeight;

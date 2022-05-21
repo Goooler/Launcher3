@@ -29,11 +29,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.views.AppLauncher;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 /**
@@ -95,11 +97,15 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         mHeader.reset(false);
     }
 
-    /** Invoke when the search results change. */
-    public void onSearchResultsChanged() {
-        for (int i = 0; i < mAH.size(); i++) {
-            if (mAH.get(i).mRecyclerView != null) {
-                mAH.get(i).mRecyclerView.onSearchResultsChanged();
+    /**
+     * Sets results list for search
+     */
+    public void setSearchResults(ArrayList<AdapterItem> results) {
+        if (getApps().setSearchResults(results)) {
+            for (int i = 0; i < mAH.size(); i++) {
+                if (mAH.get(i).mRecyclerView != null) {
+                    mAH.get(i).mRecyclerView.onSearchResultsChanged();
+                }
             }
         }
     }
@@ -175,22 +181,27 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     @Override
     protected View replaceRVContainer(boolean showTabs) {
         View rvContainer = super.replaceRVContainer(showTabs);
+
+        removeCustomRules(rvContainer);
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
-            alignParentTop(rvContainer);
+            alignParentTop(rvContainer, showTabs);
             layoutAboveSearchContainer(rvContainer);
         } else {
-            layoutBelowSearchContainer(rvContainer);
+            layoutBelowSearchContainer(rvContainer, showTabs);
         }
+
         return rvContainer;
     }
 
     @Override
     void setupHeader() {
         super.setupHeader();
+
+        removeCustomRules(mHeader);
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
-            alignParentTop(mHeader);
+            alignParentTop(mHeader, false /* includeTabsMargin */);
         } else {
-            layoutBelowSearchContainer(mHeader);
+            layoutBelowSearchContainer(mHeader, false /* includeTabsMargin */);
         }
     }
 
@@ -226,31 +237,55 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         return super.getHeaderBottom() + mSearchContainer.getBottom();
     }
 
-    private void layoutBelowSearchContainer(View v) {
+    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
-        layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
-        layoutParams.removeRule(RelativeLayout.ABOVE);
-        layoutParams.addRule(RelativeLayout.BELOW, R.id.search_container_all_apps);
+        layoutParams.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
+
+        int topMargin = getContext().getResources().getDimensionPixelSize(
+                R.dimen.all_apps_header_top_margin);
+        if (includeTabsMargin) {
+            topMargin = topMargin + getContext().getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_header_pill_height);
+        }
+        layoutParams.topMargin = topMargin;
     }
 
     private void layoutAboveSearchContainer(View v) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
         layoutParams.addRule(RelativeLayout.ABOVE, R.id.search_container_all_apps);
     }
 
-    private void alignParentTop(View v) {
+    private void alignParentTop(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
             return;
         }
+
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
-        layoutParams.removeRule(RelativeLayout.BELOW);
         layoutParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        layoutParams.topMargin =
+                includeTabsMargin
+                        ? getContext().getResources().getDimensionPixelSize(
+                                R.dimen.all_apps_header_pill_height)
+                        : 0;
+    }
+
+    private void removeCustomRules(View v) {
+        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
+            return;
+        }
+
+        RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
+        layoutParams.removeRule(RelativeLayout.ABOVE);
+        layoutParams.removeRule(RelativeLayout.ALIGN_TOP);
+        layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
     }
 
     @Override

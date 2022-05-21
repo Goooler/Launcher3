@@ -32,7 +32,6 @@ import androidx.test.uiautomator.Until;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.tapl.HomeAllApps;
 import com.android.launcher3.tapl.LaunchedAppState;
 import com.android.launcher3.tapl.LauncherInstrumentation.NavigationModel;
 import com.android.launcher3.tapl.Overview;
@@ -45,7 +44,6 @@ import com.android.quickstep.views.RecentsView;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -54,6 +52,8 @@ import org.junit.runner.RunWith;
 public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     private static final String APP_NAME = "LauncherTestApp";
+    private static final String CALCULATOR_APP_PACKAGE =
+            resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR);
 
     @Before
     public void setUp() throws Exception {
@@ -75,7 +75,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     public static void startTestApps() throws Exception {
         startAppFast(getAppPackageName());
-        startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
+        startAppFast(CALCULATOR_APP_PACKAGE);
         startTestActivity(2);
     }
 
@@ -209,7 +209,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @NavigationModeSwitch
     @PortraitLandscape
     public void testBackground() throws Exception {
-        startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
+        startAppFast(CALCULATOR_APP_PACKAGE);
         final LaunchedAppState launchedAppState = getAndAssertLaunchedApp();
 
         assertNotNull("Background.switchToOverview() returned null",
@@ -295,26 +295,16 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         getAndAssertLaunchedApp();
     }
 
-    // TODO(b/204830798): test with all navigation modes(add @NavigationModeSwitch annotation)
-    //  after the bug resolved.
-    @Ignore("b/205027405")
     @Test
     @PortraitLandscape
-    @ScreenRecord
+    @NavigationModeSwitch
     public void testPressBack() throws Exception {
         mLauncher.getWorkspace().switchToAllApps();
         mLauncher.pressBack();
         mLauncher.getWorkspace();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
 
-        HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
-        allApps.freeze();
-        try {
-            allApps.getAppIcon(APP_NAME).dragToWorkspace(false, false);
-        } finally {
-            allApps.unfreeze();
-        }
-        mLauncher.getWorkspace().getWorkspaceAppIcon(APP_NAME).launch(getAppPackageName());
+        startAppFast(CALCULATOR_APP_PACKAGE);
         mLauncher.pressBack();
         mLauncher.getWorkspace();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);

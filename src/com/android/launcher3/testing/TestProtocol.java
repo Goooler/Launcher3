@@ -110,6 +110,7 @@ public final class TestProtocol {
     public static final String REQUEST_GET_ACTIVITIES_CREATED_COUNT =
             "get-activities-created-count";
     public static final String REQUEST_GET_ACTIVITIES = "get-activities";
+    public static final String REQUEST_HAS_TIS = "has-touch-interaction-service";
 
     public static final String REQUEST_WORKSPACE_CELL_LAYOUT_SIZE = "workspace-cell-layout-size";
     public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
@@ -136,6 +137,6 @@ public final class TestProtocol {
     public static final String NO_DROP_TARGET = "b/195031154";
     public static final String NULL_INT_SET = "b/200572078";
     public static final String MISSING_PROMISE_ICON = "b/202985412";
-
     public static final String BAD_STATE = "b/223498680";
+    public static final String TASKBAR_IN_APP_STATE = "b/227657604";
 }

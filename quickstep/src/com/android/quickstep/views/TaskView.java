@@ -20,7 +20,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
-import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -619,76 +618,7 @@ public class TaskView extends FrameLayout implements Reusable {
         if (confirmSecondSplitSelectApp()) {
             return;
         }
-        RecentsView recentsView = getRecentsView();
-        RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
-            if (!mIsClickableAsLiveTile) {
-                return;
-            }
-
-            // Reset the minimized state since we force-toggled the minimized state when entering
-            // overview, but never actually finished the recents animation
-            SystemUiProxy p = SystemUiProxy.INSTANCE.getNoCreate();
-            if (p != null) {
-                p.setSplitScreenMinimized(false);
-            }
-
-            mIsClickableAsLiveTile = false;
-            RemoteAnimationTargets targets;
-            if (remoteTargetHandles.length == 1) {
-                targets = remoteTargetHandles[0].getTransformParams().getTargetSet();
-            } else {
-                TransformParams topLeftParams = remoteTargetHandles[0].getTransformParams();
-                TransformParams rightBottomParams = remoteTargetHandles[1].getTransformParams();
-                RemoteAnimationTargetCompat[] apps = Stream.concat(
-                        Arrays.stream(topLeftParams.getTargetSet().apps),
-                        Arrays.stream(rightBottomParams.getTargetSet().apps))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                RemoteAnimationTargetCompat[] wallpapers = Stream.concat(
-                        Arrays.stream(topLeftParams.getTargetSet().wallpapers),
-                        Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                targets = new RemoteAnimationTargets(apps, wallpapers,
-                        topLeftParams.getTargetSet().nonApps,
-                        topLeftParams.getTargetSet().targetMode);
-            }
-            if (targets == null) {
-                // If the recents animation is cancelled somehow between the parent if block and
-                // here, try to launch the task as a non live tile task.
-                launchTaskAnimated();
-                mIsClickableAsLiveTile = true;
-                return;
-            }
-
-            AnimatorSet anim = new AnimatorSet();
-            TaskViewUtils.composeRecentsLaunchAnimator(
-                    anim, this, targets.apps,
-                    targets.wallpapers, targets.nonApps, true /* launcherClosing */,
-                    mActivity.getStateManager(), recentsView,
-                    recentsView.getDepthController());
-            anim.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    recentsView.runActionOnRemoteHandles(
-                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
-                                    remoteTargetHandle
-                                            .getTaskViewSimulator()
-                                            .setDrawsBelowRecents(false));
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animator) {
-                    if (mTask != null && mTask.key.displayId != getRootViewDisplayId()) {
-                        launchTaskAnimated();
-                    }
-                    mIsClickableAsLiveTile = true;
-                }
-            });
-            anim.start();
-            recentsView.onTaskLaunchedInLiveTileMode();
-        } else {
-            launchTaskAnimated();
-        }
+        launchTasks();
         mActivity.getStatsLogManager().logger().withItemInfo(getItemInfo())
                 .log(LAUNCHER_TASK_LAUNCH_TAP);
     }
@@ -698,14 +628,10 @@ public class TaskView extends FrameLayout implements Reusable {
      *         second app. {@code false} otherwise
      */
     private boolean confirmSecondSplitSelectApp() {
-        boolean isSelectingSecondSplitApp = getRecentsView().isSplitSelectionActive();
-        if (isSelectingSecondSplitApp) {
-            int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
-            TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
-            getRecentsView().confirmSplitSelect(this, container.getTask(), container.getIconView(),
-                    container.getThumbnailView());
-        }
-        return isSelectingSecondSplitApp;
+        int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
+        TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
+        return getRecentsView().confirmSplitSelect(this, container.getTask(),
+                container.getIconView(), container.getThumbnailView());
     }
 
     /**
@@ -790,6 +716,79 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     /**
+     * Launch of the current task (both live and inactive tasks) with an animation.
+     */
+    public void launchTasks() {
+        RecentsView recentsView = getRecentsView();
+        RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
+        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
+            if (!mIsClickableAsLiveTile) {
+                return;
+            }
+
+            // Reset the minimized state since we force-toggled the minimized state when entering
+            // overview, but never actually finished the recents animation
+            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
+
+            mIsClickableAsLiveTile = false;
+            RemoteAnimationTargets targets;
+            if (remoteTargetHandles.length == 1) {
+                targets = remoteTargetHandles[0].getTransformParams().getTargetSet();
+            } else {
+                TransformParams topLeftParams = remoteTargetHandles[0].getTransformParams();
+                TransformParams rightBottomParams = remoteTargetHandles[1].getTransformParams();
+                RemoteAnimationTargetCompat[] apps = Stream.concat(
+                        Arrays.stream(topLeftParams.getTargetSet().apps),
+                        Arrays.stream(rightBottomParams.getTargetSet().apps))
+                        .toArray(RemoteAnimationTargetCompat[]::new);
+                RemoteAnimationTargetCompat[] wallpapers = Stream.concat(
+                        Arrays.stream(topLeftParams.getTargetSet().wallpapers),
+                        Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
+                        .toArray(RemoteAnimationTargetCompat[]::new);
+                targets = new RemoteAnimationTargets(apps, wallpapers,
+                        topLeftParams.getTargetSet().nonApps,
+                        topLeftParams.getTargetSet().targetMode);
+            }
+            if (targets == null) {
+                // If the recents animation is cancelled somehow between the parent if block and
+                // here, try to launch the task as a non live tile task.
+                launchTaskAnimated();
+                mIsClickableAsLiveTile = true;
+                return;
+            }
+
+            AnimatorSet anim = new AnimatorSet();
+            TaskViewUtils.composeRecentsLaunchAnimator(
+                    anim, this, targets.apps,
+                    targets.wallpapers, targets.nonApps, true /* launcherClosing */,
+                    mActivity.getStateManager(), recentsView,
+                    recentsView.getDepthController());
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    recentsView.runActionOnRemoteHandles(
+                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
+                                    remoteTargetHandle
+                                            .getTaskViewSimulator()
+                                            .setDrawsBelowRecents(false));
+                }
+
+                @Override
+                public void onAnimationEnd(Animator animator) {
+                    if (mTask != null && mTask.key.displayId != getRootViewDisplayId()) {
+                        launchTaskAnimated();
+                    }
+                    mIsClickableAsLiveTile = true;
+                }
+            });
+            anim.start();
+            recentsView.onTaskLaunchedInLiveTileMode();
+        } else {
+            launchTaskAnimated();
+        }
+    }
+
+    /**
      * See {@link TaskDataChanges}
      * @param visible If this task view will be visible to the user in overview or hidden
      */
@@ -855,7 +854,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     private boolean showTaskMenu(IconView iconView) {
-        if (getRecentsView().mActivity.isInState(OVERVIEW_SPLIT_SELECT)) {
+        if (!getRecentsView().canLaunchFullscreenTask()) {
             // Don't show menu when selecting second split screen app
             return true;
         }
@@ -1030,7 +1029,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     public float getTaskCornerRadius() {
-        return TaskCornerRadius.get(mActivity);
+        return mCurrentFullscreenParams.mCornerRadius;
     }
 
     @Override

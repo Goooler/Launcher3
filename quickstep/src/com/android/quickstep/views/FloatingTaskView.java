@@ -196,6 +196,13 @@ public class FloatingTaskView extends FrameLayout {
                     0, 1, ACCEL);
             animation.addFloat(mThumbnailView, LauncherAnimUtils.VIEW_ALPHA,
                     1, 0, DEACCEL_3);
+        } else if (isStagedTask) {
+            // Fade in the placeholder view when split is initiated from homescreen / all apps
+            // icons.
+            if (mSplitPlaceholderView.getAlpha() == 0) {
+                animation.addFloat(mSplitPlaceholderView, SplitPlaceholderView.ALPHA_FLOAT,
+                        0.3f, 1, ACCEL);
+            }
         }
 
         MultiValueUpdateListener listener = new MultiValueUpdateListener() {
@@ -239,12 +246,10 @@ public class FloatingTaskView extends FrameLayout {
      *                        offscreen).
      */
     void centerIconView(IconView iconView, float onScreenRectCenterX, float onScreenRectCenterY) {
-        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) iconView.getLayoutParams();
-        mOrientationHandler.updateStagedSplitIconParams(params, onScreenRectCenterX,
+        mOrientationHandler.updateStagedSplitIconParams(iconView, onScreenRectCenterX,
                 onScreenRectCenterY, mFullscreenParams.mScaleX, mFullscreenParams.mScaleY,
                 iconView.getDrawableWidth(), iconView.getDrawableHeight(),
                 mActivity.getDeviceProfile(), mStagePosition);
-        iconView.setLayoutParams(params);
     }
 
     private static class SplitOverlayProperties {

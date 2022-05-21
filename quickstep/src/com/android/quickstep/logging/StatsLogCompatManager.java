@@ -20,6 +20,7 @@ import static androidx.core.util.Preconditions.checkNotNull;
 import static androidx.core.util.Preconditions.checkState;
 
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_NON_ACTIONABLE;
+import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.ALL_APPS_CONTAINER;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.FOLDER;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.SEARCH_RESULT_CONTAINER;
@@ -92,6 +93,7 @@ public class StatsLogCompatManager extends StatsLogManager {
     private static final int FOLDER_HIERARCHY_OFFSET = 100;
     private static final int SEARCH_RESULT_HIERARCHY_OFFSET = 200;
     private static final int EXTENDED_CONTAINERS_HIERARCHY_OFFSET = 300;
+    private static final int ALL_APPS_HIERARCHY_OFFSET = 400;
 
     /**
      * Flags for converting SearchAttribute to integer value.
@@ -128,7 +130,7 @@ public class StatsLogCompatManager extends StatsLogManager {
         if (IS_VERBOSE) {
             Log.d(TAG, String.format("\nwriteSnapshot(%d):\n%s", instanceId.getId(), info));
         }
-        if (!Utilities.ATLEAST_R) {
+        if (!Utilities.ATLEAST_R || Utilities.IS_RUNNING_IN_TEST_HARNESS) {
             return;
         }
         SysUiStatsLog.write(SysUiStatsLog.LAUNCHER_SNAPSHOT,
@@ -403,7 +405,7 @@ public class StatsLogCompatManager extends StatsLogManager {
                             String.format("(State:%s->%s)", getStateString(srcState),
                                     getStateString(dstState)));
                 }
-                if (mItemInfo != DEFAULT_ITEM_INFO) {
+                if (atomInfo.hasContainerInfo()) {
                     logStringBuilder.append("\n").append(atomInfo);
                 }
                 Log.d(TAG, logStringBuilder.toString());
@@ -413,6 +415,10 @@ public class StatsLogCompatManager extends StatsLogManager {
                 consumer.consume(event, atomInfo);
             }
 
+            // TODO: remove this when b/231648228 is fixed.
+            if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+                return;
+            }
             SysUiStatsLog.write(
                     SysUiStatsLog.LAUNCHER_EVENT,
                     SysUiStatsLog.LAUNCHER_UICHANGED__ACTION__DEFAULT_ACTION /* deprecated */,
@@ -492,9 +498,7 @@ public class StatsLogCompatManager extends StatsLogManager {
                 String name = (event instanceof Enum) ? ((Enum) event).name() :
                         event.getId() + "";
                 StringBuilder logStringBuilder = new StringBuilder("\n");
-                if (mInstanceId != DEFAULT_INSTANCE_ID) {
-                    logStringBuilder.append(String.format("InstanceId:%s ", mInstanceId));
-                }
+                logStringBuilder.append(String.format("InstanceId:%s ", mInstanceId));
                 logStringBuilder.append(String.format("%s=%sms", name, mLatencyInMillis));
                 Log.d(LATENCY_TAG, logStringBuilder.toString());
             }
@@ -510,6 +514,9 @@ public class StatsLogCompatManager extends StatsLogManager {
     }
 
     private static int getCardinality(LauncherAtom.ItemInfo info) {
+        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+            return 0;
+        }
         switch (info.getContainerInfo().getContainerCase()) {
             case PREDICTED_HOTSEAT_CONTAINER:
                 return info.getContainerInfo().getPredictedHotseatContainer().getCardinality();
@@ -625,6 +632,9 @@ public class StatsLogCompatManager extends StatsLogManager {
     }
 
     private static int getHierarchy(LauncherAtom.ItemInfo info) {
+        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+            return 0;
+        }
         if (info.getContainerInfo().getContainerCase() == FOLDER) {
             return info.getContainerInfo().getFolder().getParentContainerCase().getNumber()
                     + FOLDER_HIERARCHY_OFFSET;
@@ -634,6 +644,9 @@ public class StatsLogCompatManager extends StatsLogManager {
         } else if (info.getContainerInfo().getContainerCase() == EXTENDED_CONTAINERS) {
             return info.getContainerInfo().getExtendedContainers().getContainerCase().getNumber()
                     + EXTENDED_CONTAINERS_HIERARCHY_OFFSET;
+        } else if (info.getContainerInfo().getContainerCase() == ALL_APPS_CONTAINER) {
+            return info.getContainerInfo().getAllAppsContainer().getParentContainerCase()
+                    .getNumber() + ALL_APPS_HIERARCHY_OFFSET;
         } else {
             return info.getContainerInfo().getContainerCase().getNumber();
         }
@@ -662,6 +675,9 @@ public class StatsLogCompatManager extends StatsLogManager {
     }
 
     private static int getSearchAttributes(LauncherAtom.ItemInfo info) {
+        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+            return 0;
+        }
         ContainerInfo containerInfo = info.getContainerInfo();
         if (containerInfo.getContainerCase() == EXTENDED_CONTAINERS
                 && containerInfo.getExtendedContainers().getContainerCase()

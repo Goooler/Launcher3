@@ -23,7 +23,6 @@ import static android.view.View.VISIBLE;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
 import static com.android.launcher3.model.ModelUtils.getMissingHotseatRanks;
-import static com.android.launcher3.model.ModelUtils.sortWorkspaceItemsSpatially;
 
 import android.annotation.TargetApi;
 import android.app.Fragment;
@@ -84,6 +83,7 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.uioverrides.PredictedAppIconInflater;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext;
@@ -130,7 +130,7 @@ public class LauncherPreviewRenderer extends ContextWrapper
             super(base, UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
                     CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE,
-                    WindowManagerProxy.INSTANCE);
+                    WindowManagerProxy.INSTANCE, DisplayController.INSTANCE);
             mIdp = idp;
             mObjectMap.put(InvariantDeviceProfile.INSTANCE, idp);
             mObjectMap.put(LauncherAppState.INSTANCE,
@@ -420,8 +420,6 @@ public class LauncherPreviewRenderer extends ContextWrapper
                 currentWorkspaceItems, otherWorkspaceItems);
         filterCurrentWorkspaceItems(currentScreenIds, dataModel.appWidgets, currentAppWidgets,
                 otherAppWidgets);
-
-        sortWorkspaceItemsSpatially(mIdp, currentWorkspaceItems);
         for (ItemInfo itemInfo : currentWorkspaceItems) {
             switch (itemInfo.itemType) {
                 case Favorites.ITEM_TYPE_APPLICATION:
