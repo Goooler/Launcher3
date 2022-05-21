@@ -39,7 +39,7 @@ public class SpringLoadedState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context) {
+    public int getTransitionDuration(Context context, boolean isToState) {
         return 150;
     }
 
@@ -51,17 +51,8 @@ public class SpringLoadedState extends LauncherState {
             return super.getWorkspaceScaleAndTranslation(launcher);
         }
 
-        float shrunkTop = grid.getWorkspaceSpringLoadShrunkTop();
-        float shrunkBottom = grid.getWorkspaceSpringLoadShrunkBottom();
-        float scale = Math.min((shrunkBottom - shrunkTop) / ws.getNormalChildHeight(), 1f);
-
-        // Reduce scale if next pages would not be visible after scaling the workspace
-        float scaledWorkspaceWidth = ws.getWidth() * scale;
-        float maxAvailableWidth =
-                ws.getWidth() - (2 * grid.getWorkspaceSpringLoadedMinimumNextPageVisible());
-        if (scaledWorkspaceWidth > maxAvailableWidth) {
-            scale *= maxAvailableWidth / scaledWorkspaceWidth;
-        }
+        float shrunkTop = grid.getCellLayoutSpringLoadShrunkTop();
+        float scale = grid.getWorkspaceSpringLoadScale();
 
         float halfHeight = ws.getHeight() / 2;
         float myCenter = ws.getTop() + halfHeight;
