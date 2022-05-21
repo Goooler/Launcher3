@@ -108,7 +108,7 @@ public class TestInformationHandler implements ResourceBasedOverride {
 
             case TestProtocol.REQUEST_APPS_LIST_SCROLL_Y: {
                 return getLauncherUIProperty(Bundle::putInt,
-                        l -> l.getAppsView().getActiveAppsRecyclerView().getCurrentScrollY());
+                        l -> l.getAppsView().getActiveRecyclerView().getCurrentScrollY());
             }
 
             case TestProtocol.REQUEST_WIDGETS_SCROLL_Y: {
@@ -197,6 +197,12 @@ public class TestInformationHandler implements ResourceBasedOverride {
                             cellLayout, request.cellX, request.cellY, request.spanX, request.spanY);
                     return new Point(cellRect.centerX(), cellRect.centerY());
                 });
+
+            case TestProtocol.REQUEST_HAS_TIS: {
+                response.putBoolean(
+                        TestProtocol.REQUEST_HAS_TIS, false);
+                return response;
+            }
 
             default:
                 return null;

@@ -84,8 +84,7 @@ public class AllAppsTransitionController
                 @Override
                 public Float get(AllAppsTransitionController controller) {
                     if (controller.mIsTablet) {
-                        return controller.mAppsView.getAppsRecyclerViewContainer()
-                                .getTranslationY();
+                        return controller.mAppsView.getRecyclerViewContainer().getTranslationY();
                     } else {
                         return controller.getAppsViewPullbackTranslationY().get(
                                 controller.mAppsView);
@@ -95,7 +94,7 @@ public class AllAppsTransitionController
                 @Override
                 public void setValue(AllAppsTransitionController controller, float translation) {
                     if (controller.mIsTablet) {
-                        controller.mAppsView.getAppsRecyclerViewContainer().setTranslationY(
+                        controller.mAppsView.getRecyclerViewContainer().setTranslationY(
                                 translation);
                     } else {
                         controller.getAppsViewPullbackTranslationY().set(controller.mAppsView,
@@ -110,7 +109,7 @@ public class AllAppsTransitionController
                 @Override
                 public Float get(AllAppsTransitionController controller) {
                     if (controller.mIsTablet) {
-                        return controller.mAppsView.getAppsRecyclerViewContainer().getAlpha();
+                        return controller.mAppsView.getRecyclerViewContainer().getAlpha();
                     } else {
                         return controller.getAppsViewPullbackAlpha().getValue();
                     }
@@ -119,7 +118,7 @@ public class AllAppsTransitionController
                 @Override
                 public void setValue(AllAppsTransitionController controller, float alpha) {
                     if (controller.mIsTablet) {
-                        controller.mAppsView.getAppsRecyclerViewContainer().setAlpha(alpha);
+                        controller.mAppsView.getRecyclerViewContainer().setAlpha(alpha);
                     } else {
                         controller.getAppsViewPullbackAlpha().setValue(alpha);
                     }
@@ -191,6 +190,7 @@ public class AllAppsTransitionController
     public void setProgress(float progress) {
         mProgress = progress;
         getAppsViewProgressTranslationY().set(mAppsView, mProgress * mShiftRange);
+        mLauncher.onAllAppsTransition(1 - progress);
     }
 
     public float getProgress() {
@@ -255,8 +255,6 @@ public class AllAppsTransitionController
         anim.setInterpolator(verticalProgressInterpolator);
         anim.addListener(getProgressAnimatorListener());
         builder.add(anim);
-        // Use ANIM_VERTICAL_PROGRESS's interpolator to determine state transition threshold.
-        builder.setInterpolator(verticalProgressInterpolator);
 
         setAlphas(toState, config, builder);
 
