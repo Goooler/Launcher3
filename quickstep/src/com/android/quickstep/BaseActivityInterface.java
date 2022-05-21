@@ -19,7 +19,6 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_BACKGROUND_COLOR;
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.util.DisplayController.getNavigationMode;
 import static com.android.quickstep.AbsSwipeUpHandler.RECENTS_ATTACH_DURATION;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_FADE_ANIM;
@@ -62,7 +61,6 @@ import com.android.launcher3.views.ScrimView;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.SplitScreenBounds;
-import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -85,6 +83,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     private final STATE_TYPE mBackgroundState;
 
     private STATE_TYPE mTargetState;
+
+    @Nullable private Runnable mOnInitBackgroundStateUICallback = null;
 
     protected BaseActivityInterface(boolean rotationSupportedByActivity,
             STATE_TYPE overviewState, STATE_TYPE backgroundState) {
@@ -222,32 +222,27 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      */
     public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect) {
         Resources res = context.getResources();
+        float maxScale = res.getFloat(R.dimen.overview_max_scale);
         if (dp.isTablet) {
             Rect gridRect = new Rect();
-            calculateGridSize(context, dp, gridRect);
+            calculateGridSize(dp, gridRect);
 
-            PointF taskDimension = getTaskDimension(context, dp);
-            float scale = gridRect.height() / taskDimension.y;
-            scale = Math.min(scale, res.getFloat(R.dimen.overview_max_scale));
-            int outWidth = Math.round(scale * taskDimension.x);
-            int outHeight = Math.round(scale * taskDimension.y);
-
-            int gravity = Gravity.CENTER;
-            Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
+            calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
         } else {
             int taskMargin = dp.overviewTaskMarginPx;
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
-                    getOverviewActionsHeight(context, dp),
+                    dp.getOverviewActionsClaimedSpace(),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
+                    maxScale,
+                    Gravity.CENTER,
                     outRect);
         }
     }
 
-    private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
-            int claimedSpaceAbove, int claimedSpaceBelow, int minimumHorizontalPadding,
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp, int claimedSpaceAbove,
+            int claimedSpaceBelow, int minimumHorizontalPadding, float maxScale, int gravity,
             Rect outRect) {
-        PointF taskDimension = getTaskDimension(context, dp);
         Rect insets = dp.getInsets();
 
         Rect potentialTaskRect = new Rect(0, 0, dp.widthPx, dp.heightPx);
@@ -258,13 +253,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 minimumHorizontalPadding,
                 claimedSpaceBelow);
 
+        calculateTaskSizeInternal(context, dp, potentialTaskRect, maxScale, gravity, outRect);
+    }
+
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
+            Rect potentialTaskRect, float maxScale, int gravity, Rect outRect) {
+        PointF taskDimension = getTaskDimension(context, dp);
+
         float scale = Math.min(
                 potentialTaskRect.width() / taskDimension.x,
                 potentialTaskRect.height() / taskDimension.y);
+        scale = Math.min(scale, maxScale);
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
-        Gravity.apply(Gravity.CENTER, outWidth, outHeight, potentialTaskRect, outRect);
+        Gravity.apply(gravity, outWidth, outHeight, potentialTaskRect, outRect);
     }
 
     private static PointF getTaskDimension(Context context, DeviceProfile dp) {
@@ -314,10 +317,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     /**
      * Calculates the overview grid size for the provided device configuration.
      */
-    public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
+    public final void calculateGridSize(DeviceProfile dp, Rect outRect) {
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
-        int bottomMargin = getOverviewActionsHeight(context, dp);
+        int bottomMargin = dp.getOverviewActionsClaimedSpace();
         int sideMargin = dp.overviewGridSideMargin;
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
@@ -352,19 +355,16 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Calculates the modal taskView size for the provided device configuration
      */
     public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect) {
+        calculateTaskSize(context, dp, outRect);
+        float maxScale = context.getResources().getFloat(R.dimen.overview_modal_max_scale);
         calculateTaskSizeInternal(
                 context, dp,
                 dp.overviewTaskMarginPx,
-                getOverviewActionsHeight(context, dp),
-                dp.overviewTaskMarginPx,
+                dp.heightPx - outRect.bottom - dp.getInsets().bottom,
+                Math.round((dp.availableWidthPx - outRect.width() * maxScale) / 2),
+                1f /*maxScale*/,
+                Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM,
                 outRect);
-    }
-
-    /** Gets the space that the overview actions will take, including bottom margin. */
-    private int getOverviewActionsHeight(Context context, DeviceProfile dp) {
-        return OverviewActionsView.getOverviewActionsBottomMarginPx(getNavigationMode(context), dp)
-                + OverviewActionsView.getOverviewActionsTopMarginPx(getNavigationMode(context), dp)
-                + dp.overviewActionsHeight;
     }
 
     /**
@@ -414,6 +414,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         return null;
     }
 
+    protected void runOnInitBackgroundStateUI(Runnable callback) {
+        mOnInitBackgroundStateUICallback = callback;
+        ACTIVITY_TYPE activity = getCreatedActivity();
+        if (activity != null && activity.getStateManager().getState() == mBackgroundState) {
+            onInitBackgroundStateUI();
+        }
+    }
+
+    private void onInitBackgroundStateUI() {
+        if (mOnInitBackgroundStateUICallback != null) {
+            mOnInitBackgroundStateUICallback.run();
+            mOnInitBackgroundStateUICallback = null;
+        }
+    }
+
     public interface AnimationFactory {
 
         void createActivityInterface(long transitionLength);
@@ -453,13 +468,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             mStartState = mActivity.getStateManager().getState();
         }
 
-        protected ACTIVITY_TYPE initUI() {
+        protected ACTIVITY_TYPE initBackgroundStateUI() {
             STATE_TYPE resetState = mStartState;
             if (mStartState.shouldDisableRestore()) {
                 resetState = mActivity.getStateManager().getRestState();
             }
             mActivity.getStateManager().setRestState(resetState);
             mActivity.getStateManager().goToState(mBackgroundState, false);
+            onInitBackgroundStateUI();
             return mActivity;
         }
 
