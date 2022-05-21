@@ -525,7 +525,7 @@ public abstract class AbstractLauncherUiTest {
     }
 
     protected int getAllAppsScroll(Launcher launcher) {
-        return launcher.getAppsView().getActiveAppsRecyclerView().getCurrentScrollY();
+        return launcher.getAppsView().getActiveRecyclerView().getCurrentScrollY();
     }
 
     private void checkLauncherIntegrity(
@@ -611,6 +611,10 @@ public abstract class AbstractLauncherUiTest {
     protected HomeAppIcon createShortcutInCenterIfNotExist(String name) {
         Point dimension = mLauncher.getWorkspace().getIconGridDimensions();
         return createShortcutIfNotExist(name, dimension.x / 2, dimension.y / 2);
+    }
+
+    protected HomeAppIcon createShortcutIfNotExist(String name, Point cellPosition) {
+        return createShortcutIfNotExist(name, cellPosition.x, cellPosition.y);
     }
 
     protected HomeAppIcon createShortcutIfNotExist(String name, int cellX, int cellY) {
