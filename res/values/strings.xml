@@ -277,6 +277,9 @@
     <!-- Summary for Notification dots setting. Tapping this will link enable/disable notification dots feature on the home screen. [CHAR LIMIT=50] -->
     <string name="notification_dots_service_title">Show notification dots</string>
 
+    <!-- Title for Developer Options setting. [CHAR LIMIT=50] -->
+    <string name="developer_options_title">Developer Options</string>
+
     <!-- Label for the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=60] -->
     <string name="auto_add_shortcuts_label">Add app icons to home screen</string>
     <!-- Text description of the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=NONE] -->
@@ -435,6 +438,10 @@
     <!-- A hint shown in launcher settings develop options filter box -->
     <string name="developer_options_filter_hint">Filter</string>
 
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title">Search your phone</string>
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title_tablet">Search your tablet</string>
     <!-- Failed action error message: e.g. Failed: Pause -->
     <string name="remote_action_failed">Failed: <xliff:g id="what" example="Pause">%1$s</xliff:g></string>
 </resources>
