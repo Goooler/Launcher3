@@ -16,6 +16,7 @@
 
 package com.android.quickstep;
 
+import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.BaseActivity.INVISIBLE_ALL;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_PENDING_FLAGS;
 import static com.android.launcher3.BaseActivity.PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION;
@@ -37,6 +38,7 @@ import android.view.animation.Interpolator;
 import android.window.BackEvent;
 import android.window.IOnBackInvokedCallback;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
@@ -45,6 +47,7 @@ import com.android.quickstep.util.RectFSpringAnim;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat;
+
 /**
  * Controls the animation of swiping back and returning to launcher.
  *
@@ -87,6 +90,7 @@ public class LauncherBackAnimationController {
     private boolean mAnimatorSetInProgress = false;
     private float mBackProgress = 0;
     private boolean mBackInProgress = false;
+    private IOnBackInvokedCallback mBackCallback;
 
     public LauncherBackAnimationController(
             BaseQuickstepLauncher launcher,
@@ -112,34 +116,35 @@ public class LauncherBackAnimationController {
      * @param handler Handler to the thread to run the animations on.
      */
     public void registerBackCallbacks(Handler handler) {
-        SystemUiProxy.INSTANCE.get(mLauncher).setBackToLauncherCallback(
-                new IOnBackInvokedCallback.Stub() {
-                    @Override
-                    public void onBackCancelled() {
-                        handler.post(() -> resetPositionAnimated());
-                    }
+        mBackCallback = new IOnBackInvokedCallback.Stub() {
+            @Override
+            public void onBackCancelled() {
+                handler.post(() -> resetPositionAnimated());
+            }
 
-                    @Override
-                    public void onBackInvoked() {
-                        handler.post(() -> startTransition());
-                    }
+            @Override
+            public void onBackInvoked() {
+                handler.post(() -> startTransition());
+            }
 
-                    @Override
-                    public void onBackProgressed(BackEvent backEvent) {
-                        mBackProgress = backEvent.getProgress();
-                        // TODO: Update once the interpolation curve spec is finalized.
-                        mBackProgress =
-                                1 - (1 - mBackProgress) * (1 - mBackProgress) * (1
-                                        - mBackProgress);
-                        if (!mBackInProgress) {
-                            startBack(backEvent);
-                        } else {
-                            updateBackProgress(mBackProgress, backEvent);
-                        }
-                    }
+            @Override
+            public void onBackProgressed(BackEvent backEvent) {
+                mBackProgress = backEvent.getProgress();
+                // TODO: Update once the interpolation curve spec is finalized.
+                mBackProgress =
+                        1 - (1 - mBackProgress) * (1 - mBackProgress) * (1
+                                - mBackProgress);
+                if (!mBackInProgress) {
+                    startBack(backEvent);
+                } else {
+                    updateBackProgress(mBackProgress, backEvent);
+                }
+            }
 
-                    public void onBackStarted() { }
-                });
+            @Override
+            public void onBackStarted() { }
+        };
+        SystemUiProxy.INSTANCE.get(mLauncher).setBackToLauncherCallback(mBackCallback);
     }
 
     private void resetPositionAnimated() {
@@ -162,7 +167,10 @@ public class LauncherBackAnimationController {
 
     /** Unregisters the back to launcher callback in shell. */
     public void unregisterBackCallbacks() {
-        SystemUiProxy.INSTANCE.get(mLauncher).clearBackToLauncherCallback();
+        if (mBackCallback != null) {
+            SystemUiProxy.INSTANCE.get(mLauncher).clearBackToLauncherCallback(mBackCallback);
+        }
+        mBackCallback = null;
     }
 
     private void startBack(BackEvent backEvent) {
@@ -268,6 +276,10 @@ public class LauncherBackAnimationController {
             mLauncher.getStateManager().moveToRestState();
         }
 
+        // Explicitly close opened floating views (which is typically called from
+        // Launcher#onResumed, but in the predictive back flow launcher is not resumed until
+        // the transition is fully finished.)
+        AbstractFloatingView.closeAllOpenViewsExcept(mLauncher, false, TYPE_REBIND_SAFE);
         float cornerRadius = Utilities.mapRange(
                 mBackProgress, mWindowScaleStartCornerRadius, mWindowScaleEndCornerRadius);
         Pair<RectFSpringAnim, AnimatorSet> pair =
