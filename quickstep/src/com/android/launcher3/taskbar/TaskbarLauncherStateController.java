@@ -30,7 +30,6 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseQuickstepLauncher;
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.statemanager.StateManager;
@@ -372,6 +371,7 @@ import java.util.function.Supplier;
 
         // If we're already animating to the value, just leave it be instead of restarting it.
         if (!mIconAlignmentForLauncherState.isAnimatingToValue(toAlignment)) {
+            mIconAlignmentForLauncherState.finishAnimation();
             animatorSet.play(mIconAlignmentForLauncherState.animateToValue(toAlignment)
                     .setDuration(duration));
         }
@@ -406,18 +406,13 @@ import java.util.function.Supplier;
         boolean firstFrameVisChanged = (taskbarWillBeVisible && Float.compare(currentValue, 1) != 0)
                 || (!taskbarWillBeVisible && Float.compare(currentValue, 0) != 0);
 
+        updateIconAlignment(alignment);
+
         // Sync the first frame where we swap taskbar and hotseat.
         if (firstFrameVisChanged && mCanSyncViews && !Utilities.IS_RUNNING_IN_TEST_HARNESS) {
-            DeviceProfile dp = mLauncher.getDeviceProfile();
-
-            // Do all the heavy work before the sync.
-            mControllers.taskbarViewController.createIconAlignmentControllerIfNotExists(dp);
-
             ViewRootSync.synchronizeNextDraw(mLauncher.getHotseat(),
                     mControllers.taskbarActivityContext.getDragLayer(),
-                    () -> updateIconAlignment(alignment));
-        } else {
-            updateIconAlignment(alignment);
+                    () -> {});
         }
     }
 
@@ -427,6 +422,7 @@ import java.util.function.Supplier;
 
         // Switch taskbar and hotseat in last frame
         setTaskbarViewVisible(alignment < 1);
+        mControllers.navbarButtonsViewController.updateTaskbarAlignment(alignment);
     }
 
     private float getCurrentIconAlignmentRatioBetweenAppAndHome() {

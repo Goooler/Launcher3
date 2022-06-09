@@ -127,7 +127,6 @@ public class InvariantDeviceProfile {
     public PointF[] borderSpaces;
     public float folderBorderSpace;
     public float[] hotseatBorderSpaces;
-    public int[] hotseatColumnSpan;
 
     public float[] horizontalMargin;
 
@@ -154,6 +153,8 @@ public class InvariantDeviceProfile {
      * sizes that share the same DB.
      */
     public int numDatabaseHotseatIcons;
+
+    public int[] hotseatColumnSpan;
 
     /**
      * Number of columns in the all apps list.
@@ -358,8 +359,8 @@ public class InvariantDeviceProfile {
         numShrunkenHotseatIcons = closestProfile.numShrunkenHotseatIcons;
         numDatabaseHotseatIcons = deviceType == TYPE_MULTI_DISPLAY
                 ? closestProfile.numDatabaseHotseatIcons : closestProfile.numHotseatIcons;
+        hotseatColumnSpan = closestProfile.hotseatColumnSpan;
         hotseatBorderSpaces = displayOption.hotseatBorderSpaces;
-        hotseatColumnSpan = displayOption.hotseatColumnSpan;
 
         numAllAppsColumns = closestProfile.numAllAppsColumns;
         numDatabaseAllAppsColumns = deviceType == TYPE_MULTI_DISPLAY
@@ -738,6 +739,7 @@ public class InvariantDeviceProfile {
         private final int numHotseatIcons;
         private final int numShrunkenHotseatIcons;
         private final int numDatabaseHotseatIcons;
+        private final int[] hotseatColumnSpan = new int[COUNT_SIZES];
 
         private final String dbFile;
 
@@ -777,6 +779,16 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numShrunkenHotseatIcons, numHotseatIcons / 2);
             numDatabaseHotseatIcons = a.getInt(
                     R.styleable.GridDisplayOption_numExtendedHotseatIcons, 2 * numHotseatIcons);
+            hotseatColumnSpan[INDEX_DEFAULT] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpan, numColumns);
+            hotseatColumnSpan[INDEX_LANDSCAPE] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanLandscape, numColumns);
+            hotseatColumnSpan[INDEX_TWO_PANEL_LANDSCAPE] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelLandscape,
+                    numColumns);
+            hotseatColumnSpan[INDEX_TWO_PANEL_PORTRAIT] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelPortrait,
+                    numColumns);
 
             numFolderRows = a.getInt(
                     R.styleable.GridDisplayOption_numFolderRows, numRows);
@@ -826,7 +838,6 @@ public class InvariantDeviceProfile {
         private final float[] horizontalMargin = new float[COUNT_SIZES];
         //TODO(http://b/228998082) remove this when 3 button spaces are fixed
         private final float[] hotseatBorderSpaces = new float[COUNT_SIZES];
-        private final int[] hotseatColumnSpan = new int[COUNT_SIZES];
 
         private final float[] iconSizes = new float[COUNT_SIZES];
         private final float[] textSizes = new float[COUNT_SIZES];
@@ -1052,17 +1063,6 @@ public class InvariantDeviceProfile {
                     R.styleable.ProfileDisplayOption_hotseatBorderSpaceTwoPanelPortrait,
                     hotseatBorderSpaces[INDEX_DEFAULT]);
 
-            hotseatColumnSpan[INDEX_DEFAULT] = a.getInt(
-                    R.styleable.ProfileDisplayOption_hotseatColumnSpan, grid.numColumns);
-            hotseatColumnSpan[INDEX_LANDSCAPE] = a.getInt(
-                    R.styleable.ProfileDisplayOption_hotseatColumnSpanLandscape, grid.numColumns);
-            hotseatColumnSpan[INDEX_TWO_PANEL_LANDSCAPE] = a.getInt(
-                    R.styleable.ProfileDisplayOption_hotseatColumnSpanTwoPanelLandscape,
-                    grid.numColumns);
-            hotseatColumnSpan[INDEX_TWO_PANEL_PORTRAIT] = a.getInt(
-                    R.styleable.ProfileDisplayOption_hotseatColumnSpanTwoPanelPortrait,
-                    grid.numColumns);
-
             a.recycle();
         }
 
@@ -1121,7 +1121,6 @@ public class InvariantDeviceProfile {
                 minCellSize[i].y += p.minCellSize[i].y;
                 horizontalMargin[i] += p.horizontalMargin[i];
                 hotseatBorderSpaces[i] += p.hotseatBorderSpaces[i];
-                hotseatColumnSpan[i] = p.hotseatColumnSpan[i];
                 allAppsCellSize[i].x += p.allAppsCellSize[i].x;
                 allAppsCellSize[i].y += p.allAppsCellSize[i].y;
                 allAppsIconSizes[i] += p.allAppsIconSizes[i];

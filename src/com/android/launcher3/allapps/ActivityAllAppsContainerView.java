@@ -29,11 +29,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.views.AppLauncher;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 /**
@@ -80,7 +82,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         OnClickListener marketSearchClickListener = (v) -> mActivityContext.startActivitySafely(v,
                 marketSearchIntent, null);
         for (int i = 0; i < mAH.size(); i++) {
-            mAH.get(i).adapter.setLastSearchQuery(query, marketSearchClickListener);
+            mAH.get(i).mAdapter.setLastSearchQuery(query, marketSearchClickListener);
         }
         mIsSearching = true;
         rebindAdapters();
@@ -95,11 +97,15 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         mHeader.reset(false);
     }
 
-    /** Invoke when the search results change. */
-    public void onSearchResultsChanged() {
-        for (int i = 0; i < mAH.size(); i++) {
-            if (mAH.get(i).mRecyclerView != null) {
-                mAH.get(i).mRecyclerView.onSearchResultsChanged();
+    /**
+     * Sets results list for search
+     */
+    public void setSearchResults(ArrayList<AdapterItem> results) {
+        if (getSearchResultList().setSearchResults(results)) {
+            for (int i = 0; i < mAH.size(); i++) {
+                if (mAH.get(i).mRecyclerView != null) {
+                    mAH.get(i).mRecyclerView.onSearchResultsChanged();
+                }
             }
         }
     }
@@ -142,7 +148,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
 
     @Override
     public String getDescription() {
-        if (!mUsingTabs && mIsSearching) {
+        if (!mUsingTabs && isSearching()) {
             return getContext().getString(R.string.all_apps_search_results);
         } else {
             return super.getDescription();
@@ -150,8 +156,13 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected boolean showTabs() {
-        return super.showTabs() && !mIsSearching;
+    protected boolean shouldShowTabs() {
+        return super.shouldShowTabs() && !isSearching();
+    }
+
+    @Override
+    public boolean isSearching() {
+        return mIsSearching;
     }
 
     @Override
@@ -173,15 +184,19 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected View replaceRVContainer(boolean showTabs) {
-        View rvContainer = super.replaceRVContainer(showTabs);
+    protected View replaceAppsRVContainer(boolean showTabs) {
+        View rvContainer = super.replaceAppsRVContainer(showTabs);
 
         removeCustomRules(rvContainer);
+        removeCustomRules(getSearchRecyclerView());
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
             alignParentTop(rvContainer, showTabs);
+            alignParentTop(getSearchRecyclerView(), /* tabs= */ false);
             layoutAboveSearchContainer(rvContainer);
+            layoutAboveSearchContainer(getSearchRecyclerView());
         } else {
             layoutBelowSearchContainer(rvContainer, showTabs);
+            layoutBelowSearchContainer(getSearchRecyclerView(), /* tabs= */ false);
         }
 
         return rvContainer;
@@ -208,7 +223,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
 
         float prog = Utilities.boundToRange((float) scrolledOffset / mHeaderThreshold, 0f, 1f);
         boolean bgVisible = mSearchUiManager.getBackgroundVisibility();
-        if (scrolledOffset == 0 && !mIsSearching) {
+        if (scrolledOffset == 0 && !isSearching()) {
             bgVisible = true;
         } else if (scrolledOffset > mHeaderThreshold) {
             bgVisible = false;
@@ -224,7 +239,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected int getHeaderBottom() {
+    public int getHeaderBottom() {
         if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
             return super.getHeaderBottom();
         }
@@ -242,7 +257,7 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
         int topMargin = getContext().getResources().getDimensionPixelSize(
                 R.dimen.all_apps_header_top_margin);
         if (includeTabsMargin) {
-            topMargin = topMargin + getContext().getResources().getDimensionPixelSize(
+            topMargin += getContext().getResources().getDimensionPixelSize(
                     R.dimen.all_apps_header_pill_height);
         }
         layoutParams.topMargin = topMargin;
@@ -283,9 +298,9 @@ public class ActivityAllAppsContainerView<T extends Context & AppLauncher
     }
 
     @Override
-    protected BaseAllAppsAdapter getAdapter(AlphabeticalAppsList<T> mAppsList,
+    protected BaseAllAppsAdapter<T> createAdapter(AlphabeticalAppsList<T> appsList,
             BaseAdapterProvider[] adapterProviders) {
-        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), mAppsList,
+        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), appsList,
                 adapterProviders);
     }
 }

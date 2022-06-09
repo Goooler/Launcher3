@@ -20,6 +20,7 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAP
 
 import android.content.Context;
 
+import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
@@ -30,6 +31,8 @@ import com.android.launcher3.util.Themes;
  */
 public class AllAppsState extends LauncherState {
 
+    private static final float WORKSPACE_SCALE_FACTOR = 0.97f;
+
     private static final int STATE_FLAGS =
             FLAG_WORKSPACE_INACCESSIBLE | FLAG_CLOSE_POPUPS | FLAG_HOTSEAT_INACCESSIBLE;
 
@@ -38,8 +41,11 @@ public class AllAppsState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context, boolean isToState) {
-        return isToState ? 500 : 300;
+    public <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfileListenable>
+    int getTransitionDuration(DEVICE_PROFILE_CONTEXT context, boolean isToState) {
+        return !context.getDeviceProfile().isTablet && isToState
+                ? 600
+                : isToState ? 500 : 300;
     }
 
     @Override
@@ -54,17 +60,21 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        ScaleAndTranslation scaleAndTranslation =
-                new ScaleAndTranslation(NO_SCALE, NO_OFFSET, NO_OFFSET);
+        return new ScaleAndTranslation(WORKSPACE_SCALE_FACTOR, NO_OFFSET, NO_OFFSET);
+    }
+
+    @Override
+    public ScaleAndTranslation getHotseatScaleAndTranslation(Launcher launcher) {
         if (launcher.getDeviceProfile().isTablet) {
-            scaleAndTranslation.scale = 0.97f;
+            return getWorkspaceScaleAndTranslation(launcher);
         } else {
             ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
                     .getWorkspaceScaleAndTranslation(launcher);
-            scaleAndTranslation.translationX = overviewScaleAndTranslation.translationX;
-            scaleAndTranslation.translationY = overviewScaleAndTranslation.translationY;
+            return new ScaleAndTranslation(
+                    WORKSPACE_SCALE_FACTOR,
+                    overviewScaleAndTranslation.translationX,
+                    overviewScaleAndTranslation.translationY);
         }
-        return scaleAndTranslation;
     }
 
     @Override

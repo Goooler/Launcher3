@@ -23,7 +23,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.compat.AccessibilityManagerCompat;
@@ -37,19 +37,19 @@ import com.android.launcher3.views.RecyclerViewFastScroller;
  *   <li> Enable fast scroller.
  * </ul>
  */
-public abstract class BaseRecyclerView extends RecyclerView  {
+public abstract class FastScrollRecyclerView extends RecyclerView  {
 
     protected RecyclerViewFastScroller mScrollbar;
 
-    public BaseRecyclerView(Context context) {
+    public FastScrollRecyclerView(Context context) {
         this(context, null);
     }
 
-    public BaseRecyclerView(Context context, AttributeSet attrs) {
+    public FastScrollRecyclerView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public BaseRecyclerView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public FastScrollRecyclerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
 
@@ -66,6 +66,7 @@ public abstract class BaseRecyclerView extends RecyclerView  {
         onUpdateScrollbar(0);
     }
 
+    @Nullable
     public RecyclerViewFastScroller getScrollbar() {
         return mScrollbar;
     }
@@ -196,13 +197,6 @@ public abstract class BaseRecyclerView extends RecyclerView  {
     public void scrollToTop() {
         if (mScrollbar != null) {
             mScrollbar.reattachThumbToScroll();
-        }
-        if (getLayoutManager() instanceof LinearLayoutManager) {
-            LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
-            if (layoutManager.findFirstCompletelyVisibleItemPosition() == 0) {
-                // We are at the top, so don't scrollToPosition (would cause unnecessary relayout).
-                return;
-            }
         }
         scrollToPosition(0);
     }
