@@ -140,4 +140,14 @@ public class OnboardingPrefs<T extends ActivityContext> {
         mSharedPrefs.edit().putInt(eventKey, count).apply();
         return hasReachedMaxCount(count, eventKey);
     }
+
+    /**
+     * Sets the event count to the given value.
+     *
+     * @return Whether we have now reached the max count.
+     */
+    public boolean setEventCount(int count, @EventCountKey String eventKey) {
+        mSharedPrefs.edit().putInt(eventKey, count).apply();
+        return hasReachedMaxCount(count, eventKey);
+    }
 }
