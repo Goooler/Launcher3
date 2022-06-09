@@ -31,6 +31,7 @@ import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.LauncherSettings;
@@ -50,7 +51,6 @@ import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.IntSparseArrayMap;
-import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 
@@ -66,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -469,6 +470,7 @@ public class BgDataModel {
          * or an empty IntSet
          * @param orderedScreenIds All the page ids to be bound
          */
+        @NonNull
         default IntSet getPagesToBindSynchronously(IntArray orderedScreenIds) {
             return new IntSet();
         }
@@ -495,7 +497,7 @@ public class BgDataModel {
         default void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) { }
         default void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets) { }
         default void bindRestoreItemsChange(HashSet<ItemInfo> updates) { }
-        default void bindWorkspaceComponentsRemoved(ItemInfoMatcher matcher) { }
+        default void bindWorkspaceComponentsRemoved(Predicate<ItemInfo> matcher) { }
         default void bindAllWidgets(List<WidgetsListBaseEntry> widgets) { }
 
         default void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks) {

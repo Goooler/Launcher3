@@ -378,6 +378,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     // OverScroll constants
     private static final int OVERSCROLL_PAGE_SNAP_ANIMATION_DURATION = 270;
 
+    private static final int DEFAULT_ACTIONS_VIEW_ALPHA_ANIMATION_DURATION = 300;
+
     private static final int DISMISS_TASK_DURATION = 300;
     private static final int ADDITION_TASK_DURATION = 200;
     private static final float INITIAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET = 0.55f;
@@ -652,6 +654,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private TaskView mMovingTaskView;
 
     private OverviewActionsView mActionsView;
+    private ObjectAnimator mActionsViewAlphaAnimator;
+    private float mActionsViewAlphaAnimatorFinalValue;
 
     private MultiWindowModeChangedListener mMultiWindowModeChangedListener =
             new MultiWindowModeChangedListener() {
@@ -942,7 +946,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 mHasVisibleTaskData.delete(i);
             }
             if (child instanceof GroupedTaskView) {
-                mGroupedTaskViewPool.recycle((GroupedTaskView)taskView);
+                mGroupedTaskViewPool.recycle((GroupedTaskView) taskView);
             } else {
                 mTaskViewPool.recycle(taskView);
             }
@@ -1145,6 +1149,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         return getScrollForPage(taskIndex) == getPagedOrientationHandler().getPrimaryScroll(this);
     }
 
+    private boolean isFocusedTaskInExpectedScrollPosition() {
+        TaskView focusedTask = getFocusedTaskView();
+        return focusedTask != null && isTaskInExpectedScrollPosition(indexOfChild(focusedTask));
+    }
+
     /**
      * Returns a {@link TaskView} that has taskId matching {@code taskId} or null if no match.
      */
@@ -1191,13 +1200,15 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     @Override
     protected void onPageBeginTransition() {
         super.onPageBeginTransition();
-        mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING, true);
+        if (!mActivity.getDeviceProfile().isTablet) {
+            mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING, true);
+        }
     }
 
     @Override
     protected void onPageEndTransition() {
         super.onPageEndTransition();
-        if (isClearAllHidden()) {
+        if (isClearAllHidden() && !mActivity.getDeviceProfile().isTablet) {
             mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING, false);
         }
         if (getNextPage() > 0) {
@@ -1808,16 +1819,24 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     private void updateActionsViewFocusedScroll() {
-        boolean hiddenFocusedScroll;
         if (showAsGrid()) {
-            TaskView focusedTaskView = getFocusedTaskView();
-            hiddenFocusedScroll = focusedTaskView == null
-                    || !isTaskInExpectedScrollPosition(indexOfChild(focusedTaskView));
-        } else {
-            hiddenFocusedScroll = false;
+            float actionsViewAlphaValue = isFocusedTaskInExpectedScrollPosition() ? 1 : 0;
+            // If animation is already in progress towards the same end value, do not restart.
+            if (mActionsViewAlphaAnimator == null || !mActionsViewAlphaAnimator.isStarted()
+                    || (mActionsViewAlphaAnimator.isStarted()
+                    && mActionsViewAlphaAnimatorFinalValue != actionsViewAlphaValue)) {
+                animateActionsViewAlpha(actionsViewAlphaValue,
+                        DEFAULT_ACTIONS_VIEW_ALPHA_ANIMATION_DURATION);
+            }
         }
-        mActionsView.updateHiddenFlags(OverviewActionsView.HIDDEN_FOCUSED_SCROLL,
-                hiddenFocusedScroll);
+    }
+
+    private void animateActionsViewAlpha(float alphaValue, long duration) {
+        mActionsViewAlphaAnimator = ObjectAnimator.ofFloat(
+                mActionsView.getVisibilityAlpha(), MultiValueAlpha.VALUE, alphaValue);
+        mActionsViewAlphaAnimatorFinalValue = alphaValue;
+        mActionsViewAlphaAnimator.setDuration(duration);
+        mActionsViewAlphaAnimator.start();
     }
 
     /**
@@ -1836,17 +1855,18 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (!mActivity.getDeviceProfile().isTablet) {
             return super.getDestinationPage(scaledScroll);
         }
-
-        final int childCount = getChildCount();
-        if (mPageScrolls == null || childCount != mPageScrolls.length) {
-            return -1;
+        if (!pageScrollsInitialized()) {
+            Log.e(TAG,
+                    "Cannot get destination page: RecentsView not properly initialized",
+                    new IllegalStateException());
+            return INVALID_PAGE;
         }
 
         // When in tablet with variable task width, return the page which scroll is closest to
         // screenStart instead of page nearest to center of screen.
         int minDistanceFromScreenStart = Integer.MAX_VALUE;
-        int minDistanceFromScreenStartIndex = -1;
-        for (int i = 0; i < childCount; ++i) {
+        int minDistanceFromScreenStartIndex = INVALID_PAGE;
+        for (int i = 0; i < getChildCount(); ++i) {
             int distanceFromScreenStart = Math.abs(mPageScrolls[i] - scaledScroll);
             if (distanceFromScreenStart < minDistanceFromScreenStart) {
                 minDistanceFromScreenStart = distanceFromScreenStart;
@@ -2237,6 +2257,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * is called.  Also scrolls the view to this task.
      */
     private void showCurrentTask(Task[] runningTasks) {
+        if (runningTasks.length == 0) {
+            return;
+        }
         int runningTaskViewId = -1;
         boolean needGroupTaskView = runningTasks.length > 1;
         if (shouldAddStubTaskView(runningTasks)) {
@@ -2346,10 +2369,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     private void animateActionsViewIn() {
-        ObjectAnimator anim = ObjectAnimator.ofFloat(
-                mActionsView.getVisibilityAlpha(), MultiValueAlpha.VALUE, 0, 1);
-        anim.setDuration(TaskView.SCALE_ICON_DURATION);
-        anim.start();
+        if (!showAsGrid() || isFocusedTaskInExpectedScrollPosition()) {
+            animateActionsViewAlpha(1, TaskView.SCALE_ICON_DURATION);
+        }
     }
 
     public void animateUpTaskIconScale() {
@@ -2686,13 +2708,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             PendingAnimation anim) {
         // Use setFloat instead of setViewAlpha as we want to keep the view visible even when it's
         // alpha is set to 0 so that it can be recycled in the view pool properly
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && taskView.isRunningTask()) {
-            runActionOnRemoteHandles(remoteTargetHandle -> {
-                TransformParams params = remoteTargetHandle.getTransformParams();
-                anim.setFloat(params, TransformParams.TARGET_ALPHA, 0,
-                        clampToProgress(FINAL_FRAME, 0, 0.5f));
-            });
-        }
         anim.setFloat(taskView, VIEW_ALPHA, 0,
                 clampToProgress(isOnGridBottomRow(taskView) ? ACCEL : FINAL_FRAME, 0, 0.5f));
         FloatProperty<TaskView> secondaryViewTranslate =
@@ -2739,16 +2754,15 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     mSplitHiddenTaskView.getThumbnail().getThumbnail(),
                     mSplitHiddenTaskView.getIconView().getDrawable(), startingTaskRect);
             mFirstFloatingTaskView.setAlpha(1);
-            mFirstFloatingTaskView.addAnimation(anim, startingTaskRect,
-                    mTempRect, true /* fadeWithThumbnail */, true /* isStagedTask */);
+            mFirstFloatingTaskView.addAnimation(anim, startingTaskRect, mTempRect,
+                    true /* fadeWithThumbnail */, true /* isStagedTask */);
         } else {
-            mSplitSelectSource.view.setVisibility(INVISIBLE);
             mFirstFloatingTaskView = FloatingTaskView.getFloatingTaskView(mActivity,
-                    mSplitSelectSource.view, null,
+                    mSplitSelectSource.view, null /* thumbnail */,
                     mSplitSelectSource.drawable, startingTaskRect);
             mFirstFloatingTaskView.setAlpha(1);
-            mFirstFloatingTaskView.addAnimation(anim, startingTaskRect,
-                    mTempRect, true /* fadeWithThumbnail */, true /* isStagedTask */);
+            mFirstFloatingTaskView.addAnimation(anim, startingTaskRect, mTempRect,
+                    false /* fadeWithThumbnail */, true /* isStagedTask */);
         }
         InteractionJankMonitorWrapper.begin(this,
                 InteractionJankMonitorWrapper.CUJ_SPLIT_SCREEN_ENTER, "First tile selected");
@@ -3292,7 +3306,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                         // Update various scroll-dependent UI.
                         dispatchScrollChanged();
                         updateActionsViewFocusedScroll();
-                        if (isClearAllHidden()) {
+                        if (isClearAllHidden() && !mActivity.getDeviceProfile().isTablet) {
                             mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING,
                                     false);
                         }
@@ -4041,7 +4055,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         // TODO(194414938) starting bounds seem slightly off, investigate
         Rect firstTaskStartingBounds = new Rect();
         Rect firstTaskEndingBounds = mTempRect;
-        int duration = mActivity.getStateManager().getState().getTransitionDuration(getContext());
+        int duration = mActivity.getStateManager().getState().getTransitionDuration(mActivity,
+                false /* isToState */);
         PendingAnimation pendingAnimation = new PendingAnimation(duration);
 
         int halfDividerSize = getResources()

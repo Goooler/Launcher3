@@ -39,6 +39,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
 import com.android.launcher3.util.DisplayController;
@@ -147,7 +148,7 @@ public class TaskbarManager {
                     // Config change might be handled without re-creating the taskbar
                     if (mTaskbarActivityContext != null) {
                         if (dp != null && dp.isTaskbarPresent) {
-                            mTaskbarActivityContext.updateDeviceProfile(dp.copy(mContext));
+                            mTaskbarActivityContext.updateDeviceProfile(dp);
                         }
                         mTaskbarActivityContext.onConfigurationChanged(configDiff);
                     }
@@ -183,6 +184,17 @@ public class TaskbarManager {
     }
 
     /**
+     * Displays a frame of the first Launcher reveal animation.
+     *
+     * This should be used to run a first Launcher reveal animation whose progress matches a swipe
+     * progress.
+     */
+    public AnimatorPlaybackController createLauncherStartFromSuwAnim(int duration) {
+        return mTaskbarActivityContext == null
+                ? null : mTaskbarActivityContext.createLauncherStartFromSuwAnim(duration);
+    }
+
+    /**
      * Called when the user is unlocked
      */
     public void onUserUnlocked() {
@@ -194,6 +206,9 @@ public class TaskbarManager {
      * Sets a {@link StatefulActivity} to act as taskbar callback
      */
     public void setActivity(@NonNull StatefulActivity activity) {
+        if (mActivity == activity) {
+            return;
+        }
         mActivity = activity;
         mUnfoldProgressProvider.setSourceProvider(getUnfoldTransitionProgressProviderForActivity(
                 activity));
@@ -259,8 +274,8 @@ public class TaskbarManager {
             return;
         }
 
-        mTaskbarActivityContext = new TaskbarActivityContext(mContext, dp.copy(mContext),
-                mNavButtonController, mUnfoldProgressProvider);
+        mTaskbarActivityContext = new TaskbarActivityContext(mContext, dp, mNavButtonController,
+                mUnfoldProgressProvider);
 
         mTaskbarActivityContext.init(mSharedState);
         if (mActivity != null) {

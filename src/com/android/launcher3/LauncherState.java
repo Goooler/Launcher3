@@ -80,6 +80,9 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     public static final int FLAG_CLOSE_POPUPS = BaseState.getFlag(6);
     public static final int FLAG_OVERVIEW_UI = BaseState.getFlag(7);
 
+    // Flag indicating that hotseat and its contents are not accessible.
+    public static final int FLAG_HOTSEAT_INACCESSIBLE = BaseState.getFlag(8);
+
 
     public static final float NO_OFFSET = 0;
     public static final float NO_SCALE = 1;
@@ -110,7 +113,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
             FLAG_DISABLE_RESTORE | FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED | FLAG_HIDE_BACK_BUTTON |
                     FLAG_HAS_SYS_UI_SCRIM) {
         @Override
-        public int getTransitionDuration(Context context) {
+        public int getTransitionDuration(Context context, boolean isToState) {
             // Arbitrary duration, when going to NORMAL we use the state we're coming from instead.
             return 0;
         }

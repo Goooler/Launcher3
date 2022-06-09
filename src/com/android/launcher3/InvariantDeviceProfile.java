@@ -61,6 +61,8 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -151,6 +153,8 @@ public class InvariantDeviceProfile {
      * sizes that share the same DB.
      */
     public int numDatabaseHotseatIcons;
+
+    public int[] hotseatColumnSpan;
 
     /**
      * Number of columns in the all apps list.
@@ -355,6 +359,7 @@ public class InvariantDeviceProfile {
         numShrunkenHotseatIcons = closestProfile.numShrunkenHotseatIcons;
         numDatabaseHotseatIcons = deviceType == TYPE_MULTI_DISPLAY
                 ? closestProfile.numDatabaseHotseatIcons : closestProfile.numHotseatIcons;
+        hotseatColumnSpan = closestProfile.hotseatColumnSpan;
         hotseatBorderSpaces = displayOption.hotseatBorderSpaces;
 
         numAllAppsColumns = closestProfile.numAllAppsColumns;
@@ -396,7 +401,8 @@ public class InvariantDeviceProfile {
             // We need to ensure that there is enough extra space in the wallpaper
             // for the intended parallax effects
             float parallaxFactor =
-                    dpiFromPx(Math.min(displayWidth, displayHeight), displayInfo.densityDpi) < 720
+                    dpiFromPx(Math.min(displayWidth, displayHeight), displayInfo.getDensityDpi())
+                            < 720
                             ? 2
                             : wallpaperTravelToScreenWidthRatio(displayWidth, displayHeight);
             defaultWallpaperSize.x =
@@ -585,8 +591,8 @@ public class InvariantDeviceProfile {
             }
         }
 
-        float width = dpiFromPx(minWidthPx, displayInfo.densityDpi);
-        float height = dpiFromPx(minHeightPx, displayInfo.densityDpi);
+        float width = dpiFromPx(minWidthPx, displayInfo.getDensityDpi());
+        float height = dpiFromPx(minHeightPx, displayInfo.getDensityDpi());
 
         // Sort the profiles based on the closeness to the device size
         Collections.sort(points, (a, b) ->
@@ -625,8 +631,21 @@ public class InvariantDeviceProfile {
 
         float screenWidth = config.screenWidthDp * res.getDisplayMetrics().density;
         float screenHeight = config.screenHeightDp * res.getDisplayMetrics().density;
-        return getBestMatch(screenWidth, screenHeight,
-                WindowManagerProxy.INSTANCE.get(context).getRotation(context));
+        int rotation = WindowManagerProxy.INSTANCE.get(context).getRotation(context);
+
+        if (Utilities.IS_DEBUG_DEVICE) {
+            StringWriter stringWriter = new StringWriter();
+            PrintWriter printWriter = new PrintWriter(stringWriter);
+            DisplayController.INSTANCE.get(context).dump(printWriter);
+            printWriter.flush();
+            Log.d("b/231312158", "getDeviceProfile -"
+                            + "\nconfig: " + config
+                            + "\ndisplayMetrics: " + res.getDisplayMetrics()
+                            + "\nrotation: " + rotation
+                            + "\n" + stringWriter.toString(),
+                    new Exception());
+        }
+        return getBestMatch(screenWidth, screenHeight, rotation);
     }
 
     /**
@@ -720,6 +739,7 @@ public class InvariantDeviceProfile {
         private final int numHotseatIcons;
         private final int numShrunkenHotseatIcons;
         private final int numDatabaseHotseatIcons;
+        private final int[] hotseatColumnSpan = new int[COUNT_SIZES];
 
         private final String dbFile;
 
@@ -759,6 +779,16 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numShrunkenHotseatIcons, numHotseatIcons / 2);
             numDatabaseHotseatIcons = a.getInt(
                     R.styleable.GridDisplayOption_numExtendedHotseatIcons, 2 * numHotseatIcons);
+            hotseatColumnSpan[INDEX_DEFAULT] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpan, numColumns);
+            hotseatColumnSpan[INDEX_LANDSCAPE] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanLandscape, numColumns);
+            hotseatColumnSpan[INDEX_TWO_PANEL_LANDSCAPE] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelLandscape,
+                    numColumns);
+            hotseatColumnSpan[INDEX_TWO_PANEL_PORTRAIT] = a.getInt(
+                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelPortrait,
+                    numColumns);
 
             numFolderRows = a.getInt(
                     R.styleable.GridDisplayOption_numFolderRows, numRows);
@@ -806,6 +836,7 @@ public class InvariantDeviceProfile {
         private float folderBorderSpace;
         private final PointF[] borderSpaces = new PointF[COUNT_SIZES];
         private final float[] horizontalMargin = new float[COUNT_SIZES];
+        //TODO(http://b/228998082) remove this when 3 button spaces are fixed
         private final float[] hotseatBorderSpaces = new float[COUNT_SIZES];
 
         private final float[] iconSizes = new float[COUNT_SIZES];

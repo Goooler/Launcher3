@@ -29,6 +29,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_N
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 
 import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
 import android.app.ActivityOptions;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -60,6 +61,8 @@ import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
+import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
@@ -108,6 +111,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     private final WindowManager mWindowManager;
     private final @Nullable RoundedCorner mLeftCorner, mRightCorner;
+    private DeviceProfile mDeviceProfile;
     private WindowManager.LayoutParams mWindowLayoutParams;
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
@@ -132,7 +136,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
             unfoldTransitionProgressProvider) {
         super(windowContext);
-        mDeviceProfile = dp;
+        mDeviceProfile = dp.copy(this);
 
         final Resources resources = getResources();
 
@@ -195,11 +199,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarAutohideSuspendController(this),
                 new TaskbarPopupController(this),
                 new TaskbarForceVisibleImmersiveController(this),
-                new TaskbarAllAppsController(this),
+                new TaskbarAllAppsController(this, dp),
                 new TaskbarInsetsController(this));
     }
 
-    public void init(TaskbarSharedState sharedState) {
+    public void init(@NonNull TaskbarSharedState sharedState) {
         mLastRequestedNonFullscreenHeight = getDefaultTaskbarWindowHeight();
         mWindowLayoutParams = createDefaultWindowLayoutParams();
 
@@ -211,8 +215,14 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     @Override
+    public DeviceProfile getDeviceProfile() {
+        return mDeviceProfile;
+    }
+
+    /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
     public void updateDeviceProfile(DeviceProfile dp) {
-        mDeviceProfile = dp;
+        mControllers.taskbarAllAppsController.updateDeviceProfile(dp);
+        mDeviceProfile = dp.copy(this);
         updateIconSize(getResources());
 
         AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
@@ -227,7 +237,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mDeviceProfile.updateIconSize(1, resources);
         float iconScale = taskbarIconSize / mDeviceProfile.iconSizePx;
         mDeviceProfile.updateIconSize(iconScale, resources);
-        mDeviceProfile.updateAllAppsIconSize(1, resources); // Leave all apps unscaled.
     }
 
     @VisibleForTesting
@@ -732,6 +741,45 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     protected boolean isNavBarForceVisible() {
         return mIsNavBarForceVisible;
+    }
+
+    /**
+     * Displays a single frame of the Launcher start from SUW animation.
+     *
+     * This animation is a combination of the Launcher resume animation, which animates the hotseat
+     * icons into position, the Taskbar unstash to hotseat animation, which animates the Taskbar
+     * stash bar into the hotseat icons, and an override to prevent showing the Taskbar all apps
+     * button.
+     *
+     * This should be used to run a Taskbar unstash to hotseat animation whose progress matches a
+     * swipe progress.
+     *
+     * @param duration a placeholder duration to be used to ensure all full-length
+     *                 sub-animations are properly coordinated. This duration should not actually
+     *                 be used since this animation tracks a swipe progress.
+     */
+    protected AnimatorPlaybackController createLauncherStartFromSuwAnim(int duration) {
+        AnimatorSet fullAnimation = new AnimatorSet();
+        fullAnimation.setDuration(duration);
+
+        TaskbarUIController uiController = mControllers.uiController;
+        if (uiController instanceof LauncherTaskbarUIController) {
+            ((LauncherTaskbarUIController) uiController).addLauncherResumeAnimation(
+                    fullAnimation, duration);
+        }
+        mControllers.taskbarStashController.addUnstashToHotseatAnimation(fullAnimation, duration);
+
+        if (!FeatureFlags.ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.get()) {
+            ValueAnimator alphaOverride = ValueAnimator.ofFloat(0, 1);
+            alphaOverride.setDuration(duration);
+            alphaOverride.addUpdateListener(a -> {
+                // Override the alpha updates in the icon alignment animation.
+                mControllers.taskbarViewController.getAllAppsButtonView().setAlpha(0);
+            });
+            fullAnimation.play(alphaOverride);
+        }
+
+        return AnimatorPlaybackController.wrap(fullAnimation, duration);
     }
 
     /**

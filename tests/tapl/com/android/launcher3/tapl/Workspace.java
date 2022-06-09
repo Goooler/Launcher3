@@ -43,6 +43,7 @@ import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.testing.WorkspaceCellCenterRequest;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -107,6 +108,18 @@ public final class Workspace extends Home {
                     "swiped to all apps")) {
                 return new HomeAllApps(mLauncher);
             }
+        }
+    }
+
+    /**
+     * Returns the home qsb.
+     *
+     * The qsb must already be visible when calling this method.
+     */
+    public HomeQsb getQsb() {
+        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                "want to get the home qsb")) {
+            return new HomeQsb(mLauncher);
         }
     }
 
@@ -222,6 +235,21 @@ public final class Workspace extends Home {
                 mHotseat, AppIcon.getAppIconSelector(appName, mLauncher)));
     }
 
+    /**
+     * @return map of text -> center of the view. In case of icons with the same name, the one with
+     *     lower x coordinate is selected.
+     */
+    public Map<String, Point> getWorkspaceIconsPositions() {
+        final UiObject2 workspace = verifyActiveContainer();
+        List<UiObject2> workspaceIcons =
+                mLauncher.waitForObjectsInContainer(workspace, AppIcon.getAnyAppIconSelector());
+        return workspaceIcons.stream()
+                .collect(
+                        Collectors.toMap(
+                                /* keyMapper= */ UiObject2::getText,
+                                /* valueMapper= */ UiObject2::getVisibleCenter,
+                                /* mergeFunction= */ (p1, p2) -> p1.x < p2.x ? p1 : p2));
+    }
     /*
      * Get the center point of the delete/uninstall icon in the drop target bar.
      */
@@ -366,6 +394,7 @@ public final class Workspace extends Home {
                 launcher,
                 launchable,
                 destSupplier,
+                /* isDecelerating= */ false,
                 () -> launcher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
                 /* expectDropEvents= */ null);
     }
@@ -374,6 +403,17 @@ public final class Workspace extends Home {
             LauncherInstrumentation launcher,
             Launchable launchable,
             Supplier<Point> dest,
+            Runnable expectLongClickEvents,
+            @Nullable Runnable expectDropEvents) {
+        dragIconToWorkspace(launcher, launchable, dest, /* isDecelerating */ true,
+                expectLongClickEvents, expectDropEvents);
+    }
+
+    static void dragIconToWorkspace(
+            LauncherInstrumentation launcher,
+            Launchable launchable,
+            Supplier<Point> dest,
+            boolean isDecelerating,
             Runnable expectLongClickEvents,
             @Nullable Runnable expectDropEvents) {
         try (LauncherInstrumentation.Closable ignored = launcher.addContextLayer(
@@ -402,7 +442,7 @@ public final class Workspace extends Home {
 
             // targetDest.x is now between 0 and displayX so we found the target page,
             // we just have to put move the icon to the destination and drop it
-            launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, true,
+            launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
                     LauncherInstrumentation.GestureScope.INSIDE);
             dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);

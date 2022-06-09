@@ -85,14 +85,12 @@ import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
-import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
-import com.android.launcher3.model.data.SearchActionItemInfo;
+import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicator;
-import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
@@ -102,7 +100,6 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.IntSparseArrayMap;
-import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.OverlayEdgeEffect;
 import com.android.launcher3.util.PackageUserKey;
@@ -1681,11 +1678,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
 
         if (child instanceof BubbleTextView && !dragOptions.isAccessibleDrag) {
-            PopupContainerWithArrow<Launcher> popupContainer = PopupContainerWithArrow
-                    .showForIcon((BubbleTextView) child);
-            if (popupContainer != null) {
-                dragOptions.preDragCondition = popupContainer.createPreDragCondition(true);
-            }
+            dragOptions.preDragCondition = ((BubbleTextView) child).startLongPressAction();
         }
 
         final DragView dv;
@@ -2118,7 +2111,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     final Runnable onCompleteCallback = onCompleteRunnable;
                     mLauncher.getDragController().animateDragViewToOriginalPosition(
                             /* onComplete= */ callbackList::executeAllAndDestroy, cell,
-                            SPRING_LOADED.getTransitionDuration(mLauncher));
+                            SPRING_LOADED.getTransitionDuration(mLauncher, true /* isToState */));
                     mLauncher.getStateManager().goToState(NORMAL, /* delay= */ 0,
                             onCompleteCallback == null
                                     ? null
@@ -2778,20 +2771,15 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 case LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT:
                 case LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT:
                 case LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION:
-                    if (info instanceof AppInfo) {
+                    if (info instanceof WorkspaceItemFactory) {
                         // Came from all apps -- make a copy
-                        info = ((AppInfo) info).makeWorkspaceItem();
+                        info = ((WorkspaceItemFactory) info).makeWorkspaceItem(mLauncher);
                         d.dragInfo = info;
                     }
                     if (info instanceof WorkspaceItemInfo
                             && info.container == LauncherSettings.Favorites.CONTAINER_PREDICTION) {
                         // Came from all apps prediction row -- make a copy
                         info = new WorkspaceItemInfo((WorkspaceItemInfo) info);
-                        d.dragInfo = info;
-                    }
-                    if (info instanceof SearchActionItemInfo) {
-                        info = ((SearchActionItemInfo) info).createWorkspaceItem(
-                                mLauncher.getModel());
                         d.dragInfo = info;
                     }
                     view = mLauncher.createShortcut(cellLayout, (WorkspaceItemInfo) info);
@@ -3080,7 +3068,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             if (info instanceof LauncherAppWidgetInfo) {
                 LauncherAppWidgetInfo appWidgetInfo = (LauncherAppWidgetInfo) info;
                 if (appWidgetInfo.appWidgetId == appWidgetId) {
-                    mLauncher.removeItem(view, appWidgetInfo, true);
+                    mLauncher.removeItem(view, appWidgetInfo, true,
+                            "widget is removed in response to widget remove broadcast");
                     return true;
                 }
             }
@@ -3235,7 +3224,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      * as a part of an update, this is called to ensure that other widgets and application
      * shortcuts are not removed.
      */
-    public void removeItemsByMatcher(final ItemInfoMatcher matcher) {
+    public void removeItemsByMatcher(final Predicate<ItemInfo> matcher) {
         for (CellLayout layout : getWorkspaceAndHotseatCellLayouts()) {
             ShortcutAndWidgetContainer container = layout.getShortcutsAndWidgets();
             // Iterate in reverse order as we are removing items
@@ -3243,7 +3232,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 View child = container.getChildAt(i);
                 ItemInfo info = (ItemInfo) child.getTag();
 
-                if (matcher.matchesInfo(info)) {
+                if (matcher.test(info)) {
                     layout.removeViewInLayout(child);
                     if (child instanceof DropTarget) {
                         mDragController.removeDropTarget((DropTarget) child);
@@ -3251,7 +3240,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 } else if (child instanceof FolderIcon) {
                     FolderInfo folderInfo = (FolderInfo) info;
                     List<WorkspaceItemInfo> matches = folderInfo.contents.stream()
-                            .filter(matcher::matchesInfo)
+                            .filter(matcher)
                             .collect(Collectors.toList());
                     if (!matches.isEmpty()) {
                         folderInfo.removeAll(matches, false);
@@ -3276,7 +3265,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
     }
 
-    private View mapOverCellLayout(CellLayout layout, ItemOperator op) {
+    /**
+     * Perform {param operator} over all the items in a given {param layout}.
+     * @return The first item that satisfies the operator or null.
+     */
+    public View mapOverCellLayout(CellLayout layout, ItemOperator operator) {
         // TODO(b/128460496) Potential race condition where layout is not yet loaded
         if (layout == null) {
             return null;
@@ -3286,7 +3279,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
             View item = container.getChildAt(itemIdx);
-            if (op.evaluate((ItemInfo) item.getTag(), item)) {
+            if (operator.evaluate((ItemInfo) item.getTag(), item)) {
                 return item;
             }
         }
@@ -3330,8 +3323,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      *
      * @param matcher  the matcher generated by the caller.
      */
-    public void persistRemoveItemsByMatcher(ItemInfoMatcher matcher) {
-        mLauncher.getModelWriter().deleteItemsFromDatabase(matcher);
+    public void persistRemoveItemsByMatcher(Predicate<ItemInfo> matcher,
+            @Nullable final String reason) {
+        mLauncher.getModelWriter().deleteItemsFromDatabase(matcher, reason);
         removeItemsByMatcher(matcher);
     }
 

@@ -42,7 +42,7 @@
     <string name="hotseat_auto_enrolled" msgid="522100018967146807">"सबैभन्दा बढी प्रयोग हुने एपहरू यहाँ देखिन्छन् र यी एपहरूको क्रम तपाईंले एप प्रयोग गर्ने समयतालिकाअनुसार बदलिरहन्छ"</string>
     <string name="hotseat_tip_no_empty_slots" msgid="1325212677738179185">"एपसम्बन्धी सिफारिस प्राप्त गर्न फेदको रोमा रहेका एपहरू ड्र्याग गरी हटाउनुहोस्"</string>
     <string name="hotseat_tip_gaps_filled" msgid="3035673010274223538">"खाली ठाउँमा सिफारिस गरिएका एपहरू थपिए"</string>
-    <string name="hotsaet_tip_prediction_enabled" msgid="2233554377501347650">"सिफारिस गरिएका एप देखाउने सुविधा अन गरिएको छ"</string>
+    <string name="hotsaet_tip_prediction_enabled" msgid="2233554377501347650">"सिफारिस गरिएका एपहरू देखाउने सुविधा सक्षम पारिएका छन्"</string>
     <string name="hotsaet_tip_prediction_disabled" msgid="1506426298884658491">"सिफारिस गरिएका एपहरू देखाउने सुविधा असक्षम पारिएको छ"</string>
     <string name="hotseat_prediction_content_description" msgid="4582028296938078419">"पूर्वानुमान गरिएको एप: <xliff:g id="TITLE">%1$s</xliff:g>"</string>
     <string name="back_gesture_feedback_swipe_too_far_from_edge" msgid="1711645592102201538">"स्क्रिनको सबैभन्दा दायाँ किनारा वा सबैभन्दा बायाँ किनाराबाट स्वाइप गर्नुहोस्।"</string>
@@ -76,7 +76,6 @@
     <string name="allset_title" msgid="5021126669778966707">"सबै तयार भयो!"</string>
     <string name="allset_hint" msgid="2384632994739392447">"होममा जान माथितिर स्वाइप गर्नुहोस्"</string>
     <string name="allset_description" msgid="6350320429953234580">"तपाईं आफ्नो फोन चलाउन थाल्न सक्नुहुन्छ"</string>
-    <string name="allset_description_tablet" msgid="7332070270570039247">"तपाईं अब आफ्नो ट्याब्लेट चलाउन थाल्न सक्नुहुन्छ"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"सिस्टम नेभिगेसनसम्बन्धी सेटिङ"</annotation></string>
     <string name="action_share" msgid="2648470652637092375">"सेयर गर्नुहोस्"</string>
     <string name="action_screenshot" msgid="8171125848358142917">"स्क्रिनसट"</string>
@@ -103,8 +102,10 @@
     <string name="taskbar_button_back" msgid="8558862226461164514">"पछाडि जानुहोस्"</string>
     <string name="taskbar_button_ime_switcher" msgid="1730244360907588541">"IME स्विचर"</string>
     <string name="taskbar_button_recents" msgid="7273376136216613134">"हालसालैका बटनहरू"</string>
-    <string name="taskbar_button_notifications" msgid="7471740351507357318">"सूचनाहरू"</string>
-    <string name="taskbar_button_quick_settings" msgid="227662894293189391">"द्रुत सेटिङ"</string>
+    <!-- no translation found for taskbar_button_notifications (7471740351507357318) -->
+    <skip />
+    <!-- no translation found for taskbar_button_quick_settings (227662894293189391) -->
+    <skip />
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"सिरान/बायाँतिर सार्नुहोस्"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"फेद/दायाँतिर सार्नुहोस्"</string>
 </resources>

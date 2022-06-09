@@ -15,7 +15,6 @@
 */
 -->
 <resources>
+    <!--  Overview actions  -->
     <dimen name="overview_actions_top_margin">12dp</dimen>
-    <dimen name="overview_grid_side_margin">52dp</dimen>
-    <dimen name="overview_page_spacing">38dp</dimen>
 </resources>

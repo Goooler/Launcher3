@@ -15,16 +15,18 @@
  */
 package com.android.quickstep;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.content.Intent.ACTION_CHOOSER;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
-import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.ACTIVITY_TYPE_ASSISTANT;
 
 import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
 import com.android.launcher3.util.MainThreadInitializedObject;
@@ -63,6 +65,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
 
     private final StagedSplitTaskPosition mMainStagePosition = new StagedSplitTaskPosition();
     private final StagedSplitTaskPosition mSideStagePosition = new StagedSplitTaskPosition();
+    private int mPinnedTaskId = INVALID_TASK_ID;
 
     private TopTaskTracker(Context context) {
         mMainStagePosition.stageType = SplitConfigurationOptions.STAGE_TYPE_MAIN;
@@ -131,8 +134,18 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
         }
     }
 
+    @Override
+    public void onActivityPinned(String packageName, int userId, int taskId, int stackId) {
+        mPinnedTaskId = taskId;
+    }
+
+    @Override
+    public void onActivityUnpinned() {
+        mPinnedTaskId = INVALID_TASK_ID;
+    }
+
     private void resetTaskId(StagedSplitTaskPosition taskPosition) {
-        taskPosition.taskId = -1;
+        taskPosition.taskId = INVALID_TASK_ID;
     }
 
     /**
@@ -140,7 +153,8 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
      *         Will return empty array if device is not in staged split
      */
     public int[] getRunningSplitTaskIds() {
-        if (mMainStagePosition.taskId == -1 || mSideStagePosition.taskId == -1) {
+        if (mMainStagePosition.taskId == INVALID_TASK_ID
+                || mSideStagePosition.taskId == INVALID_TASK_ID) {
             return new int[]{};
         }
         int[] out = new int[2];
@@ -174,7 +188,11 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
                             false /* filterOnlyVisibleRecents */));
             Collections.addAll(mOrderedTaskList, tasks);
         }
-        return new CachedTaskInfo(new ArrayList<>(mOrderedTaskList));
+
+        // Strip the pinned task
+        ArrayList<RunningTaskInfo> tasks = new ArrayList<>(mOrderedTaskList);
+        tasks.removeIf(t -> t.taskId == mPinnedTaskId);
+        return new CachedTaskInfo(tasks);
     }
 
     /**
@@ -183,30 +201,31 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
      */
     public static class CachedTaskInfo {
 
+        @Nullable
         private final RunningTaskInfo mTopTask;
         private final List<RunningTaskInfo> mAllCachedTasks;
 
         CachedTaskInfo(List<RunningTaskInfo> allCachedTasks) {
             mAllCachedTasks = allCachedTasks;
-            mTopTask = allCachedTasks.get(0);
+            mTopTask = allCachedTasks.isEmpty() ? null : allCachedTasks.get(0);
         }
 
         public int getTaskId() {
-            return mTopTask.taskId;
+            return mTopTask == null ? INVALID_TASK_ID : mTopTask.taskId;
         }
 
         /**
          * Returns true if the root of the task chooser activity
          */
         public boolean isRootChooseActivity() {
-            return ACTION_CHOOSER.equals(mTopTask.baseIntent.getAction());
+            return mTopTask != null && ACTION_CHOOSER.equals(mTopTask.baseIntent.getAction());
         }
 
         /**
          * Returns true if the given task holds an Assistant activity that is excluded from recents
          */
         public boolean isExcludedAssistant() {
-            return mTopTask.configuration.windowConfiguration
+            return mTopTask != null && mTopTask.configuration.windowConfiguration
                     .getActivityType() == ACTIVITY_TYPE_ASSISTANT
                     && (mTopTask.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
         }
@@ -215,7 +234,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
          * Returns true if this represents the HOME task
          */
         public boolean isHomeTask() {
-            return mTopTask.configuration.windowConfiguration
+            return mTopTask != null && mTopTask.configuration.windowConfiguration
                     .getActivityType() == ACTIVITY_TYPE_HOME;
         }
 
@@ -224,7 +243,8 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
          * is loaded by the model
          */
         public Task[] getPlaceholderTasks() {
-            return new Task[] {Task.from(new TaskKey(mTopTask), mTopTask, false)};
+            return mTopTask == null ? new Task[0]
+                    : new Task[] {Task.from(new TaskKey(mTopTask), mTopTask, false)};
         }
 
         /**
@@ -232,6 +252,9 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
          * placeholder until the true object is loaded by the model
          */
         public Task[] getPlaceholderTasks(int[] taskIds) {
+            if (mTopTask == null) {
+                return new Task[0];
+            }
             Task[] result = new Task[taskIds.length];
             for (int i = 0; i < taskIds.length; i++) {
                 final int index = i;

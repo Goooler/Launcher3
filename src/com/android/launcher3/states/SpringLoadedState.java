@@ -39,7 +39,7 @@ public class SpringLoadedState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context) {
+    public int getTransitionDuration(Context context, boolean isToState) {
         return 150;
     }
 
@@ -51,7 +51,7 @@ public class SpringLoadedState extends LauncherState {
             return super.getWorkspaceScaleAndTranslation(launcher);
         }
 
-        float shrunkTop = grid.getWorkspaceSpringLoadShrunkTop();
+        float shrunkTop = grid.getCellLayoutSpringLoadShrunkTop();
         float scale = grid.getWorkspaceSpringLoadScale();
 
         float halfHeight = ws.getHeight() / 2;

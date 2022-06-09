@@ -177,8 +177,9 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     ((RecentsActivity) activityInterface.getCreatedActivity()).startHome();
                     return;
                 }
-                RemoteAnimationTarget[] nonAppTargets = SystemUiProxy.INSTANCE.get(mCtx)
-                        .onGoingToRecentsLegacy(false, nonHomeApps);
+
+                RemoteAnimationTarget[] nonAppTargets =
+                        SystemUiProxy.INSTANCE.getNoCreate().onStartingSplitLegacy(nonHomeApps);
 
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && activityInterface.isInLiveTileMode()
                         && activityInterface.getCreatedActivity() != null) {
@@ -191,6 +192,10 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                                 RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */);
                         return;
                     }
+                } else if (nonAppTargets != null && nonAppTargets.length > 0) {
+                    TaskViewUtils.createSplitAuxiliarySurfacesAnimator(
+                            RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */,
+                            true /*shown*/, dividerAnimator -> dividerAnimator.start());
                 }
                 if (mController != null) {
                     if (mLastAppearedTaskTarget == null

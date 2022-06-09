@@ -16,8 +16,6 @@
 
 package com.android.launcher3.tapl;
 
-import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
-
 import static com.android.launcher3.testing.TestProtocol.SPRING_LOADED_STATE_ORDINAL;
 
 import android.graphics.Point;
@@ -33,7 +31,7 @@ import com.android.launcher3.testing.TestProtocol;
 /**
  * Ancestor for AppIcon and AppMenuItem.
  */
-abstract class Launchable {
+public abstract class Launchable {
 
     protected static final int DEFAULT_DRAG_STEPS = 10;
 
@@ -64,35 +62,24 @@ abstract class Launchable {
     protected abstract String launchableType();
 
     private LaunchedAppState launch(BySelector selector) {
-        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+        try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                 "want to launch an app from " + launchableType())) {
             LauncherInstrumentation.log("Launchable.launch before click "
                     + mObject.getVisibleCenter() + " in " + mLauncher.getVisibleBounds(mObject));
-            final String label = mObject.getText();
 
-            executeAndWaitForWindowChange(() -> {
-                mLauncher.clickLauncherObject(mObject);
+            mLauncher.clickLauncherObject(mObject);
+
+            try (LauncherInstrumentation.Closable c2 = mLauncher.addContextLayer("clicked")) {
                 expectActivityStartEvents();
-            }, label, "clicking " + launchableType());
-
-            try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer("clicked")) {
-                return assertAppLaunched(label, selector);
+                return assertAppLaunched(selector);
             }
         }
     }
 
-    protected void executeAndWaitForWindowChange(Runnable command, String label, String action) {
-        mLauncher.executeAndWaitForEvent(
-                command,
-                event -> event.getEventType() == TYPE_WINDOW_STATE_CHANGED,
-                () -> "Launching an app didn't open a new window: " + label,
-                action);
-    }
-
-    protected LaunchedAppState assertAppLaunched(String label, BySelector selector) {
+    protected LaunchedAppState assertAppLaunched(BySelector selector) {
         mLauncher.assertTrue(
-                "App didn't start: " + label + " (" + selector + ")",
-                TestHelpers.wait(Until.hasObject(selector),
+                "App didn't start: (" + selector + ")",
+                mLauncher.getDevice().wait(Until.hasObject(selector),
                         LauncherInstrumentation.WAIT_TIME_MS));
         return new LaunchedAppState(mLauncher);
     }
@@ -116,7 +103,6 @@ abstract class Launchable {
                     dragStartCenter,
                     expectLongClickEvents);
         }
-
 
         return dragStartCenter;
     }
