@@ -100,6 +100,8 @@ public class DeviceProfile {
     // Workspace
     public final int desiredWorkspaceHorizontalMarginOriginalPx;
     public int desiredWorkspaceHorizontalMarginPx;
+    public int gridVisualizationPaddingX;
+    public int gridVisualizationPaddingY;
     public Point cellLayoutBorderSpaceOriginalPx;
     public Point cellLayoutBorderSpacePx;
     public Rect cellLayoutPaddingPx = new Rect();
@@ -108,6 +110,7 @@ public class DeviceProfile {
     public float workspaceSpringLoadShrunkTop;
     public float workspaceSpringLoadShrunkBottom;
     public final int workspaceSpringLoadedBottomSpace;
+    public final int workspaceSpringLoadedMinNextPageVisiblePx;
 
     private final int extraSpace;
     public int workspaceTopPadding;
@@ -214,6 +217,7 @@ public class DeviceProfile {
     public int dropTargetHorizontalPaddingPx;
     public int dropTargetVerticalPaddingPx;
     public int dropTargetGapPx;
+    public int dropTargetButtonWorkspaceEdgeGapPx;
 
     // Insets
     private final Rect mInsets = new Rect();
@@ -300,6 +304,10 @@ public class DeviceProfile {
 
         desiredWorkspaceHorizontalMarginPx = getHorizontalMarginPx(inv, res);
         desiredWorkspaceHorizontalMarginOriginalPx = desiredWorkspaceHorizontalMarginPx;
+        gridVisualizationPaddingX = res.getDimensionPixelSize(
+                R.dimen.grid_visualization_horizontal_cell_spacing);
+        gridVisualizationPaddingY = res.getDimensionPixelSize(
+                R.dimen.grid_visualization_vertical_cell_spacing);
 
         bottomSheetTopPadding = mInsets.top // statusbar height
                 + res.getDimensionPixelSize(R.dimen.bottom_sheet_extra_top_padding)
@@ -341,9 +349,13 @@ public class DeviceProfile {
         dropTargetVerticalPaddingPx = res.getDimensionPixelSize(
                 R.dimen.drop_target_button_drawable_vertical_padding);
         dropTargetGapPx = res.getDimensionPixelSize(R.dimen.drop_target_button_gap);
+        dropTargetButtonWorkspaceEdgeGapPx = res.getDimensionPixelSize(
+                R.dimen.drop_target_button_workspace_edge_gap);
 
         workspaceSpringLoadedBottomSpace =
                 res.getDimensionPixelSize(R.dimen.dynamic_grid_min_spring_loaded_space);
+        workspaceSpringLoadedMinNextPageVisiblePx = res.getDimensionPixelSize(
+                R.dimen.dynamic_grid_spring_loaded_min_next_space_visible);
 
         workspaceCellPaddingXPx = res.getDimensionPixelSize(R.dimen.dynamic_grid_cell_padding_x);
 
@@ -499,7 +511,7 @@ public class DeviceProfile {
      */
     private int calculateQsbWidth() {
         if (isQsbInline) {
-            int columns = isTwoPanels ? inv.numColumns * 2 : inv.numColumns;
+            int columns = getPanelCount() * inv.numColumns;
             return getIconToIconWidthForColumns(columns)
                     - iconSizePx * numShownHotseatIcons
                     - hotseatBorderSpace * numShownHotseatIcons;
@@ -780,7 +792,7 @@ public class DeviceProfile {
     /**
      * Updates the iconSize for allApps* variants.
      */
-    public void updateAllAppsIconSize(float scale, Resources res) {
+    private void updateAllAppsIconSize(float scale, Resources res) {
         allAppsBorderSpacePx = new Point(
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].x, mMetrics, scale),
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].y, mMetrics, scale));
@@ -793,9 +805,9 @@ public class DeviceProfile {
         allAppsCellWidthPx = pxFromDp(inv.allAppsCellSize[mTypeIndex].x, mMetrics, scale);
         if (isScalableGrid) {
             allAppsIconSizePx =
-                    pxFromDp(inv.allAppsIconSize[mTypeIndex], mMetrics);
+                    pxFromDp(inv.allAppsIconSize[mTypeIndex], mMetrics, scale);
             allAppsIconTextSizePx =
-                    pxFromSp(inv.allAppsIconTextSize[mTypeIndex], mMetrics);
+                    pxFromSp(inv.allAppsIconTextSize[mTypeIndex], mMetrics, scale);
             allAppsIconDrawablePaddingPx = iconDrawablePaddingOriginalPx;
         } else {
             float invIconSizeDp = inv.allAppsIconSize[mTypeIndex];
@@ -952,13 +964,6 @@ public class DeviceProfile {
     }
 
     /**
-     * Gets the minimum visible amount of the next workspace page when in the spring-loaded state.
-     */
-    private float getWorkspaceSpringLoadedMinimumNextPageVisible() {
-        return getCellSize().x / 2f;
-    }
-
-    /**
      * Gets the scale of the workspace for the spring-loaded edit state.
      */
     public float getWorkspaceSpringLoadScale() {
@@ -969,8 +974,7 @@ public class DeviceProfile {
         // Reduce scale if next pages would not be visible after scaling the workspace
         int workspaceWidth = availableWidthPx;
         float scaledWorkspaceWidth = workspaceWidth * scale;
-        float maxAvailableWidth =
-                workspaceWidth - (2 * getWorkspaceSpringLoadedMinimumNextPageVisible());
+        float maxAvailableWidth = workspaceWidth - (2 * workspaceSpringLoadedMinNextPageVisiblePx);
         if (scaledWorkspaceWidth > maxAvailableWidth) {
             scale *= maxAvailableWidth / scaledWorkspaceWidth;
         }
@@ -1068,24 +1072,23 @@ public class DeviceProfile {
                         mInsets.right + hotseatBarSidePaddingStartPx, paddingBottom);
             }
         } else if (isTaskbarPresent) {
-            boolean isRtl = Utilities.isRtl(context.getResources());
-            int hotseatHeight = workspacePadding.bottom;
-            int taskbarOffset = getTaskbarOffsetY();
+            // Center the QSB vertically with hotseat
+            int hotseatBottomPadding = getHotseatBottomPadding();
+            int hotseatTopPadding =
+                    workspacePadding.bottom - hotseatBottomPadding - hotseatCellHeightPx;
+
             // Push icons to the side
             int additionalQsbSpace = isQsbInline ? qsbWidth + hotseatBorderSpace : 0;
-
-            // Center the QSB vertically with hotseat
-            int hotseatTopPadding = hotseatHeight - taskbarOffset - hotseatCellHeightPx;
-
-            int endOffset = ApiWrapper.getHotseatEndOffset(context);
             int requiredWidth = iconSizePx * numShownHotseatIcons
                     + hotseatBorderSpace * (numShownHotseatIcons - 1)
                     + additionalQsbSpace;
-
+            int endOffset = ApiWrapper.getHotseatEndOffset(context);
             int hotseatWidth = Math.min(requiredWidth, availableWidthPx - endOffset);
             int sideSpacing = (availableWidthPx - hotseatWidth) / 2;
-            mHotseatPadding.set(sideSpacing, hotseatTopPadding, sideSpacing, taskbarOffset);
 
+            mHotseatPadding.set(sideSpacing, hotseatTopPadding, sideSpacing, hotseatBottomPadding);
+
+            boolean isRtl = Utilities.isRtl(context.getResources());
             if (isRtl) {
                 mHotseatPadding.right += additionalQsbSpace;
             } else {
@@ -1145,15 +1148,22 @@ public class DeviceProfile {
         }
     }
 
-    /**
-     * Returns the number of pixels the taskbar is translated from the bottom of the screen.
-     */
-    public int getTaskbarOffsetY() {
+    private int getHotseatBottomPadding() {
         if (isQsbInline) {
             return getQsbOffsetY() - (Math.abs(hotseatQsbHeight - hotseatCellHeightPx) / 2);
         } else {
             return (getQsbOffsetY() - taskbarSize) / 2;
         }
+    }
+
+    /**
+     * Returns the number of pixels the taskbar is translated from the bottom of the screen.
+     */
+    public int getTaskbarOffsetY() {
+        int taskbarIconBottomSpace = (taskbarSize - iconSizePx) / 2;
+        int launcherIconBottomSpace =
+                Math.min((hotseatCellHeightPx - iconSizePx) / 2, gridVisualizationPaddingY);
+        return getHotseatBottomPadding() + launcherIconBottomSpace - taskbarIconBottomSpace;
     }
 
     /**
@@ -1414,6 +1424,10 @@ public class DeviceProfile {
                 prefix + pxToDpStr("workspaceSpringLoadShrunkTop", workspaceSpringLoadShrunkTop));
         writer.println(prefix + pxToDpStr("workspaceSpringLoadShrunkBottom",
                 workspaceSpringLoadShrunkBottom));
+        writer.println(prefix + pxToDpStr("workspaceSpringLoadedBottomSpace",
+                workspaceSpringLoadedBottomSpace));
+        writer.println(prefix + pxToDpStr("workspaceSpringLoadedMinNextPageVisiblePx",
+                workspaceSpringLoadedMinNextPageVisiblePx));
         writer.println(
                 prefix + pxToDpStr("getWorkspaceSpringLoadScale()", getWorkspaceSpringLoadScale()));
     }
