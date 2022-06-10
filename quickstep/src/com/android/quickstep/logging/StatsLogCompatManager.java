@@ -462,6 +462,7 @@ public class StatsLogCompatManager extends StatsLogManager {
         private LatencyType mType = LatencyType.UNKNOWN;
         private int mPackageId = 0;
         private long mLatencyInMillis;
+        private int mQueryLength = -1;
 
         StatsCompatLatencyLogger(Context context, ActivityContext activityContext) {
             mContext = context;
@@ -493,6 +494,12 @@ public class StatsLogCompatManager extends StatsLogManager {
         }
 
         @Override
+        public StatsLatencyLogger withQueryLength(int queryLength) {
+            this.mQueryLength = queryLength;
+            return this;
+        }
+
+        @Override
         public void log(EventEnum event) {
             if (IS_VERBOSE) {
                 String name = (event instanceof Enum) ? ((Enum) event).name() :
@@ -508,7 +515,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                     mInstanceId.getId(), // instance_id
                     mPackageId, // package_id
                     mLatencyInMillis, // latency_in_millis
-                    mType.getId() //type
+                    mType.getId(), //type
+                    mQueryLength // query_length
             );
         }
     }
@@ -574,14 +582,18 @@ public class StatsLogCompatManager extends StatsLogManager {
     }
 
     private static int getGridX(LauncherAtom.ItemInfo info, boolean parent) {
-        if (info.getContainerInfo().getContainerCase() == FOLDER) {
+        LauncherAtom.ContainerInfo containerInfo = info.getContainerInfo();
+        if (containerInfo.getContainerCase() == FOLDER) {
             if (parent) {
-                return info.getContainerInfo().getFolder().getWorkspace().getGridX();
+                return containerInfo.getFolder().getWorkspace().getGridX();
             } else {
-                return info.getContainerInfo().getFolder().getGridX();
+                return containerInfo.getFolder().getGridX();
             }
+        } else if (containerInfo.getContainerCase() == EXTENDED_CONTAINERS) {
+            return containerInfo.getExtendedContainers()
+                    .getDeviceSearchResultContainer().getGridX();
         } else {
-            return info.getContainerInfo().getWorkspace().getGridX();
+            return containerInfo.getWorkspace().getGridX();
         }
     }
 
