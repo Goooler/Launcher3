@@ -735,7 +735,9 @@ public class StatsLogManager implements ResourceBasedOverride {
             UNKNOWN(0),
             COLD(1),
             HOT(2),
-            TIMEOUT(3);
+            TIMEOUT(3),
+            FAIL(4),
+            COLD_USERWAITING(5);
 
             private final int mId;
 
@@ -768,6 +770,13 @@ public class StatsLogManager implements ResourceBasedOverride {
          * Sets {@link LatencyType} of log message.
          */
         default StatsLatencyLogger withType(LatencyType type) {
+            return this;
+        }
+
+        /**
+         * Sets query length of the event.
+         */
+        default StatsLatencyLogger withQueryLength(int queryLength) {
             return this;
         }
 
