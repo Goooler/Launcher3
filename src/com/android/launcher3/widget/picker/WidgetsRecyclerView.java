@@ -23,25 +23,25 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TableLayout;
 
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.OnItemTouchListener;
 
+import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.FastScrollRecyclerView;
 import com.android.launcher3.R;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.widget.model.WidgetListSpaceEntry;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
 import com.android.launcher3.widget.model.WidgetsListSearchHeaderEntry;
-import com.android.launcher3.widget.picker.WidgetsSpaceViewHolderBinder.EmptySpaceView;
+import com.android.launcher3.widget.picker.SearchAndRecommendationsScrollController.OnContentChangeListener;
 
 /**
  * The widgets recycler view.
  */
-public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnItemTouchListener {
+public class WidgetsRecyclerView extends BaseRecyclerView implements OnItemTouchListener {
 
     private WidgetsListAdapter mAdapter;
 
@@ -50,13 +50,10 @@ public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnIte
     private final Point mFastScrollerOffset = new Point();
     private boolean mTouchDownOnScroller;
     private HeaderViewDimensionsProvider mHeaderViewDimensionsProvider;
-
-    // Cached sizes
     private int mLastVisibleWidgetContentTableHeight = 0;
     private int mWidgetHeaderHeight = 0;
-    private int mWidgetEmptySpaceHeight = 0;
-
     private final int mSpacingBetweenEntries;
+    @Nullable private OnContentChangeListener mOnContentChangeListener;
 
     public WidgetsRecyclerView(Context context) {
         this(context, null);
@@ -85,7 +82,9 @@ public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnIte
         super.onFinishInflate();
         // create a layout manager with Launcher's context so that scroll position
         // can be preserved during screen rotation.
-        setLayoutManager(new LinearLayoutManager(getContext()));
+        WidgetsListLayoutManager layoutManager = new WidgetsListLayoutManager(getContext());
+        layoutManager.setOnContentChangeListener(mOnContentChangeListener);
+        setLayoutManager(layoutManager);
     }
 
     @Override
@@ -170,12 +169,10 @@ public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnIte
                 // This assumes there is ever only one content shown in this recycler view.
                 mLastVisibleWidgetContentTableHeight = view.getMeasuredHeight();
             } else if (view instanceof WidgetsListHeader
-                    && mWidgetHeaderHeight == 0
+                    && mLastVisibleWidgetContentTableHeight == 0
                     && view.getMeasuredHeight() > 0) {
                 // This assumes all header views are of the same height.
                 mWidgetHeaderHeight = view.getMeasuredHeight();
-            } else if (view instanceof EmptySpaceView && view.getMeasuredHeight() > 0) {
-                mWidgetEmptySpaceHeight = view.getMeasuredHeight();
             }
         }
 
@@ -239,6 +236,29 @@ public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnIte
         mHeaderViewDimensionsProvider = headerViewDimensionsProvider;
     }
 
+    @Override
+    public void scrollToTop() {
+        if (mScrollbar != null) {
+            mScrollbar.reattachThumbToScroll();
+        }
+
+        if (getLayoutManager() instanceof LinearLayoutManager) {
+            if (getCurrentScrollY() == 0) {
+                // We are at the top, so don't scrollToPosition (would cause unnecessary relayout).
+                return;
+            }
+        }
+        scrollToPosition(0);
+    }
+
+    public void setOnContentChangeListener(@Nullable OnContentChangeListener listener) {
+        mOnContentChangeListener = listener;
+        WidgetsListLayoutManager layoutManager = (WidgetsListLayoutManager) getLayoutManager();
+        if (layoutManager != null) {
+            layoutManager.setOnContentChangeListener(listener);
+        }
+    }
+
     /**
      * Returns the sum of the height, in pixels, of this list adapter's items from index 0 until
      * {@code untilIndex}.
@@ -263,8 +283,6 @@ public class WidgetsRecyclerView extends FastScrollRecyclerView implements OnIte
                 }
             } else if (entry instanceof WidgetsListContentEntry) {
                 totalItemsHeight += mLastVisibleWidgetContentTableHeight;
-            } else if (entry instanceof WidgetListSpaceEntry) {
-                totalItemsHeight += mWidgetEmptySpaceHeight;
             } else {
                 throw new UnsupportedOperationException("Can't estimate height for " + entry);
             }

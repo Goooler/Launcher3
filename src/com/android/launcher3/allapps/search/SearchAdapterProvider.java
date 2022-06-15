@@ -21,19 +21,18 @@ import android.view.View;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.android.launcher3.BaseDraggingActivity;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.allapps.BaseAdapterProvider;
-import com.android.launcher3.views.ActivityContext;
 
 /**
  * A UI expansion wrapper providing for search results
- *
- * @param <T> Context for this adapter provider.
  */
-public abstract class SearchAdapterProvider<T extends ActivityContext> extends BaseAdapterProvider {
+public abstract class SearchAdapterProvider extends BaseAdapterProvider {
 
-    protected final T mLauncher;
+    protected final BaseDraggingActivity mLauncher;
 
-    public SearchAdapterProvider(T launcher) {
+    public SearchAdapterProvider(BaseDraggingActivity launcher, AllAppsContainerView appsView) {
         mLauncher = launcher;
     }
 

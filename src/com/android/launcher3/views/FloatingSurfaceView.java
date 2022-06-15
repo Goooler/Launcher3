@@ -40,8 +40,8 @@ import com.android.launcher3.GestureNavContract;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.window.RefreshRateTracker;
 
 /**
  * Similar to {@link FloatingIconView} but displays a surface with the targetIcon. It then passes
@@ -61,6 +61,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
     private final Runnable mRemoveViewRunnable = this::removeViewFromParent;
 
     private final SurfaceView mSurfaceView;
+
 
     private View mIcon;
     private GestureNavContract mContract;
@@ -96,19 +97,13 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
 
         // Remove after some time, to avoid flickering
         Executors.MAIN_EXECUTOR.getHandler().postDelayed(mRemoveViewRunnable,
-                RefreshRateTracker.getSingleFrameMs(mLauncher));
+                DisplayController.INSTANCE.get(mLauncher).getInfo().singleFrameMs);
     }
 
     private void removeViewFromParent() {
         mPicture.beginRecording(1, 1);
         mPicture.endRecording();
-        mLauncher.getDragLayer().removeViewInLayout(this);
-    }
-
-    private void removeViewImmediate() {
-        // Cancel any pending remove
-        Executors.MAIN_EXECUTOR.getHandler().removeCallbacks(mRemoveViewRunnable);
-        removeViewFromParent();
+        mLauncher.getDragLayer().removeView(this);
     }
 
     /**
@@ -120,7 +115,9 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
         view.mContract = contract;
         view.mIsOpen = true;
 
-        view.removeViewImmediate();
+        // Cancel any pending remove
+        Executors.MAIN_EXECUTOR.getHandler().removeCallbacks(view.mRemoveViewRunnable);
+        view.removeViewFromParent();
         launcher.getDragLayer().addView(view);
     }
 
@@ -132,7 +129,6 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
     @Override
     public boolean onControllerInterceptTouchEvent(MotionEvent ev) {
         close(false);
-        removeViewImmediate();
         return false;
     }
 
@@ -162,9 +158,8 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
         if (mContract == null) {
             return;
         }
-        View icon = mLauncher.getFirstMatchForAppClose(-1,
-                mContract.componentName.getPackageName(), mContract.user,
-                false /* supportsAllAppsState */);
+        View icon = mLauncher.getWorkspace().getFirstMatchForAppClose(-1,
+                mContract.componentName.getPackageName(), mContract.user);
 
         boolean iconChanged = mIcon != icon;
         if (iconChanged) {
@@ -187,7 +182,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
                 lp.topMargin = Math.round(mIconPosition.top);
             }
         }
-        if (mIcon != null && iconChanged && !mIconBounds.isEmpty()) {
+        if (iconChanged && !mIconBounds.isEmpty()) {
             // Record the icon display
             setCurrentIconVisible(true);
             Canvas c = mPicture.beginRecording(mIconBounds.width(), mIconBounds.height());
@@ -201,7 +196,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
 
     private void sendIconInfo() {
         if (mContract != null && !mIconPosition.isEmpty()) {
-            mContract.sendEndPosition(mIconPosition, mLauncher, mSurfaceView.getSurfaceControl());
+            mContract.sendEndPosition(mIconPosition, mSurfaceView.getSurfaceControl());
         }
     }
 

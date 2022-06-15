@@ -17,21 +17,14 @@
 package com.android.quickstep.views;
 
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
-import android.util.TypedValue;
+import android.view.Gravity;
 import android.widget.FrameLayout;
 
-import androidx.annotation.Nullable;
+import com.android.quickstep.util.SplitSelectStateController;
 
 public class SplitPlaceholderView extends FrameLayout {
-
-    private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Rect mTempRect = new Rect();
 
     public static final FloatProperty<SplitPlaceholderView> ALPHA_FLOAT =
             new FloatProperty<SplitPlaceholderView>("SplitViewAlpha") {
@@ -47,55 +40,29 @@ public class SplitPlaceholderView extends FrameLayout {
                 }
             };
 
-    @Nullable
-    private IconView mIconView;
+    private SplitSelectStateController mSplitController;
+    private IconView mIcon;
 
     public SplitPlaceholderView(Context context, AttributeSet attrs) {
         super(context, attrs);
-
-        mPaint.setColor(getThemeBackgroundColor(context));
-        setWillNotDraw(false);
     }
 
-    @Override
-    protected void dispatchDraw(Canvas canvas) {
-        // Call this before super call to draw below the children.
-        drawBackground(canvas);
+    public void init(SplitSelectStateController controller) {
+        this.mSplitController = controller;
+    }
 
-        super.dispatchDraw(canvas);
+    public SplitSelectStateController getSplitController() {
+        return mSplitController;
+    }
 
-        if (mIconView != null) {
-            // Center the icon view in the visible area.
-            getLocalVisibleRect(mTempRect);
-            FloatingTaskView parent = (FloatingTaskView) getParent();
-            parent.centerIconView(mIconView, mTempRect.centerX(), mTempRect.centerY());
+    public void setIcon(IconView icon) {
+        if (mIcon == null) {
+            mIcon = new IconView(getContext());
+            addView(mIcon);
         }
-    }
-
-    @Nullable
-    public IconView getIconView() {
-        return mIconView;
-    }
-
-    public void setIcon(Drawable drawable, int iconSize) {
-        if (mIconView == null) {
-            mIconView = new IconView(getContext());
-            addView(mIconView);
-        }
-        mIconView.setDrawable(drawable);
-        mIconView.setDrawableSize(iconSize, iconSize);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(iconSize, iconSize);
-        mIconView.setLayoutParams(params);
-    }
-
-    private void drawBackground(Canvas canvas) {
-        FloatingTaskView parent = (FloatingTaskView) getParent();
-        parent.drawRoundedRect(canvas, mPaint);
-    }
-
-    private static int getThemeBackgroundColor(Context context) {
-        final TypedValue value = new TypedValue();
-        context.getTheme().resolveAttribute(android.R.attr.colorBackground, value, true);
-        return value.data;
+        mIcon.setDrawable(icon.getDrawable());
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(icon.getLayoutParams());
+        params.gravity = Gravity.CENTER;
+        mIcon.setLayoutParams(params);
     }
 }

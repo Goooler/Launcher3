@@ -30,8 +30,6 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.widget.FrameLayout;
 
-import androidx.annotation.Nullable;
-
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -57,14 +55,10 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
     private LauncherAppWidgetHostView mAppWidgetView;
     private View mAppWidgetBackgroundView;
     private RectF mBackgroundPosition;
-    @Nullable
     private GhostView mForegroundOverlayView;
 
-    @Nullable
     private Runnable mEndRunnable;
-    @Nullable
     private Runnable mFastFinishRunnable;
-    @Nullable
     private Runnable mOnTargetChangeRunnable;
     private boolean mAppTargetIsTranslucent;
 
@@ -74,11 +68,11 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
         this(context, null);
     }
 
-    public FloatingWidgetView(Context context, @Nullable AttributeSet attrs) {
+    public FloatingWidgetView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public FloatingWidgetView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+    public FloatingWidgetView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mLauncher = Launcher.getLauncher(context);
         mListenerView = new ListenerView(context, attrs);

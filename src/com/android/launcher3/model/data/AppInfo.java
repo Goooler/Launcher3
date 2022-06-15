@@ -35,6 +35,7 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.pm.PackageInstallInfo;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.PackageManagerHelper;
 
 import java.util.Comparator;
@@ -42,7 +43,7 @@ import java.util.Comparator;
 /**
  * Represents an app in AllAppsView.
  */
-public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
+public class AppInfo extends ItemInfoWithIcon {
 
     public static final AppInfo[] EMPTY_ARRAY = new AppInfo[0];
     public static final Comparator<AppInfo> COMPONENT_KEY_COMPARATOR = (a, b) -> {
@@ -120,8 +121,7 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
         return super.dumpProperties() + " componentName=" + componentName;
     }
 
-    @Override
-    public WorkspaceItemInfo makeWorkspaceItem(Context context) {
+    public WorkspaceItemInfo makeWorkspaceItem() {
         WorkspaceItemInfo workspaceItemInfo = new WorkspaceItemInfo(this);
 
         if ((runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) != 0) {
@@ -137,6 +137,10 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
         }
 
         return workspaceItemInfo;
+    }
+
+    public ComponentKey toComponentKey() {
+        return new ComponentKey(componentName, user);
     }
 
     public static Intent makeLaunchIntent(LauncherActivityInfo info) {

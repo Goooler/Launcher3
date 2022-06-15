@@ -60,8 +60,6 @@ import com.android.systemui.shared.system.InputMonitorCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams.Builder;
 
-import java.util.HashMap;
-
 /**
  * A placeholder input consumer used when the device is still locked, e.g. from secure camera.
  */
@@ -241,7 +239,7 @@ public class DeviceLockedInputConsumer implements InputConsumer,
     }
 
     @Override
-    public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
+    public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
         mRecentsAnimationController = null;
         mTransformParams.setTargetSet(null);
     }

@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.folder;
 
-import android.annotation.SuppressLint;
-import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.os.Process;
@@ -24,15 +22,11 @@ import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
 
-import androidx.annotation.WorkerThread;
-
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.model.AllAppsList;
 import com.android.launcher3.model.BaseModelUpdateTask;
 import com.android.launcher3.model.BgDataModel;
-import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -100,7 +94,6 @@ public class FolderNameProvider implements ResourceBasedOverride {
     /**
      * Generate and rank the suggested Folder names.
      */
-    @WorkerThread
     public void getSuggestedFolderName(Context context,
             ArrayList<WorkspaceItemInfo> workspaceItemInfos,
             FolderNameInfos nameInfos) {
@@ -108,13 +101,13 @@ public class FolderNameProvider implements ResourceBasedOverride {
         if (DEBUG) {
             Log.d(TAG, "getSuggestedFolderName:" + nameInfos.toString());
         }
-
         // If all the icons are from work profile,
         // Then, suggest "Work" as the folder name
         Set<UserHandle> users = workspaceItemInfos.stream().map(w -> w.user)
                 .collect(Collectors.toSet());
         if (users.size() == 1 && !users.contains(Process.myUserHandle())) {
-            setAsLastSuggestion(nameInfos, getWorkFolderName(context));
+            setAsLastSuggestion(nameInfos,
+                    context.getResources().getString(R.string.work_folder_name));
         }
 
         // If all the icons are from same package (e.g., main icon, shortcut, shortcut)
@@ -128,23 +121,11 @@ public class FolderNameProvider implements ResourceBasedOverride {
         if (packageNames.size() == 1) {
             Optional<AppInfo> info = getAppInfoByPackageName(packageNames.iterator().next());
             // Place it as first viable suggestion and shift everything else
-            info.ifPresent(i -> setAsFirstSuggestion(
-                    nameInfos, i.title == null ? "" : i.title.toString()));
+            info.ifPresent(i -> setAsFirstSuggestion(nameInfos, i.title.toString()));
         }
         if (DEBUG) {
             Log.d(TAG, "getSuggestedFolderName:" + nameInfos.toString());
         }
-    }
-
-    @WorkerThread
-    @SuppressLint("NewApi")
-    private String getWorkFolderName(Context context) {
-        if (!Utilities.ATLEAST_T) {
-            return context.getString(R.string.work_folder_name);
-        }
-        return context.getSystemService(DevicePolicyManager.class).getResources()
-                .getString(StringCache.WORK_FOLDER_NAME, () ->
-                        context.getString(R.string.work_folder_name));
     }
 
     private Optional<AppInfo> getAppInfoByPackageName(String packageName) {

@@ -57,7 +57,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.function.Predicate;
 
 /**
  * Handles updates due to changes in package manager (app installed/updated/removed)
@@ -96,7 +95,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
         final int N = packages.length;
         final FlagOp flagOp;
         final HashSet<String> packageSet = new HashSet<>(Arrays.asList(packages));
-        final Predicate<ItemInfo> matcher = mOp == OP_USER_AVAILABILITY_CHANGE
+        final ItemInfoMatcher matcher = mOp == OP_USER_AVAILABILITY_CHANGE
                 ? ItemInfoMatcher.ofUser(mUser) // We want to update all packages for this user
                 : ItemInfoMatcher.ofPackages(packageSet, mUser);
         final HashSet<ComponentName> removedComponents = new HashSet<>();
@@ -113,7 +112,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                     activitiesLists.put(
                             packages[i], appsList.addPackage(context, packages[i], mUser));
                 }
-                flagOp = FlagOp.NO_OP.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
+                flagOp = FlagOp.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
                 break;
             }
             case OP_UPDATE:
@@ -124,6 +123,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                         iconCache.updateIconsForPkg(packages[i], mUser);
                         activitiesLists.put(
                                 packages[i], appsList.updatePackage(context, packages[i], mUser));
+                        app.getWidgetCache().removePackage(packages[i], mUser);
 
                         // The update may have changed which shortcuts/widgets are available.
                         // Refresh the widgets for the package if we have an activity running.
@@ -135,7 +135,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                     }
                 }
                 // Since package was just updated, the target must be available now.
-                flagOp = FlagOp.NO_OP.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
+                flagOp = FlagOp.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
                 break;
             case OP_REMOVE: {
                 for (int i = 0; i < N; i++) {
@@ -148,13 +148,15 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                 for (int i = 0; i < N; i++) {
                     if (DEBUG) Log.d(TAG, "mAllAppsList.removePackage " + packages[i]);
                     appsList.removePackage(packages[i], mUser);
+                    app.getWidgetCache().removePackage(packages[i], mUser);
                 }
-                flagOp = FlagOp.NO_OP.addFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
+                flagOp = FlagOp.addFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
                 break;
             case OP_SUSPEND:
             case OP_UNSUSPEND:
-                flagOp = FlagOp.NO_OP.setFlag(
-                        WorkspaceItemInfo.FLAG_DISABLED_SUSPENDED, mOp == OP_SUSPEND);
+                flagOp = mOp == OP_SUSPEND ?
+                        FlagOp.addFlag(WorkspaceItemInfo.FLAG_DISABLED_SUSPENDED) :
+                        FlagOp.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_SUSPENDED);
                 if (DEBUG) Log.d(TAG, "mAllAppsList.(un)suspend " + N);
                 appsList.updateDisabledFlags(matcher, flagOp);
                 break;
@@ -162,8 +164,9 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                 UserManagerState ums = new UserManagerState();
                 ums.init(UserCache.INSTANCE.get(context),
                         context.getSystemService(UserManager.class));
-                flagOp = FlagOp.NO_OP.setFlag(
-                        WorkspaceItemInfo.FLAG_DISABLED_QUIET_USER, ums.isUserQuiet(mUser));
+                flagOp = ums.isUserQuiet(mUser)
+                        ? FlagOp.addFlag(WorkspaceItemInfo.FLAG_DISABLED_QUIET_USER)
+                        : FlagOp.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_QUIET_USER);
                 appsList.updateDisabledFlags(matcher, flagOp);
 
                 // We are not synchronizing here, as int operations are atomic
@@ -207,7 +210,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                     }
 
                     ComponentName cn = si.getTargetComponent();
-                    if (cn != null && matcher.test(si)) {
+                    if (cn != null && matcher.matches(si, cn)) {
                         String packageName = cn.getPackageName();
 
                         if (si.hasStatusFlag(WorkspaceItemInfo.FLAG_SUPPORTS_WEB_UI)) {
@@ -311,9 +314,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
 
             bindUpdatedWorkspaceItems(updatedWorkspaceItems);
             if (!removedShortcuts.isEmpty()) {
-                deleteAndBindComponentsRemoved(
-                        ItemInfoMatcher.ofItemIds(removedShortcuts),
-                        "removed because the target component is invalid");
+                deleteAndBindComponentsRemoved(ItemInfoMatcher.ofItemIds(removedShortcuts));
             }
 
             if (!widgets.isEmpty()) {
@@ -339,11 +340,10 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
         }
 
         if (!removedPackages.isEmpty() || !removedComponents.isEmpty()) {
-            Predicate<ItemInfo> removeMatch = ItemInfoMatcher.ofPackages(removedPackages, mUser)
+            ItemInfoMatcher removeMatch = ItemInfoMatcher.ofPackages(removedPackages, mUser)
                     .or(ItemInfoMatcher.ofComponents(removedComponents, mUser))
                     .and(ItemInfoMatcher.ofItemIds(forceKeepShortcuts).negate());
-            deleteAndBindComponentsRemoved(removeMatch,
-                    "removed because the corresponding package or component is removed");
+            deleteAndBindComponentsRemoved(removeMatch);
 
             // Remove any queued items from the install queue
             ItemInstallQueue.INSTANCE.get(context)

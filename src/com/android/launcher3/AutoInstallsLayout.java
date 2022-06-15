@@ -27,7 +27,9 @@ import android.content.res.Resources;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build.VERSION;
 import android.os.Bundle;
+import android.os.Process;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
@@ -447,7 +449,7 @@ public class AutoInstallsLayout {
             // Auto installs should always support the current platform version.
             LauncherIcons li = LauncherIcons.obtain(mContext);
             mValues.put(LauncherSettings.Favorites.ICON, GraphicsUtils.flattenBitmap(
-                    li.createBadgedIconBitmap(icon).icon));
+                    li.createBadgedIconBitmap(icon, Process.myUserHandle(), VERSION.SDK_INT).icon));
             li.recycle();
 
             mValues.put(Favorites.ICON_PACKAGE, mIconRes.getResourcePackageName(iconId));

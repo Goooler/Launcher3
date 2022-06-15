@@ -16,10 +16,6 @@
 
 package com.android.launcher3.proxy;
 
-import static android.app.PendingIntent.FLAG_MUTABLE;
-import static android.app.PendingIntent.FLAG_ONE_SHOT;
-import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
-
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
@@ -49,7 +45,7 @@ public class StartActivityParams implements Parcelable {
 
     public StartActivityParams(Activity activity, int requestCode) {
         this(activity.createPendingResult(requestCode, new Intent(),
-                FLAG_ONE_SHOT | FLAG_UPDATE_CURRENT | FLAG_MUTABLE), requestCode);
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_UPDATE_CURRENT), requestCode);
     }
 
     public StartActivityParams(PendingIntent pendingIntent, int requestCode) {

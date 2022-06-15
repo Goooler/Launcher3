@@ -31,7 +31,6 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.util.DisplayController;
 
 /**
  * Utility class to handle edge swipes for back gestures.
@@ -116,9 +115,10 @@ public class EdgeBackGestureHandler implements OnTouchListener {
             // Add a nav bar panel window.
             mEdgeBackPanel = new EdgeBackGesturePanel(mContext, parent, createLayoutParams());
             mEdgeBackPanel.setBackCallback(mBackCallback);
-            Point currentSize = DisplayController.INSTANCE.get(mContext).getInfo().currentSize;
-            mDisplaySize.set(currentSize.x, currentSize.y);
-            mEdgeBackPanel.setDisplaySize(mDisplaySize);
+            if (mContext.getDisplay() != null) {
+                mContext.getDisplay().getRealSize(mDisplaySize);
+                mEdgeBackPanel.setDisplaySize(mDisplaySize);
+            }
         }
     }
 

@@ -121,29 +121,29 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo
                 localPadding.set(widgetPadding);
             }
             minSpanX = Math.max(minSpanX,
-                    getSpanX(localPadding, minResizeWidth, dp.cellLayoutBorderSpacePx.x,
+                    getSpanX(localPadding, minResizeWidth, dp.cellLayoutBorderSpacingPx,
                             cellSize.x));
             minSpanY = Math.max(minSpanY,
-                    getSpanY(localPadding, minResizeHeight, dp.cellLayoutBorderSpacePx.y,
+                    getSpanY(localPadding, minResizeHeight, dp.cellLayoutBorderSpacingPx,
                             cellSize.y));
 
             if (ATLEAST_S) {
                 if (maxResizeWidth > 0) {
-                    maxSpanX = Math.min(maxSpanX, getSpanX(localPadding, maxResizeWidth,
-                            dp.cellLayoutBorderSpacePx.x, cellSize.x));
+                    maxSpanX = Math.min(maxSpanX,
+                            getSpanX(localPadding, maxResizeWidth, dp.cellLayoutBorderSpacingPx,
+                                    cellSize.x));
                 }
                 if (maxResizeHeight > 0) {
-                    maxSpanY = Math.min(maxSpanY, getSpanY(localPadding, maxResizeHeight,
-                            dp.cellLayoutBorderSpacePx.y, cellSize.y));
+                    maxSpanY = Math.min(maxSpanY,
+                            getSpanY(localPadding, maxResizeHeight, dp.cellLayoutBorderSpacingPx,
+                                    cellSize.y));
                 }
             }
 
             spanX = Math.max(spanX,
-                    getSpanX(localPadding, minWidth, dp.cellLayoutBorderSpacePx.x,
-                            cellSize.x));
+                    getSpanX(localPadding, minWidth, dp.cellLayoutBorderSpacingPx, cellSize.x));
             spanY = Math.max(spanY,
-                    getSpanY(localPadding, minHeight, dp.cellLayoutBorderSpacePx.y,
-                            cellSize.y));
+                    getSpanY(localPadding, minHeight, dp.cellLayoutBorderSpacingPx, cellSize.y));
         }
 
         if (ATLEAST_S) {

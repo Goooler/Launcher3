@@ -15,11 +15,9 @@
  */
 package com.android.quickstep.inputconsumers;
 
-import android.app.ActivityManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.PointF;
-import android.os.RemoteException;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import com.android.launcher3.testing.TestLogging;
@@ -38,10 +36,6 @@ import com.android.systemui.shared.system.InputMonitorCompat;
  */
 public class SysUiOverlayInputConsumer implements InputConsumer,
         TriggerSwipeUpTouchTracker.OnSwipeUpListener {
-    private static final String TAG = "SysUiOverlayInputConsumer";
-
-    // Should match the values in PhoneWindowManager
-    private static final String SYSTEM_DIALOG_REASON_GESTURE_NAV = "gestureNav";
 
     private final Context mContext;
     private final InputMonitorCompat mInputMonitor;
@@ -82,11 +76,7 @@ public class SysUiOverlayInputConsumer implements InputConsumer,
     @Override
     public void onSwipeUp(boolean wasFling, PointF finalVelocity) {
         // Close system dialogs when a swipe up is detected.
-        try {
-            ActivityManager.getService().closeSystemDialogs(SYSTEM_DIALOG_REASON_GESTURE_NAV);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Exception calling closeSystemDialogs " + e.getMessage());
-        }
+        mContext.sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
     }
 
     @Override

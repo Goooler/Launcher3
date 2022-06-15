@@ -95,6 +95,11 @@ public class WidgetsSearchBarController implements TextWatcher,
     }
 
     @Override
+    public void onAppendSearchResult(String query, ArrayList<WidgetsListBaseEntry> items) {
+        // Not needed.
+    }
+
+    @Override
     public void clearSearchResult() {
         // Any existing search session will be cancelled by setting text to empty.
         mInput.setText("");

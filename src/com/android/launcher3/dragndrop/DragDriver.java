@@ -165,11 +165,8 @@ public abstract class DragDriver {
      * Class for driving an internal (i.e. not using framework) drag/drop operation.
      */
     static class InternalDragDriver extends DragDriver {
-        private final DragController mDragController;
-
         InternalDragDriver(DragController dragController, Consumer<MotionEvent> sec) {
             super(dragController, sec);
-            mDragController = dragController;
         }
 
         @Override
@@ -179,14 +176,11 @@ public abstract class DragDriver {
 
             switch (action) {
                 case MotionEvent.ACTION_MOVE:
-                    mEventListener.onDriverDragMove(mDragController.getX(ev),
-                            mDragController.getY(ev));
+                    mEventListener.onDriverDragMove(ev.getX(), ev.getY());
                     break;
                 case MotionEvent.ACTION_UP:
-                    mEventListener.onDriverDragMove(mDragController.getX(ev),
-                            mDragController.getY(ev));
-                    mEventListener.onDriverDragEnd(mDragController.getX(ev),
-                            mDragController.getY(ev));
+                    mEventListener.onDriverDragMove(ev.getX(), ev.getY());
+                    mEventListener.onDriverDragEnd(ev.getX(), ev.getY());
                     break;
                 case MotionEvent.ACTION_CANCEL:
                     mEventListener.onDriverDragCancel();
@@ -203,8 +197,7 @@ public abstract class DragDriver {
 
             switch (action) {
                 case MotionEvent.ACTION_UP:
-                    mEventListener.onDriverDragEnd(mDragController.getX(ev),
-                            mDragController.getY(ev));
+                    mEventListener.onDriverDragEnd(ev.getX(), ev.getY());
                     break;
                 case MotionEvent.ACTION_CANCEL:
                     mEventListener.onDriverDragCancel();

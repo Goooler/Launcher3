@@ -30,10 +30,9 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
-import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.BaseDragLayer;
@@ -47,7 +46,7 @@ import java.util.Collections;
 public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> {
 
     private View mAllAppsButton;
-    private ActivityAllAppsContainerView<SecondaryDisplayLauncher> mAppsView;
+    private AllAppsContainerView mAppsView;
 
     private GridView mWorkspace;
     private PinnedAppsAdapter mPinnedAppsAdapter;
@@ -113,27 +112,26 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         for (int i = 0; i < count; i++) {
             final View child = getChildAt(i);
             if (child == mAppsView) {
-                int horizontalPadding = (2 * grid.desiredWorkspaceHorizontalMarginPx)
-                        + grid.cellLayoutPaddingPx.left + grid.cellLayoutPaddingPx.right;
-                int verticalPadding =
-                        grid.cellLayoutPaddingPx.top + grid.cellLayoutPaddingPx.bottom;
+                int padding = 2 * (grid.desiredWorkspaceLeftRightMarginPx
+                        + grid.cellLayoutPaddingLeftRightPx);
 
-                int maxWidth =
-                        grid.allAppsCellWidthPx * grid.numShownAllAppsColumns + horizontalPadding;
-                int appsWidth = Math.min(width - getPaddingLeft() - getPaddingRight(), maxWidth);
+                int maxWidth = grid.allAppsCellWidthPx * grid.numShownAllAppsColumns + padding;
+                int appsWidth = Math.min(width, maxWidth);
 
-                int maxHeight =
-                        grid.allAppsCellHeightPx * grid.numShownAllAppsColumns + verticalPadding;
-                int appsHeight = Math.min(height - getPaddingTop() - getPaddingBottom(), maxHeight);
+                int maxHeight = grid.allAppsCellHeightPx * grid.numShownAllAppsColumns + padding;
+                int appsHeight = Math.min(height, maxHeight);
 
                 mAppsView.measure(
                         makeMeasureSpec(appsWidth, EXACTLY), makeMeasureSpec(appsHeight, EXACTLY));
+
             } else if (child == mAllAppsButton) {
                 int appsButtonSpec = makeMeasureSpec(grid.iconSizePx, EXACTLY);
                 mAllAppsButton.measure(appsButtonSpec, appsButtonSpec);
+
             } else if (child == mWorkspace) {
                 measureChildWithMargins(mWorkspace, widthMeasureSpec, 0, heightMeasureSpec,
                         grid.iconSizePx + grid.edgeMarginPx);
+
             } else {
                 measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
             }
@@ -179,19 +177,15 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         if (!ShortcutUtil.supportsShortcuts(item)) {
             return false;
         }
-        PopupDataProvider popupDataProvider = mActivity.getPopupDataProvider();
-        if (popupDataProvider == null) {
-            return false;
-        }
         final PopupContainerWithArrow container =
                 (PopupContainerWithArrow) mActivity.getLayoutInflater().inflate(
                         R.layout.popup_container, mActivity.getDragLayer(), false);
 
         container.populateAndShow((BubbleTextView) v,
-                popupDataProvider.getShortcutCountForItem(item),
+                mActivity.getPopupDataProvider().getShortcutCountForItem(item),
                 Collections.emptyList(),
-                Arrays.asList(mPinnedAppsAdapter.getSystemShortcut(item, v),
-                        APP_INFO.getShortcut(mActivity, item, v)));
+                Arrays.asList(mPinnedAppsAdapter.getSystemShortcut(item),
+                        APP_INFO.getShortcut(mActivity, item)));
         v.getParent().requestDisallowInterceptTouchEvent(true);
         return true;
     }

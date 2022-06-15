@@ -37,7 +37,6 @@ import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
-import com.android.launcher3.views.BubbleTextHolder;
 
 /**
  * Class to handle long-clicks on workspace items and start drag as a result.
@@ -80,12 +79,9 @@ public class ItemLongClickListener {
         launcher.getWorkspace().startDrag(longClickCellInfo, dragOptions);
     }
 
-    private static boolean onAllAppsItemLongClick(View view) {
+    private static boolean onAllAppsItemLongClick(View v) {
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onAllAppsItemLongClick");
-        view.cancelLongPress();
-        View v = (view instanceof BubbleTextHolder)
-                ? ((BubbleTextHolder) view).getBubbleText()
-                : view;
+        v.cancelLongPress();
         Launcher launcher = Launcher.getLauncher(v.getContext());
         if (!canStartDrag(launcher)) return false;
         // When we have exited all apps or are in transition, disregard long clicks

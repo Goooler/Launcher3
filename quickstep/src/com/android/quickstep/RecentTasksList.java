@@ -22,36 +22,35 @@ import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.os.Build;
 import android.os.Process;
-import android.os.RemoteException;
+import android.util.Log;
 import android.util.SparseBooleanArray;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.quickstep.util.GroupTask;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.LooperExecutor;
-import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.KeyguardManagerCompat;
-import com.android.wm.shell.recents.IRecentTasksListener;
-import com.android.wm.shell.util.GroupedRecentTaskInfo;
-import com.android.wm.shell.util.StagedSplitBounds;
+import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
  * Manages the recent task list from the system, caching it as necessary.
  */
 @TargetApi(Build.VERSION_CODES.R)
-public class RecentTasksList {
+public class RecentTasksList extends TaskStackChangeListener {
 
     private static final TaskLoadResult INVALID_RESULT = new TaskLoadResult(-1, false, 0);
 
     private final KeyguardManagerCompat mKeyguardManager;
     private final LooperExecutor mMainThreadExecutor;
-    private final SystemUiProxy mSysUiProxy;
+    private final ActivityManagerWrapper mActivityManagerWrapper;
 
     // The list change id, increments as the task list changes in the system
     private int mChangeId;
@@ -63,17 +62,12 @@ public class RecentTasksList {
     private TaskLoadResult mResultsUi = INVALID_RESULT;
 
     public RecentTasksList(LooperExecutor mainThreadExecutor,
-            KeyguardManagerCompat keyguardManager, SystemUiProxy sysUiProxy) {
+            KeyguardManagerCompat keyguardManager, ActivityManagerWrapper activityManagerWrapper) {
         mMainThreadExecutor = mainThreadExecutor;
         mKeyguardManager = keyguardManager;
         mChangeId = 1;
-        mSysUiProxy = sysUiProxy;
-        sysUiProxy.registerRecentTasksListener(new IRecentTasksListener.Stub() {
-            @Override
-            public void onRecentTasksChanged() throws RemoteException {
-                mMainThreadExecutor.execute(RecentTasksList.this::onRecentTasksChanged);
-            }
-        });
+        mActivityManagerWrapper = activityManagerWrapper;
+        TaskStackChangeListeners.getInstance().registerTaskStackListener(this);
     }
 
     @VisibleForTesting
@@ -84,11 +78,10 @@ public class RecentTasksList {
     /**
      * Fetches the task keys skipping any local cache.
      */
-    public void getTaskKeys(int numTasks, Consumer<ArrayList<GroupTask>> callback) {
+    public void getTaskKeys(int numTasks, Consumer<ArrayList<Task>> callback) {
         // Kick off task loading in the background
         UI_HELPER_EXECUTOR.execute(() -> {
-            ArrayList<GroupTask> tasks = loadTasksInBackground(numTasks, -1,
-                    true /* loadKeysOnly */);
+            ArrayList<Task> tasks = loadTasksInBackground(numTasks, -1, true /* loadKeysOnly */);
             mMainThreadExecutor.execute(() -> callback.accept(tasks));
         });
     }
@@ -100,15 +93,14 @@ public class RecentTasksList {
      * @param callback The callback to receive the list of recent tasks
      * @return The change id of the current task list
      */
-    public synchronized int getTasks(boolean loadKeysOnly,
-            Consumer<ArrayList<GroupTask>> callback) {
+    public synchronized int getTasks(boolean loadKeysOnly, Consumer<ArrayList<Task>> callback) {
         final int requestLoadId = mChangeId;
         if (mResultsUi.isValidForRequest(requestLoadId, loadKeysOnly)) {
             // The list is up to date, send the callback on the next frame,
             // so that requestID can be returned first.
             if (callback != null) {
                 // Copy synchronously as the changeId might change by next frame
-                ArrayList<GroupTask> result = copyOf(mResultsUi);
+                ArrayList<Task> result = copyOf(mResultsUi);
                 mMainThreadExecutor.post(() -> {
                     callback.accept(result);
                 });
@@ -128,7 +120,7 @@ public class RecentTasksList {
                 mLoadingTasksInBackground = false;
                 mResultsUi = loadResult;
                 if (callback != null) {
-                    ArrayList<GroupTask> result = copyOf(mResultsUi);
+                    ArrayList<Task> result = copyOf(mResultsUi);
                     callback.accept(result);
                 }
             });
@@ -144,7 +136,35 @@ public class RecentTasksList {
         return mChangeId == changeId;
     }
 
-    public void onRecentTasksChanged() {
+    @Override
+    public void onTaskStackChanged() {
+        invalidateLoadedTasks();
+    }
+
+    @Override
+    public void onRecentTaskListUpdated() {
+        // In some cases immediately after booting, the tasks in the system recent task list may be
+        // loaded, but not in the active task hierarchy in the system.  These tasks are displayed in 
+        // overview, but removing them don't result in a onTaskStackChanged() nor a onTaskRemoved()
+        // callback (those are for changes to the active tasks), but the task list is still updated,
+        // so we should also invalidate the change id to ensure we load a new list instead of 
+        // reusing a stale list.
+        invalidateLoadedTasks();
+    }
+
+    @Override
+    public void onTaskRemoved(int taskId) {
+        invalidateLoadedTasks();
+    }
+
+
+    @Override
+    public void onActivityPinned(String packageName, int userId, int taskId, int stackId) {
+        invalidateLoadedTasks();
+    }
+
+    @Override
+    public synchronized void onActivityUnpinned() {
         invalidateLoadedTasks();
     }
 
@@ -160,8 +180,8 @@ public class RecentTasksList {
     @VisibleForTesting
     TaskLoadResult loadTasksInBackground(int numTasks, int requestId, boolean loadKeysOnly) {
         int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(numTasks, currentUserId);
+        List<ActivityManager.RecentTaskInfo> rawTasks =
+                mActivityManagerWrapper.getRecentTasks(numTasks, currentUserId);
         // The raw tasks are given in most-recent to least-recent order, we need to reverse it
         Collections.reverse(rawTasks);
 
@@ -177,84 +197,45 @@ public class RecentTasksList {
         };
 
         TaskLoadResult allTasks = new TaskLoadResult(requestId, loadKeysOnly, rawTasks.size());
-        for (GroupedRecentTaskInfo rawTask : rawTasks) {
-            ActivityManager.RecentTaskInfo taskInfo1 = rawTask.mTaskInfo1;
-            ActivityManager.RecentTaskInfo taskInfo2 = rawTask.mTaskInfo2;
-            Task.TaskKey task1Key = new Task.TaskKey(taskInfo1);
-            Task task1 = loadKeysOnly
-                    ? new Task(task1Key)
-                    : Task.from(task1Key, taskInfo1,
-                            tmpLockedUsers.get(task1Key.userId) /* isLocked */);
-            task1.setLastSnapshotData(taskInfo1);
-            Task task2 = null;
-            if (taskInfo2 != null) {
-                Task.TaskKey task2Key = new Task.TaskKey(taskInfo2);
-                task2 = loadKeysOnly
-                        ? new Task(task2Key)
-                        : Task.from(task2Key, taskInfo2,
-                                tmpLockedUsers.get(task2Key.userId) /* isLocked */);
-                task2.setLastSnapshotData(taskInfo2);
+        for (ActivityManager.RecentTaskInfo rawTask : rawTasks) {
+            Task.TaskKey taskKey = new Task.TaskKey(rawTask);
+            Task task;
+            if (!loadKeysOnly) {
+                boolean isLocked = tmpLockedUsers.get(taskKey.userId);
+                task = Task.from(taskKey, rawTask, isLocked);
+            } else {
+                task = new Task(taskKey);
             }
-            final SplitConfigurationOptions.StagedSplitBounds launcherSplitBounds =
-                    convertSplitBounds(rawTask.mStagedSplitBounds);
-            allTasks.add(new GroupTask(task1, task2, launcherSplitBounds));
+            task.setLastSnapshotData(rawTask);
+            allTasks.add(task);
         }
 
         return allTasks;
     }
 
-    private SplitConfigurationOptions.StagedSplitBounds convertSplitBounds(
-            StagedSplitBounds shellSplitBounds) {
-        return shellSplitBounds == null ?
-                null :
-                new SplitConfigurationOptions.StagedSplitBounds(
-                        shellSplitBounds.leftTopBounds, shellSplitBounds.rightBottomBounds,
-                        shellSplitBounds.leftTopTaskId, shellSplitBounds.rightBottomTaskId);
-    }
-
-    private ArrayList<GroupTask> copyOf(ArrayList<GroupTask> tasks) {
-        ArrayList<GroupTask> newTasks = new ArrayList<>();
+    private ArrayList<Task> copyOf(ArrayList<Task> tasks) {
+        ArrayList<Task> newTasks = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
-            newTasks.add(new GroupTask(tasks.get(i)));
+            newTasks.add(new Task(tasks.get(i)));
         }
         return newTasks;
     }
 
-    public void dump(String prefix, PrintWriter writer) {
-        writer.println(prefix + "RecentTasksList:");
-        writer.println(prefix + "  mChangeId=" + mChangeId);
-        writer.println(prefix + "  mResultsUi=[id=" + mResultsUi.mRequestId + ", tasks=");
-        for (GroupTask task : mResultsUi) {
-            writer.println(prefix + "    t1=" + task.task1.key.id
-                    + " t2=" + (task.hasMultipleTasks() ? task.task2.key.id : "-1"));
-        }
-        writer.println(prefix + "  ]");
-        int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(Integer.MAX_VALUE, currentUserId);
-        writer.println(prefix + "  rawTasks=[");
-        for (GroupedRecentTaskInfo task : rawTasks) {
-            writer.println(prefix + "    t1=" + task.mTaskInfo1.taskId
-                    + " t2=" + (task.mTaskInfo2 != null ? task.mTaskInfo2.taskId : "-1"));
-        }
-        writer.println(prefix + "  ]");
-    }
+    private static class TaskLoadResult extends ArrayList<Task> {
 
-    private static class TaskLoadResult extends ArrayList<GroupTask> {
-
-        final int mRequestId;
+        final int mId;
 
         // If the result was loaded with keysOnly  = true
         final boolean mKeysOnly;
 
-        TaskLoadResult(int requestId, boolean keysOnly, int size) {
+        TaskLoadResult(int id, boolean keysOnly, int size) {
             super(size);
-            mRequestId = requestId;
+            mId = id;
             mKeysOnly = keysOnly;
         }
 
         boolean isValidForRequest(int requestId, boolean loadKeysOnly) {
-            return mRequestId == requestId && (!mKeysOnly || loadKeysOnly);
+            return mId == requestId && (!mKeysOnly || loadKeysOnly);
         }
     }
 }

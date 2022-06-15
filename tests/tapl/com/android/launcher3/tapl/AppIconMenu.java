@@ -25,9 +25,9 @@ import java.util.List;
 /**
  * Context menu of an app icon.
  */
-public abstract class AppIconMenu {
-    protected final LauncherInstrumentation mLauncher;
-    protected final UiObject2 mDeepShortcutsContainer;
+public class AppIconMenu {
+    private final LauncherInstrumentation mLauncher;
+    private final UiObject2 mDeepShortcutsContainer;
 
     AppIconMenu(LauncherInstrumentation launcher,
             UiObject2 deepShortcutsContainer) {
@@ -42,17 +42,6 @@ public abstract class AppIconMenu {
         final List<UiObject2> menuItems = mLauncher.getObjectsInContainer(mDeepShortcutsContainer,
                 "bubble_text");
         assertTrue(menuItems.size() > itemNumber);
-        return createMenuItem(menuItems.get(itemNumber));
+        return new AppIconMenuItem(mLauncher, menuItems.get(itemNumber));
     }
-
-    /**
-     * Returns a menu item with the given text. Fails if it doesn't exist.
-     */
-    public AppIconMenuItem getMenuItem(String shortcutText) {
-        final UiObject2 menuItem = mLauncher.waitForObjectInContainer(mDeepShortcutsContainer,
-                AppIcon.getAppIconSelector(shortcutText, mLauncher));
-        return createMenuItem(menuItem);
-    }
-
-    protected abstract AppIconMenuItem createMenuItem(UiObject2 menuItem);
 }

@@ -32,6 +32,13 @@ public interface SearchCallback<T> {
     void onSearchResult(String query, ArrayList<T> items);
 
     /**
+     * Called when the search from secondary source is complete.
+     *
+     * @param items list of search results
+     */
+    void onAppendSearchResult(String query, ArrayList<T> items);
+
+    /**
      * Called when the search results should be cleared.
      */
     void clearSearchResult();

@@ -46,10 +46,9 @@ public class DigitalWellBeingToastTest extends AbstractQuickStepTest {
             runWithShellPermission(() ->
                     usageStatsManager.registerAppUsageLimitObserver(observerId, packages,
                             Duration.ofSeconds(600), Duration.ofSeconds(300),
-                            PendingIntent.getActivity(mTargetContext, -1, new Intent(),
-                                    PendingIntent.FLAG_MUTABLE)));
+                            PendingIntent.getActivity(mTargetContext, -1, new Intent(), 0)));
 
-            mLauncher.goHome();
+            mLauncher.pressHome();
             final DigitalWellBeingToast toast = getToast();
 
             waitForLauncherCondition("Toast is not visible", launcher -> toast.hasLimit());
@@ -59,7 +58,7 @@ public class DigitalWellBeingToastTest extends AbstractQuickStepTest {
             runWithShellPermission(
                     () -> usageStatsManager.unregisterAppUsageLimitObserver(observerId));
 
-            mLauncher.goHome();
+            mLauncher.pressHome();
             assertFalse("Toast is visible", getToast().hasLimit());
         } finally {
             runWithShellPermission(

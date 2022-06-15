@@ -50,9 +50,9 @@ import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.BaseActivity;
+import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.views.ArrowTipView;
 import com.android.quickstep.util.AssistContentRequester;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.views.GoOverviewActionsView;
@@ -75,7 +75,7 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
     public static final String ACTIONS_ERROR_CODE = "niu_actions_app_error_code";
     public static final int ERROR_PERMISSIONS_STRUCTURE = 1;
     public static final int ERROR_PERMISSIONS_SCREENSHOT = 2;
-    public static final String NIU_ACTIONS_CONFIRMED = "launcher_go.niu_actions_confirmed";
+    private static final String NIU_ACTIONS_CONFIRMED = "launcher_go.niu_actions_confirmed";
     private static final String ASSIST_SETTINGS_ARGS_BUNDLE = ":settings:show_fragment_args";
     private static final String ASSIST_SETTINGS_ARGS_KEY = ":settings:fragment_args_key";
     private static final String ASSIST_SETTINGS_PREFERENCE_KEY = "default_assist";
@@ -86,11 +86,10 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
 
     @Retention(SOURCE)
     @IntDef({PRIVACY_CONFIRMATION, ASSISTANT_NOT_SELECTED, ASSISTANT_NOT_SUPPORTED})
-    @VisibleForTesting
-    public @interface DialogType{}
-    public static final int PRIVACY_CONFIRMATION = 0;
-    public static final int ASSISTANT_NOT_SELECTED = 1;
-    public static final int ASSISTANT_NOT_SUPPORTED = 2;
+    private @interface DialogType{}
+    private static final int PRIVACY_CONFIRMATION = 0;
+    private static final int ASSISTANT_NOT_SELECTED = 1;
+    private static final int ASSISTANT_NOT_SUPPORTED = 2;
 
     private AssistContentRequester mContentRequester;
 
@@ -118,7 +117,6 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         private AssistContentRequester mFactoryContentRequester;
         private SharedPreferences mSharedPreferences;
         private OverlayDialogGo mDialog;
-        private ArrowTipView mArrowTipView;
 
         private TaskOverlayGo(TaskThumbnailView taskThumbnailView,
                 AssistContentRequester assistContentRequester) {
@@ -186,9 +184,6 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         public void reset() {
             super.reset();
             mWebUrl = null;
-            if (mDialog != null && mDialog.isShowing()) {
-                mDialog.dismiss();
-            }
         }
 
         @Override
@@ -214,8 +209,7 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
             Intent intent = createNIUIntent(actionType);
             // Only add and send the image if the appropriate permissions are held
             if (mAssistStructurePermitted && mAssistScreenshotPermitted) {
-                mImageApi.shareAsDataWithExplicitIntent(/* crop */ null, intent,
-                        () -> showDialog(actionType, ASSISTANT_NOT_SUPPORTED));
+                mImageApi.shareAsDataWithExplicitIntent(/* crop */ null, intent);
             } else {
                 // If both permissions are disabled, the structure error code takes priority
                 // The user must enable that one before they can enable screenshots
@@ -259,11 +253,7 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
 
             String assistantPackage =
                     Settings.Secure.getString(contentResolver, Settings.Secure.ASSISTANT);
-            if (!TextUtils.isEmpty(assistantPackage)) {
-                mNIUPackageName = assistantPackage.split("/", 2)[0];
-            } else {
-                mNIUPackageName = "";
-            }
+            mNIUPackageName = assistantPackage.split("/", 2)[0];
         }
 
         protected class OverlayUICallbacksGoImpl extends OverlayUICallbacksImpl
@@ -305,6 +295,7 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
             mImageApi = imageActionsApi;
         }
 
+        // TODO (b/192406446): Test that these dialogs are shown at the appropriate times
         private void showDialog(String action, @DialogType int type) {
             switch (type) {
                 case PRIVACY_CONFIRMATION:
@@ -337,7 +328,7 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
                                 int bodyTextID, int button1TextID,
                                 View.OnClickListener button1Callback, int button2TextID,
                                 View.OnClickListener button2Callback) {
-            BaseActivity activity = BaseActivity.fromContext(getActionsView().getContext());
+            BaseDraggingActivity activity = BaseActivity.fromContext(getActionsView().getContext());
             LayoutInflater inflater = LayoutInflater.from(activity);
             View view = inflater.inflate(R.layout.niu_actions_dialog, /* root */ null);
 
@@ -371,11 +362,6 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
             mDialog.cancel();
         }
 
-        @VisibleForTesting
-        public OverlayDialogGo getDialog() {
-            return mDialog;
-        }
-
         private void onDialogClickSettings(View v) {
             mDialog.dismiss();
 
@@ -396,24 +382,17 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
          * Order of tooltips are translate and then listen
          */
         private void showTooltipsIfUnseen() {
-            if (mArrowTipView != null && mArrowTipView.isOpen()) {
-                return;
-            }
             if (!mSharedPreferences.getBoolean(TRANSLATE_TOOL_TIP_SEEN, false)) {
-                mArrowTipView = ((GoOverviewActionsView) getActionsView()).showTranslateToolTip();
+                ((GoOverviewActionsView) getActionsView()).showTranslateToolTip();
                 mSharedPreferences.edit().putBoolean(TRANSLATE_TOOL_TIP_SEEN, true).apply();
             } else if (!mSharedPreferences.getBoolean(LISTEN_TOOL_TIP_SEEN, false)) {
-                mArrowTipView = ((GoOverviewActionsView) getActionsView()).showListenToolTip();
+                ((GoOverviewActionsView) getActionsView()).showListenToolTip();
                 mSharedPreferences.edit().putBoolean(LISTEN_TOOL_TIP_SEEN, true).apply();
             }
         }
     }
 
-    /**
-     * Basic modal dialog for various user prompts
-     */
-    @VisibleForTesting
-    public static final class OverlayDialogGo extends AlertDialog {
+    private static final class OverlayDialogGo extends AlertDialog {
         private final String mAction;
         private final @DialogType int mType;
 

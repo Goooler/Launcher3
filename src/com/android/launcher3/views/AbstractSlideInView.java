@@ -17,8 +17,6 @@ package com.android.launcher3.views;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-import static com.android.launcher3.LauncherAnimUtils.SUCCESS_TRANSITION_PROGRESS;
-import static com.android.launcher3.LauncherAnimUtils.TABLET_BOTTOM_SHEET_SUCCESS_TRANSITION_PROGRESS;
 import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
 
 import android.animation.Animator;
@@ -30,7 +28,6 @@ import android.util.AttributeSet;
 import android.util.Property;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.AbstractFloatingView;
@@ -71,7 +68,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected final SingleAxisSwipeDetector mSwipeDetector;
     protected final ObjectAnimator mOpenCloseAnimator;
 
-    protected ViewGroup mContent;
+    protected View mContent;
     protected final View mColorScrim;
     protected Interpolator mScrollInterpolator;
 
@@ -115,16 +112,9 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         return -1;
     }
 
-    /**
-     * Returns the range in height that the slide in view can be dragged.
-     */
-    protected float getShiftRange() {
-        return mContent.getHeight();
-    }
-
     protected void setTranslationShift(float translationShift) {
         mTranslationShift = translationShift;
-        mContent.setTranslationY(mTranslationShift * getShiftRange());
+        mContent.setTranslationY(mTranslationShift * mContent.getHeight());
         if (mColorScrim != null) {
             mColorScrim.setAlpha(1 - mTranslationShift);
         }
@@ -141,7 +131,8 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mSwipeDetector.setDetectableScrollConditions(
                 directionsToDetectScroll, false);
         mSwipeDetector.onTouchEvent(ev);
-        return mSwipeDetector.isDraggingOrSettling() || !isEventOverContent(ev);
+        return mSwipeDetector.isDraggingOrSettling()
+                || !getPopupContainer().isEventOverView(mContent, ev);
     }
 
     @Override
@@ -150,21 +141,11 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         if (ev.getAction() == MotionEvent.ACTION_UP && mSwipeDetector.isIdleState()
                 && !isOpeningAnimationRunning()) {
             // If we got ACTION_UP without ever starting swipe, close the panel.
-            if (!isEventOverContent(ev)) {
+            if (!getPopupContainer().isEventOverView(mContent, ev)) {
                 close(true);
             }
         }
         return true;
-    }
-
-    /**
-     * Returns {@code true} if the touch event is over the visible area of the bottom sheet.
-     *
-     * By default will check if the touch event is over {@code mContent}, subclasses should override
-     * this method if the visible area of the bottom sheet is different from {@code mContent}.
-     */
-    protected boolean isEventOverContent(MotionEvent ev) {
-        return getPopupContainer().isEventOverView(mContent, ev);
     }
 
     private boolean isOpeningAnimationRunning() {
@@ -178,7 +159,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
 
     @Override
     public boolean onDrag(float displacement) {
-        float range = getShiftRange();
+        float range = mContent.getHeight();
         displacement = Utilities.boundToRange(displacement, 0, range);
         setTranslationShift(displacement / range);
         return true;
@@ -186,10 +167,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
 
     @Override
     public void onDragEnd(float velocity) {
-        float successfulShiftThreshold = mActivityContext.getDeviceProfile().isTablet
-                ? TABLET_BOTTOM_SHEET_SUCCESS_TRANSITION_PROGRESS : SUCCESS_TRANSITION_PROGRESS;
-        if ((mSwipeDetector.isFling(velocity) && velocity > 0)
-                || mTranslationShift > successfulShiftThreshold) {
+        if ((mSwipeDetector.isFling(velocity) && velocity > 0) || mTranslationShift > 0.5f) {
             mScrollInterpolator = scrollInterpolatorForVelocity(velocity);
             mOpenCloseAnimator.setDuration(BaseSwipeDetector.calculateDuration(
                     velocity, TRANSLATION_SHIFT_CLOSED - mTranslationShift));
@@ -224,22 +202,17 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mOpenCloseAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                mOpenCloseAnimator.removeListener(this);
                 onCloseComplete();
             }
         });
         if (mSwipeDetector.isIdleState()) {
             mOpenCloseAnimator
                     .setDuration(defaultDuration)
-                    .setInterpolator(getIdleInterpolator());
+                    .setInterpolator(Interpolators.ACCEL);
         } else {
             mOpenCloseAnimator.setInterpolator(mScrollInterpolator);
         }
         mOpenCloseAnimator.start();
-    }
-
-    protected Interpolator getIdleInterpolator() {
-        return Interpolators.ACCEL;
     }
 
     protected void onCloseComplete() {

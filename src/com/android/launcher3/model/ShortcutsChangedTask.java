@@ -108,8 +108,7 @@ public class ShortcutsChangedTask extends BaseModelUpdateTask {
                 deleteAndBindComponentsRemoved(ItemInfoMatcher.ofShortcutKeys(
                         nonPinnedIds.stream()
                                 .map(id -> new ShortcutKey(mPackageName, mUser, id))
-                                .collect(Collectors.toSet())),
-                        "removed because the shortcut is no longer available in shortcut service");
+                                .collect(Collectors.toSet())));
             }
         }
 

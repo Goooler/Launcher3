@@ -23,7 +23,7 @@ import com.android.launcher3.testing.TestProtocol;
 /**
  * Menu item in an app icon menu.
  */
-public abstract class AppIconMenuItem extends Launchable {
+public class AppIconMenuItem extends Launchable {
 
     AppIconMenuItem(LauncherInstrumentation launcher, UiObject2 shortcut) {
         super(launcher, shortcut);
@@ -41,8 +41,8 @@ public abstract class AppIconMenuItem extends Launchable {
     }
 
     @Override
-    protected void waitForLongPressConfirmation() {
-        mLauncher.waitForLauncherObject("drop_target_bar");
+    protected String getLongPressIndicator() {
+        return "drop_target_bar";
     }
 
     @Override

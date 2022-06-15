@@ -23,7 +23,6 @@ import android.view.VelocityTracker;
 import com.android.launcher3.Alarm;
 import com.android.launcher3.R;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
-import com.android.launcher3.testing.TestProtocol;
 
 /**
  * Given positions along x- or y-axis, tracks velocity and acceleration and determines when there is
@@ -119,10 +118,9 @@ public class MotionPauseDetector {
      * @param pointerIndex Index for the pointer being tracked in the motion event
      */
     public void addPosition(MotionEvent ev, int pointerIndex) {
-        long timeoutMs = TestProtocol.sForcePauseTimeout != null
-                ? TestProtocol.sForcePauseTimeout
-                : mMakePauseHarderToTrigger ? HARDER_TRIGGER_TIMEOUT : FORCE_PAUSE_TIMEOUT;
-        mForcePauseTimeout.setAlarm(timeoutMs);
+        mForcePauseTimeout.setAlarm(mMakePauseHarderToTrigger
+                ? HARDER_TRIGGER_TIMEOUT
+                : FORCE_PAUSE_TIMEOUT);
         float newVelocity = mVelocityProvider.addMotionEvent(ev, ev.getPointerId(pointerIndex));
         if (mPreviousVelocity != null) {
             checkMotionPaused(newVelocity, mPreviousVelocity, ev.getEventTime());

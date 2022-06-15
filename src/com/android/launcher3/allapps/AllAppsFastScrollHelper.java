@@ -37,10 +37,10 @@ public class AllAppsFastScrollHelper {
      * Smooth scrolls the recycler view to the given section.
      */
     public void smoothScrollToSection(FastScrollSectionInfo info) {
-        if (mTargetFastScrollPosition == info.position) {
+        if (mTargetFastScrollPosition == info.fastScrollToItem.position) {
             return;
         }
-        mTargetFastScrollPosition = info.position;
+        mTargetFastScrollPosition = info.fastScrollToItem.position;
         mRv.getLayoutManager().startSmoothScroll(new MyScroller(mTargetFastScrollPosition));
     }
 

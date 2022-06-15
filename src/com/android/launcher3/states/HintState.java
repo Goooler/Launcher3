@@ -43,7 +43,7 @@ public class HintState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context, boolean isToState) {
+    public int getTransitionDuration(Context context) {
         return 80;
     }
 

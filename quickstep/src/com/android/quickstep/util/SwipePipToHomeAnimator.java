@@ -40,7 +40,6 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.util.Themes;
-import com.android.quickstep.TaskAnimationManager;
 import com.android.systemui.shared.pip.PipSurfaceTransactionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
@@ -56,7 +55,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
     private final int mTaskId;
     private final ComponentName mComponentName;
     private final SurfaceControl mLeash;
-    private final Rect mSourceRectHint = new Rect();
     private final Rect mAppBounds = new Rect();
     private final Matrix mHomeToWindowPositionMap = new Matrix();
     private final Rect mStartBounds = new Rect();
@@ -102,7 +100,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
      * @param fromRotation From rotation if different from final rotation, ROTATION_0 otherwise
      * @param destinationBoundsTransformed Destination bounds in window space
      * @param cornerRadius Corner radius in pixel value for PiP window
-     * @param shadowRadius Shadow radius in pixel value for PiP window
      * @param view Attached view for logging purpose
      */
     private SwipePipToHomeAnimator(@NonNull Context context,
@@ -117,9 +114,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             @RecentsOrientedState.SurfaceRotation int fromRotation,
             @NonNull Rect destinationBoundsTransformed,
             int cornerRadius,
-            int shadowRadius,
             @NonNull View view) {
-        super(startBounds, new RectF(destinationBoundsTransformed), context, null);
+        super(startBounds, new RectF(destinationBoundsTransformed), context);
         mTaskId = taskId;
         mComponentName = componentName;
         mLeash = leash;
@@ -129,7 +125,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         mDestinationBounds.set(destinationBounds);
         mFromRotation = fromRotation;
         mDestinationBoundsTransformed.set(destinationBoundsTransformed);
-        mSurfaceTransactionHelper = new PipSurfaceTransactionHelper(cornerRadius, shadowRadius);
+        mSurfaceTransactionHelper = new PipSurfaceTransactionHelper(cornerRadius);
 
         if (sourceRectHint != null && (sourceRectHint.width() < destinationBounds.width()
                 || sourceRectHint.height() < destinationBounds.height())) {
@@ -141,7 +137,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         }
 
         if (sourceRectHint == null) {
-            mSourceRectHint.setEmpty();
             mSourceHintRectInsets = null;
 
             // Create a new overlay layer
@@ -162,7 +157,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             t.reparent(mContentOverlay, mLeash);
             t.apply();
 
-            addOnUpdateListener((currentRect, progress) -> {
+            addOnUpdateListener((values, currentRect, progress) -> {
                 float alpha = progress < 0.5f
                         ? 0
                         : Utilities.mapToRange(Math.min(progress, 1f), 0.5f, 1f,
@@ -171,7 +166,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
                 t.apply();
             });
         } else {
-            mSourceRectHint.set(sourceRectHint);
             mSourceHintRectInsets = new Rect(sourceRectHint.left - appBounds.left,
                     sourceRectHint.top - appBounds.top,
                     appBounds.right - sourceRectHint.right,
@@ -206,7 +200,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         addOnUpdateListener(this::onAnimationUpdate);
     }
 
-    private void onAnimationUpdate(RectF currentRect, float progress) {
+    private void onAnimationUpdate(@Nullable AppCloseConfig values, RectF currentRect,
+            float progress) {
         if (mHasAnimationEnded) return;
         final SurfaceControl.Transaction tx =
                 PipSurfaceTransactionHelper.newSurfaceControlTransaction();
@@ -252,8 +247,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             return mSurfaceTransactionHelper.scaleAndRotate(tx, mLeash, mAppBounds, bounds, insets,
                     rotatedPosition.degree, rotatedPosition.positionX, rotatedPosition.positionY);
         } else {
-            return mSurfaceTransactionHelper.scaleAndCrop(tx, mLeash, mSourceRectHint, mAppBounds,
-                    bounds, insets);
+            return mSurfaceTransactionHelper.scaleAndCrop(tx, mLeash, mAppBounds, bounds, insets);
         }
     }
 
@@ -284,36 +278,19 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
     private RotatedPosition getRotatedPosition(float progress) {
         final float degree, positionX, positionY;
-        if (TaskAnimationManager.SHELL_TRANSITIONS_ROTATION) {
-            if (mFromRotation == Surface.ROTATION_90) {
-                degree = -90 * (1 - progress);
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top + mStartBounds.bottom * (1 - progress);
-            } else {
-                degree = 90 * (1 - progress);
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left + mStartBounds.right * (1 - progress);
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top;
-            }
+        if (mFromRotation == Surface.ROTATION_90) {
+            degree = -90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.bottom - mStartBounds.top)
+                    + mStartBounds.top;
         } else {
-            if (mFromRotation == Surface.ROTATION_90) {
-                degree = -90 * progress;
-                positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.bottom - mStartBounds.top)
-                        + mStartBounds.top;
-            } else {
-                degree = 90 * progress;
-                positionX = progress * (mDestinationBoundsTransformed.right - mStartBounds.left)
-                        + mStartBounds.left;
-                positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
-                        + mStartBounds.top;
-            }
+            degree = 90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.right - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
+                    + mStartBounds.top;
         }
-
         return new RotatedPosition(degree, positionX, positionY);
     }
 
@@ -330,7 +307,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         private RectF mStartBounds;
         private Rect mDestinationBounds;
         private int mCornerRadius;
-        private int mShadowRadius;
         private View mAttachedView;
         private @RecentsOrientedState.SurfaceRotation int mFromRotation = Surface.ROTATION_0;
         private final Rect mDestinationBoundsTransformed = new Rect();
@@ -385,11 +361,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             return this;
         }
 
-        public Builder setShadowRadius(int shadowRadius) {
-            mShadowRadius = shadowRadius;
-            return this;
-        }
-
         public Builder setAttachedView(View attachedView) {
             mAttachedView = attachedView;
             return this;
@@ -434,7 +405,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
                     mSourceRectHint, mAppBounds,
                     mHomeToWindowPositionMap, mStartBounds, mDestinationBounds,
                     mFromRotation, mDestinationBoundsTransformed,
-                    mCornerRadius, mShadowRadius, mAttachedView);
+                    mCornerRadius, mAttachedView);
         }
     }
 

@@ -66,6 +66,7 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     float mScale = 1f;
+    private float mColorMultiplier = 1f;
     private int mBgColor;
     private int mStrokeColor;
     private int mDotColor;
@@ -86,6 +87,7 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
 
     // Drawing / animation configurations
     private static final float ACCEPT_SCALE_FACTOR = 1.20f;
+    private static final float ACCEPT_COLOR_MULTIPLIER = 1.5f;
 
     // Expressed on a scale from 0 to 255.
     private static final int BG_OPACITY = 255;
@@ -152,7 +154,7 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
         TypedArray ta = context.getTheme().obtainStyledAttributes(R.styleable.FolderIconPreview);
         mDotColor = ta.getColor(R.styleable.FolderIconPreview_folderDotColor, 0);
         mStrokeColor = ta.getColor(R.styleable.FolderIconPreview_folderIconBorderColor, 0);
-        mBgColor = ta.getColor(R.styleable.FolderIconPreview_folderPreviewColor, 0);
+        mBgColor = ta.getColor(R.styleable.FolderIconPreview_folderFillColor, 0);
         ta.recycle();
 
         DeviceProfile grid = activity.getDeviceProfile();
@@ -225,7 +227,8 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
     }
 
     public int getBgColor() {
-        return mBgColor;
+        int alpha = (int) Math.min(MAX_BG_OPACITY, BG_OPACITY * mColorMultiplier);
+        return setColorAlphaBound(mBgColor, alpha);
     }
 
     public int getDotColor() {
@@ -381,9 +384,13 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
         return mDrawingDelegate != null;
     }
 
-    private void animateScale(float finalScale, final Runnable onStart, final Runnable onEnd) {
+    private void animateScale(float finalScale, float finalMultiplier,
+                              final Runnable onStart, final Runnable onEnd) {
         final float scale0 = mScale;
         final float scale1 = finalScale;
+
+        final float bgMultiplier0 = mColorMultiplier;
+        final float bgMultiplier1 = finalMultiplier;
 
         if (mScaleAnimator != null) {
             mScaleAnimator.cancel();
@@ -396,6 +403,7 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
             public void onAnimationUpdate(ValueAnimator animation) {
                 float prog = animation.getAnimatedFraction();
                 mScale = prog * scale1 + (1 - prog) * scale0;
+                mColorMultiplier = prog * bgMultiplier1 + (1 - prog) * bgMultiplier0;
                 invalidate();
             }
         });
@@ -421,7 +429,8 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
     }
 
     public void animateToAccept(CellLayout cl, int cellX, int cellY) {
-        animateScale(ACCEPT_SCALE_FACTOR, () -> delegateDrawing(cl, cellX, cellY), null);
+        animateScale(ACCEPT_SCALE_FACTOR, ACCEPT_COLOR_MULTIPLIER,
+                () -> delegateDrawing(cl, cellX, cellY), null);
     }
 
     public void animateToRest() {
@@ -431,7 +440,11 @@ public class PreviewBackground extends CellLayout.DelegatedCellDrawing {
         CellLayout cl = mDrawingDelegate;
         int cellX = mDelegateCellX;
         int cellY = mDelegateCellY;
-        animateScale(1f, () -> delegateDrawing(cl, cellX, cellY), this::clearDrawingDelegate);
+        animateScale(1f, 1f, () -> delegateDrawing(cl, cellX, cellY), this::clearDrawingDelegate);
+    }
+
+    public int getBackgroundAlpha() {
+        return (int) Math.min(MAX_BG_OPACITY, BG_OPACITY * mColorMultiplier);
     }
 
     public float getStrokeWidth() {

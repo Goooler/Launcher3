@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
 
+import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Reorderable;
 import com.android.launcher3.dragndrop.DraggableView;
@@ -49,8 +50,6 @@ public abstract class NavigableAppWidgetHostView extends AppWidgetHostView
      */
     private final PointF mTranslationForCentering = new PointF(0, 0);
 
-    private final PointF mTranslationForMoveFromCenterAnimation = new PointF(0, 0);
-
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
     private float mScaleForReorderBounce = 1f;
@@ -60,7 +59,7 @@ public abstract class NavigableAppWidgetHostView extends AppWidgetHostView
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mChildrenFocused;
 
-    protected final ActivityContext mActivity;
+    protected final BaseActivity mActivity;
 
     public NavigableAppWidgetHostView(Context context) {
         super(context);
@@ -169,18 +168,13 @@ public abstract class NavigableAppWidgetHostView extends AppWidgetHostView
 
     private void updateTranslation() {
         super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x
-                + mTranslationForCentering.x + mTranslationForMoveFromCenterAnimation.x);
+                + mTranslationForCentering.x);
         super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y
-                + mTranslationForCentering.y + mTranslationForMoveFromCenterAnimation.y);
+                + mTranslationForCentering.y);
     }
 
     public void setTranslationForCentering(float x, float y) {
         mTranslationForCentering.set(x, y);
-        updateTranslation();
-    }
-
-    public void setTranslationForMoveFromCenterAnimation(float x, float y) {
-        mTranslationForMoveFromCenterAnimation.set(x, y);
         updateTranslation();
     }
 

@@ -53,9 +53,6 @@ public class PageIndicatorDots extends View implements PageIndicator {
     private static final int ENTER_ANIMATION_STAGGERED_DELAY = 150;
     private static final int ENTER_ANIMATION_DURATION = 400;
 
-    private static final int DOT_ACTIVE_ALPHA = 255;
-    private static final int DOT_INACTIVE_ALPHA = 128;
-
     // This value approximately overshoots to 1.5 times the original size.
     private static final float ENTER_ANIMATION_OVERSHOOT_TENSION = 4.9f;
 
@@ -78,6 +75,8 @@ public class PageIndicatorDots extends View implements PageIndicator {
 
     private final Paint mCirclePaint;
     private final float mDotRadius;
+    private final int mActiveColor;
+    private final int mInActiveColor;
     private final boolean mIsRtl;
 
     private int mNumPages;
@@ -111,9 +110,11 @@ public class PageIndicatorDots extends View implements PageIndicator {
 
         mCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mCirclePaint.setStyle(Style.FILL);
-        mCirclePaint.setColor(Themes.getAttrColor(context, R.attr.folderPaginationColor));
         mDotRadius = getResources().getDimension(R.dimen.page_indicator_dot_size) / 2;
         setOutlineProvider(new MyOutlineProver());
+
+        mActiveColor = Themes.getColorAccent(context);
+        mInActiveColor = Themes.getAttrColor(context, android.R.attr.colorControlHighlight);
 
         mIsRtl = Utilities.isRtl(getResources());
     }
@@ -252,18 +253,18 @@ public class PageIndicatorDots extends View implements PageIndicator {
                 circleGap = -circleGap;
             }
             for (int i = 0; i < mEntryAnimationRadiusFactors.length; i++) {
-                mCirclePaint.setAlpha(i == mActivePage ? DOT_ACTIVE_ALPHA : DOT_INACTIVE_ALPHA);
+                mCirclePaint.setColor(i == mActivePage ? mActiveColor : mInActiveColor);
                 canvas.drawCircle(x, y, mDotRadius * mEntryAnimationRadiusFactors[i], mCirclePaint);
                 x += circleGap;
             }
         } else {
-            mCirclePaint.setAlpha(DOT_INACTIVE_ALPHA);
+            mCirclePaint.setColor(mInActiveColor);
             for (int i = 0; i < mNumPages; i++) {
                 canvas.drawCircle(x, y, mDotRadius, mCirclePaint);
                 x += circleGap;
             }
 
-            mCirclePaint.setAlpha(DOT_ACTIVE_ALPHA);
+            mCirclePaint.setColor(mActiveColor);
             canvas.drawRoundRect(getActiveRect(), mDotRadius, mDotRadius, mCirclePaint);
         }
     }

@@ -24,7 +24,6 @@ import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.ComponentCallbacks2;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
@@ -35,7 +34,6 @@ import com.android.launcher3.icons.IconProvider;
 import com.android.launcher3.icons.IconProvider.IconChangeListener;
 import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.launcher3.util.MainThreadInitializedObject;
-import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -43,7 +41,6 @@ import com.android.systemui.shared.system.KeyguardManagerCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -54,7 +51,7 @@ import java.util.function.Consumer;
  * Singleton class to load and manage recents model.
  */
 @TargetApi(Build.VERSION_CODES.O)
-public class RecentsModel implements IconChangeListener, TaskStackChangeListener {
+public class RecentsModel extends TaskStackChangeListener implements IconChangeListener {
 
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<RecentsModel> INSTANCE =
@@ -73,7 +70,7 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
     private RecentsModel(Context context) {
         mContext = context;
         mTaskList = new RecentTasksList(MAIN_EXECUTOR,
-                new KeyguardManagerCompat(context), SystemUiProxy.INSTANCE.get(context));
+                new KeyguardManagerCompat(context), ActivityManagerWrapper.getInstance());
 
         IconProvider iconProvider = new IconProvider(context);
         mIconCache = new TaskIconCache(context, RECENTS_MODEL_EXECUTOR, iconProvider);
@@ -98,7 +95,7 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
      *                always called on the UI thread.
      * @return the request id associated with this call.
      */
-    public int getTasks(Consumer<ArrayList<GroupTask>> callback) {
+    public int getTasks(Consumer<ArrayList<Task>> callback) {
         return mTaskList.getTasks(false /* loadKeysOnly */, callback);
     }
 
@@ -123,9 +120,9 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
      * @param callback Receives true if task is removed, false otherwise
      */
     public void isTaskRemoved(int taskId, Consumer<Boolean> callback) {
-        mTaskList.getTasks(true /* loadKeysOnly */, (taskGroups) -> {
-            for (GroupTask group : taskGroups) {
-                if (group.containsTask(taskId)) {
+        mTaskList.getTasks(true /* loadKeysOnly */, (tasks) -> {
+            for (Task task : tasks) {
+                if (task.key.id == taskId) {
                     callback.accept(false);
                     return;
                 }
@@ -151,21 +148,20 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
         ActivityManager.RunningTaskInfo runningTask =
                 ActivityManagerWrapper.getInstance().getRunningTask();
         int runningTaskId = runningTask != null ? runningTask.id : -1;
-        mTaskList.getTaskKeys(mThumbnailCache.getCacheSize(), taskGroups -> {
-            for (GroupTask group : taskGroups) {
-                if (group.containsTask(runningTaskId)) {
+        mTaskList.getTaskKeys(mThumbnailCache.getCacheSize(), tasks -> {
+            for (Task task : tasks) {
+                if (task.key.id == runningTaskId) {
                     // Skip the running task, it's not going to have an up-to-date snapshot by the
                     // time the user next enters overview
                     continue;
                 }
-                mThumbnailCache.updateThumbnailInCache(group.task1);
-                mThumbnailCache.updateThumbnailInCache(group.task2);
+                mThumbnailCache.updateThumbnailInCache(task);
             }
         });
     }
 
     @Override
-    public boolean onTaskSnapshotChanged(int taskId, ThumbnailData snapshot) {
+    public void onTaskSnapshotChanged(int taskId, ThumbnailData snapshot) {
         mThumbnailCache.updateTaskSnapShot(taskId, snapshot);
 
         for (int i = mThumbnailChangeListeners.size() - 1; i >= 0; i--) {
@@ -174,12 +170,11 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
                 task.thumbnail = snapshot;
             }
         }
-        return true;
     }
 
     @Override
     public void onTaskRemoved(int taskId) {
-        Task.TaskKey stubKey = new Task.TaskKey(taskId, 0, new Intent(), null, 0, 0);
+        Task.TaskKey stubKey = new Task.TaskKey(taskId, 0, null, null, 0, 0);
         mThumbnailCache.remove(stubKey);
         mIconCache.onTaskRemoved(stubKey);
     }
@@ -220,11 +215,6 @@ public class RecentsModel implements IconChangeListener, TaskStackChangeListener
      */
     public void removeThumbnailChangeListener(TaskVisualsChangeListener listener) {
         mThumbnailChangeListeners.remove(listener);
-    }
-
-    public void dump(String prefix, PrintWriter writer) {
-        writer.println(prefix + "RecentsModel:");
-        mTaskList.dump("  ", writer);
     }
 
     /**

@@ -17,7 +17,6 @@ package com.android.launcher3.allapps;
 
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
-import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
@@ -29,7 +28,6 @@ import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
 import android.animation.ObjectAnimator;
 import android.util.FloatProperty;
-import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.animation.Interpolator;
 
@@ -39,14 +37,12 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
-import com.android.launcher3.util.MultiAdditivePropertyFactory;
-import com.android.launcher3.util.MultiValueAlpha;
-import com.android.launcher3.util.UiThreadHelper;
 import com.android.launcher3.views.ScrimView;
 
 /**
@@ -63,6 +59,7 @@ public class AllAppsTransitionController
         implements StateHandler<LauncherState>, OnDeviceProfileChangeListener {
     // This constant should match the second derivative of the animator interpolator.
     public static final float INTERP_COEFF = 1.7f;
+    private static final float CONTENT_VISIBLE_MAX_THRESHOLD = 0.5f;
 
     public static final FloatProperty<AllAppsTransitionController> ALL_APPS_PROGRESS =
             new FloatProperty<AllAppsTransitionController>("allAppsProgress") {
@@ -78,57 +75,7 @@ public class AllAppsTransitionController
                 }
             };
 
-    public static final FloatProperty<AllAppsTransitionController> ALL_APPS_PULL_BACK_TRANSLATION =
-            new FloatProperty<AllAppsTransitionController>("allAppsPullBackTranslation") {
-
-                @Override
-                public Float get(AllAppsTransitionController controller) {
-                    if (controller.mIsTablet) {
-                        return controller.mAppsView.getActiveRecyclerView().getTranslationY();
-                    } else {
-                        return controller.getAppsViewPullbackTranslationY().get(
-                                controller.mAppsView);
-                    }
-                }
-
-                @Override
-                public void setValue(AllAppsTransitionController controller, float translation) {
-                    if (controller.mIsTablet) {
-                        controller.mAppsView.getActiveRecyclerView().setTranslationY(translation);
-                    } else {
-                        controller.getAppsViewPullbackTranslationY().set(controller.mAppsView,
-                                translation);
-                    }
-                }
-            };
-
-    public static final FloatProperty<AllAppsTransitionController> ALL_APPS_PULL_BACK_ALPHA =
-            new FloatProperty<AllAppsTransitionController>("allAppsPullBackAlpha") {
-
-                @Override
-                public Float get(AllAppsTransitionController controller) {
-                    if (controller.mIsTablet) {
-                        return controller.mAppsView.getActiveRecyclerView().getAlpha();
-                    } else {
-                        return controller.getAppsViewPullbackAlpha().getValue();
-                    }
-                }
-
-                @Override
-                public void setValue(AllAppsTransitionController controller, float alpha) {
-                    if (controller.mIsTablet) {
-                        controller.mAppsView.getActiveRecyclerView().setAlpha(alpha);
-                    } else {
-                        controller.getAppsViewPullbackAlpha().setValue(alpha);
-                    }
-                }
-            };
-
-    private static final int INDEX_APPS_VIEW_PROGRESS = 0;
-    private static final int INDEX_APPS_VIEW_PULLBACK = 1;
-    private static final int APPS_VIEW_INDEX_COUNT = 2;
-
-    private ActivityAllAppsContainerView<Launcher> mAppsView;
+    private AllAppsContainerView mAppsView;
 
     private final Launcher mLauncher;
     private boolean mIsVerticalLayout;
@@ -142,22 +89,15 @@ public class AllAppsTransitionController
     private float mShiftRange;      // changes depending on the orientation
     private float mProgress;        // [0, 1], mShiftRange * mProgress = shiftCurrent
 
+    private float mScrollRangeDelta = 0;
     private ScrimView mScrimView;
-
-    private final MultiAdditivePropertyFactory<View>
-            mAppsViewTranslationYPropertyFactory = new MultiAdditivePropertyFactory<>(
-            "appsViewTranslationY", View.TRANSLATION_Y);
-    private MultiValueAlpha mAppsViewAlpha;
-
-    private boolean mIsTablet;
 
     public AllAppsTransitionController(Launcher l) {
         mLauncher = l;
-        DeviceProfile dp = mLauncher.getDeviceProfile();
-        setShiftRange(dp.allAppsShiftRange);
+        mShiftRange = mLauncher.getDeviceProfile().heightPx;
         mProgress = 1f;
-        mIsVerticalLayout = dp.isVerticalBarLayout();
-        mIsTablet = dp.isTablet;
+
+        mIsVerticalLayout = mLauncher.getDeviceProfile().isVerticalBarLayout();
         mLauncher.addOnDeviceProfileChangeListener(this);
     }
 
@@ -168,14 +108,12 @@ public class AllAppsTransitionController
     @Override
     public void onDeviceProfileChanged(DeviceProfile dp) {
         mIsVerticalLayout = dp.isVerticalBarLayout();
-        setShiftRange(dp.allAppsShiftRange);
+        setScrollRangeDelta(mScrollRangeDelta);
 
         if (mIsVerticalLayout) {
             mLauncher.getHotseat().setTranslationY(0);
             mLauncher.getWorkspace().getPageIndicator().setTranslationY(0);
         }
-
-        mIsTablet = dp.isTablet;
     }
 
     /**
@@ -188,28 +126,11 @@ public class AllAppsTransitionController
      */
     public void setProgress(float progress) {
         mProgress = progress;
-        getAppsViewProgressTranslationY().set(mAppsView, mProgress * mShiftRange);
-        mLauncher.onAllAppsTransition(1 - progress);
+        mAppsView.setTranslationY(mProgress * mShiftRange);
     }
 
     public float getProgress() {
         return mProgress;
-    }
-
-    private FloatProperty<View> getAppsViewProgressTranslationY() {
-        return mAppsViewTranslationYPropertyFactory.get(INDEX_APPS_VIEW_PROGRESS);
-    }
-
-    private FloatProperty<View> getAppsViewPullbackTranslationY() {
-        return mAppsViewTranslationYPropertyFactory.get(INDEX_APPS_VIEW_PULLBACK);
-    }
-
-    private MultiValueAlpha.AlphaProperty getAppsViewProgressAlpha() {
-        return mAppsViewAlpha.getProperty(INDEX_APPS_VIEW_PROGRESS);
-    }
-
-    private MultiValueAlpha.AlphaProperty getAppsViewPullbackAlpha() {
-        return mAppsViewAlpha.getProperty(INDEX_APPS_VIEW_PULLBACK);
     }
 
     /**
@@ -230,15 +151,6 @@ public class AllAppsTransitionController
     @Override
     public void setStateWithAnimation(LauncherState toState,
             StateAnimationConfig config, PendingAnimation builder) {
-        if (NORMAL.equals(toState) && mLauncher.isInState(ALL_APPS)) {
-            UiThreadHelper.hideKeyboardAsync(mLauncher, mLauncher.getAppsView().getWindowToken());
-            builder.addEndListener(success -> {
-                // Reset pull back progress and alpha after switching states.
-                ALL_APPS_PULL_BACK_TRANSLATION.set(this, 0f);
-                ALL_APPS_PULL_BACK_ALPHA.set(this, 1f);
-            });
-        }
-
         float targetProgress = toState.getVerticalProgress(mLauncher);
         if (Float.compare(mProgress, targetProgress) == 0) {
             setAlphas(toState, config, builder);
@@ -248,19 +160,14 @@ public class AllAppsTransitionController
         }
 
         // need to decide depending on the release velocity
-        Interpolator verticalProgressInterpolator = config.getInterpolator(ANIM_VERTICAL_PROGRESS,
-                config.userControlled ? LINEAR : DEACCEL_1_7);
+        Interpolator interpolator = (config.userControlled ? LINEAR : DEACCEL_1_7);
+
         Animator anim = createSpringAnimation(mProgress, targetProgress);
-        anim.setInterpolator(verticalProgressInterpolator);
+        anim.setInterpolator(config.getInterpolator(ANIM_VERTICAL_PROGRESS, interpolator));
         anim.addListener(getProgressAnimatorListener());
         builder.add(anim);
 
         setAlphas(toState, config, builder);
-
-        if (ALL_APPS.equals(toState) && mLauncher.isInState(NORMAL)) {
-            mLauncher.getAppsView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY,
-                    HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-        }
     }
 
     public Animator createSpringAnimation(float... progressValues) {
@@ -274,9 +181,9 @@ public class AllAppsTransitionController
         int visibleElements = state.getVisibleElements(mLauncher);
         boolean hasAllAppsContent = (visibleElements & ALL_APPS_CONTENT) != 0;
 
-        Interpolator allAppsFade = config.getInterpolator(ANIM_ALL_APPS_FADE, LINEAR);
-        setter.setFloat(getAppsViewProgressAlpha(), MultiValueAlpha.VALUE,
-                hasAllAppsContent ? 1 : 0, allAppsFade);
+        Interpolator allAppsFade = config.getInterpolator(ANIM_ALL_APPS_FADE,
+                Interpolators.clampToProgress(LINEAR, 0, CONTENT_VISIBLE_MAX_THRESHOLD));
+        setter.setViewAlpha(mAppsView, hasAllAppsContent ? 1 : 0, allAppsFade);
 
         boolean shouldProtectHeader =
                 ALL_APPS == state || mLauncher.getStateManager().getState() == ALL_APPS;
@@ -290,7 +197,7 @@ public class AllAppsTransitionController
     /**
      * see Launcher#setupViews
      */
-    public void setupViews(ScrimView scrimView, ActivityAllAppsContainerView<Launcher> appsView) {
+    public void setupViews(ScrimView scrimView, AllAppsContainerView appsView) {
         mScrimView = scrimView;
         mAppsView = appsView;
         if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && Utilities.ATLEAST_R) {
@@ -299,15 +206,14 @@ public class AllAppsTransitionController
                             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
         mAppsView.setScrimView(scrimView);
-        mAppsViewAlpha = new MultiValueAlpha(mAppsView, APPS_VIEW_INDEX_COUNT);
-        mAppsViewAlpha.setUpdateVisibility(true);
     }
 
     /**
      * Updates the total scroll range but does not update the UI.
      */
-    public void setShiftRange(float shiftRange) {
-        mShiftRange = shiftRange;
+    public void setScrollRangeDelta(float delta) {
+        mScrollRangeDelta = delta;
+        mShiftRange = mLauncher.getDeviceProfile().heightPx - mScrollRangeDelta;
     }
 
     /**

@@ -21,15 +21,16 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERV
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.SystemProperties;
+import android.view.View;
 
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
-import com.android.launcher3.taskbar.LauncherTaskbarUIController;
-import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.Workspace;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.Themes;
+import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
@@ -58,17 +59,20 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
-    public int getTransitionDuration(Context context, boolean isToState) {
+    public int getTransitionDuration(Context context) {
         // In gesture modes, overview comes in all the way from the side, so give it more time.
-        return DisplayController.getNavigationMode(context).hasGestures ? 380 : 250;
+        return SysUINavigationMode.INSTANCE.get(context).getMode().hasGestures ? 380 : 250;
     }
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
-        float workspacePageHeight = launcher.getDeviceProfile().getCellLayoutHeight();
+        Workspace workspace = launcher.getWorkspace();
+        View workspacePage = workspace.getPageAt(workspace.getCurrentPage());
+        float workspacePageWidth = workspacePage != null && workspacePage.getWidth() != 0
+                ? workspacePage.getWidth() : launcher.getDeviceProfile().availableWidthPx;
         recentsView.getTaskSize(sTempRect);
-        float scale = (float) sTempRect.height() / workspacePageHeight;
+        float scale = (float) sTempRect.width() / workspacePageWidth;
         float parallaxFactor = 0.5f;
         return new ScaleAndTranslation(scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor);
     }
@@ -76,6 +80,16 @@ public class OverviewState extends LauncherState {
     @Override
     public float[] getOverviewScaleAndOffset(Launcher launcher) {
         return new float[] {NO_SCALE, NO_OFFSET};
+    }
+
+    @Override
+    public float getTaskbarScale(Launcher launcher) {
+        return 1f;
+    }
+
+    @Override
+    public float getTaskbarTranslationY(Launcher launcher) {
+        return 0f;
     }
 
     @Override
@@ -94,24 +108,13 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
-    public boolean isTaskbarStashed(Launcher launcher) {
-        if (launcher instanceof BaseQuickstepLauncher) {
-            LauncherTaskbarUIController uiController =
-                    ((BaseQuickstepLauncher) launcher).getTaskbarUIController();
-
-            return uiController != null && uiController.supportsVisualStashing();
-        }
-        return super.isTaskbarStashed(launcher);
-    }
-
-    @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
         return Themes.getAttrColor(launcher, R.attr.overviewScrimColor);
     }
 
     @Override
     public boolean displayOverviewTasksAsGrid(DeviceProfile deviceProfile) {
-        return deviceProfile.isTablet;
+        return deviceProfile.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get();
     }
 
     @Override
@@ -131,14 +134,9 @@ public class OverviewState extends LauncherState {
 
     @Override
     public void onBackPressed(Launcher launcher) {
-        RecentsView recentsView = launcher.getOverviewPanel();
-        TaskView taskView = recentsView.getRunningTaskView();
+        TaskView taskView = launcher.<RecentsView>getOverviewPanel().getRunningTaskView();
         if (taskView != null) {
-            if (recentsView.isTaskViewFullyVisible(taskView)) {
-                taskView.launchTasks();
-            } else {
-                recentsView.snapToPage(recentsView.indexOfChild(taskView));
-            }
+            taskView.launchTaskAnimated();
         } else {
             super.onBackPressed(launcher);
         }

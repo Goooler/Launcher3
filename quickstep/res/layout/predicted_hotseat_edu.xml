@@ -42,7 +42,6 @@
             android:paddingLeft="@dimen/bottom_sheet_edu_padding"
             android:paddingRight="@dimen/bottom_sheet_edu_padding"
             android:text="@string/hotseat_edu_title_migrate"
-            android:fontFamily="google-sans"
             android:textAlignment="center"
             android:textColor="@android:color/white"
             android:textSize="20sp" />
@@ -74,7 +73,6 @@
                 launcher:containerType="hotseat" />
 
             <LinearLayout
-                android:id="@+id/button_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingLeft="@dimen/bottom_sheet_edu_padding"
