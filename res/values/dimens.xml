@@ -242,7 +242,6 @@
     <dimen name="drop_target_button_drawable_vertical_padding">8dp</dimen>
     <dimen name="drop_target_button_gap">28dp</dimen>
     <dimen name="drop_target_button_workspace_edge_gap">0dp</dimen>
-    <dimen name="drop_target_button_screen_edge_gap">28dp</dimen>
 
     <!-- the distance an icon must be dragged before button drop targets accept it -->
     <dimen name="drag_distanceThreshold">30dp</dimen>
