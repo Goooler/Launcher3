@@ -52,7 +52,7 @@ public final class FeatureFlags {
      * Enable moving the QSB on the 0th screen of the workspace. This is not a configuration feature
      * and should be modified at a project level.
      */
-    public static final boolean QSB_ON_FIRST_SCREEN = true;
+    public static final boolean QSB_ON_FIRST_SCREEN = BuildConfig.QSB_ON_FIRST_SCREEN;
 
     /**
      * Feature flag to handle define config changes dynamically instead of killing the process.
@@ -89,12 +89,12 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH", true, "Allows on device search in all apps");
 
-    public static final BooleanFlag ENABLE_ONE_SEARCH = new DeviceFlag("ENABLE_ONE_SEARCH", false,
-            "Use homescreen search box to complete allApps searches");
-
     public static final BooleanFlag ENABLE_FLOATING_SEARCH_BAR =
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
+
+    public static final BooleanFlag ENABLE_QUICK_SEARCH = new DeviceFlag("ENABLE_QUICK_SEARCH",
+            true, "Use quick search behavior.");
 
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
@@ -246,6 +246,14 @@ public final class FeatureFlags {
             "ENABLE_ALL_APPS_IN_TASKBAR", true,
             "Enables accessing All Apps from the system Taskbar.");
 
+    public static final BooleanFlag ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT = getDebugFlag(
+            "ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT", false,
+            "Enables displaying the all apps button in the hotseat.");
+
+    public static final BooleanFlag ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR = getDebugFlag(
+            "ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR", false,
+            "Enables One Search box in Taskbar All Apps.");
+
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,
             "Enable initiating split screen from workspace.");
@@ -253,6 +261,21 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
             "ENABLE_NEW_MIGRATION_LOGIC", true,
             "Enable the new grid migration logic, keeping pages when src < dest");
+
+    public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
+            "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
+
+    public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = new DeviceFlag(
+            "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", true,
+            "Enable option to show keyboard when going to all-apps");
+
+    public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(
+            "USE_LOCAL_ICON_OVERRIDES", true,
+            "Use inbuilt monochrome icons if app doesn't provide one");
+
+    public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(
+            "ENABLE_DISMISS_PREDICTION_UNDO", false,
+            "Show an 'Undo' snackbar when users dismiss a predicted hotseat item");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

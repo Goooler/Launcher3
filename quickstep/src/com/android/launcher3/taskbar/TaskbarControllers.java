@@ -19,6 +19,7 @@ import android.content.pm.ActivityInfo.Config;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
 import com.android.systemui.shared.rotation.RotationButtonController;
@@ -50,6 +51,7 @@ public class TaskbarControllers {
     public final TaskbarPopupController taskbarPopupController;
     public final TaskbarForceVisibleImmersiveController taskbarForceVisibleImmersiveController;
     public final TaskbarAllAppsController taskbarAllAppsController;
+    public final TaskbarInsetsController taskbarInsetsController;
 
     @Nullable private LoggableTaskbarController[] mControllersToLog = null;
 
@@ -58,6 +60,8 @@ public class TaskbarControllers {
 
     private boolean mAreAllControllersInitialized;
     private final List<Runnable> mPostInitCallbacks = new ArrayList<>();
+
+    @Nullable private TaskbarSharedState mSharedState = null;
 
     public TaskbarControllers(TaskbarActivityContext taskbarActivityContext,
             TaskbarDragController taskbarDragController,
@@ -75,7 +79,8 @@ public class TaskbarControllers {
             TaskbarAutohideSuspendController taskbarAutoHideSuspendController,
             TaskbarPopupController taskbarPopupController,
             TaskbarForceVisibleImmersiveController taskbarForceVisibleImmersiveController,
-            TaskbarAllAppsController taskbarAllAppsController) {
+            TaskbarAllAppsController taskbarAllAppsController,
+            TaskbarInsetsController taskbarInsetsController) {
         this.taskbarActivityContext = taskbarActivityContext;
         this.taskbarDragController = taskbarDragController;
         this.navButtonController = navButtonController;
@@ -93,6 +98,7 @@ public class TaskbarControllers {
         this.taskbarPopupController = taskbarPopupController;
         this.taskbarForceVisibleImmersiveController = taskbarForceVisibleImmersiveController;
         this.taskbarAllAppsController = taskbarAllAppsController;
+        this.taskbarInsetsController = taskbarInsetsController;
     }
 
     /**
@@ -100,8 +106,9 @@ public class TaskbarControllers {
      * TaskbarControllers instance, but should be careful to only access things that were created
      * in constructors for now, as some controllers may still be waiting for init().
      */
-    public void init(TaskbarSharedState sharedState) {
+    public void init(@NonNull TaskbarSharedState sharedState) {
         mAreAllControllersInitialized = false;
+        mSharedState = sharedState;
 
         taskbarDragController.init(this);
         navbarButtonsViewController.init(this);
@@ -112,18 +119,20 @@ public class TaskbarControllers {
         taskbarUnfoldAnimationController.init(this);
         taskbarKeyguardController.init(navbarButtonsViewController);
         stashedHandleViewController.init(this);
-        taskbarStashController.init(this, sharedState);
+        taskbarStashController.init(this, sharedState.setupUIVisible);
         taskbarEduController.init(this);
         taskbarPopupController.init(this);
         taskbarForceVisibleImmersiveController.init(this);
-        taskbarAllAppsController.init(this);
+        taskbarAllAppsController.init(this, sharedState.allAppsVisible);
+        navButtonController.init(this);
+        taskbarInsetsController.init(this);
 
         mControllersToLog = new LoggableTaskbarController[] {
                 taskbarDragController, navButtonController, navbarButtonsViewController,
                 taskbarDragLayerController, taskbarScrimViewController, taskbarViewController,
                 taskbarUnfoldAnimationController, taskbarKeyguardController,
                 stashedHandleViewController, taskbarStashController, taskbarEduController,
-                taskbarAutohideSuspendController, taskbarPopupController
+                taskbarAutohideSuspendController, taskbarPopupController, taskbarInsetsController
         };
 
         mAreAllControllersInitialized = true;
@@ -131,6 +140,12 @@ public class TaskbarControllers {
             postInitCallback.run();
         }
         mPostInitCallbacks.clear();
+    }
+
+    @Nullable
+    public TaskbarSharedState getSharedState() {
+        // This should only be null if called before init() and after destroy().
+        return mSharedState;
     }
 
     public void onConfigurationChanged(@Config int configChanges) {
@@ -141,6 +156,8 @@ public class TaskbarControllers {
      * Cleans up all controllers.
      */
     public void onDestroy() {
+        mSharedState = null;
+
         navbarButtonsViewController.onDestroy();
         uiController.onDestroy();
         rotationButtonController.onDestroy();
@@ -152,6 +169,9 @@ public class TaskbarControllers {
         taskbarAutohideSuspendController.onDestroy();
         taskbarPopupController.onDestroy();
         taskbarForceVisibleImmersiveController.onDestroy();
+        taskbarAllAppsController.onDestroy();
+        navButtonController.onDestroy();
+        taskbarInsetsController.onDestroy();
 
         mControllersToLog = null;
     }
@@ -178,10 +198,19 @@ public class TaskbarControllers {
             return;
         }
 
+        pw.println(String.format(
+                "%s\tmAreAllControllersInitialized=%b", prefix, mAreAllControllersInitialized));
         for (LoggableTaskbarController controller : mControllersToLog) {
             controller.dumpLogs(prefix + "\t", pw);
         }
+        uiController.dumpLogs(prefix + "\t", pw);
         rotationButtonController.dumpLogs(prefix + "\t", pw);
+    }
+
+    @VisibleForTesting
+    TaskbarActivityContext getTaskbarActivityContext() {
+        // Used to mock
+        return taskbarActivityContext;
     }
 
     protected interface LoggableTaskbarController {

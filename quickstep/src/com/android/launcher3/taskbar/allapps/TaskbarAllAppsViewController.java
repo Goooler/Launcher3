@@ -15,11 +15,11 @@
  */
 package com.android.launcher3.taskbar.allapps;
 
+import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_STASHED_IN_APP_ALL_APPS;
-import static com.android.launcher3.taskbar.allapps.TaskbarAllAppsSlideInView.DEFAULT_CLOSE_DURATION;
-import static com.android.launcher3.taskbar.allapps.TaskbarAllAppsSlideInView.DEFAULT_OPEN_DURATION;
 import static com.android.launcher3.util.OnboardingPrefs.ALL_APPS_VISITED_COUNT;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.appprediction.AppsDividerView;
 import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.taskbar.TaskbarStashController;
@@ -49,12 +49,12 @@ final class TaskbarAllAppsViewController {
         setUpIconLongClick();
         setUpAppDivider();
         setUpTaskbarStashing();
-        mSlideInView.addOnCloseListener(windowController::closeWindow);
+        mSlideInView.addOnCloseListener(windowController::maybeCloseWindow);
     }
 
     /** Starts the {@link TaskbarAllAppsSlideInView} enter transition. */
-    void show() {
-        mSlideInView.show();
+    void show(boolean animate) {
+        mSlideInView.show(animate);
     }
 
     /** Closes the {@link TaskbarAllAppsSlideInView}. */
@@ -81,11 +81,14 @@ final class TaskbarAllAppsViewController {
 
     private void setUpTaskbarStashing() {
         mTaskbarStashController.updateStateForFlag(FLAG_STASHED_IN_APP_ALL_APPS, true);
-        mTaskbarStashController.applyState(DEFAULT_OPEN_DURATION);
+        mTaskbarStashController.applyState(
+                ALL_APPS.getTransitionDuration(mContext, true /* isToState */));
         mSlideInView.setOnCloseBeginListener(() -> {
-            mTaskbarStashController.updateStateForFlag(
-                    FLAG_STASHED_IN_APP_ALL_APPS, false);
-            mTaskbarStashController.applyState(DEFAULT_CLOSE_DURATION);
+            AbstractFloatingView.closeOpenContainer(
+                    mContext, AbstractFloatingView.TYPE_ACTION_POPUP);
+            // Post in case view is closing due to gesture navigation. If a gesture is in progress,
+            // wait to unstash until after the gesture is finished.
+            mSlideInView.post(mTaskbarStashController::maybeResetStashedInAppAllApps);
         });
     }
 }

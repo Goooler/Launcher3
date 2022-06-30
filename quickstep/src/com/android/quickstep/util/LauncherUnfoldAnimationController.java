@@ -45,7 +45,7 @@ public class LauncherUnfoldAnimationController {
     // Percentage of the width of the quick search bar that will be reduced
     // from the both sides of the bar when progress is 0
     private static final float MAX_WIDTH_INSET_FRACTION = 0.15f;
-    private static final FloatProperty<Workspace> WORKSPACE_SCALE_PROPERTY =
+    private static final FloatProperty<Workspace<?>> WORKSPACE_SCALE_PROPERTY =
             WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
     private static final FloatProperty<Hotseat> HOTSEAT_SCALE_PROPERTY =
             HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
@@ -144,6 +144,7 @@ public class LauncherUnfoldAnimationController {
 
         @Override
         public void onTransitionStarted() {
+            mLauncher.getWorkspace().setPivotToScaleWithSelf(mLauncher.getHotseat());
         }
 
         @Override

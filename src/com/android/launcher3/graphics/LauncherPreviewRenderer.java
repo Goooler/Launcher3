@@ -23,7 +23,6 @@ import static android.view.View.VISIBLE;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
 import static com.android.launcher3.model.ModelUtils.getMissingHotseatRanks;
-import static com.android.launcher3.model.ModelUtils.sortWorkspaceItemsSpatially;
 
 import android.annotation.TargetApi;
 import android.app.Fragment;
@@ -84,9 +83,11 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.uioverrides.PredictedAppIconInflater;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext;
+import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.BaseLauncherAppWidgetHostView;
@@ -128,7 +129,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
         public PreviewContext(Context base, InvariantDeviceProfile idp) {
             super(base, UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
-                    CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE);
+                    CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE,
+                    WindowManagerProxy.INSTANCE, DisplayController.INSTANCE);
             mIdp = idp;
             mObjectMap.put(InvariantDeviceProfile.INSTANCE, idp);
             mObjectMap.put(LauncherAppState.INSTANCE,
@@ -223,21 +225,21 @@ public class LauncherPreviewRenderer extends ContextWrapper
         mHotseat.resetLayout(false);
 
         CellLayout firstScreen = mRootView.findViewById(R.id.workspace);
-        firstScreen.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
-                mDp.workspacePadding.top,
+        firstScreen.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingPx.left,
+                mDp.workspacePadding.top + mDp.cellLayoutPaddingPx.top,
                 (mDp.isTwoPanels ? mDp.cellLayoutBorderSpacePx.x / 2
-                        : mDp.workspacePadding.right) + mDp.cellLayoutPaddingLeftRightPx,
-                mDp.workspacePadding.bottom
+                        : mDp.workspacePadding.right) + mDp.cellLayoutPaddingPx.right,
+                mDp.workspacePadding.bottom + mDp.cellLayoutPaddingPx.bottom
         );
         mWorkspaceScreens.put(FIRST_SCREEN_ID, firstScreen);
 
         if (mDp.isTwoPanels) {
             CellLayout rightPanel = mRootView.findViewById(R.id.workspace_right);
             rightPanel.setPadding(
-                    mDp.cellLayoutBorderSpacePx.x / 2 + mDp.cellLayoutPaddingLeftRightPx,
-                    mDp.workspacePadding.top,
-                    mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
-                    mDp.workspacePadding.bottom
+                    mDp.cellLayoutBorderSpacePx.x / 2  + mDp.cellLayoutPaddingPx.left,
+                    mDp.workspacePadding.top + mDp.cellLayoutPaddingPx.top,
+                    mDp.workspacePadding.right + mDp.cellLayoutPaddingPx.right,
+                    mDp.workspacePadding.bottom + mDp.cellLayoutPaddingPx.bottom
             );
             mWorkspaceScreens.put(Workspace.SECOND_SCREEN_ID, rightPanel);
         }
@@ -418,8 +420,6 @@ public class LauncherPreviewRenderer extends ContextWrapper
                 currentWorkspaceItems, otherWorkspaceItems);
         filterCurrentWorkspaceItems(currentScreenIds, dataModel.appWidgets, currentAppWidgets,
                 otherAppWidgets);
-
-        sortWorkspaceItemsSpatially(mIdp, currentWorkspaceItems);
         for (ItemInfo itemInfo : currentWorkspaceItems) {
             switch (itemInfo.itemType) {
                 case Favorites.ITEM_TYPE_APPLICATION:

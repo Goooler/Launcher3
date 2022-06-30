@@ -16,8 +16,6 @@
 
 package com.android.launcher3.tapl;
 
-import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
-
 import static com.android.launcher3.testing.TestProtocol.SPRING_LOADED_STATE_ORDINAL;
 
 import android.graphics.Point;
@@ -33,7 +31,7 @@ import com.android.launcher3.testing.TestProtocol;
 /**
  * Ancestor for AppIcon and AppMenuItem.
  */
-abstract class Launchable {
+public abstract class Launchable {
 
     protected static final int DEFAULT_DRAG_STEPS = 10;
 
@@ -64,41 +62,29 @@ abstract class Launchable {
     protected abstract String launchableType();
 
     private LaunchedAppState launch(BySelector selector) {
-        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+        try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                 "want to launch an app from " + launchableType())) {
             LauncherInstrumentation.log("Launchable.launch before click "
                     + mObject.getVisibleCenter() + " in " + mLauncher.getVisibleBounds(mObject));
-            final String label = mObject.getText();
 
-            executeAndWaitForWindowChange(() -> {
-                mLauncher.clickLauncherObject(mObject);
+            mLauncher.clickLauncherObject(mObject);
+
+            try (LauncherInstrumentation.Closable c2 = mLauncher.addContextLayer("clicked")) {
                 expectActivityStartEvents();
-            }, label, "clicking " + launchableType());
-
-            try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer("clicked")) {
-                return assertAppLaunched(label, selector);
+                return assertAppLaunched(selector);
             }
         }
     }
 
-    protected void executeAndWaitForWindowChange(Runnable command, String label, String action) {
-        mLauncher.executeAndWaitForEvent(
-                command,
-                event -> event.getEventType() == TYPE_WINDOW_STATE_CHANGED,
-                () -> "Launching an app didn't open a new window: " + label,
-                action);
-    }
-
-    protected LaunchedAppState assertAppLaunched(String label, BySelector selector) {
+    protected LaunchedAppState assertAppLaunched(BySelector selector) {
         mLauncher.assertTrue(
-                "App didn't start: " + label + " (" + selector + ")",
-                TestHelpers.wait(Until.hasObject(selector),
+                "App didn't start: (" + selector + ")",
+                mLauncher.getDevice().wait(Until.hasObject(selector),
                         LauncherInstrumentation.WAIT_TIME_MS));
         return new LaunchedAppState(mLauncher);
     }
 
-    Point startDrag(long downTime, String longPressIndicator,
-            Runnable expectLongClickEvents, boolean runToSpringLoadedState) {
+    Point startDrag(long downTime, Runnable expectLongClickEvents, boolean runToSpringLoadedState) {
         final Point iconCenter = getObject().getVisibleCenter();
         final Point dragStartCenter = new Point(iconCenter.x,
                 iconCenter.y - getStartDragThreshold());
@@ -108,7 +94,6 @@ abstract class Launchable {
                     downTime,
                     iconCenter,
                     dragStartCenter,
-                    longPressIndicator,
                     expectLongClickEvents),
                     SPRING_LOADED_STATE_ORDINAL, "long-pressing and triggering drag start");
         } else {
@@ -116,13 +101,19 @@ abstract class Launchable {
                     downTime,
                     iconCenter,
                     dragStartCenter,
-                    longPressIndicator,
                     expectLongClickEvents);
         }
 
-
         return dragStartCenter;
     }
+
+    /**
+     * Waits for a confirmation that a long press has successfully been triggered.
+     *
+     * This method waits for a view to either appear or disappear to confirm that the long press
+     * has been triggered and fails if no confirmation is received before the default timeout.
+     */
+    protected abstract void waitForLongPressConfirmation();
 
     /**
      * Drags this Launchable a short distance before starting a full drag.
@@ -130,16 +121,30 @@ abstract class Launchable {
      * This is necessary for shortcuts, which require being dragged beyond a threshold to close
      * their container and start drag callbacks.
      */
-    private void movePointerForStartDrag(long downTime, Point iconCenter, Point dragStartCenter,
-            String longPressIndicator, Runnable expectLongClickEvents) {
-        mLauncher.sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN,
-                iconCenter, LauncherInstrumentation.GestureScope.INSIDE);
+    private void movePointerForStartDrag(
+            long downTime,
+            Point iconCenter,
+            Point dragStartCenter,
+            Runnable expectLongClickEvents) {
+        mLauncher.sendPointer(
+                downTime,
+                downTime,
+                MotionEvent.ACTION_DOWN,
+                iconCenter,
+                LauncherInstrumentation.GestureScope.INSIDE);
         LauncherInstrumentation.log("movePointerForStartDrag: sent down");
         expectLongClickEvents.run();
-        mLauncher.waitForLauncherObject(longPressIndicator);
+        waitForLongPressConfirmation();
         LauncherInstrumentation.log("movePointerForStartDrag: indicator");
-        mLauncher.movePointer(iconCenter, dragStartCenter, DEFAULT_DRAG_STEPS, false,
-                downTime, true, LauncherInstrumentation.GestureScope.INSIDE);
+        mLauncher.movePointer(
+                iconCenter,
+                dragStartCenter,
+                DEFAULT_DRAG_STEPS,
+                /* isDecelerating= */ false,
+                downTime,
+                downTime,
+                /* slowDown= */ true,
+                LauncherInstrumentation.GestureScope.INSIDE);
     }
 
     private int getStartDragThreshold() {
@@ -148,6 +153,4 @@ abstract class Launchable {
     }
 
     protected abstract void addExpectedEventsForLongClick();
-
-    protected abstract String getLongPressIndicator();
 }

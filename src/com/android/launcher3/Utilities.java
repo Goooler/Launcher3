@@ -18,6 +18,9 @@ package com.android.launcher3;
 
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
 
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
@@ -50,6 +53,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Build.VERSION_CODES;
 import android.os.DeadObjectException;
 import android.os.Handler;
 import android.os.Message;
@@ -69,9 +73,9 @@ import android.view.ViewConfiguration;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
 
+import androidx.annotation.ChecksSdkIntAtLeast;
 import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
-import androidx.core.os.BuildCompat;
 
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.graphics.GridCustomizationsProvider;
@@ -86,12 +90,14 @@ import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -117,15 +123,20 @@ public final class Utilities {
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
     public static final Person[] EMPTY_PERSON_ARRAY = new Person[0];
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.P)
     public static final boolean ATLEAST_P = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.Q)
     public static final boolean ATLEAST_Q = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.R)
     public static final boolean ATLEAST_R = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.S)
     public static final boolean ATLEAST_S = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
 
-    public static final boolean ATLEAST_T = BuildCompat.isAtLeastT();
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.TIRAMISU, codename = "T")
+    public static final boolean ATLEAST_T = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
 
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
@@ -259,6 +270,16 @@ public final class Utilities {
                 Math.min(points[1], points[3]),
                 Math.max(points[0], points[2]),
                 Math.max(points[1], points[3]));
+    }
+
+    /**
+     * Similar to {@link #mapCoordInSelfToDescendant(View descendant, View root, float[] coord)}
+     * but accepts a Rect instead of float[].
+     */
+    public static void mapRectInSelfToDescendant(View descendant, View root, Rect rect) {
+        float[] coords = new float[]{rect.left, rect.top, rect.right, rect.bottom};
+        mapCoordInSelfToDescendant(descendant, root, coords);
+        rect.set((int) coords[0], (int) coords[1], (int) coords[2], (int) coords[3]);
     }
 
     /**
@@ -483,6 +504,11 @@ public final class Utilities {
         return res.getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
 
+    /** Converts a pixel value (px) to scale pixel value (SP) for the current device. */
+    public static float pxToSp(float size) {
+        return size / Resources.getSystem().getDisplayMetrics().scaledDensity;
+    }
+
     public static float dpiFromPx(float size, int densityDpi) {
         float densityRatio = (float) densityDpi / DisplayMetrics.DENSITY_DEFAULT;
         return (size / densityRatio);
@@ -606,6 +632,10 @@ public final class Utilities {
         // Use application context for shared preferences, so that we use a single cached instance
         return context.getApplicationContext().getSharedPreferences(
                 LauncherFiles.DEVICE_PREFERENCES_KEY, Context.MODE_PRIVATE);
+    }
+
+    public static boolean isWallpaperSupported(Context context) {
+        return context.getSystemService(WallpaperManager.class).isWallpaperSupported();
     }
 
     public static boolean isWallpaperAllowed(Context context) {
@@ -866,5 +896,40 @@ public final class Utilities {
         int[] pos = new int[2];
         v.getLocationOnScreen(pos);
         return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
+    }
+
+    /**
+     * Returns a list of screen-splitting options depending on the device orientation (split top for
+     * portrait, split left for landscape, split left and right for landscape tablets, etc.)
+     */
+    public static List<SplitPositionOption> getSplitPositionOptions(
+            DeviceProfile dp) {
+        List<SplitPositionOption> options = new ArrayList<>();
+        // Add both left and right options if we're in tablet mode
+        if (dp.isTablet && dp.isLandscape) {
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_left, R.string.split_screen_position_left,
+                    STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_right, R.string.split_screen_position_right,
+                    STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
+        } else {
+            if (dp.isSeascape()) {
+                // Add left/right options
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_right, R.string.split_screen_position_right,
+                        STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
+            } else if (dp.isLandscape) {
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_left, R.string.split_screen_position_left,
+                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            } else {
+                // Only add top option
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_top, R.string.split_screen_position_top,
+                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            }
+        }
+        return options;
     }
 }

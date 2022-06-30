@@ -25,6 +25,7 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.LauncherState.FLAG_HAS_SYS_UI_SCRIM;
+import static com.android.launcher3.LauncherState.FLAG_HOTSEAT_INACCESSIBLE;
 import static com.android.launcher3.LauncherState.HINT_STATE;
 import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -35,10 +36,12 @@ import static com.android.launcher3.anim.Interpolators.ZOOM_OUT;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
 import static com.android.launcher3.graphics.Scrim.SCRIM_PROGRESS;
 import static com.android.launcher3.graphics.SysUiScrim.SYSUI_PROGRESS;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_TRANSLATE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_PAGE_TRANSLATE_X;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_SCRIM;
@@ -49,6 +52,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.LauncherState.PageAlphaProvider;
+import com.android.launcher3.LauncherState.PageTranslationProvider;
 import com.android.launcher3.LauncherState.ScaleAndTranslation;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
@@ -65,18 +69,18 @@ import com.android.systemui.plugins.ResourceProvider;
  */
 public class WorkspaceStateTransitionAnimation {
 
-    private static final FloatProperty<Workspace> WORKSPACE_SCALE_PROPERTY =
+    private static final FloatProperty<Workspace<?>> WORKSPACE_SCALE_PROPERTY =
             WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WORKSPACE_STATE);
 
     private static final FloatProperty<Hotseat> HOTSEAT_SCALE_PROPERTY =
             HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WORKSPACE_STATE);
 
     private final Launcher mLauncher;
-    private final Workspace mWorkspace;
+    private final Workspace<?> mWorkspace;
 
     private float mNewScale;
 
-    public WorkspaceStateTransitionAnimation(Launcher launcher, Workspace workspace) {
+    public WorkspaceStateTransitionAnimation(Launcher launcher, Workspace<?> workspace) {
         mLauncher = launcher;
         mWorkspace = workspace;
     }
@@ -114,8 +118,6 @@ public class WorkspaceStateTransitionAnimation {
         }
 
         int elements = state.getVisibleElements(mLauncher);
-        Interpolator fadeInterpolator = config.getInterpolator(ANIM_WORKSPACE_FADE,
-                pageAlphaProvider.interpolator);
         Hotseat hotseat = mWorkspace.getHotseat();
         Interpolator scaleInterpolator = config.getInterpolator(ANIM_WORKSPACE_SCALE, ZOOM_OUT);
         LauncherState fromState = mLauncher.getStateManager().getState();
@@ -143,11 +145,21 @@ public class WorkspaceStateTransitionAnimation {
                     hotseatScaleInterpolator);
         }
 
-        float hotseatIconsAlpha = (elements & HOTSEAT_ICONS) != 0 ? 1 : 0;
-        propertySetter.setViewAlpha(hotseat, hotseatIconsAlpha, fadeInterpolator);
+        Interpolator workspaceFadeInterpolator = config.getInterpolator(ANIM_WORKSPACE_FADE,
+                pageAlphaProvider.interpolator);
         float workspacePageIndicatorAlpha = (elements & WORKSPACE_PAGE_INDICATOR) != 0 ? 1 : 0;
         propertySetter.setViewAlpha(mLauncher.getWorkspace().getPageIndicator(),
-                workspacePageIndicatorAlpha, fadeInterpolator);
+                workspacePageIndicatorAlpha, workspaceFadeInterpolator);
+        Interpolator hotseatFadeInterpolator = config.getInterpolator(ANIM_HOTSEAT_FADE,
+                workspaceFadeInterpolator);
+        float hotseatIconsAlpha = (elements & HOTSEAT_ICONS) != 0 ? 1 : 0;
+        propertySetter.setViewAlpha(hotseat, hotseatIconsAlpha, hotseatFadeInterpolator);
+
+        // Update the accessibility flags for hotseat based on launcher state.
+        hotseat.setImportantForAccessibility(
+                state.hasFlag(FLAG_HOTSEAT_INACCESSIBLE)
+                        ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                        : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
 
         Interpolator translationInterpolator =
                 config.getInterpolator(ANIM_WORKSPACE_TRANSLATE, ZOOM_OUT);
@@ -155,6 +167,12 @@ public class WorkspaceStateTransitionAnimation {
                 scaleAndTranslation.translationX, translationInterpolator);
         propertySetter.setFloat(mWorkspace, VIEW_TRANSLATE_Y,
                 scaleAndTranslation.translationY, translationInterpolator);
+        PageTranslationProvider pageTranslationProvider = state.getWorkspacePageTranslationProvider(
+                mLauncher);
+        for (int i = 0; i < childCount; i++) {
+            applyPageTranslation((CellLayout) mWorkspace.getChildAt(i), i, pageTranslationProvider,
+                    propertySetter, config);
+        }
 
         Interpolator hotseatTranslationInterpolator = config.getInterpolator(
                 ANIM_HOTSEAT_TRANSLATE, translationInterpolator);
@@ -202,11 +220,21 @@ public class WorkspaceStateTransitionAnimation {
                 pageAlpha, fadeInterpolator);
     }
 
+    private void applyPageTranslation(CellLayout cellLayout, int childIndex,
+            PageTranslationProvider pageTranslationProvider, PropertySetter propertySetter,
+            StateAnimationConfig config) {
+        float pageTranslation = pageTranslationProvider.getPageTranslation(childIndex);
+        Interpolator translationInterpolator = config.getInterpolator(
+                ANIM_WORKSPACE_PAGE_TRANSLATE_X, pageTranslationProvider.interpolator);
+        propertySetter.setFloat(cellLayout, VIEW_TRANSLATE_X, pageTranslation,
+                translationInterpolator);
+    }
+
     /**
      * Returns a spring based animator for the scale property of {@param workspace}.
      */
     public static ValueAnimator getWorkspaceSpringScaleAnimator(Launcher launcher,
-            Workspace workspace, float scale) {
+            Workspace<?> workspace, float scale) {
         return getSpringScaleAnimator(launcher, workspace, scale, WORKSPACE_SCALE_PROPERTY);
     }
 

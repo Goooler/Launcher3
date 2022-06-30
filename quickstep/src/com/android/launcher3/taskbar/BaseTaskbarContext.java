@@ -19,24 +19,21 @@ import android.content.Context;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.util.Themes;
-import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.AppLauncher;
 
 import java.util.ArrayList;
 import java.util.List;
 
 // TODO(b/218912746): Share more behavior to avoid all apps context depending directly on taskbar.
 /** Base for common behavior between taskbar window contexts. */
-public abstract class BaseTaskbarContext extends ContextThemeWrapper implements ActivityContext,
+public abstract class BaseTaskbarContext extends ContextThemeWrapper implements AppLauncher,
         DeviceProfileListenable {
 
     protected final LayoutInflater mLayoutInflater;
     private final List<OnDeviceProfileChangeListener> mDPChangeListeners = new ArrayList<>();
-
-    protected DeviceProfile mDeviceProfile;
 
     public BaseTaskbarContext(Context windowContext) {
         super(windowContext, Themes.getActivityThemeRes(windowContext));
@@ -49,20 +46,15 @@ public abstract class BaseTaskbarContext extends ContextThemeWrapper implements 
     }
 
     @Override
-    public final DeviceProfile getDeviceProfile() {
-        return mDeviceProfile;
-    }
-
-    @Override
     public final List<OnDeviceProfileChangeListener> getOnDeviceProfileChangeListeners() {
         return mDPChangeListeners;
     }
 
-    /** Updates the {@link DeviceProfile} instance to the latest representation of the screen. */
-    public abstract void updateDeviceProfile(DeviceProfile dp);
-
     /** Callback invoked when a drag is initiated within this context. */
     public abstract void onDragStart();
+
+    /** Callback invoked when a drag is finished within this context. */
+    public abstract void onDragEnd();
 
     /** Callback invoked when a popup is shown or closed within this context. */
     public abstract void onPopupVisibilityChanged(boolean isVisible);

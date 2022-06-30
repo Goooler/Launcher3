@@ -19,14 +19,22 @@ import static android.view.KeyEvent.ACTION_UP;
 import static android.view.KeyEvent.KEYCODE_BACK;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
+import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_REGION;
+
 import android.content.Context;
+import android.graphics.Insets;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowInsets;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.search.DefaultSearchAdapterProvider;
+import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
@@ -34,9 +42,14 @@ import com.android.launcher3.taskbar.BaseTaskbarContext;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarDragController;
 import com.android.launcher3.taskbar.TaskbarStashController;
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.systemui.shared.system.ViewTreeObserverWrapper;
+import com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo;
+import com.android.systemui.shared.system.ViewTreeObserverWrapper.OnComputeInsetsListener;
 
 /**
  * Window context for the taskbar all apps overlay.
@@ -48,10 +61,15 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
     private final TaskbarActivityContext mTaskbarContext;
     private final OnboardingPrefs<TaskbarAllAppsContext> mOnboardingPrefs;
 
+    private final TaskbarAllAppsController mWindowController;
     private final TaskbarAllAppsViewController mAllAppsViewController;
     private final TaskbarDragController mDragController;
     private final TaskbarAllAppsDragLayer mDragLayer;
     private final TaskbarAllAppsContainerView mAppsView;
+
+    // We automatically stash taskbar when all apps is opened in gesture navigation mode.
+    private final boolean mWillTaskbarBeVisuallyStashed;
+    private final int mStashedTaskbarHeight;
 
     TaskbarAllAppsContext(
             TaskbarActivityContext taskbarContext,
@@ -59,7 +77,7 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
             TaskbarStashController taskbarStashController) {
         super(taskbarContext.createWindowContext(TYPE_APPLICATION_OVERLAY, null));
         mTaskbarContext = taskbarContext;
-        mDeviceProfile = taskbarContext.getDeviceProfile();
+        mWindowController = windowController;
         mDragController = new TaskbarDragController(this);
         mOnboardingPrefs = new OnboardingPrefs<>(this, Utilities.getPrefs(this));
 
@@ -72,10 +90,18 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
                 windowController,
                 taskbarStashController);
         mAppsView = slideInView.getAppsView();
+
+        mWillTaskbarBeVisuallyStashed = taskbarStashController.supportsVisualStashing();
+        mStashedTaskbarHeight = taskbarStashController.getStashedHeight();
     }
 
     TaskbarAllAppsViewController getAllAppsViewController() {
         return mAllAppsViewController;
+    }
+
+    @Override
+    public DeviceProfile getDeviceProfile() {
+        return mWindowController.getDeviceProfile();
     }
 
     @Override
@@ -119,19 +145,25 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
     }
 
     @Override
-    public void updateDeviceProfile(DeviceProfile dp) {
-        mDeviceProfile = dp;
-        dispatchDeviceProfileChanged();
-    }
+    public void onDragStart() {}
 
     @Override
-    public void onDragStart() {}
+    public void onDragEnd() {
+        mWindowController.maybeCloseWindow();
+    }
 
     @Override
     public void onPopupVisibilityChanged(boolean isVisible) {}
 
+    @Override
+    public SearchAdapterProvider<?> createSearchAdapterProvider(
+            ActivityAllAppsContainerView<?> appsView) {
+        return new DefaultSearchAdapterProvider(this);
+    }
+
     /** Root drag layer for this context. */
-    private static class TaskbarAllAppsDragLayer extends BaseDragLayer<TaskbarAllAppsContext> {
+    private static class TaskbarAllAppsDragLayer extends
+            BaseDragLayer<TaskbarAllAppsContext> implements OnComputeInsetsListener {
 
         private TaskbarAllAppsDragLayer(Context context) {
             super(context, null, 1);
@@ -142,12 +174,25 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
         @Override
         protected void onAttachedToWindow() {
             super.onAttachedToWindow();
-            mActivity.mAllAppsViewController.show();
+            ViewTreeObserverWrapper.addOnComputeInsetsListener(
+                    getViewTreeObserver(), this);
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            ViewTreeObserverWrapper.removeOnComputeInsetsListener(this);
         }
 
         @Override
         public void recreateControllers() {
             mControllers = new TouchController[]{mActivity.mDragController};
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(MotionEvent ev) {
+            TestLogging.recordMotionEvent(TestProtocol.SEQUENCE_MAIN, "Touch event", ev);
+            return super.dispatchTouchEvent(ev);
         }
 
         @Override
@@ -159,6 +204,46 @@ class TaskbarAllAppsContext extends BaseTaskbarContext {
                 }
             }
             return super.dispatchKeyEvent(event);
+        }
+
+        @Override
+        public void onComputeInsets(InsetsInfo inoutInfo) {
+            if (mActivity.mDragController.isSystemDragInProgress()) {
+                inoutInfo.touchableRegion.setEmpty();
+                inoutInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
+            }
+        }
+
+        @Override
+        public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+            return updateInsetsDueToStashing(insets);
+        }
+
+        /**
+         * Taskbar automatically stashes when opening all apps, but we don't report the insets as
+         * changing to avoid moving the underlying app. But internally, the apps view should still
+         * layout according to the stashed insets rather than the unstashed insets. So this method
+         * does two things:
+         * 1) Sets navigationBars bottom inset to stashedHeight.
+         * 2) Sets tappableInsets bottom inset to 0.
+         */
+        private WindowInsets updateInsetsDueToStashing(WindowInsets oldInsets) {
+            if (!mActivity.mWillTaskbarBeVisuallyStashed) {
+                return oldInsets;
+            }
+            WindowInsets.Builder updatedInsetsBuilder = new WindowInsets.Builder(oldInsets);
+
+            Insets oldNavInsets = oldInsets.getInsets(WindowInsets.Type.navigationBars());
+            Insets newNavInsets = Insets.of(oldNavInsets.left, oldNavInsets.top, oldNavInsets.right,
+                    mActivity.mStashedTaskbarHeight);
+            updatedInsetsBuilder.setInsets(WindowInsets.Type.navigationBars(), newNavInsets);
+
+            Insets oldTappableInsets = oldInsets.getInsets(WindowInsets.Type.tappableElement());
+            Insets newTappableInsets = Insets.of(oldTappableInsets.left, oldTappableInsets.top,
+                    oldTappableInsets.right, 0);
+            updatedInsetsBuilder.setInsets(WindowInsets.Type.tappableElement(), newTappableInsets);
+
+            return updatedInsetsBuilder.build();
         }
     }
 }

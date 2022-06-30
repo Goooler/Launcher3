@@ -32,17 +32,16 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
 import com.android.launcher3.allapps.AllAppsStore;
-import com.android.launcher3.allapps.AlphabeticalAppsList;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.search.SearchCallback;
+import com.android.launcher3.views.ActivityContext;
 
 import java.util.ArrayList;
 
@@ -53,11 +52,10 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         implements SearchUiManager, SearchCallback<AdapterItem>,
         AllAppsStore.OnUpdateListener, Insettable {
 
-    private final BaseDraggingActivity mLauncher;
+    private final ActivityContext mLauncher;
     private final AllAppsSearchBarController mSearchBarController;
     private final SpannableStringBuilder mSearchQueryBuilder;
 
-    private AlphabeticalAppsList<?> mApps;
     private ActivityAllAppsContainerView<?> mAppsView;
 
     // The amount of pixels to shift down and overlap with the rest of the content.
@@ -74,7 +72,7 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     public AppsSearchContainerLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
-        mLauncher = BaseDraggingActivity.fromContext(context);
+        mLauncher = ActivityContext.lookupContext(context);
         mSearchBarController = new AllAppsSearchBarController();
 
         mSearchQueryBuilder = new SpannableStringBuilder();
@@ -131,10 +129,9 @@ public class AppsSearchContainerLayout extends ExtendedEditText
 
     @Override
     public void initializeSearch(ActivityAllAppsContainerView<?> appsView) {
-        mApps = appsView.getApps();
         mAppsView = appsView;
         mSearchBarController.initialize(
-                new DefaultAppSearchAlgorithm(mLauncher),
+                new DefaultAppSearchAlgorithm(getContext()),
                 this, mLauncher, this);
     }
 
@@ -170,35 +167,20 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     @Override
     public void onSearchResult(String query, ArrayList<AdapterItem> items) {
         if (items != null) {
-            mApps.setSearchResults(items);
-            notifyResultChanged();
+            mAppsView.setSearchResults(items);
             mAppsView.setLastSearchQuery(query);
         }
     }
 
     @Override
-    public void onAppendSearchResult(String query, ArrayList<AdapterItem> items) {
-        if (items != null) {
-            mApps.appendSearchResults(items);
-            notifyResultChanged();
-        }
-    }
-
-    @Override
     public void clearSearchResult() {
-        if (mApps.setSearchResults(null)) {
-            notifyResultChanged();
-        }
+        mAppsView.setSearchResults(null);
 
         // Clear the search query
         mSearchQueryBuilder.clear();
         mSearchQueryBuilder.clearSpans();
         Selection.setSelection(mSearchQueryBuilder, 0);
         mAppsView.onClearSearchResult();
-    }
-
-    private void notifyResultChanged() {
-        mAppsView.onSearchResultsChanged();
     }
 
     @Override

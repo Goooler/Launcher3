@@ -65,6 +65,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.PreviewBackground;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.CellAndSpan;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.ParcelableSparseArray;
@@ -93,7 +94,7 @@ public class CellLayout extends ViewGroup {
     private int mFixedCellWidth;
     private int mFixedCellHeight;
     @ViewDebug.ExportedProperty(category = "launcher")
-    private final Point mBorderSpace;
+    private Point mBorderSpace;
 
     @ViewDebug.ExportedProperty(category = "launcher")
     private int mCountX;
@@ -148,7 +149,6 @@ public class CellLayout extends ViewGroup {
     private boolean mVisualizeDropLocation = true;
     private RectF mVisualizeGridRect = new RectF();
     private Paint mVisualizeGridPaint = new Paint();
-    private int mGridVisualizationPadding;
     private int mGridVisualizationRoundingRadius;
     private float mGridAlpha = 0f;
     private int mGridColor = 0;
@@ -238,22 +238,7 @@ public class CellLayout extends ViewGroup {
         mActivity = ActivityContext.lookupContext(context);
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
 
-        switch (mContainerType) {
-            case FOLDER:
-                mBorderSpace = new Point(deviceProfile.folderCellLayoutBorderSpacePx);
-                break;
-            case HOTSEAT:
-                mBorderSpace = new Point(deviceProfile.hotseatBorderSpace,
-                        deviceProfile.hotseatBorderSpace);
-                break;
-            case WORKSPACE:
-            default:
-                mBorderSpace = new Point(deviceProfile.cellLayoutBorderSpacePx);
-                break;
-        }
-
-        mCellWidth = mCellHeight = -1;
-        mFixedCellWidth = mFixedCellHeight = -1;
+        resetCellSizeInternal(deviceProfile);
 
         mCountX = deviceProfile.inv.numColumns;
         mCountY = deviceProfile.inv.numRows;
@@ -275,8 +260,6 @@ public class CellLayout extends ViewGroup {
         mBackground.setAlpha(0);
 
         mGridColor = Themes.getAttrColor(getContext(), R.attr.workspaceAccentColor);
-        mGridVisualizationPadding =
-                res.getDimensionPixelSize(R.dimen.grid_visualization_cell_spacing);
         mGridVisualizationRoundingRadius =
                 res.getDimensionPixelSize(R.dimen.grid_visualization_rounding_radius);
         mReorderPreviewAnimationMagnitude = (REORDER_PREVIEW_MAGNITUDE * deviceProfile.iconSizePx);
@@ -302,7 +285,7 @@ public class CellLayout extends ViewGroup {
 
         for (int i = 0; i < mDragOutlineAnims.length; i++) {
             final InterruptibleInOutAnimator anim =
-                new InterruptibleInOutAnimator(duration, fromAlphaValue, toAlphaValue);
+                    new InterruptibleInOutAnimator(duration, fromAlphaValue, toAlphaValue);
             anim.getAnimator().setInterpolator(mEaseOutInterpolator);
             final int thisIndex = i;
             anim.getAnimator().addUpdateListener(new AnimatorUpdateListener() {
@@ -376,11 +359,44 @@ public class CellLayout extends ViewGroup {
         return mShortcutsAndWidgets.getLayerType() == LAYER_TYPE_HARDWARE;
     }
 
+    /**
+     * Change sizes of cells
+     *
+     * @param width  the new width of the cells
+     * @param height the new height of the cells
+     */
     public void setCellDimensions(int width, int height) {
         mFixedCellWidth = mCellWidth = width;
         mFixedCellHeight = mCellHeight = height;
         mShortcutsAndWidgets.setCellDimensions(mCellWidth, mCellHeight, mCountX, mCountY,
                 mBorderSpace);
+    }
+
+    private void resetCellSizeInternal(DeviceProfile deviceProfile) {
+        switch (mContainerType) {
+            case FOLDER:
+                mBorderSpace = new Point(deviceProfile.folderCellLayoutBorderSpacePx);
+                break;
+            case HOTSEAT:
+                mBorderSpace = new Point(deviceProfile.hotseatBorderSpace,
+                        deviceProfile.hotseatBorderSpace);
+                break;
+            case WORKSPACE:
+            default:
+                mBorderSpace = new Point(deviceProfile.cellLayoutBorderSpacePx);
+                break;
+        }
+
+        mCellWidth = mCellHeight = -1;
+        mFixedCellWidth = mFixedCellHeight = -1;
+    }
+
+    /**
+     * Reset the cell sizes and border space
+     */
+    public void resetCellSize(DeviceProfile deviceProfile) {
+        resetCellSizeInternal(deviceProfile);
+        requestLayout();
     }
 
     public void setGridSize(int x, int y) {
@@ -573,8 +589,8 @@ public class CellLayout extends ViewGroup {
 
     protected void visualizeGrid(Canvas canvas) {
         DeviceProfile dp = mActivity.getDeviceProfile();
-        int paddingX = (int) Math.min((mCellWidth - dp.iconSizePx) / 2, mGridVisualizationPadding);
-        int paddingY = (int) Math.min((mCellHeight - dp.iconSizePx) / 2, mGridVisualizationPadding);
+        int paddingX = Math.min((mCellWidth - dp.iconSizePx) / 2, dp.gridVisualizationPaddingX);
+        int paddingY = Math.min((mCellHeight - dp.iconSizePx) / 2, dp.gridVisualizationPaddingY);
         mVisualizeGridRect.set(paddingX, paddingY,
                 mCellWidth - paddingX,
                 mCellHeight - paddingY);
@@ -1182,7 +1198,7 @@ public class CellLayout extends ViewGroup {
             return getContext().getString(R.string.move_to_hotseat_position,
                     Math.max(cellX, cellY) + 1);
         } else {
-            Workspace workspace = getWorkspace();
+            Workspace<?> workspace = getWorkspace();
             int row = cellY + 1;
             int col = workspace.mIsRtl ? mCountX - cellX : cellX + 1;
             int panelCount = workspace.getPanelCount();
@@ -1196,7 +1212,7 @@ public class CellLayout extends ViewGroup {
         }
     }
 
-    private Workspace getWorkspace() {
+    private Workspace<?> getWorkspace() {
         return Launcher.cast(mActivity).getWorkspace();
     }
 
@@ -2419,7 +2435,7 @@ public class CellLayout extends ViewGroup {
 
         // First we determine if things have moved enough to cause a different layout
         ItemConfiguration swapSolution = findReorderSolution(pixelXY[0], pixelXY[1], spanX, spanY,
-                 spanX,  spanY, direction, dragView,  true,  new ItemConfiguration());
+                spanX,  spanY, direction, dragView,  true,  new ItemConfiguration());
 
         setUseTempCoords(true);
         if (swapSolution != null && swapSolution.isSolution) {
@@ -2456,7 +2472,7 @@ public class CellLayout extends ViewGroup {
         // direction vector, since we want the solution to match the preview, and it's possible
         // that the exact position of the item has changed to result in a new reordering outcome.
         if ((mode == MODE_ON_DROP || mode == MODE_ON_DROP_EXTERNAL || mode == MODE_ACCEPT_DROP)
-               && mPreviousReorderDirection[0] != INVALID_DIRECTION) {
+                && mPreviousReorderDirection[0] != INVALID_DIRECTION) {
             mDirectionVector[0] = mPreviousReorderDirection[0];
             mDirectionVector[1] = mPreviousReorderDirection[1];
             // We reset this vector after drop
@@ -2472,7 +2488,7 @@ public class CellLayout extends ViewGroup {
 
         // Find a solution involving pushing / displacing any items in the way
         ItemConfiguration swapSolution = findReorderSolution(pixelX, pixelY, minSpanX, minSpanY,
-                 spanX,  spanY, mDirectionVector, dragView,  true,  new ItemConfiguration());
+                spanX,  spanY, mDirectionVector, dragView,  true,  new ItemConfiguration());
 
         // We attempt the approach which doesn't shuffle views at all
         ItemConfiguration noShuffleSolution = findConfigurationNoShuffle(pixelX, pixelY, minSpanX,
@@ -2712,12 +2728,24 @@ public class CellLayout extends ViewGroup {
     }
 
     public void markCellsAsOccupiedForView(View view) {
+        if (view instanceof LauncherAppWidgetHostView
+                && view.getTag() instanceof LauncherAppWidgetInfo) {
+            LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) view.getTag();
+            mOccupied.markCells(info.cellX, info.cellY, info.spanX, info.spanY, true);
+            return;
+        }
         if (view == null || view.getParent() != mShortcutsAndWidgets) return;
         LayoutParams lp = (LayoutParams) view.getLayoutParams();
         mOccupied.markCells(lp.cellX, lp.cellY, lp.cellHSpan, lp.cellVSpan, true);
     }
 
     public void markCellsAsUnoccupiedForView(View view) {
+        if (view instanceof LauncherAppWidgetHostView
+                && view.getTag() instanceof LauncherAppWidgetInfo) {
+            LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) view.getTag();
+            mOccupied.markCells(info.cellX, info.cellY, info.spanX, info.spanY, false);
+            return;
+        }
         if (view == null || view.getParent() != mShortcutsAndWidgets) return;
         LayoutParams lp = (LayoutParams) view.getLayoutParams();
         mOccupied.markCells(lp.cellX, lp.cellY, lp.cellHSpan, lp.cellVSpan, false);

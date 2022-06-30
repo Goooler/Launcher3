@@ -33,6 +33,7 @@ import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Point;
 import android.os.Debug;
 import android.os.Process;
 import android.os.RemoteException;
@@ -54,6 +55,8 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.tapl.HomeAllApps;
+import com.android.launcher3.tapl.HomeAppIcon;
 import com.android.launcher3.tapl.LauncherInstrumentation;
 import com.android.launcher3.tapl.LauncherInstrumentation.ContainerType;
 import com.android.launcher3.tapl.TestHelpers;
@@ -65,6 +68,7 @@ import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.WidgetUtils;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.launcher3.util.rule.LauncherActivityRule;
+import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.util.rule.TestStabilityRule;
@@ -224,7 +228,8 @@ public abstract class AbstractLauncherUiTest {
 
     @Rule
     public TestRule mOrderSensitiveRules = RuleChain
-            .outerRule(new TestStabilityRule())
+            .outerRule(new SamplerRule())
+            .around(new TestStabilityRule())
             .around(mActivityMonitor)
             .around(getRulesInsideActivityMonitor());
 
@@ -564,6 +569,7 @@ public abstract class AbstractLauncherUiTest {
                             ordinal == TestProtocol.OVERVIEW_STATE_ORDINAL);
                     break;
                 }
+                case TASKBAR_ALL_APPS:
                 case LAUNCHED_APP: {
                     assertTrue("Launcher is resumed in state: " + expectedContainerType,
                             !isResumed);
@@ -577,9 +583,10 @@ public abstract class AbstractLauncherUiTest {
             }
         } else {
             assertTrue(
-                    "Container type is not LAUNCHED_APP or FALLBACK_OVERVIEW: "
-                            + expectedContainerType,
+                    "Container type is not LAUNCHED_APP, TASKBAR_ALL_APPS "
+                            + "or FALLBACK_OVERVIEW: " + expectedContainerType,
                     expectedContainerType == ContainerType.LAUNCHED_APP
+                            || expectedContainerType == ContainerType.TASKBAR_ALL_APPS
                             || expectedContainerType == ContainerType.FALLBACK_OVERVIEW);
         }
     }
@@ -600,4 +607,30 @@ public abstract class AbstractLauncherUiTest {
 
     protected void onLauncherActivityClose(Launcher launcher) {
     }
+
+    protected HomeAppIcon createShortcutInCenterIfNotExist(String name) {
+        Point dimension = mLauncher.getWorkspace().getIconGridDimensions();
+        return createShortcutIfNotExist(name, dimension.x / 2, dimension.y / 2);
+    }
+
+    protected HomeAppIcon createShortcutIfNotExist(String name, Point cellPosition) {
+        return createShortcutIfNotExist(name, cellPosition.x, cellPosition.y);
+    }
+
+    protected HomeAppIcon createShortcutIfNotExist(String name, int cellX, int cellY) {
+        HomeAppIcon homeAppIcon = mLauncher.getWorkspace().tryGetWorkspaceAppIcon(name);
+        if (homeAppIcon == null) {
+            HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
+            allApps.freeze();
+            try {
+                allApps.getAppIcon(name).dragToWorkspace(cellX, cellY);
+            } finally {
+                allApps.unfreeze();
+            }
+            homeAppIcon = mLauncher.getWorkspace().getWorkspaceAppIcon(name);
+        }
+        return homeAppIcon;
+    }
+
+
 }

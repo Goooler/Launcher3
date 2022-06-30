@@ -1,3 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2022 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
 <resources>
     <!-- Miscellaneous -->
     <bool name="config_largeHeap">false</bool>
@@ -22,11 +37,11 @@
     <item type="id" name="drag_event_parity" />
 
     <!-- AllApps & Launcher transitions -->
-    <!-- Out of 100, the percent to shrink the workspace during spring loaded mode. -->
-    <integer name="config_workspaceSpringLoadShrinkPercentage">85</integer>
-
     <!-- The duration of the animation from search hint to text entry -->
     <integer name="config_searchHintAnimationDuration">50</integer>
+
+    <!-- The duration of the PagedView page snap animation -->
+    <integer name="config_pageSnapAnimationDuration">750</integer>
 
     <!-- View tag key used to store SpringAnimation data. -->
     <item type="id" name="spring_animation_tag" />
@@ -69,6 +84,7 @@
     <string name="test_information_handler_class" translatable="false"></string>
     <string name="launcher_activity_logic_class" translatable="false"></string>
     <string name="model_delegate_class" translatable="false"></string>
+    <string name="window_manager_proxy_class" translatable="false"></string>
 
     <!-- View ID to use for QSB widget -->
     <item type="id" name="qsb_widget" />
@@ -90,6 +106,7 @@
     <string name="custom_activity_picker" translatable="false">
         com.android.customization.picker.CustomizationPickerActivity</string>
     <string name="local_colors_extraction_class" translatable="false"></string>
+    <string name="search_session_manager_class" translatable="false"></string>
 
     <!-- Accessibility actions -->
     <item type="id" name="action_remove" />
@@ -165,4 +182,8 @@
     <!-- Name of the class used to generate colors from the wallpaper colors. Must be implementing the LauncherAppWidgetHostView.ColorGenerator interface. -->
     <string name="color_generator_class" translatable="false"/>
 
+    <!-- Swipe back to home related -->
+    <dimen name="swipe_back_window_scale_x_margin">10dp</dimen>
+    <dimen name="swipe_back_window_max_delta_y">160dp</dimen>
+    <dimen name="swipe_back_window_corner_radius">40dp</dimen>
 </resources>

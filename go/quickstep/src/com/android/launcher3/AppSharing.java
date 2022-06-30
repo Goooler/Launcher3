@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_SHARE_TAP;
+
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -39,6 +41,7 @@ import com.android.launcher3.model.AppShareabilityManager.ShareabilityStatus;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.popup.SystemShortcut;
+import com.android.launcher3.views.ActivityContext;
 
 import java.io.File;
 
@@ -77,11 +80,12 @@ public final class AppSharing {
         return FileProvider.getUriForFile(context, authority, pathFile, displayName);
     }
 
-    private SystemShortcut<Launcher> getShortcut(Launcher launcher, ItemInfo info) {
+    private SystemShortcut<Launcher> getShortcut(Launcher launcher, ItemInfo info,
+            View originalView) {
         if (TextUtils.isEmpty(mSharingComponent)) {
             return null;
         }
-        return new Share(launcher, info);
+        return new Share(launcher, info, originalView);
     }
 
     /**
@@ -104,8 +108,9 @@ public final class AppSharing {
         private final PopupDataProvider mPopupDataProvider;
         private final boolean mSharingEnabledForUser;
 
-        public Share(Launcher target, ItemInfo itemInfo) {
-            super(R.drawable.ic_share, R.string.app_share_drop_target_label, target, itemInfo);
+        public Share(Launcher target, ItemInfo itemInfo, View originalView) {
+            super(R.drawable.ic_share, R.string.app_share_drop_target_label, target, itemInfo,
+                    originalView);
             mPopupDataProvider = target.getPopupDataProvider();
 
             mSharingEnabledForUser = bluetoothSharingEnabled(target);
@@ -120,6 +125,8 @@ public final class AppSharing {
 
         @Override
         public void onClick(View view) {
+            ActivityContext.lookupContext(view.getContext())
+                    .getStatsLogManager().logger().log(LAUNCHER_SYSTEM_SHORTCUT_APP_SHARE_TAP);
             if (!isEnabled()) {
                 showCannotShareToast(view.getContext());
                 return;
@@ -189,9 +196,14 @@ public final class AppSharing {
         }
 
         private void showCannotShareToast(Context context) {
+            ActivityContext activityContext = ActivityContext.lookupContext(context);
+            String blockedByMessage = activityContext.getStringCache() != null
+                    ? activityContext.getStringCache().disabledByAdminMessage
+                    : context.getString(R.string.blocked_by_policy);
+
             CharSequence text = (mSharingEnabledForUser)
                     ? context.getText(R.string.toast_p2p_app_not_shareable)
-                    : context.getText(R.string.blocked_by_policy);
+                    : blockedByMessage;
             int duration = Toast.LENGTH_SHORT;
             Toast.makeText(context, text, duration).show();
         }
@@ -200,6 +212,7 @@ public final class AppSharing {
     /**
      * Shortcut factory for generating the Share App button
      */
-    public static final SystemShortcut.Factory<Launcher> SHORTCUT_FACTORY = (launcher, itemInfo) ->
-            (new AppSharing(launcher)).getShortcut(launcher, itemInfo);
+    public static final SystemShortcut.Factory<Launcher> SHORTCUT_FACTORY =
+            (launcher, itemInfo, originalView) ->
+                    (new AppSharing(launcher)).getShortcut(launcher, itemInfo, originalView);
 }

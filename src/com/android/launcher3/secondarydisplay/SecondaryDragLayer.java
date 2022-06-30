@@ -113,26 +113,27 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         for (int i = 0; i < count; i++) {
             final View child = getChildAt(i);
             if (child == mAppsView) {
-                int padding = 2 * (grid.desiredWorkspaceHorizontalMarginPx
-                        + grid.cellLayoutPaddingLeftRightPx);
+                int horizontalPadding = (2 * grid.desiredWorkspaceHorizontalMarginPx)
+                        + grid.cellLayoutPaddingPx.left + grid.cellLayoutPaddingPx.right;
+                int verticalPadding =
+                        grid.cellLayoutPaddingPx.top + grid.cellLayoutPaddingPx.bottom;
 
-                int maxWidth = grid.allAppsCellWidthPx * grid.numShownAllAppsColumns + padding;
-                int appsWidth = Math.min(width, maxWidth);
+                int maxWidth =
+                        grid.allAppsCellWidthPx * grid.numShownAllAppsColumns + horizontalPadding;
+                int appsWidth = Math.min(width - getPaddingLeft() - getPaddingRight(), maxWidth);
 
-                int maxHeight = grid.allAppsCellHeightPx * grid.numShownAllAppsColumns + padding;
-                int appsHeight = Math.min(height, maxHeight);
+                int maxHeight =
+                        grid.allAppsCellHeightPx * grid.numShownAllAppsColumns + verticalPadding;
+                int appsHeight = Math.min(height - getPaddingTop() - getPaddingBottom(), maxHeight);
 
                 mAppsView.measure(
                         makeMeasureSpec(appsWidth, EXACTLY), makeMeasureSpec(appsHeight, EXACTLY));
-
             } else if (child == mAllAppsButton) {
                 int appsButtonSpec = makeMeasureSpec(grid.iconSizePx, EXACTLY);
                 mAllAppsButton.measure(appsButtonSpec, appsButtonSpec);
-
             } else if (child == mWorkspace) {
                 measureChildWithMargins(mWorkspace, widthMeasureSpec, 0, heightMeasureSpec,
                         grid.iconSizePx + grid.edgeMarginPx);
-
             } else {
                 measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
             }
@@ -189,8 +190,8 @@ public class SecondaryDragLayer extends BaseDragLayer<SecondaryDisplayLauncher> 
         container.populateAndShow((BubbleTextView) v,
                 popupDataProvider.getShortcutCountForItem(item),
                 Collections.emptyList(),
-                Arrays.asList(mPinnedAppsAdapter.getSystemShortcut(item),
-                        APP_INFO.getShortcut(mActivity, item)));
+                Arrays.asList(mPinnedAppsAdapter.getSystemShortcut(item, v),
+                        APP_INFO.getShortcut(mActivity, item, v)));
         v.getParent().requestDisallowInterceptTouchEvent(true);
         return true;
     }

@@ -98,6 +98,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
     final ValueAnimator mAnim;
     // Whether mAnim has started. Unlike mAnim.isStarted(), this is true even after mAnim ends.
     private boolean mAnimStarted;
+    private Runnable mOnAnimEndCallback = null;
 
     private int mLastTouchX;
     private int mLastTouchY;
@@ -180,6 +181,14 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             public void onAnimationStart(Animator animation) {
                 mAnimStarted = true;
             }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                if (mOnAnimEndCallback != null) {
+                    mOnAnimEndCallback.run();
+                }
+            }
         });
 
         setDragRegion(new Rect(0, 0, width, height));
@@ -197,6 +206,10 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         mBlurSizeOutline = getResources().getDimensionPixelSize(R.dimen.blur_size_medium_outline);
         setElevation(getResources().getDimension(R.dimen.drag_elevation));
         setWillNotDraw(false);
+    }
+
+    public void setOnAnimationEndCallback(Runnable callback) {
+        mOnAnimEndCallback = callback;
     }
 
     /**
@@ -564,5 +577,20 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         ImageView iv = new ImageView(context);
         iv.setImageDrawable(drawable);
         return iv;
+    }
+
+    /**
+     * Removes any stray DragView from the DragLayer.
+     */
+    public static void removeAllViews(ActivityContext activity) {
+        BaseDragLayer dragLayer = activity.getDragLayer();
+        // Iterate in reverse order. DragView is added later to the dragLayer,
+        // and will be one of the last views.
+        for (int i = dragLayer.getChildCount() - 1; i >= 0; i--) {
+            View child = dragLayer.getChildAt(i);
+            if (child instanceof DragView) {
+                dragLayer.removeView(child);
+            }
+        }
     }
 }

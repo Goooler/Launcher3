@@ -16,6 +16,7 @@
 
 package com.android.launcher3.icons;
 
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.widget.WidgetSections.NO_CATEGORY;
@@ -41,8 +42,10 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.SparseArray;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.util.Pair;
 
 import com.android.launcher3.InvariantDeviceProfile;
@@ -93,6 +96,8 @@ public class IconCache extends BaseIconCache {
     private final InstantAppResolver mInstantAppResolver;
     private final IconProvider mIconProvider;
 
+    private final SparseArray<BitmapInfo> mWidgetCategoryBitmapInfos;
+
     private int mPendingIconRequestCount = 0;
 
     public IconCache(Context context, InvariantDeviceProfile idp) {
@@ -110,6 +115,7 @@ public class IconCache extends BaseIconCache {
         mUserManager = UserCache.INSTANCE.get(mContext);
         mInstantAppResolver = InstantAppResolver.newInstance(mContext);
         mIconProvider = iconProvider;
+        mWidgetCategoryBitmapInfos = new SparseArray<>();
     }
 
     @Override
@@ -340,14 +346,15 @@ public class IconCache extends BaseIconCache {
         Map<Pair<UserHandle, Boolean>, List<IconRequestInfo<T>>> iconLoadSubsectionsMap =
                 iconRequestInfos.stream()
                         .filter(iconRequest -> {
-                            if (iconRequest.itemInfo.getTargetComponent() != null) {
-                                return true;
+                            if (iconRequest.itemInfo.getTargetComponent() == null) {
+                                Log.i(TAG,
+                                        "Skipping Item info with null component name: "
+                                                + iconRequest.itemInfo);
+                                iconRequest.itemInfo.bitmap = getDefaultIcon(
+                                        iconRequest.itemInfo.user);
+                                return false;
                             }
-                            Log.i(TAG,
-                                    "Skipping Item info with null component name: "
-                                            + iconRequest.itemInfo);
-                            iconRequest.itemInfo.bitmap = getDefaultIcon(iconRequest.itemInfo.user);
-                            return false;
+                            return true;
                         })
                         .collect(groupingBy(iconRequest ->
                                 Pair.create(iconRequest.itemInfo.user, iconRequest.useLowResIcon)));
@@ -356,6 +363,17 @@ public class IconCache extends BaseIconCache {
         iconLoadSubsectionsMap.forEach((sectionKey, filteredList) -> {
             Map<ComponentName, List<IconRequestInfo<T>>> duplicateIconRequestsMap =
                     filteredList.stream()
+                            .filter(iconRequest -> {
+                                // Filter out icons that should not share the same bitmap and title
+                                if (iconRequest.itemInfo.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
+                                    Log.e(TAG,
+                                            "Skipping Item info for deep shortcut: "
+                                                    + iconRequest.itemInfo,
+                                            new IllegalStateException());
+                                    return false;
+                                }
+                                return true;
+                            })
                             .collect(groupingBy(iconRequest ->
                                     iconRequest.itemInfo.getTargetComponent()));
 
@@ -440,7 +458,7 @@ public class IconCache extends BaseIconCache {
                             cn,
                             sectionKey.first);
                 }
-                if (loadFallbackTitle && TextUtils.isEmpty(entry.title)) {
+                if (loadFallbackTitle && TextUtils.isEmpty(entry.title) && lai != null) {
                     loadFallbackTitle(
                             lai,
                             entry,
@@ -464,13 +482,39 @@ public class IconCache extends BaseIconCache {
         CacheEntry entry = getEntryForPackageLocked(
                 infoInOut.packageName, infoInOut.user, useLowResIcon);
         applyCacheEntry(entry, infoInOut);
-        if (infoInOut.widgetCategory != NO_CATEGORY) {
-            WidgetSection widgetSection = WidgetSections.getWidgetSections(mContext)
-                    .get(infoInOut.widgetCategory);
-            infoInOut.title = mContext.getString(widgetSection.mSectionTitle);
-            infoInOut.contentDescription = mPackageManager.getUserBadgedLabel(
-                    infoInOut.title, infoInOut.user);
+        if (infoInOut.widgetCategory == NO_CATEGORY) {
+            return;
         }
+
+        WidgetSection widgetSection = WidgetSections.getWidgetSections(mContext)
+                .get(infoInOut.widgetCategory);
+        infoInOut.title = mContext.getString(widgetSection.mSectionTitle);
+        infoInOut.contentDescription = mPackageManager.getUserBadgedLabel(
+                infoInOut.title, infoInOut.user);
+        final BitmapInfo cachedBitmap = mWidgetCategoryBitmapInfos.get(infoInOut.widgetCategory);
+        if (cachedBitmap != null) {
+            infoInOut.bitmap = getBadgedIcon(cachedBitmap, infoInOut.user);
+            return;
+        }
+
+        try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
+            final BitmapInfo tempBitmap = li.createBadgedIconBitmap(
+                    mContext.getDrawable(widgetSection.mSectionDrawable),
+                    new BaseIconFactory.IconOptions().setShrinkNonAdaptiveIcons(false));
+            mWidgetCategoryBitmapInfos.put(infoInOut.widgetCategory, tempBitmap);
+            infoInOut.bitmap = getBadgedIcon(tempBitmap, infoInOut.user);
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing bitmap for icons with widget category", e);
+        }
+
+    }
+
+    private synchronized BitmapInfo getBadgedIcon(@Nullable final BitmapInfo bitmap,
+            @NonNull final UserHandle user) {
+        if (bitmap == null) {
+            return getDefaultIcon(user);
+        }
+        return bitmap.withFlags(getUserFlagOpLocked(user));
     }
 
     protected void applyCacheEntry(CacheEntry entry, ItemInfoWithIcon info) {

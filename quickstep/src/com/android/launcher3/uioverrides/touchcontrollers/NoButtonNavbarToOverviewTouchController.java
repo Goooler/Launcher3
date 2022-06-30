@@ -86,7 +86,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
         mDidTouchStartInNavBar = (ev.getEdgeFlags() & EDGE_NAV_BAR) != 0;
-        return super.canInterceptTouch(ev);
+        return super.canInterceptTouch(ev) && !mLauncher.isInState(HINT_STATE);
     }
 
     @Override
@@ -180,7 +180,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
             // Normally we compute the duration based on the velocity and distance to the given
             // state, but since the hint state tracks the entire screen without a clear endpoint, we
             // need to manually set the duration to a reasonable value.
-            animator.setDuration(HINT_STATE.getTransitionDuration(mLauncher));
+            animator.setDuration(HINT_STATE.getTransitionDuration(mLauncher, true /* isToState */));
         }
     }
 

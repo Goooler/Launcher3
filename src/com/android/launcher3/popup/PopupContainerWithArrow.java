@@ -90,6 +90,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     private BubbleTextView mOriginalIcon;
     private int mNumNotifications;
     private NotificationContainer mNotificationContainer;
+    private int mContainerWidth;
 
     private ViewGroup mWidgetContainer;
 
@@ -104,6 +105,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         super(context, attrs, defStyleAttr);
         mStartDragThreshold = getResources().getDimensionPixelSize(
                 R.dimen.deep_shortcuts_start_drag_threshold);
+        mContainerWidth = getResources().getDimensionPixelSize(R.dimen.bg_popup_item_width);
     }
 
     public PopupContainerWithArrow(Context context, AttributeSet attrs) {
@@ -148,7 +150,6 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     public OnClickListener getItemClickListener() {
         return (view) -> {
             mActivityContext.getItemOnClickListener().onClick(view);
-            close(true);
         };
     }
 
@@ -186,7 +187,10 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
     /**
      * Returns true if we can show the container.
+     *
+     * @deprecated Left here since some dependent projects are using this method
      */
+    @Deprecated
     public static boolean canShow(View icon, ItemInfo item) {
         return icon instanceof BubbleTextView && ShortcutUtil.supportsShortcuts(item);
     }
@@ -203,7 +207,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
             return null;
         }
         ItemInfo item = (ItemInfo) icon.getTag();
-        if (!canShow(icon, item)) {
+        if (!ShortcutUtil.supportsShortcuts(item)) {
             return null;
         }
 
@@ -217,7 +221,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                 popupDataProvider.getShortcutCountForItem(item),
                 popupDataProvider.getNotificationKeysForItem(item),
                 launcher.getSupportedShortcuts()
-                        .map(s -> s.getShortcut(launcher, item))
+                        .map(s -> s.getShortcut(launcher, item, icon))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()));
         launcher.refreshAndBindWidgetsForPackageUser(PackageUserKey.fromItemInfo(item));
@@ -247,14 +251,15 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         mOriginalIcon = originalIcon;
 
         boolean hasDeepShortcuts = shortcutCount > 0;
-        int containerWidth = (int) getResources().getDimension(R.dimen.bg_popup_item_width);
+        mContainerWidth = getResources().getDimensionPixelSize(R.dimen.bg_popup_item_width);
 
         // if there are deep shortcuts, we might want to increase the width of shortcuts to fit
         // horizontally laid out system shortcuts.
         if (hasDeepShortcuts) {
-            containerWidth = (int) Math.max(containerWidth,
-                    systemShortcuts.size() * getResources().getDimension(
-                            R.dimen.system_shortcut_header_icon_touch_size));
+            mContainerWidth = Math.max(mContainerWidth,
+                    systemShortcuts.size() * getResources()
+                            .getDimensionPixelSize(R.dimen.system_shortcut_header_icon_touch_size)
+            );
         }
         // Add views
         if (mNumNotifications > 0) {
@@ -278,7 +283,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
             for (int i = shortcutCount; i > 0; i--) {
                 DeepShortcutView v = inflateAndAdd(R.layout.deep_shortcut, mDeepShortcutContainer);
-                v.getLayoutParams().width = containerWidth;
+                v.getLayoutParams().width = mContainerWidth;
                 mShortcuts.add(v);
             }
             updateHiddenShortcuts();
@@ -290,8 +295,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                             mWidgetContainer = inflateAndAdd(R.layout.widget_shortcut_container,
                                     this);
                         }
-                        initializeSystemShortcut(R.layout.system_shortcut, mWidgetContainer,
-                                shortcut);
+                        initializeWidgetShortcut(mWidgetContainer, shortcut);
                     }
                 }
                 mSystemShortcutContainer = inflateAndAdd(R.layout.system_shortcut_icons, this);
@@ -385,7 +389,12 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         }
     }
 
-    protected void initializeSystemShortcut(int resId, ViewGroup container, SystemShortcut info) {
+    protected void initializeWidgetShortcut(ViewGroup container, SystemShortcut info) {
+        View view = initializeSystemShortcut(R.layout.system_shortcut, container, info);
+        view.getLayoutParams().width = mContainerWidth;
+    }
+
+    protected View initializeSystemShortcut(int resId, ViewGroup container, SystemShortcut info) {
         View view = inflateAndAdd(
                 resId, container, getInsertIndexForSystemShortcut(container, info));
         if (view instanceof DeepShortcutView) {
@@ -399,6 +408,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         }
         view.setTag(info);
         view.setOnClickListener(info);
+        return view;
     }
 
     /**
@@ -508,7 +518,9 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     @Override
     protected void closeComplete() {
         super.closeComplete();
-        mActivityContext.getDragController().removeDragListener(this);
+        if (mActivityContext.getDragController() != null) {
+            mActivityContext.getDragController().removeDragListener(this);
+        }
         PopupContainerWithArrow openPopup = getOpen(mActivityContext);
         if (openPopup == null || openPopup.mOriginalIcon != mOriginalIcon) {
             mOriginalIcon.setTextVisibility(mOriginalIcon.shouldTextBeVisible());
@@ -529,7 +541,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     public static void dismissInvalidPopup(BaseDraggingActivity activity) {
         PopupContainerWithArrow popup = getOpen(activity);
         if (popup != null && (!popup.mOriginalIcon.isAttachedToWindow()
-                || !canShow(popup.mOriginalIcon, (ItemInfo) popup.mOriginalIcon.getTag()))) {
+                || !ShortcutUtil.supportsShortcuts((ItemInfo) popup.mOriginalIcon.getTag()))) {
             popup.animateClose();
         }
     }

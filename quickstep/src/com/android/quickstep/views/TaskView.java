@@ -20,7 +20,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
-import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -619,6 +618,107 @@ public class TaskView extends FrameLayout implements Reusable {
         if (confirmSecondSplitSelectApp()) {
             return;
         }
+        launchTasks();
+        mActivity.getStatsLogManager().logger().withItemInfo(getItemInfo())
+                .log(LAUNCHER_TASK_LAUNCH_TAP);
+    }
+
+    /**
+     * @return {@code true} if user is already in split select mode and this tap was to choose the
+     *         second app. {@code false} otherwise
+     */
+    private boolean confirmSecondSplitSelectApp() {
+        int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
+        TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
+        return getRecentsView().confirmSplitSelect(this, container.getTask(),
+                container.getIconView(), container.getThumbnailView());
+    }
+
+    /**
+     * Returns the task under the given position in the local coordinates of this task view.
+     */
+    protected int getChildTaskIndexAtPosition(PointF position) {
+        return 0;
+    }
+
+    /**
+     * Starts the task associated with this view and animates the startup.
+     * @return CompletionStage to indicate the animation completion or null if the launch failed.
+     */
+    @Nullable
+    public RunnableList launchTaskAnimated() {
+        if (mTask != null) {
+            TestLogging.recordEvent(
+                    TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
+            ActivityOptionsWrapper opts =  mActivity.getActivityLaunchOptions(this, null);
+            opts.options.setLaunchDisplayId(
+                    getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
+            if (ActivityManagerWrapper.getInstance()
+                    .startActivityFromRecents(mTask.key, opts.options)) {
+                RecentsView recentsView = getRecentsView();
+                if (ENABLE_QUICKSTEP_LIVE_TILE.get() && recentsView.getRunningTaskViewId() != -1) {
+                    recentsView.onTaskLaunchedInLiveTileMode();
+
+                    // Return a fresh callback in the live tile case, so that it's not accidentally
+                    // triggered by QuickstepTransitionManager.AppLaunchAnimationRunner.
+                    RunnableList callbackList = new RunnableList();
+                    recentsView.addSideTaskLaunchCallback(callbackList);
+                    return callbackList;
+                }
+                return opts.onEndCallback;
+            } else {
+                notifyTaskLaunchFailed(TAG);
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Starts the task associated with this view without any animation
+     */
+    public void launchTask(@NonNull Consumer<Boolean> callback) {
+        launchTask(callback, false /* freezeTaskList */);
+    }
+
+    /**
+     * Starts the task associated with this view without any animation
+     */
+    public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
+        if (mTask != null) {
+            TestLogging.recordEvent(
+                    TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
+
+            // Indicate success once the system has indicated that the transition has started
+            ActivityOptions opts = ActivityOptionsCompat.makeCustomAnimation(
+                    getContext(), 0, 0, () -> callback.accept(true), MAIN_EXECUTOR.getHandler());
+            opts.setLaunchDisplayId(
+                    getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
+            if (freezeTaskList) {
+                ActivityOptionsCompat.setFreezeRecentTasksList(opts);
+            }
+            Task.TaskKey key = mTask.key;
+            UI_HELPER_EXECUTOR.execute(() -> {
+                if (!ActivityManagerWrapper.getInstance().startActivityFromRecents(key, opts)) {
+                    // If the call to start activity failed, then post the result immediately,
+                    // otherwise, wait for the animation start callback from the activity options
+                    // above
+                    MAIN_EXECUTOR.post(() -> {
+                        notifyTaskLaunchFailed(TAG);
+                        callback.accept(false);
+                    });
+                }
+            });
+        } else {
+            callback.accept(false);
+        }
+    }
+
+    /**
+     * Launch of the current task (both live and inactive tasks) with an animation.
+     */
+    public void launchTasks() {
         RecentsView recentsView = getRecentsView();
         RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
         if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
@@ -628,10 +728,7 @@ public class TaskView extends FrameLayout implements Reusable {
 
             // Reset the minimized state since we force-toggled the minimized state when entering
             // overview, but never actually finished the recents animation
-            SystemUiProxy p = SystemUiProxy.INSTANCE.getNoCreate();
-            if (p != null) {
-                p.setSplitScreenMinimized(false);
-            }
+            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
 
             mIsClickableAsLiveTile = false;
             RemoteAnimationTargets targets;
@@ -688,102 +785,6 @@ public class TaskView extends FrameLayout implements Reusable {
             recentsView.onTaskLaunchedInLiveTileMode();
         } else {
             launchTaskAnimated();
-        }
-        mActivity.getStatsLogManager().logger().withItemInfo(getItemInfo())
-                .log(LAUNCHER_TASK_LAUNCH_TAP);
-    }
-
-    /**
-     * @return {@code true} if user is already in split select mode and this tap was to choose the
-     *         second app. {@code false} otherwise
-     */
-    private boolean confirmSecondSplitSelectApp() {
-        boolean isSelectingSecondSplitApp = getRecentsView().isSplitSelectionActive();
-        if (isSelectingSecondSplitApp) {
-            int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
-            TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
-            getRecentsView().confirmSplitSelect(this, container.getTask(), container.getIconView(),
-                    container.getThumbnailView());
-        }
-        return isSelectingSecondSplitApp;
-    }
-
-    /**
-     * Returns the task under the given position in the local coordinates of this task view.
-     */
-    protected int getChildTaskIndexAtPosition(PointF position) {
-        return 0;
-    }
-
-    /**
-     * Starts the task associated with this view and animates the startup.
-     * @return CompletionStage to indicate the animation completion or null if the launch failed.
-     */
-    @Nullable
-    public RunnableList launchTaskAnimated() {
-        if (mTask != null) {
-            TestLogging.recordEvent(
-                    TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
-            ActivityOptionsWrapper opts =  mActivity.getActivityLaunchOptions(this, null);
-            opts.options.setLaunchDisplayId(getRootViewDisplayId());
-            if (ActivityManagerWrapper.getInstance()
-                    .startActivityFromRecents(mTask.key, opts.options)) {
-                RecentsView recentsView = getRecentsView();
-                if (ENABLE_QUICKSTEP_LIVE_TILE.get() && recentsView.getRunningTaskViewId() != -1) {
-                    recentsView.onTaskLaunchedInLiveTileMode();
-
-                    // Return a fresh callback in the live tile case, so that it's not accidentally
-                    // triggered by QuickstepTransitionManager.AppLaunchAnimationRunner.
-                    RunnableList callbackList = new RunnableList();
-                    recentsView.addSideTaskLaunchCallback(callbackList);
-                    return callbackList;
-                }
-                return opts.onEndCallback;
-            } else {
-                notifyTaskLaunchFailed(TAG);
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Starts the task associated with this view without any animation
-     */
-    public void launchTask(@NonNull Consumer<Boolean> callback) {
-        launchTask(callback, false /* freezeTaskList */);
-    }
-
-    /**
-     * Starts the task associated with this view without any animation
-     */
-    public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
-        if (mTask != null) {
-            TestLogging.recordEvent(
-                    TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
-
-            // Indicate success once the system has indicated that the transition has started
-            ActivityOptions opts = ActivityOptionsCompat.makeCustomAnimation(
-                    getContext(), 0, 0, () -> callback.accept(true), MAIN_EXECUTOR.getHandler());
-            opts.setLaunchDisplayId(getRootViewDisplayId());
-            if (freezeTaskList) {
-                ActivityOptionsCompat.setFreezeRecentTasksList(opts);
-            }
-            Task.TaskKey key = mTask.key;
-            UI_HELPER_EXECUTOR.execute(() -> {
-                if (!ActivityManagerWrapper.getInstance().startActivityFromRecents(key, opts)) {
-                    // If the call to start activity failed, then post the result immediately,
-                    // otherwise, wait for the animation start callback from the activity options
-                    // above
-                    MAIN_EXECUTOR.post(() -> {
-                        notifyTaskLaunchFailed(TAG);
-                        callback.accept(false);
-                    });
-                }
-            });
-        } else {
-            callback.accept(false);
         }
     }
 
@@ -853,7 +854,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     private boolean showTaskMenu(IconView iconView) {
-        if (getRecentsView().mActivity.isInState(OVERVIEW_SPLIT_SELECT)) {
+        if (!getRecentsView().canLaunchFullscreenTask()) {
             // Don't show menu when selecting second split screen app
             return true;
         }
@@ -888,15 +889,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 if (confirmSecondSplitSelectApp()) {
                     return;
                 }
-                if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask()) {
-                    RecentsView recentsView = getRecentsView();
-                    recentsView.switchToScreenshot(
-                            () -> recentsView.finishRecentsAnimation(true /* toRecents */,
-                                    false /* shouldPip */,
-                                    () -> showTaskMenu(iconView)));
-                } else {
-                    showTaskMenu(iconView);
-                }
+                showTaskMenu(iconView);
             });
             iconView.setOnLongClickListener(v -> {
                 requestDisallowInterceptTouchEvent(true);
@@ -912,31 +905,31 @@ public class TaskView extends FrameLayout implements Reusable {
     public void setOrientationState(RecentsOrientedState orientationState) {
         PagedOrientationHandler orientationHandler = orientationState.getOrientationHandler();
         boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
-        LayoutParams snapshotParams = (LayoutParams) mSnapshotView.getLayoutParams();
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
-        snapshotParams.topMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
+
         boolean isGridTask = isGridTask();
+        LayoutParams iconParams = (LayoutParams) mIconView.getLayoutParams();
+
+        int thumbnailTopMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
         int taskIconHeight = deviceProfile.overviewTaskIconSizePx;
         int taskMargin = isGridTask ? deviceProfile.overviewTaskMarginGridPx
                 : deviceProfile.overviewTaskMarginPx;
-        int taskIconMargin = snapshotParams.topMargin - taskIconHeight - taskMargin;
-        LayoutParams iconParams = (LayoutParams) mIconView.getLayoutParams();
-        orientationHandler.setIconAndSnapshotParams(mIconView, taskIconMargin, taskIconHeight,
-                snapshotParams, isRtl);
-        updateDwbPlacement();
-        mSnapshotView.setLayoutParams(snapshotParams);
+        int taskIconMargin = thumbnailTopMargin - taskIconHeight - taskMargin;
+        orientationHandler.setTaskIconParams(iconParams, taskIconMargin, taskIconHeight,
+                thumbnailTopMargin, isRtl);
         iconParams.width = iconParams.height = taskIconHeight;
         mIconView.setLayoutParams(iconParams);
+
         mIconView.setRotation(orientationHandler.getDegreesRotated());
         int iconDrawableSize = isGridTask ? deviceProfile.overviewTaskIconDrawableSizeGridPx
                 : deviceProfile.overviewTaskIconDrawableSizePx;
         mIconView.setDrawableSize(iconDrawableSize, iconDrawableSize);
-        snapshotParams.topMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
-        mSnapshotView.setLayoutParams(snapshotParams);
-        mSnapshotView.getTaskOverlay().updateOrientationState(orientationState);
-    }
 
-    private void updateDwbPlacement() {
+        LayoutParams snapshotParams = (LayoutParams) mSnapshotView.getLayoutParams();
+        snapshotParams.topMargin = thumbnailTopMargin;
+        mSnapshotView.setLayoutParams(snapshotParams);
+
+        mSnapshotView.getTaskOverlay().updateOrientationState(orientationState);
         mDigitalWellBeingToast.initialize(mTask);
     }
 
@@ -1006,8 +999,11 @@ public class TaskView extends FrameLayout implements Reusable {
         // resetViewTransforms is called during Quickswitch scrolling.
         mDismissTranslationX = mTaskOffsetTranslationX =
                 mTaskResistanceTranslationX = mSplitSelectTranslationX = mGridEndTranslationX = 0f;
-        mDismissTranslationY = mTaskOffsetTranslationY = mTaskResistanceTranslationY =
-                mSplitSelectTranslationY = 0f;
+        mDismissTranslationY = mTaskOffsetTranslationY = mTaskResistanceTranslationY = 0f;
+        if (getRecentsView() == null || !getRecentsView().isSplitSelectionActive()) {
+            mSplitSelectTranslationY = 0f;
+        }
+
         setSnapshotScale(1f);
         applyTranslationX();
         applyTranslationY();
@@ -1033,7 +1029,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     public float getTaskCornerRadius() {
-        return TaskCornerRadius.get(mActivity);
+        return mCurrentFullscreenParams.mCornerRadius;
     }
 
     @Override

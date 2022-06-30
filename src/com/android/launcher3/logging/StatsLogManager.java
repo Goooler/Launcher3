@@ -527,7 +527,72 @@ public class StatsLogManager implements ResourceBasedOverride {
         LAUNCHER_TASKBAR_LONGPRESS_SHOW(897),
 
         @UiEvent(doc = "User clicks on the search icon on header to launch search in app.")
-        LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913);
+        LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913),
+
+        @UiEvent(doc = "User is shown the back gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_SHOWN(959),
+
+        @UiEvent(doc = "User is shown the home gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_SHOWN(960),
+
+        @UiEvent(doc = "User is shown the overview gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_SHOWN(961),
+
+        @UiEvent(doc = "User completed the back gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_BACK_STEP_COMPLETED(962),
+
+        @UiEvent(doc = "User completed the home gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_HOME_STEP_COMPLETED(963),
+
+        @UiEvent(doc = "User completed the overview gesture navigation tutorial step.")
+        LAUNCHER_GESTURE_TUTORIAL_OVERVIEW_STEP_COMPLETED(964),
+
+        @UiEvent(doc = "User skips the gesture navigation tutorial.")
+        LAUNCHER_GESTURE_TUTORIAL_SKIPPED(965),
+
+        @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
+                + "result page etc.")
+        LAUNCHER_ALLAPPS_SCROLLED(985),
+
+        @UiEvent(doc = "User tapped taskbar home button")
+        LAUNCHER_TASKBAR_HOME_BUTTON_TAP(1003),
+
+        @UiEvent(doc = "User tapped taskbar back button")
+        LAUNCHER_TASKBAR_BACK_BUTTON_TAP(1004),
+
+        @UiEvent(doc = "User tapped taskbar overview/recents button")
+        LAUNCHER_TASKBAR_OVERVIEW_BUTTON_TAP(1005),
+
+        @UiEvent(doc = "User tapped taskbar IME switcher button")
+        LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP(1006),
+
+        @UiEvent(doc = "User tapped taskbar a11y button")
+        LAUNCHER_TASKBAR_A11Y_BUTTON_TAP(1007),
+
+        @UiEvent(doc = "User tapped taskbar home button")
+        LAUNCHER_TASKBAR_HOME_BUTTON_LONGPRESS(1008),
+
+        @UiEvent(doc = "User tapped taskbar back button")
+        LAUNCHER_TASKBAR_BACK_BUTTON_LONGPRESS(1009),
+
+        @UiEvent(doc = "User tapped taskbar overview/recents button")
+        LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS(1010),
+
+        @UiEvent(doc = "User tapped taskbar a11y button")
+        LAUNCHER_TASKBAR_A11Y_BUTTON_LONGPRESS(1011),
+
+        @UiEvent(doc = "Show an 'Undo' snackbar when users dismiss a predicted hotseat item")
+        LAUNCHER_DISMISS_PREDICTION_UNDO(1035),
+
+        @UiEvent(doc = "User clicked on IME quicksearch button.")
+        LAUNCHER_ALLAPPS_QUICK_SEARCH_WITH_IME(1047),
+
+        @UiEvent(doc = "User tapped taskbar All Apps button.")
+        LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP(1057),
+
+        @UiEvent(doc = "User tapped on Share app system shortcut.")
+        LAUNCHER_SYSTEM_SHORTCUT_APP_SHARE_TAP(1075),
+        ;
 
         // ADD MORE
 
@@ -562,7 +627,7 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
-     * Helps to construct and write the log message.
+     * Helps to construct and log launcher event.
      */
     public interface StatsLogger {
 
@@ -662,6 +727,74 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
+     * Helps to construct and log latency event.
+     */
+    public interface StatsLatencyLogger {
+
+        enum LatencyType {
+            UNKNOWN(0),
+            COLD(1),
+            HOT(2),
+            TIMEOUT(3),
+            FAIL(4),
+            COLD_USERWAITING(5);
+
+            private final int mId;
+
+            LatencyType(int id) {
+                this.mId = id;
+            }
+
+            public int getId() {
+                return mId;
+            }
+
+        }
+
+        /**
+         * Sets {@link InstanceId} of log message.
+         */
+        default StatsLatencyLogger withInstanceId(InstanceId instanceId) {
+            return this;
+        }
+
+
+        /**
+         * Sets latency of the event.
+         */
+        default StatsLatencyLogger withLatency(long latencyInMillis) {
+            return this;
+        }
+
+        /**
+         * Sets {@link LatencyType} of log message.
+         */
+        default StatsLatencyLogger withType(LatencyType type) {
+            return this;
+        }
+
+        /**
+         * Sets query length of the event.
+         */
+        default StatsLatencyLogger withQueryLength(int queryLength) {
+            return this;
+        }
+
+        /**
+         * Sets packageId of log message.
+         */
+        default StatsLatencyLogger withPackageId(int packageId) {
+            return this;
+        }
+
+        /**
+         * Builds the final message and logs it as {@link EventEnum}.
+         */
+        default void log(EventEnum event) {
+        }
+    }
+
+    /**
      * Returns new logger object.
      */
     public StatsLogger logger() {
@@ -672,8 +805,24 @@ public class StatsLogManager implements ResourceBasedOverride {
         return logger;
     }
 
+    /**
+     * Returns new latency logger object.
+     */
+    public StatsLatencyLogger latencyLogger() {
+        StatsLatencyLogger logger = createLatencyLogger();
+        if (mInstanceId != null) {
+            logger.withInstanceId(mInstanceId);
+        }
+        return logger;
+    }
+
     protected StatsLogger createLogger() {
         return new StatsLogger() {
+        };
+    }
+
+    protected StatsLatencyLogger createLatencyLogger() {
+        return new StatsLatencyLogger() {
         };
     }
 
