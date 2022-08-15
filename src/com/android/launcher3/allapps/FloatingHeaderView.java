@@ -30,7 +30,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.BaseAllAppsContainerView.AdapterHolder;
@@ -81,7 +80,6 @@ public class FloatingHeaderView extends LinearLayout implements
 
     protected final Map<AllAppsRow, PluginHeaderRow> mPluginRows = new ArrayMap<>();
 
-    private final int mHeaderTopPadding;
     // These two values are necessary to ensure that the header protection is drawn correctly.
     private final int mHeaderTopAdjustment;
     private final int mHeaderBottomAdjustment;
@@ -118,8 +116,6 @@ public class FloatingHeaderView extends LinearLayout implements
 
     public FloatingHeaderView(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        mHeaderTopPadding = context.getResources()
-                .getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
         mHeaderTopAdjustment = context.getResources()
                 .getDimensionPixelSize(R.dimen.all_apps_header_top_adjustment);
         mHeaderBottomAdjustment = context.getResources()
@@ -161,22 +157,6 @@ public class FloatingHeaderView extends LinearLayout implements
         PluginManagerWrapper.INSTANCE.get(getContext()).removePluginListener(this);
     }
 
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        mTabLayout.getLayoutParams().width = getTabWidth();
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-    }
-
-    /**
-     * Returns distance between left and right app icons
-     */
-    public int getTabWidth() {
-        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
-        int totalWidth = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
-        int iconPadding = totalWidth / grid.numShownAllAppsColumns - grid.allAppsIconSizePx;
-        return totalWidth - iconPadding - grid.allAppsIconDrawablePaddingPx;
-    }
-
     private void recreateAllRowsArray() {
         int pluginCount = mPluginRows.size();
         if (pluginCount == 0) {
@@ -209,7 +189,7 @@ public class FloatingHeaderView extends LinearLayout implements
         int oldMaxHeight = mMaxTranslation;
         updateExpectedHeight();
 
-        if (mMaxTranslation != oldMaxHeight) {
+        if (mMaxTranslation != oldMaxHeight || mCollapsed) {
             BaseAllAppsContainerView<?> parent = (BaseAllAppsContainerView<?>) getParent();
             if (parent != null) {
                 parent.setupHeader();
@@ -326,7 +306,7 @@ public class FloatingHeaderView extends LinearLayout implements
         int uncappedTranslationY = mTranslationY;
         mTranslationY = Math.max(mTranslationY, -mMaxTranslation);
 
-        if (mCollapsed || uncappedTranslationY < mTranslationY - mHeaderTopPadding) {
+        if (mCollapsed || uncappedTranslationY < mTranslationY - getPaddingTop()) {
             // we hide it completely if already capped (for opening search anim)
             for (FloatingHeaderRow row : mAllRows) {
                 row.setVerticalScroll(0, true /* isScrolledOut */);
@@ -339,7 +319,10 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabLayout.setTranslationY(mTranslationY);
 
-        int clipTop = mHeaderTopPadding - mHeaderTopAdjustment;
+        int clipTop = getPaddingTop() - mHeaderTopAdjustment;
+        if (mTabsHidden) {
+            clipTop += getPaddingBottom() - mHeaderBottomAdjustment;
+        }
         mRVClip.top = mTabsHidden ? clipTop : 0;
         mHeaderClip.top = clipTop;
         // clipping on a draw might cause additional redraw
@@ -423,15 +406,6 @@ public class FloatingHeaderView extends LinearLayout implements
         p.y = getTop() - mCurrentRV.getTop() - ((ViewGroup) mCurrentRV.getParent()).getTop();
     }
 
-    public boolean hasVisibleContent() {
-        for (FloatingHeaderRow row : mAllRows) {
-            if (row.hasVisibleContent()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public boolean isHeaderProtectionSupported() {
         return mHeaderProtectionSupported;
     }
@@ -443,10 +417,9 @@ public class FloatingHeaderView extends LinearLayout implements
 
     @Override
     public void setInsets(Rect insets) {
-        DeviceProfile grid = ActivityContext.lookupContext(getContext()).getDeviceProfile();
-        for (FloatingHeaderRow row : mAllRows) {
-            row.setInsets(insets, grid);
-        }
+        int leftRightPadding = ActivityContext.lookupContext(getContext())
+                .getDeviceProfile().allAppsLeftRightPadding;
+        setPadding(leftRightPadding, getPaddingTop(), leftRightPadding, getPaddingBottom());
     }
 
     public <T extends FloatingHeaderRow> T findFixedRowByType(Class<T> type) {
