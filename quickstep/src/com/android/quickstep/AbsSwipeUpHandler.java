@@ -166,11 +166,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     if (mActivity != activity) {
                         return;
                     }
-                    if (mTaskAnimationManager != null) {
-                        mTaskAnimationManager.finishRunningRecentsAnimation(true);
-                    }
                     mRecentsView = null;
-                    mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
                     mActivity = null;
                 }
             };
@@ -1599,6 +1595,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
+        if (mActivity != null) {
+            mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
+        }
     }
 
     /**
@@ -1996,9 +1995,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
      * Applies the transform on the recents animation
      */
     protected void applyScrollAndTransform() {
-        // No need to apply any transform if there is ongoing swipe-pip-to-home animator since
-        // that animator handles the leash solely.
-        boolean notSwipingPipToHome = mRecentsAnimationTargets != null && !mIsSwipingPipToHome;
+        // No need to apply any transform if there is ongoing swipe-to-home animator
+        //    swipe-to-pip handles the leash solely
+        //    swipe-to-icon animation is handled by RectFSpringAnim anim
+        boolean notSwipingToHome = mRecentsAnimationTargets != null
+                && mGestureState.getEndTarget() != HOME;
         boolean setRecentsScroll = mRecentsViewScrollLinked && mRecentsView != null;
         for (RemoteTargetHandle remoteHandle : mRemoteTargetHandles) {
             AnimatorControllerWithResistance playbackController =
@@ -2008,7 +2009,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                         getScaleProgressDueToScroll()), mDragLengthFactor);
             }
 
-            if (notSwipingPipToHome) {
+            if (notSwipingToHome) {
                 TaskViewSimulator taskViewSimulator = remoteHandle.getTaskViewSimulator();
                 if (setRecentsScroll) {
                     taskViewSimulator.setScroll(mRecentsView.getScrollOffset());
