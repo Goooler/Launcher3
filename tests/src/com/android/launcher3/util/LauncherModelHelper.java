@@ -47,6 +47,7 @@ import android.provider.Settings;
 import android.test.mock.MockContentResolver;
 import android.util.ArrayMap;
 
+import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.uiautomator.UiDevice;
 
@@ -67,6 +68,7 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.testing.TestInformationProvider;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext;
+import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 import org.mockito.ArgumentCaptor;
@@ -193,8 +195,9 @@ public class LauncherModelHelper {
         Executor mockExecutor = mock(Executor.class);
         model.enqueueModelUpdateTask(new ModelUpdateTask() {
             @Override
-            public void init(LauncherAppState app, LauncherModel model, BgDataModel dataModel,
-                    AllAppsList allAppsList, Executor uiExecutor) {
+            public void init(@NonNull final LauncherAppState app,
+                    @NonNull final LauncherModel model, @NonNull final BgDataModel dataModel,
+                    @NonNull final AllAppsList allAppsList, @NonNull final Executor uiExecutor) {
                 task.init(app, model, dataModel, allAppsList, mockExecutor);
             }
 
@@ -501,7 +504,7 @@ public class LauncherModelHelper {
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
                     DisplayController.INSTANCE, CustomWidgetManager.INSTANCE,
                     SettingsCache.INSTANCE, PluginManagerWrapper.INSTANCE,
-                    ItemInstallQueue.INSTANCE);
+                    ItemInstallQueue.INSTANCE, WindowManagerProxy.INSTANCE);
             mPm = spy(getBaseContext().getPackageManager());
             mDbDir = new File(getCacheDir(), UUID.randomUUID().toString());
         }

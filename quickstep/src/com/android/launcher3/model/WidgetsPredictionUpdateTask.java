@@ -21,6 +21,8 @@ import android.app.prediction.AppTarget;
 import android.content.ComponentName;
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
+
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
@@ -52,15 +54,16 @@ public final class WidgetsPredictionUpdateTask extends BaseModelUpdateTask {
      * workspace.
      */
     @Override
-    public void execute(LauncherAppState appState, BgDataModel dataModel, AllAppsList apps) {
+    public void execute(@NonNull final LauncherAppState appState,
+            @NonNull final BgDataModel dataModel, @NonNull final AllAppsList apps) {
         Set<ComponentKey> widgetsInWorkspace = dataModel.appWidgets.stream().map(
                 widget -> new ComponentKey(widget.providerName, widget.user)).collect(
                 Collectors.toSet());
         Map<PackageUserKey, List<WidgetItem>> allWidgets =
                 dataModel.widgetsModel.getAllWidgetsWithoutShortcuts();
 
-        FixedContainerItems fixedContainerItems = mPredictorState.items;
-        fixedContainerItems.items.clear();
+        FixedContainerItems fixedContainerItems =
+                new FixedContainerItems(mPredictorState.containerId);
 
         if (FeatureFlags.ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER.get()) {
             for (AppTarget app : mTargets) {
@@ -100,6 +103,7 @@ public final class WidgetsPredictionUpdateTask extends BaseModelUpdateTask {
                 }
             }
         }
+        dataModel.extraItems.put(mPredictorState.containerId, fixedContainerItems);
         bindExtraContainerItems(fixedContainerItems);
 
         // Don't store widgets prediction to disk because it is not used frequently.

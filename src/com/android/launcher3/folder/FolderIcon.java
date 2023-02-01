@@ -55,9 +55,8 @@ import com.android.launcher3.R;
 import com.android.launcher3.Reorderable;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
-import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.anim.Interpolators;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.FolderDotInfo;
 import com.android.launcher3.dragndrop.BaseItemDragListener;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -68,11 +67,11 @@ import com.android.launcher3.logger.LauncherAtom.FromState;
 import com.android.launcher3.logger.LauncherAtom.ToState;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.FolderInfo.FolderListener;
 import com.android.launcher3.model.data.FolderInfo.LabelState;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.Executors;
@@ -284,7 +283,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
         mBackground.animateToAccept(cl, lp.cellX, lp.cellY);
         mOpenAlarm.setOnAlarmListener(mOnOpenListener);
         if (SPRING_LOADING_ENABLED &&
-                ((dragInfo instanceof AppInfo)
+                ((dragInfo instanceof WorkspaceItemFactory)
                         || (dragInfo instanceof WorkspaceItemInfo)
                         || (dragInfo instanceof PendingAddShortcutInfo))) {
             mOpenAlarm.setAlarm(ON_OPEN_DELAY);
@@ -342,7 +341,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             Rect to = finalRect;
             if (to == null) {
                 to = new Rect();
-                Workspace workspace = launcher.getWorkspace();
+                Workspace<?> workspace = launcher.getWorkspace();
                 // Set cellLayout and this to it's final state to compute final animation locations
                 workspace.setFinalTransitionTransform();
                 float scaleX = getScaleX();
@@ -397,7 +396,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             float finalScale = scale * scaleRelativeToDragLayer;
 
             // Account for potentially different icon sizes with non-default grid settings
-            if (d.dragSource instanceof AllAppsContainerView) {
+            if (d.dragSource instanceof ActivityAllAppsContainerView) {
                 DeviceProfile grid = mActivity.getDeviceProfile();
                 float containerScale = (1f * grid.iconSizePx / grid.allAppsIconSizePx);
                 finalScale *= containerScale;
@@ -418,35 +417,23 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             if (!itemAdded) mPreviewItemManager.hidePreviewItem(index, true);
 
             FolderNameInfos nameInfos = new FolderNameInfos();
-            if (FeatureFlags.FOLDER_NAME_SUGGEST.get()) {
-                Executors.MODEL_EXECUTOR.post(() -> {
-                    d.folderNameProvider.getSuggestedFolderName(
-                            getContext(), mInfo.contents, nameInfos);
-                    showFinalView(finalIndex, item, nameInfos, d.logInstanceId);
-                });
-            } else {
-                showFinalView(finalIndex, item, nameInfos, d.logInstanceId);
-            }
+            Executors.MODEL_EXECUTOR.post(() -> {
+                d.folderNameProvider.getSuggestedFolderName(
+                        getContext(), mInfo.contents, nameInfos);
+                postDelayed(() -> {
+                    setLabelSuggestion(nameInfos, d.logInstanceId);
+                    invalidate();
+                }, DROP_IN_ANIMATION_DURATION);
+            });
         } else {
             addItem(item);
         }
-    }
-
-    private void showFinalView(int finalIndex, final WorkspaceItemInfo item,
-            FolderNameInfos nameInfos, InstanceId instanceId) {
-        postDelayed(() -> {
-            setLabelSuggestion(nameInfos, instanceId);
-            invalidate();
-        }, DROP_IN_ANIMATION_DURATION);
     }
 
     /**
      * Set the suggested folder name.
      */
     public void setLabelSuggestion(FolderNameInfos nameInfos, InstanceId instanceId) {
-        if (!FeatureFlags.FOLDER_NAME_SUGGEST.get()) {
-            return;
-        }
         if (!mInfo.getLabelState().equals(LabelState.UNLABELED)) {
             return;
         }
@@ -486,9 +473,9 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
     public void onDrop(DragObject d, boolean itemReturnedOnFailedDrop) {
         WorkspaceItemInfo item;
-        if (d.dragInfo instanceof AppInfo) {
+        if (d.dragInfo instanceof WorkspaceItemFactory) {
             // Came from all apps -- make a copy
-            item = ((AppInfo) d.dragInfo).makeWorkspaceItem();
+            item = ((WorkspaceItemFactory) d.dragInfo).makeWorkspaceItem(getContext());
         } else if (d.dragSource instanceof BaseItemDragListener){
             // Came from a different window -- make a copy
             item = new WorkspaceItemInfo((WorkspaceItemInfo) d.dragInfo);
@@ -637,7 +624,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
             // If we are animating to the accepting state, animate the dot out.
             mDotParams.scale = Math.max(0, mDotScale - mBackground.getScaleProgress());
-            mDotParams.color = mBackground.getDotColor();
+            mDotParams.dotColor = mBackground.getDotColor();
             mDotRenderer.draw(canvas, mDotParams);
         }
     }

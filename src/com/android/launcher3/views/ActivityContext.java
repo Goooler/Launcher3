@@ -15,22 +15,38 @@
  */
 package com.android.launcher3.views;
 
+import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.HIDE;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_KEYBOARD_CLOSED;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.graphics.Rect;
+import android.os.IBinder;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.AccessibilityDelegate;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.popup.PopupDataProvider;
+import com.android.launcher3.util.OnboardingPrefs;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.ViewCache;
 
 /**
@@ -92,6 +108,13 @@ public interface ActivityContext {
      */
     BaseDragLayer getDragLayer();
 
+    /**
+     * The all apps container, if it exists in this context.
+     */
+    default ActivityAllAppsContainerView<?> getAppsView() {
+        return null;
+    }
+
     DeviceProfile getDeviceProfile();
 
     default ViewCache getViewCache() {
@@ -124,16 +147,20 @@ public interface ActivityContext {
     }
 
     /**
-     * Returns whether we can show the IME for elements hosted by this ActivityContext.
-     */
-    default boolean supportsIme() {
-        return true;
-    }
-
-    /**
      * Called just before logging the given item.
      */
     default void applyOverwritesToLogItem(LauncherAtom.ItemInfo.Builder itemInfoBuilder) { }
+
+    /** Onboarding preferences for any onboarding data within this context. */
+    @Nullable
+    default OnboardingPrefs<?> getOnboardingPrefs() {
+        return null;
+    }
+
+    /** Returns {@code true} if items are currently being bound within this context. */
+    default boolean isBindingItems() {
+        return false;
+    }
 
     /**
      * Returns the ActivityContext associated with the given Context, or throws an exception if
@@ -165,5 +192,68 @@ public interface ActivityContext {
         return v -> {
             // No op.
         };
+    }
+
+    @Nullable
+    default PopupDataProvider getPopupDataProvider() {
+        return null;
+    }
+
+    @Nullable
+    default StringCache getStringCache() {
+        return null;
+    }
+
+    /**
+     * Creates and returns {@link SearchAdapterProvider} for build variant specific search result
+     * views.
+     */
+    @Nullable
+    default SearchAdapterProvider<?> createSearchAdapterProvider(
+            ActivityAllAppsContainerView<?> appsView) {
+        return null;
+    }
+
+    /**
+     * Hides the keyboard if it is visible
+     */
+    default void hideKeyboard() {
+        View root = getDragLayer();
+        if (root == null) {
+            return;
+        }
+        if (Utilities.ATLEAST_R) {
+            Preconditions.assertUIThread();
+            //  Hide keyboard with WindowInsetsController if could. In case
+            //  hideSoftInputFromWindow may get ignored by input connection being finished
+            //  when the screen is off.
+            //
+            // In addition, inside IMF, the keyboards are closed asynchronously that launcher no
+            // longer need to post to the message queue.
+            final WindowInsetsController wic = root.getWindowInsetsController();
+            WindowInsets insets = root.getRootWindowInsets();
+            boolean isImeShown = insets != null && insets.isVisible(WindowInsets.Type.ime());
+            if (wic != null && isImeShown) {
+                StatsLogManager slm  = getStatsLogManager();
+                slm.keyboardStateManager().setKeyboardState(HIDE);
+
+                // this method cannot be called cross threads
+                wic.hide(WindowInsets.Type.ime());
+                slm.logger().log(LAUNCHER_ALLAPPS_KEYBOARD_CLOSED);
+                return;
+            }
+        }
+
+        InputMethodManager imm = root.getContext().getSystemService(InputMethodManager.class);
+        IBinder token = root.getWindowToken();
+        if (imm != null && token != null) {
+            UI_HELPER_EXECUTOR.execute(() -> {
+                if (imm.hideSoftInputFromWindow(token, 0)) {
+                    // log keyboard close event only when keyboard is actually closed
+                    MAIN_EXECUTOR.execute(() ->
+                            getStatsLogManager().logger().log(LAUNCHER_ALLAPPS_KEYBOARD_CLOSED));
+                }
+            });
+        }
     }
 }

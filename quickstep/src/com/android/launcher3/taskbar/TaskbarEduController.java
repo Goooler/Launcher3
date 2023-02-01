@@ -37,12 +37,13 @@ import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.uioverrides.PredictedAppIcon;
 
+import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /** Handles the Taskbar Education flow. */
-public class TaskbarEduController {
+public class TaskbarEduController implements TaskbarControllers.LoggableTaskbarController {
 
     private static final long WAVE_ANIM_DELAY = 250;
     private static final long WAVE_ANIM_STAGGER = 50;
@@ -89,6 +90,9 @@ public class TaskbarEduController {
             mTaskbarEduView = (TaskbarEduView) mActivity.getLayoutInflater().inflate(
                     R.layout.taskbar_edu, mActivity.getDragLayer(), false);
             mTaskbarEduView.init(new TaskbarEduCallbacks());
+            mControllers.navbarButtonsViewController.setSlideInViewVisible(true);
+            mTaskbarEduView.setOnCloseBeginListener(
+                    () -> mControllers.navbarButtonsViewController.setSlideInViewVisible(false));
             mTaskbarEduView.addOnCloseListener(() -> mTaskbarEduView = null);
             mTaskbarEduView.show();
             startAnim(createWaveAnim());
@@ -184,6 +188,16 @@ public class TaskbarEduController {
         }
         waveAnim.setStartDelay(WAVE_ANIM_DELAY);
         return waveAnim;
+    }
+
+    @Override
+    public void dumpLogs(String prefix, PrintWriter pw) {
+        pw.println(prefix + "TaskbarEduController:");
+
+        pw.println(prefix + "\tisShowingEdu=" + (mTaskbarEduView != null));
+        pw.println(prefix + "\tmWaveAnimTranslationY=" + mWaveAnimTranslationY);
+        pw.println(prefix + "\tmWaveAnimTranslationYReturnOvershoot="
+                + mWaveAnimTranslationYReturnOvershoot);
     }
 
     /**

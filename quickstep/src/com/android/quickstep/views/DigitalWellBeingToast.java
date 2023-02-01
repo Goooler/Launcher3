@@ -17,9 +17,6 @@
 package com.android.quickstep.views;
 
 import static android.provider.Settings.ACTION_APP_USAGE_SETTINGS;
-import static android.view.Gravity.BOTTOM;
-import static android.view.Gravity.CENTER_HORIZONTAL;
-import static android.view.Gravity.START;
 
 import static com.android.launcher3.Utilities.prefixTextWithIcon;
 import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
@@ -56,7 +53,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.touch.PagedOrientationHandler;
-import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
 import com.android.systemui.shared.recents.model.Task;
 
 import java.lang.annotation.Retention;
@@ -106,7 +103,7 @@ public final class DigitalWellBeingToast {
      */
     private float mModalOffset = 0f;
     @Nullable
-    private StagedSplitBounds mStagedSplitBounds;
+    private SplitBounds mSplitBounds;
     private int mSplitBannerConfig = SPLIT_BANNER_FULLSCREEN;
     private float mSplitOffsetTranslationY;
     private float mSplitOffsetTranslationX;
@@ -147,12 +144,6 @@ public final class DigitalWellBeingToast {
 
     public void initialize(Task task) {
         mTask = task;
-
-        if (task.key.userId != UserHandle.myUserId()) {
-            setNoLimit();
-            return;
-        }
-
         THREAD_POOL_EXECUTOR.execute(() -> {
             final AppUsageLimit usageLimit = mLauncherApps.getAppUsageLimit(
                     task.getTopComponent().getPackageName(),
@@ -173,11 +164,11 @@ public final class DigitalWellBeingToast {
         });
     }
 
-    public void setSplitConfiguration(StagedSplitBounds stagedSplitBounds) {
-        mStagedSplitBounds = stagedSplitBounds;
-        if (mStagedSplitBounds == null ||
-                !mActivity.getDeviceProfile().overviewShowAsGrid ||
-                mTaskView.isFocusedTask()) {
+    public void setSplitConfiguration(SplitBounds splitBounds) {
+        mSplitBounds = splitBounds;
+        if (mSplitBounds == null
+                || !mActivity.getDeviceProfile().isTablet
+                || mTaskView.isFocusedTask()) {
             mSplitBannerConfig = SPLIT_BANNER_FULLSCREEN;
             return;
         }
@@ -189,11 +180,11 @@ public final class DigitalWellBeingToast {
         }
 
         // For landscape grid, for 30% width we only show icon, otherwise show icon and time
-        if (mTask.key.id == mStagedSplitBounds.leftTopTaskId) {
-            mSplitBannerConfig = mStagedSplitBounds.leftTaskPercent < THRESHOLD_LEFT_ICON_ONLY ?
+        if (mTask.key.id == mSplitBounds.leftTopTaskId) {
+            mSplitBannerConfig = mSplitBounds.leftTaskPercent < THRESHOLD_LEFT_ICON_ONLY ?
                     SPLIT_GRID_BANNER_SMALL : SPLIT_GRID_BANNER_LARGE;
         } else {
-            mSplitBannerConfig = mStagedSplitBounds.leftTaskPercent > THRESHOLD_RIGHT_ICON_ONLY ?
+            mSplitBannerConfig = mSplitBounds.leftTaskPercent > THRESHOLD_RIGHT_ICON_ONLY ?
                     SPLIT_GRID_BANNER_SMALL : SPLIT_GRID_BANNER_LARGE;
         }
     }
@@ -315,7 +306,7 @@ public final class DigitalWellBeingToast {
 
     private void setBanner(@Nullable View view) {
         mBanner = view;
-        if (view != null) {
+        if (view != null && mTaskView.getRecentsView() != null) {
             setupAndAddBanner();
             setBannerOutline();
         }
@@ -329,8 +320,8 @@ public final class DigitalWellBeingToast {
                 mTaskView.getThumbnail().getLayoutParams()).bottomMargin;
         PagedOrientationHandler orientationHandler = mTaskView.getPagedOrientationHandler();
         Pair<Float, Float> translations = orientationHandler
-                .setDwbLayoutParamsAndGetTranslations(mTaskView.getMeasuredWidth(),
-                        mTaskView.getMeasuredHeight(), mStagedSplitBounds, deviceProfile,
+                .getDwbLayoutTranslations(mTaskView.getMeasuredWidth(),
+                        mTaskView.getMeasuredHeight(), mSplitBounds, deviceProfile,
                         mTaskView.getThumbnails(), mTask.key.id, mBanner);
         mSplitOffsetTranslationX = translations.first;
         mSplitOffsetTranslationY = translations.second;
@@ -393,5 +384,13 @@ public final class DigitalWellBeingToast {
         layerPaint.setColorFilter(Utilities.makeColorTintingColorFilter(color, amount));
         mBanner.setLayerType(View.LAYER_TYPE_HARDWARE, layerPaint);
         mBanner.setLayerPaint(layerPaint);
+    }
+
+    void setBannerVisibility(int visibility) {
+        if (mBanner == null) {
+            return;
+        }
+
+        mBanner.setVisibility(visibility);
     }
 }

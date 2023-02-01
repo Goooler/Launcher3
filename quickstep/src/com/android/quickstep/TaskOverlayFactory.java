@@ -23,7 +23,6 @@ import static com.android.quickstep.views.OverviewActionsView.DISABLED_NO_THUMBN
 import static com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED;
 
 import android.annotation.SuppressLint;
-import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Insets;
 import android.graphics.Matrix;
@@ -37,16 +36,12 @@ import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.BaseDraggingActivity;
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.ResourceBasedOverride;
-import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
-import com.android.quickstep.TaskShortcutFactory.SplitSelectSystemShortcut;
+import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
@@ -55,7 +50,6 @@ import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,7 +60,7 @@ import java.util.List;
 public class TaskOverlayFactory implements ResourceBasedOverride {
 
     public static List<SystemShortcut> getEnabledShortcuts(TaskView taskView,
-            DeviceProfile deviceProfile, TaskIdAttributeContainer taskContainer) {
+            TaskIdAttributeContainer taskContainer) {
         final ArrayList<SystemShortcut> shortcuts = new ArrayList<>();
         final BaseDraggingActivity activity = BaseActivity.fromContext(taskView.getContext());
         boolean hasMultipleTasks = taskView.getTaskIds()[1] != -1;
@@ -75,17 +69,11 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
                 continue;
             }
 
-            SystemShortcut shortcut = menuOption.getShortcut(activity, taskContainer);
-            if (shortcut == null) {
+            List<SystemShortcut> menuShortcuts = menuOption.getShortcuts(activity, taskContainer);
+            if (menuShortcuts == null) {
                 continue;
             }
-
-            if (menuOption == TaskShortcutFactory.SPLIT_SCREEN &&
-                    FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
-                addSplitOptions(shortcuts, activity, taskView, deviceProfile);
-            } else {
-                shortcuts.add(shortcut);
-            }
+            shortcuts.addAll(menuShortcuts);
         }
         RecentsOrientedState orientedState = taskView.getRecentsView().getPagedViewOrientedState();
         boolean canLauncherRotate = orientedState.isRecentsActivityRotationAllowed();
@@ -94,59 +82,22 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         // Add overview actions to the menu when in in-place rotate landscape mode.
         if (!canLauncherRotate && isInLandscape) {
             // Add screenshot action to task menu.
-            SystemShortcut screenshotShortcut = TaskShortcutFactory.SCREENSHOT
-                    .getShortcut(activity, taskContainer);
-            if (screenshotShortcut != null) {
-                shortcuts.add(screenshotShortcut);
+            List<SystemShortcut> screenshotShortcuts = TaskShortcutFactory.SCREENSHOT
+                    .getShortcuts(activity, taskContainer);
+            if (screenshotShortcuts != null) {
+                shortcuts.addAll(screenshotShortcuts);
             }
 
             // Add modal action only if display orientation is the same as the device orientation.
             if (orientedState.getDisplayRotation() == ROTATION_0) {
-                SystemShortcut modalShortcut = TaskShortcutFactory.MODAL
-                        .getShortcut(activity, taskContainer);
-                if (modalShortcut != null) {
-                    shortcuts.add(modalShortcut);
+                List<SystemShortcut> modalShortcuts = TaskShortcutFactory.MODAL
+                        .getShortcuts(activity, taskContainer);
+                if (modalShortcuts != null) {
+                    shortcuts.addAll(modalShortcuts);
                 }
             }
         }
         return shortcuts;
-    }
-
-
-    /**
-     * Does NOT add split options in the following scenarios:
-     * * The taskView to add split options is already showing split screen tasks
-     * * There aren't at least 2 tasks in overview to show split options for
-     * * Device is in "Lock task mode"
-     * * The taskView to show split options for is the focused task AND we haven't started
-     *   scrolling in overview (if we haven't scrolled, there's a split overview action button so
-     *   we don't need this menu option)
-     */
-    private static void addSplitOptions(List<SystemShortcut> outShortcuts,
-            BaseDraggingActivity activity, TaskView taskView, DeviceProfile deviceProfile) {
-        RecentsView recentsView = taskView.getRecentsView();
-        PagedOrientationHandler orientationHandler = recentsView.getPagedOrientationHandler();
-        int[] taskViewTaskIds = taskView.getTaskIds();
-        boolean taskViewHasMultipleTasks = taskViewTaskIds[0] != -1 &&
-                taskViewTaskIds[1] != -1;
-        boolean notEnoughTasksToSplit = recentsView.getTaskViewCount() < 2;
-        boolean isFocusedTask = deviceProfile.overviewShowAsGrid && taskView.isFocusedTask();
-        boolean isTaskInExpectedScrollPosition =
-                recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
-        ActivityManager activityManager =
-                (ActivityManager) taskView.getContext().getSystemService(Context.ACTIVITY_SERVICE);
-        boolean isLockTaskMode = activityManager.isInLockTaskMode();
-
-        if (taskViewHasMultipleTasks || notEnoughTasksToSplit || isLockTaskMode ||
-                (isFocusedTask && isTaskInExpectedScrollPosition)) {
-            return;
-        }
-
-        List<SplitPositionOption> positions =
-                orientationHandler.getSplitPositionOptions(deviceProfile);
-        for (SplitPositionOption option : positions) {
-            outShortcuts.add(new SplitSelectSystemShortcut(activity, taskView, option));
-        }
     }
 
     public TaskOverlay createOverlay(TaskThumbnailView thumbnailView) {
@@ -157,18 +108,20 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
      * Subclasses can attach any system listeners in this method, must be paired with
      * {@link #removeListeners()}
      */
-    public void initListeners() { }
+    public void initListeners() {
+    }
 
     /**
      * Subclasses should remove any system listeners in this method, must be paired with
      * {@link #initListeners()}
      */
-    public void removeListeners() { }
+    public void removeListeners() {
+    }
 
     /** Note that these will be shown in order from top to bottom, if available for the task. */
     private static final TaskShortcutFactory[] MENU_OPTIONS = new TaskShortcutFactory[]{
             TaskShortcutFactory.APP_INFO,
-            TaskShortcutFactory.SPLIT_SCREEN,
+            TaskShortcutFactory.SPLIT_SELECT,
             TaskShortcutFactory.PIN,
             TaskShortcutFactory.INSTALL,
             TaskShortcutFactory.FREE_FORM,
@@ -190,7 +143,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             mApplicationContext = taskThumbnailView.getContext().getApplicationContext();
             mThumbnailView = taskThumbnailView;
             mImageApi = new ImageActionsApi(
-                mApplicationContext, mThumbnailView::getThumbnail);
+                    mApplicationContext, mThumbnailView::getThumbnail);
         }
 
         protected T getActionsView() {
@@ -264,7 +217,8 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         /**
          * Gets the modal state system shortcut.
          */
-        public SystemShortcut getModalStateSystemShortcut(WorkspaceItemInfo itemInfo) {
+        public SystemShortcut getModalStateSystemShortcut(WorkspaceItemInfo itemInfo,
+                View original) {
             return null;
         }
 
@@ -278,9 +232,10 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          * Gets the system shortcut for the screenshot that will be added to the task menu.
          */
         public SystemShortcut getScreenshotShortcut(BaseDraggingActivity activity,
-                ItemInfo iteminfo) {
-            return new ScreenshotSystemShortcut(activity, iteminfo);
+                ItemInfo iteminfo, View originalView) {
+            return new ScreenshotSystemShortcut(activity, iteminfo, originalView);
         }
+
         /**
          * Gets the task snapshot as it is displayed on the screen.
          *
@@ -311,18 +266,29 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         }
 
         protected void showBlockedByPolicyMessage() {
+            ActivityContext activityContext = ActivityContext.lookupContext(
+                    mThumbnailView.getContext());
+            String message = activityContext.getStringCache() != null
+                    ? activityContext.getStringCache().disabledByAdminMessage
+                    : mThumbnailView.getContext().getString(R.string.blocked_by_policy);
             Toast.makeText(
                     mThumbnailView.getContext(),
-                    R.string.blocked_by_policy,
+                    message,
                     Toast.LENGTH_LONG).show();
+        }
+
+        /** Called when the snapshot has updated its full screen drawing parameters. */
+        public void setFullscreenParams(TaskView.FullscreenDrawParams fullscreenParams) {
         }
 
         private class ScreenshotSystemShortcut extends SystemShortcut {
 
             private final BaseDraggingActivity mActivity;
 
-            ScreenshotSystemShortcut(BaseDraggingActivity activity, ItemInfo itemInfo) {
-                super(R.drawable.ic_screenshot, R.string.action_screenshot, activity, itemInfo);
+            ScreenshotSystemShortcut(BaseDraggingActivity activity, ItemInfo itemInfo,
+                    View originalView) {
+                super(R.drawable.ic_screenshot, R.string.action_screenshot, activity, itemInfo,
+                        originalView);
                 mActivity = activity;
             }
 
