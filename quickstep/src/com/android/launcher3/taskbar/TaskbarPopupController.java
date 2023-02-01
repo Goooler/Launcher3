@@ -15,14 +15,18 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.util.SplitConfigurationOptions.getLogEventForPosition;
+
 import android.content.Intent;
 import android.content.pm.LauncherApps;
 import android.graphics.Point;
+import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.NonNull;
 
+import com.android.internal.logging.InstanceId;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.LauncherSettings;
@@ -40,6 +44,7 @@ import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.popup.PopupLiveUpdateHandler;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.shortcuts.DeepShortcutView;
+import com.android.launcher3.splitscreen.SplitShortcut;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.PackageUserKey;
@@ -47,6 +52,7 @@ import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.LogUtils;
 
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -68,6 +74,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     // Initialized in init.
     private TaskbarControllers mControllers;
+    private boolean mAllowInitialSplitSelection;
 
     public TaskbarPopupController(TaskbarActivityContext context) {
         mContext = context;
@@ -91,6 +98,10 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     public void setDeepShortcutMap(HashMap<ComponentKey, Integer> deepShortcutMapCopy) {
         mPopupDataProvider.setDeepShortcutMap(deepShortcutMapCopy);
+    }
+
+    public void setAllowInitialSplitSelection(boolean allowInitialSplitSelection) {
+        mAllowInitialSplitSelection = allowInitialSplitSelection;
     }
 
     private void updateNotificationDots(Predicate<PackageUserKey> updatedDots) {
@@ -176,14 +187,15 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     }
 
     // Create a Stream of all applicable system shortcuts
-    // TODO(b/227800345): Add "Split bottom" option when tablet is in portrait mode.
     private Stream<SystemShortcut.Factory> getSystemShortcuts() {
         // concat a Stream of split options with a Stream of APP_INFO
+        Stream<SystemShortcut.Factory> appInfo = Stream.of(APP_INFO);
+
         return Stream.concat(
                 Utilities.getSplitPositionOptions(mContext.getDeviceProfile())
                         .stream()
                         .map(this::createSplitShortcutFactory),
-                Stream.of(APP_INFO)
+                appInfo
         );
     }
 
@@ -244,7 +256,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     private SystemShortcut.Factory<BaseTaskbarContext> createSplitShortcutFactory(
             SplitPositionOption position) {
         return (context, itemInfo, originalView) -> new TaskbarSplitShortcut(context, itemInfo,
-                originalView, position);
+                originalView, position, mAllowInitialSplitSelection);
     }
 
      /**
@@ -252,27 +264,46 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
      * from the taskbar, as if the user performed a drag and drop split.
      * Includes an onClick method that initiates the actual split.
      */
-    private static class TaskbarSplitShortcut extends SystemShortcut<BaseTaskbarContext> {
-        private final SplitPositionOption mPosition;
+    private static class TaskbarSplitShortcut extends
+             SplitShortcut<BaseTaskbarContext> {
+         /**
+          * If {@code true}, clicking this shortcut will not attempt to start a split app directly,
+          * but be the first app in split selection mode
+          */
+         private final boolean mAllowInitialSplitSelection;
 
-        TaskbarSplitShortcut(BaseTaskbarContext context, ItemInfo itemInfo, View originalView,
-                SplitPositionOption position) {
-            super(position.iconResId, position.textResId, context, itemInfo, originalView);
-            mPosition = position;
-        }
+         TaskbarSplitShortcut(BaseTaskbarContext context, ItemInfo itemInfo, View originalView,
+                SplitPositionOption position, boolean allowInitialSplitSelection) {
+             super(position.iconResId, position.textResId, context, itemInfo, originalView,
+                     position);
+             mAllowInitialSplitSelection = allowInitialSplitSelection;
+         }
 
         @Override
         public void onClick(View view) {
             AbstractFloatingView.closeAllOpenViews(mTarget);
+             if (mAllowInitialSplitSelection) {
+                 super.onClick(view);
+                 return;
+             }
+
+            // Initiate splitscreen from the in-app Taskbar or Taskbar All Apps
+            Pair<InstanceId, com.android.launcher3.logging.InstanceId> instanceIds =
+                    LogUtils.getShellShareableInstanceId();
+            mTarget.getStatsLogManager().logger()
+                    .withItemInfo(mItemInfo)
+                    .withInstanceId(instanceIds.second)
+                    .log(getLogEventForPosition(getPosition().stagePosition));
 
             if (mItemInfo.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
                 WorkspaceItemInfo workspaceItemInfo = (WorkspaceItemInfo) mItemInfo;
                 SystemUiProxy.INSTANCE.get(mTarget).startShortcut(
                         workspaceItemInfo.getIntent().getPackage(),
                         workspaceItemInfo.getDeepShortcutId(),
-                        mPosition.stagePosition,
+                        getPosition().stagePosition,
                         null,
-                        workspaceItemInfo.user);
+                        workspaceItemInfo.user,
+                        instanceIds.first);
             } else {
                 SystemUiProxy.INSTANCE.get(mTarget).startIntent(
                         mTarget.getSystemService(LauncherApps.class).getMainActivityLaunchIntent(
@@ -280,8 +311,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
                                 null,
                                 mItemInfo.user),
                         new Intent(),
-                        mPosition.stagePosition,
-                        null);
+                        getPosition().stagePosition,
+                        null,
+                        instanceIds.first);
             }
         }
     }

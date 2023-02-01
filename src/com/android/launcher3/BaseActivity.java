@@ -25,15 +25,18 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.os.Bundle;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.IntDef;
 
-import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.ViewCache;
-import com.android.launcher3.views.AppLauncher;
+import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.ScrimView;
 
 import java.io.PrintWriter;
@@ -44,8 +47,7 @@ import java.util.List;
 /**
  * Launcher BaseActivity
  */
-public abstract class BaseActivity extends Activity implements AppLauncher,
-        DeviceProfileListenable {
+public abstract class BaseActivity extends Activity implements ActivityContext {
 
     private static final String TAG = "BaseActivity";
 
@@ -77,8 +79,8 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
             new ArrayList<>();
 
     protected DeviceProfile mDeviceProfile;
-    protected StatsLogManager mStatsLogManager;
     protected SystemUiController mSystemUiController;
+    private StatsLogManager mStatsLogManager;
 
 
     public static final int ACTIVITY_STATE_STARTED = 1 << 0;
@@ -172,6 +174,12 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
     }
 
     @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        registerBackDispatcher();
+    }
+
+    @Override
     protected void onStart() {
         addActivityFlags(ACTIVITY_STATE_STARTED);
         super.onStart();
@@ -179,8 +187,7 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
 
     @Override
     protected void onResume() {
-        addActivityFlags(ACTIVITY_STATE_RESUMED | ACTIVITY_STATE_USER_ACTIVE);
-        removeActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
+        setResumed();
         super.onResume();
     }
 
@@ -211,7 +218,7 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
 
     @Override
     protected void onPause() {
-        removeActivityFlags(ACTIVITY_STATE_RESUMED | ACTIVITY_STATE_DEFERRED_RESUMED);
+        setPaused();
         super.onPause();
 
         // Reset the overridden sysui flags used for the task-swipe launch animation, we do this
@@ -232,6 +239,17 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
 
     }
 
+    protected void registerBackDispatcher() {
+        if (Utilities.ATLEAST_T) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    () -> {
+                        onBackPressed();
+                        TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onBackInvoked");
+                    });
+        }
+    }
+
     public boolean isStarted() {
         return (mActivityFlags & ACTIVITY_STATE_STARTED) != 0;
     }
@@ -241,6 +259,21 @@ public abstract class BaseActivity extends Activity implements AppLauncher,
      */
     public boolean hasBeenResumed() {
         return (mActivityFlags & ACTIVITY_STATE_RESUMED) != 0;
+    }
+
+    /**
+     * Sets the activity to appear as paused.
+     */
+    public void setPaused() {
+        removeActivityFlags(ACTIVITY_STATE_RESUMED | ACTIVITY_STATE_DEFERRED_RESUMED);
+    }
+
+    /**
+     * Sets the activity to appear as resumed.
+     */
+    public void setResumed() {
+        addActivityFlags(ACTIVITY_STATE_RESUMED | ACTIVITY_STATE_USER_ACTIVE);
+        removeActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
     }
 
     public boolean isUserActive() {

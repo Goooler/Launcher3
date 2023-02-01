@@ -1,8 +1,7 @@
 package com.android.launcher3.graphics;
 
-import static com.android.launcher3.Utilities.getPrefs;
+import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.launcher3.util.Themes.KEY_THEMED_ICONS;
 import static com.android.launcher3.util.Themes.isThemedIconEnabled;
 
 import android.annotation.TargetApi;
@@ -25,8 +24,8 @@ import android.util.Log;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile.GridOption;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.Executors;
 
 /**
@@ -143,11 +142,8 @@ public class GridCustomizationsProvider extends ContentProvider {
             }
             case ICON_THEMED:
             case SET_ICON_THEMED: {
-                if (FeatureFlags.ENABLE_THEMED_ICONS.get()) {
-                    getPrefs(getContext()).edit()
-                            .putBoolean(KEY_THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE))
-                            .apply();
-                }
+                LauncherPrefs.get(getContext())
+                        .put(THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE));
                 return 1;
             }
             default:

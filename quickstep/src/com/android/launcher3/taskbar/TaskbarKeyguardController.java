@@ -10,12 +10,10 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_S
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED;
 
 import android.app.KeyguardManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.util.ScreenOnTracker;
+import com.android.launcher3.util.ScreenOnTracker.ScreenOnListener;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import java.io.PrintWriter;
@@ -30,6 +28,7 @@ public class TaskbarKeyguardController implements TaskbarControllers.LoggableTas
             SYSUI_STATE_OVERVIEW_DISABLED | SYSUI_STATE_HOME_DISABLED |
             SYSUI_STATE_BACK_DISABLED | SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED;
 
+    private final ScreenOnListener mScreenOnListener;
     private final TaskbarActivityContext mContext;
     private int mKeyguardSysuiFlags;
     private boolean mBouncerShowing;
@@ -37,22 +36,20 @@ public class TaskbarKeyguardController implements TaskbarControllers.LoggableTas
     private final KeyguardManager mKeyguardManager;
     private boolean mIsScreenOff;
 
-    private final BroadcastReceiver mScreenOffReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            mIsScreenOff = true;
-            AbstractFloatingView.closeOpenViews(mContext, false, TYPE_ALL);
-        }
-    };
-
     public TaskbarKeyguardController(TaskbarActivityContext context) {
         mContext = context;
+        mScreenOnListener = isOn -> {
+            if (!isOn) {
+                mIsScreenOff = true;
+                AbstractFloatingView.closeOpenViews(mContext, false, TYPE_ALL);
+            }
+        };
         mKeyguardManager = mContext.getSystemService(KeyguardManager.class);
     }
 
     public void init(NavbarButtonsViewController navbarButtonUIController) {
         mNavbarButtonsViewController = navbarButtonUIController;
-        mContext.registerReceiver(mScreenOffReceiver, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+        ScreenOnTracker.INSTANCE.get(mContext).addListener(mScreenOnListener);
     }
 
     public void updateStateForSysuiFlags(int systemUiStateFlags) {
@@ -93,29 +90,22 @@ public class TaskbarKeyguardController implements TaskbarControllers.LoggableTas
      */
     private void updateIconsForBouncer() {
         boolean disableBack = (mKeyguardSysuiFlags & SYSUI_STATE_BACK_DISABLED) != 0;
-        boolean disableRecent = (mKeyguardSysuiFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
-        boolean disableHome = (mKeyguardSysuiFlags & SYSUI_STATE_HOME_DISABLED) != 0;
-        boolean onlyBackEnabled = !disableBack && disableRecent && disableHome;
-
-        boolean showBackForBouncer = onlyBackEnabled &&
-                mKeyguardManager.isDeviceSecure() &&
-                mBouncerShowing;
+        boolean showBackForBouncer =
+                !disableBack && mKeyguardManager.isDeviceSecure() && mBouncerShowing;
         mNavbarButtonsViewController.setBackForBouncer(showBackForBouncer);
     }
 
     public void onDestroy() {
-        mContext.unregisterReceiver(mScreenOffReceiver);
+        ScreenOnTracker.INSTANCE.get(mContext).removeListener(mScreenOnListener);
     }
 
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarKeyguardController:");
 
-        pw.println(String.format(
-                "%s\tmKeyguardSysuiFlags=%s",
-                prefix,
-                QuickStepContract.getSystemUiStateString(mKeyguardSysuiFlags)));
-        pw.println(String.format("%s\tmBouncerShowing=%b", prefix, mBouncerShowing));
-        pw.println(String.format("%s\tmIsScreenOff=%b", prefix, mIsScreenOff));
+        pw.println(prefix + "\tmKeyguardSysuiFlags=" + QuickStepContract.getSystemUiStateString(
+                mKeyguardSysuiFlags));
+        pw.println(prefix + "\tmBouncerShowing=" + mBouncerShowing);
+        pw.println(prefix + "\tmIsScreenOff=" + mIsScreenOff);
     }
 }

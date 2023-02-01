@@ -18,8 +18,9 @@ package com.android.launcher3.tapl;
 
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_SCROLLED;
 
-import static com.android.launcher3.testing.TestProtocol.ALL_APPS_STATE_ORDINAL;
-import static com.android.launcher3.testing.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.tapl.LauncherInstrumentation.CALLBACK_RUN_POINT.CALLBACK_HOLD_BEFORE_DROP;
+import static com.android.launcher3.testing.shared.TestProtocol.ALL_APPS_STATE_ORDINAL;
+import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
 import static junit.framework.TestCase.assertNotNull;
 import static junit.framework.TestCase.assertTrue;
@@ -39,8 +40,9 @@ import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
 
-import com.android.launcher3.testing.TestProtocol;
-import com.android.launcher3.testing.WorkspaceCellCenterRequest;
+import com.android.launcher3.testing.shared.HotseatCellCenterRequest;
+import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.testing.shared.WorkspaceCellCenterRequest;
 
 import java.util.List;
 import java.util.Map;
@@ -89,7 +91,7 @@ public final class Workspace extends Home {
             final int windowCornerRadius = (int) Math.ceil(mLauncher.getWindowCornerRadius());
             final int startY = deviceHeight - Math.max(bottomGestureMargin, windowCornerRadius) - 1;
             final int swipeHeight = mLauncher.getTestInfo(
-                    TestProtocol.REQUEST_HOME_TO_ALL_APPS_SWIPE_HEIGHT)
+                            TestProtocol.REQUEST_HOME_TO_ALL_APPS_SWIPE_HEIGHT)
                     .getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
             LauncherInstrumentation.log(
                     "switchToAllApps: deviceHeight = " + deviceHeight + ", startY = " + startY
@@ -140,6 +142,20 @@ public final class Workspace extends Home {
         }
     }
 
+    /**
+     * Waits for an app icon to be gone (e.g. after uninstall). Fails if it remains.
+     *
+     * @param errorMessage error message thrown then the icon doesn't disappear.
+     * @param appName      app that should be gone.
+     */
+    public void verifyWorkspaceAppIconIsGone(String errorMessage, String appName) {
+        final UiObject2 workspace = verifyActiveContainer();
+        assertTrue(errorMessage,
+                workspace.wait(
+                        Until.gone(AppIcon.getAppIconSelector(appName, mLauncher)),
+                        LauncherInstrumentation.WAIT_TIME_MS));
+    }
+
 
     /**
      * Returns an icon for the app; fails if the icon doesn't exist.
@@ -175,6 +191,12 @@ public final class Workspace extends Home {
             assertTrue("Home screen workspace didn't become scrollable",
                     isWorkspaceScrollable(workspace));
         }
+    }
+
+    /** Returns the number of pages. */
+    public int getPageCount() {
+        final UiObject2 workspace = verifyActiveContainer();
+        return workspace.getChildCount();
     }
 
     /**
@@ -214,10 +236,11 @@ public final class Workspace extends Home {
     private void dragIcon(UiObject2 workspace, HomeAppIcon homeAppIcon, int pageDelta) {
         int pageWidth = mLauncher.getDevice().getDisplayWidth() / pagesPerScreen();
         int targetX = (pageWidth / 2) + pageWidth * pageDelta;
+        int targetY = mLauncher.getVisibleBounds(workspace).centerY();
         dragIconToWorkspace(
                 mLauncher,
                 homeAppIcon,
-                new Point(targetX, mLauncher.getVisibleBounds(workspace).centerY()),
+                () -> new Point(targetX, targetY),
                 false,
                 false,
                 () -> mLauncher.expectEvent(
@@ -236,8 +259,26 @@ public final class Workspace extends Home {
     }
 
     /**
+     * Returns an icon for the given cell; fails if the icon doesn't exist.
+     *
+     * @param cellInd zero based index number of the hotseat cells.
+     * @return app icon.
+     */
+    @NonNull
+    public HomeAppIcon getHotseatAppIcon(int cellInd) {
+        List<UiObject2> icons = mHotseat.findObjects(AppIcon.getAnyAppIconSelector());
+        final Point center = getHotseatCellCenter(mLauncher, cellInd);
+        return icons.stream()
+                .filter(icon -> icon.getVisibleBounds().contains(center.x, center.y))
+                .findFirst()
+                .map(icon -> new WorkspaceAppIcon(mLauncher, icon))
+                .orElseThrow(() ->
+                        new AssertionError("Unable to get a hotseat icon on " + cellInd));
+    }
+
+    /**
      * @return map of text -> center of the view. In case of icons with the same name, the one with
-     *     lower x coordinate is selected.
+     * lower x coordinate is selected.
      */
     public Map<String, Point> getWorkspaceIconsPositions() {
         final UiObject2 workspace = verifyActiveContainer();
@@ -250,6 +291,7 @@ public final class Workspace extends Home {
                                 /* valueMapper= */ UiObject2::getVisibleCenter,
                                 /* mergeFunction= */ (p1, p2) -> p1.x < p2.x ? p1 : p2));
     }
+
     /*
      * Get the center point of the delete/uninstall icon in the drop target bar.
      */
@@ -258,6 +300,31 @@ public final class Workspace extends Home {
         return launcher.waitForObjectInContainer(
                 launcher.waitForLauncherObject(DROP_BAR_RES_ID),
                 targetId).getVisibleCenter();
+    }
+
+    /**
+     * Drag the appIcon from the workspace and cancel by dragging icon to corner of screen where no
+     * drop point exists.
+     *
+     * @param homeAppIcon to be dragged.
+     */
+    @NonNull
+    public Workspace dragAndCancelAppIcon(HomeAppIcon homeAppIcon) {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
+             LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                     "dragging app icon across workspace")) {
+            dragIconToWorkspace(
+                    mLauncher,
+                    homeAppIcon,
+                    () -> new Point(0, 0),
+                    () -> mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
+                    null);
+
+            try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
+                    "dragged the app across workspace")) {
+                return new Workspace(mLauncher);
+            }
+        }
     }
 
     /**
@@ -283,6 +350,7 @@ public final class Workspace extends Home {
             }
         }
     }
+
 
     /**
      * Uninstall the appIcon by dragging it to the 'uninstall' drop point of the drop_target_bar.
@@ -317,7 +385,7 @@ public final class Workspace extends Home {
                     Until.hasObject(installerAlert), LauncherInstrumentation.WAIT_TIME_MS));
             final UiObject2 ok = device.findObject(By.text("OK"));
             assertNotNull("OK button is not shown", ok);
-            launcher.clickObject(ok);
+            launcher.clickObject(ok, LauncherInstrumentation.GestureScope.OUTSIDE_WITHOUT_PILFER);
             assertTrue("Uninstall alert is not dismissed after clicking OK", device.wait(
                     Until.gone(installerAlert), LauncherInstrumentation.WAIT_TIME_MS));
 
@@ -340,8 +408,25 @@ public final class Workspace extends Home {
     }
 
     static Point getCellCenter(LauncherInstrumentation launcher, int cellX, int cellY) {
-        return launcher.getTestInfo(WorkspaceCellCenterRequest.builder().setCellX(
-                cellX).setCellY(cellY).build()).getParcelable(
+        return launcher.getTestInfo(WorkspaceCellCenterRequest.builder().setCellX(cellX).setCellY(
+                cellY).build()).getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    static Point getCellCenter(LauncherInstrumentation launcher, int cellX, int cellY, int spanX,
+            int spanY) {
+        return launcher.getTestInfo(WorkspaceCellCenterRequest.builder().setCellX(cellX)
+                .setCellY(cellY).setSpanX(spanX).setSpanY(spanY).build())
+                .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    static Point getHotseatCellCenter(LauncherInstrumentation launcher, int cellInd) {
+        return launcher.getTestInfo(HotseatCellCenterRequest.builder()
+                .setCellInd(cellInd).build()).getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    /** Returns the number of rows and columns in the workspace */
+    public Point getRowsAndCols() {
+        return mLauncher.getTestInfo(TestProtocol.REQUEST_WORKSPACE_COLUMNS_ROWS).getParcelable(
                 TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
@@ -372,7 +457,7 @@ public final class Workspace extends Home {
     }
 
     static void dragIconToWorkspace(LauncherInstrumentation launcher, Launchable launchable,
-            Point dest, boolean startsActivity, boolean isWidgetShortcut,
+            Supplier<Point> dest, boolean startsActivity, boolean isWidgetShortcut,
             Runnable expectLongClickEvents) {
         Runnable expectDropEvents = null;
         if (startsActivity || isWidgetShortcut) {
@@ -380,7 +465,20 @@ public final class Workspace extends Home {
                     LauncherInstrumentation.EVENT_START);
         }
         dragIconToWorkspace(
-                launcher, launchable, () -> dest, expectLongClickEvents, expectDropEvents);
+                launcher, launchable, dest, expectLongClickEvents, expectDropEvents);
+    }
+
+    static void dragIconToWorkspaceCellPosition(LauncherInstrumentation launcher,
+            Launchable launchable, int cellX, int cellY, int spanX, int spanY,
+            boolean startsActivity, boolean isWidgetShortcut, Runnable expectLongClickEvents) {
+        Runnable expectDropEvents = null;
+        if (startsActivity || isWidgetShortcut) {
+            expectDropEvents = () -> launcher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                    LauncherInstrumentation.EVENT_START);
+        }
+        dragIconToWorkspaceCellPosition(
+                launcher, launchable, cellX, cellY, spanX, spanY, true, expectLongClickEvents,
+                expectDropEvents);
     }
 
     /**
@@ -429,7 +527,9 @@ public final class Workspace extends Home {
             // Since the destination can be on another page, we need to drag to the edge first
             // until we reach the target page
             while (targetDest.x > displayX || targetDest.x < 0) {
-                int edgeX = targetDest.x > 0 ? displayX : 0;
+                // Don't drag all the way to the edge to prevent touch events from getting out of
+                //screen bounds.
+                int edgeX = targetDest.x > 0 ? displayX - 1 : 1;
                 Point screenEdge = new Point(edgeX, targetDest.y);
                 Point finalDragStart = dragStart;
                 executeAndWaitForPageScroll(launcher,
@@ -445,6 +545,52 @@ public final class Workspace extends Home {
             launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
                     LauncherInstrumentation.GestureScope.INSIDE);
+            launcher.runCallbackIfActive(CALLBACK_HOLD_BEFORE_DROP);
+            dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
+        }
+    }
+
+    static void dragIconToWorkspaceCellPosition(
+            LauncherInstrumentation launcher,
+            Launchable launchable,
+            int cellX, int cellY, int spanX, int spanY,
+            boolean isDecelerating,
+            Runnable expectLongClickEvents,
+            @Nullable Runnable expectDropEvents) {
+        try (LauncherInstrumentation.Closable ignored = launcher.addContextLayer(
+                "want to drag icon to workspace")) {
+            Point rowsAndCols = launcher.getWorkspace().getRowsAndCols();
+            int destinationWorkspace = cellX / rowsAndCols.x;
+            cellX = cellX % rowsAndCols.x;
+
+            final long downTime = SystemClock.uptimeMillis();
+            Point dragStart = launchable.startDrag(
+                    downTime,
+                    expectLongClickEvents,
+                    /* runToSpringLoadedState= */ true);
+            Point targetDest = getCellCenter(launcher, cellX, cellY, spanX, spanY);
+            int displayX = launcher.getRealDisplaySize().x;
+
+            // Since the destination can be on another page, we need to drag to the edge first
+            // until we reach the target page
+            for (int i = 0; i < destinationWorkspace; i++) {
+                // Don't drag all the way to the edge to prevent touch events from getting out of
+                //screen bounds.
+                Point screenEdge = new Point(displayX - 1, targetDest.y);
+                Point finalDragStart = dragStart;
+                executeAndWaitForPageScroll(launcher,
+                        () -> launcher.movePointer(finalDragStart, screenEdge, DEFAULT_DRAG_STEPS,
+                                true, downTime, downTime, true,
+                                LauncherInstrumentation.GestureScope.INSIDE));
+                dragStart = screenEdge;
+            }
+
+            // targetDest.x is now between 0 and displayX so we found the target page,
+            // we just have to put move the icon to the destination and drop it
+            launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
+                    downTime, SystemClock.uptimeMillis(), false,
+                    LauncherInstrumentation.GestureScope.INSIDE);
+            launcher.runCallbackIfActive(CALLBACK_HOLD_BEFORE_DROP);
             dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
         }
     }
@@ -454,6 +600,25 @@ public final class Workspace extends Home {
         launcher.executeAndWaitForEvent(command,
                 event -> event.getEventType() == TYPE_VIEW_SCROLLED,
                 () -> "Page scroll didn't happen", "Scrolling page");
+    }
+
+    static void dragIconToHotseat(
+            LauncherInstrumentation launcher,
+            Launchable launchable,
+            Supplier<Point> dest,
+            Runnable expectLongClickEvents,
+            @Nullable Runnable expectDropEvents) {
+        final long downTime = SystemClock.uptimeMillis();
+        Point dragStart = launchable.startDrag(
+                downTime,
+                expectLongClickEvents,
+                /* runToSpringLoadedState= */ true);
+        Point targetDest = dest.get();
+
+        launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, true,
+                downTime, SystemClock.uptimeMillis(), false,
+                LauncherInstrumentation.GestureScope.INSIDE);
+        dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
     }
 
     /**
@@ -521,6 +686,32 @@ public final class Workspace extends Home {
                     timeout);
             return widget != null ? new Widget(mLauncher, widget) : null;
         }
+    }
+
+    /**
+     * @param cellX X position of the widget trying to get.
+     * @param cellY Y position of the widget trying to get.
+     * @return returns the Widget in the given position in the Launcher or an Exception if no such
+     * widget is in that position.
+     */
+    @NonNull
+    public Widget getWidgetAtCell(int cellX, int cellY) {
+        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                "getting widget at cell position " + cellX + "," + cellY)) {
+            final List<UiObject2> widgets = mLauncher.waitForObjectsBySelector(
+                    By.clazz("com.android.launcher3.widget.LauncherAppWidgetHostView"));
+            Point coordinateInScreen = Workspace.getCellCenter(mLauncher, cellX, cellY);
+            for (UiObject2 widget : widgets) {
+                if (widget.getVisibleBounds().contains(coordinateInScreen.x,
+                        coordinateInScreen.y)) {
+                    return new Widget(mLauncher, widget);
+                }
+            }
+        }
+        mLauncher.fail("Unable to find widget at cell " + cellX + "," + cellY);
+        // This statement is unreachable because mLauncher.fail throws an exception
+        // but is needed for compiling
+        return null;
     }
 
     @Nullable

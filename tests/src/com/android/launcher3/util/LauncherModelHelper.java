@@ -47,6 +47,7 @@ import android.provider.Settings;
 import android.test.mock.MockContentResolver;
 import android.util.ArrayMap;
 
+import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.uiautomator.UiDevice;
 
@@ -54,6 +55,7 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherProvider;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.model.AllAppsList;
@@ -194,8 +196,9 @@ public class LauncherModelHelper {
         Executor mockExecutor = mock(Executor.class);
         model.enqueueModelUpdateTask(new ModelUpdateTask() {
             @Override
-            public void init(LauncherAppState app, LauncherModel model, BgDataModel dataModel,
-                    AllAppsList allAppsList, Executor uiExecutor) {
+            public void init(@NonNull final LauncherAppState app,
+                    @NonNull final LauncherModel model, @NonNull final BgDataModel dataModel,
+                    @NonNull final AllAppsList allAppsList, @NonNull final Executor uiExecutor) {
                 task.init(app, model, dataModel, allAppsList, mockExecutor);
             }
 
@@ -360,6 +363,12 @@ public class LauncherModelHelper {
         sandboxContext.getContentResolver().insert(contentUri, values);
     }
 
+    public void deleteItem(int itemId, @NonNull final String tableName) {
+        final Uri uri = Uri.parse("content://"
+                + LauncherProvider.AUTHORITY + "/" + tableName + "/" + itemId);
+        sandboxContext.getContentResolver().delete(uri, null, null);
+    }
+
     public int[][][] createGrid(int[][][] typeArray) {
         return createGrid(typeArray, 1);
     }
@@ -498,7 +507,7 @@ public class LauncherModelHelper {
 
         SanboxModelContext() {
             super(ApplicationProvider.getApplicationContext(),
-                    UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
+                    UserCache.INSTANCE, InstallSessionHelper.INSTANCE, LauncherPrefs.INSTANCE,
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
                     DisplayController.INSTANCE, CustomWidgetManager.INSTANCE,
                     SettingsCache.INSTANCE, PluginManagerWrapper.INSTANCE,

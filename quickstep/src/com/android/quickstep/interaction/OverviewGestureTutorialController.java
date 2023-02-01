@@ -24,8 +24,8 @@ import android.graphics.PointF;
 import android.os.Build;
 
 import com.android.launcher3.R;
+import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SwipeUpAnimationLogic;
 import com.android.quickstep.interaction.EdgeBackGestureHandler.BackGestureResult;
 import com.android.quickstep.interaction.NavBarGestureHandler.NavBarGestureResult;
@@ -154,7 +154,6 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
 
         AnimatorSet animset = new AnimatorSet();
         animset.playTogether(animators);
-        hideFakeTaskbar(/* animateToHotseat= */ false);
         animset.start();
         mRunningWindowAnim = SwipeUpAnimationLogic.RunningWindowAnim.wrap(animset);
     }

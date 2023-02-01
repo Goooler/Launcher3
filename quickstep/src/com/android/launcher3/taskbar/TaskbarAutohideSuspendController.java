@@ -33,21 +33,31 @@ import java.util.StringJoiner;
 public class TaskbarAutohideSuspendController implements
         TaskbarControllers.LoggableTaskbarController {
 
+    // Taskbar window is fullscreen.
     public static final int FLAG_AUTOHIDE_SUSPEND_FULLSCREEN = 1 << 0;
+    // User is dragging item.
     public static final int FLAG_AUTOHIDE_SUSPEND_DRAGGING = 1 << 1;
+    // User has touched down but has not lifted finger.
+    public static final int FLAG_AUTOHIDE_SUSPEND_TOUCHING = 1 << 2;
+    // Taskbar EDU overlay is open above the Taskbar. */
+    public static final int FLAG_AUTOHIDE_SUSPEND_EDU_OPEN = 1 << 3;
 
     @IntDef(flag = true, value = {
             FLAG_AUTOHIDE_SUSPEND_FULLSCREEN,
             FLAG_AUTOHIDE_SUSPEND_DRAGGING,
+            FLAG_AUTOHIDE_SUSPEND_TOUCHING,
+            FLAG_AUTOHIDE_SUSPEND_EDU_OPEN,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface AutohideSuspendFlag {}
 
+    private final TaskbarActivityContext mActivity;
     private final SystemUiProxy mSystemUiProxy;
 
     private @AutohideSuspendFlag int mAutohideSuspendFlags = 0;
 
     public TaskbarAutohideSuspendController(TaskbarActivityContext activity) {
+        mActivity = activity;
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(activity);
     }
 
@@ -59,20 +69,34 @@ public class TaskbarAutohideSuspendController implements
      * Adds or removes the given flag, then notifies system UI proxy whether to suspend auto-hide.
      */
     public void updateFlag(@AutohideSuspendFlag int flag, boolean enabled) {
+        int flagsBefore = mAutohideSuspendFlags;
         if (enabled) {
             mAutohideSuspendFlags |= flag;
         } else {
             mAutohideSuspendFlags &= ~flag;
         }
-        mSystemUiProxy.notifyTaskbarAutohideSuspend(mAutohideSuspendFlags != 0);
+        if (flagsBefore == mAutohideSuspendFlags) {
+            // Nothing has changed, no need to notify.
+            return;
+        }
+
+        boolean isSuspended = isSuspended();
+        mSystemUiProxy.notifyTaskbarAutohideSuspend(isSuspended);
+        mActivity.onTransientAutohideSuspendFlagChanged(isSuspended);
+    }
+
+    /**
+     * Returns true iff taskbar autohide is currently suspended.
+     */
+    public boolean isSuspended() {
+        return mAutohideSuspendFlags != 0;
     }
 
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarAutohideSuspendController:");
 
-        pw.println(String.format(
-                "%s\tmAutohideSuspendFlags=%s", prefix, getStateString(mAutohideSuspendFlags)));
+        pw.println(prefix + "\tmAutohideSuspendFlags=" + getStateString(mAutohideSuspendFlags));
     }
 
     private static String getStateString(int flags) {
@@ -80,6 +104,8 @@ public class TaskbarAutohideSuspendController implements
         appendFlag(str, flags, FLAG_AUTOHIDE_SUSPEND_FULLSCREEN,
                 "FLAG_AUTOHIDE_SUSPEND_FULLSCREEN");
         appendFlag(str, flags, FLAG_AUTOHIDE_SUSPEND_DRAGGING, "FLAG_AUTOHIDE_SUSPEND_DRAGGING");
+        appendFlag(str, flags, FLAG_AUTOHIDE_SUSPEND_TOUCHING, "FLAG_AUTOHIDE_SUSPEND_TOUCHING");
+        appendFlag(str, flags, FLAG_AUTOHIDE_SUSPEND_EDU_OPEN, "FLAG_AUTOHIDE_SUSPEND_EDU_OPEN");
         return str.toString();
     }
 }

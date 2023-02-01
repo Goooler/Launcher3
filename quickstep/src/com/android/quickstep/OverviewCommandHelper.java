@@ -116,7 +116,7 @@ public class OverviewCommandHelper {
      */
     @BinderThread
     public void addCommand(int type) {
-        if (mPendingCommands.size() > MAX_QUEUE_SIZE) {
+        if (mPendingCommands.size() >= MAX_QUEUE_SIZE) {
             return;
         }
         CommandInfo cmd = new CommandInfo(type);
@@ -144,7 +144,7 @@ public class OverviewCommandHelper {
         RunnableList callbackList = null;
         if (taskView != null) {
             taskView.setEndQuickswitchCuj(true);
-            callbackList = taskView.launchTaskAnimated();
+            callbackList = taskView.launchTasks();
         }
 
         if (callbackList != null) {
@@ -193,7 +193,20 @@ public class OverviewCommandHelper {
             }
         }
 
-        if (activityInterface.switchToRecentsIfVisible(() -> scheduleNextTask(cmd))) {
+        final Runnable completeCallback = () -> {
+            if (cmd.type == TYPE_SHOW_NEXT_FOCUS) {
+                RecentsView rv = activityInterface.getVisibleRecentsView();
+                // When the overview is launched via alt tab (cmd type is TYPE_SHOW_NEXT_FOCUS),
+                // the touch mode somehow is not change to false by the Android framework.
+                // The subsequent tab to go through tasks in overview can only be dispatched to
+                // focuses views, while focus can only be requested in
+                // {@link View#requestFocusNoSearch(int, Rect)} when touch mode is false. To note,
+                // here we launch overview from home.
+                rv.getViewRootImpl().touchModeChanged(false);
+            }
+            scheduleNextTask(cmd);
+        };
+        if (activityInterface.switchToRecentsIfVisible(completeCallback)) {
             // If successfully switched, wait until animation finishes
             return false;
         }
@@ -205,7 +218,8 @@ public class OverviewCommandHelper {
                     InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH);
         }
 
-        GestureState gestureState = mService.createGestureState(GestureState.DEFAULT_STATE);
+        GestureState gestureState = mService.createGestureState(GestureState.DEFAULT_STATE,
+                false /* isTrackpadGesture */);
         gestureState.setHandlingAtomicEvent(true);
         AbsSwipeUpHandler interactionHandler = mService.getSwipeUpHandlerFactory()
                 .newHandler(gestureState, cmd.createTime);
@@ -218,7 +232,7 @@ public class OverviewCommandHelper {
             public void onRecentsAnimationStart(RecentsAnimationController controller,
                     RecentsAnimationTargets targets) {
                 activityInterface.runOnInitBackgroundStateUI(() ->
-                        interactionHandler.onGestureEnded(0, new PointF(), new PointF()));
+                        interactionHandler.onGestureEnded(0, new PointF()));
                 cmd.removeListener(this);
             }
 
@@ -227,14 +241,21 @@ public class OverviewCommandHelper {
                 interactionHandler.onGestureCancelled();
                 cmd.removeListener(this);
 
-                RecentsView createdRecents =
-                        activityInterface.getCreatedActivity().getOverviewPanel();
+                T createdActivity = activityInterface.getCreatedActivity();
+                if (createdActivity == null) {
+                    return;
+                }
+                RecentsView createdRecents = createdActivity.getOverviewPanel();
                 if (createdRecents != null) {
                     createdRecents.onRecentsAnimationComplete();
                 }
             }
         };
 
+        RecentsView<?, ?> visibleRecentsView = activityInterface.getVisibleRecentsView();
+        if (visibleRecentsView != null) {
+            visibleRecentsView.moveFocusedTaskToFront();
+        }
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
             cmd.mActiveCallbacks = mTaskAnimationManager.continueRecentsAnimation(gestureState);
             cmd.mActiveCallbacks.addListener(interactionHandler);
@@ -264,6 +285,13 @@ public class OverviewCommandHelper {
             RecentsView rv =
                     mOverviewComponentObserver.getActivityInterface().getVisibleRecentsView();
             if (rv != null) {
+                // When the overview is launched via alt tab (cmd type is TYPE_SHOW_NEXT_FOCUS),
+                // the touch mode somehow is not change to false by the Android framework.
+                // The subsequent tab to go through tasks in overview can only be dispatched to
+                // focuses views, while focus can only be requested in
+                // {@link View#requestFocusNoSearch(int, Rect)} when touch mode is false. To note,
+                // here we launch overview with live tile.
+                rv.getViewRootImpl().touchModeChanged(false);
                 // Ensure that recents view has focus so that it receives the followup key inputs
                 TaskView taskView = rv.getNextTaskView();
                 if (taskView == null) {

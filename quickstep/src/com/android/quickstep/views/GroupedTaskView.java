@@ -2,7 +2,6 @@ package com.android.quickstep.views;
 
 import static com.android.launcher3.util.SplitConfigurationOptions.DEFAULT_SPLIT_RATIO;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 
 import android.content.Context;
 import android.graphics.PointF;
@@ -17,15 +16,18 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.RunnableList;
-import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
+import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
 import com.android.launcher3.util.TransformingTouchDelegate;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.util.CancellableTask;
 import com.android.quickstep.util.RecentsOrientedState;
+import com.android.quickstep.util.TaskViewSimulator;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
+import com.android.systemui.shared.recents.utilities.PreviewPositionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 import java.util.HashMap;
@@ -53,7 +55,7 @@ public class GroupedTaskView extends TaskView {
     private CancellableTask mIconLoadRequest2;
     private final float[] mIcon2CenterCoords = new float[2];
     private TransformingTouchDelegate mIcon2TouchDelegate;
-    @Nullable private StagedSplitBounds mSplitBoundsConfig;
+    @Nullable private SplitBounds mSplitBoundsConfig;
     private final DigitalWellBeingToast mDigitalWellBeingToast2;
 
     public GroupedTaskView(Context context) {
@@ -78,15 +80,41 @@ public class GroupedTaskView extends TaskView {
     }
 
     public void bind(Task primary, Task secondary, RecentsOrientedState orientedState,
-            @Nullable StagedSplitBounds splitBoundsConfig) {
+            @Nullable SplitBounds splitBoundsConfig) {
         super.bind(primary, orientedState);
         mSecondaryTask = secondary;
         mTaskIdContainer[1] = secondary.key.id;
         mTaskIdAttributeContainer[1] = new TaskIdAttributeContainer(secondary, mSnapshotView2,
                 mIconView2, STAGE_POSITION_BOTTOM_OR_RIGHT);
-        mTaskIdAttributeContainer[0].setStagePosition(STAGE_POSITION_TOP_OR_LEFT);
+        mTaskIdAttributeContainer[0].setStagePosition(
+                SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT);
         mSnapshotView2.bind(secondary);
         mSplitBoundsConfig = splitBoundsConfig;
+        if (mSplitBoundsConfig == null) {
+            return;
+        }
+        mSnapshotView.getPreviewPositionHelper().setSplitBounds(TaskViewSimulator
+                        .convertSplitBounds(splitBoundsConfig),
+                PreviewPositionHelper.STAGE_POSITION_TOP_OR_LEFT);
+        mSnapshotView2.getPreviewPositionHelper().setSplitBounds(TaskViewSimulator
+                        .convertSplitBounds(splitBoundsConfig),
+                PreviewPositionHelper.STAGE_POSITION_BOTTOM_OR_RIGHT);
+    }
+
+    /**
+     * Sets up an on-click listener and the visibility for show_windows icon on top of each task.
+     */
+    @Override
+    public void setUpShowAllInstancesListener() {
+        // sets up the listener for the left/top task
+        super.setUpShowAllInstancesListener();
+
+        // right/bottom task's base package name
+        String taskPackageName = mTaskIdAttributeContainer[1].getTask().key.getPackageName();
+
+        // icon of the right/bottom task
+        View showWindowsView = findViewById(R.id.show_windows_right);
+        updateFilterCallback(showWindowsView, getFilterUpdateCallback(taskPackageName));
     }
 
     @Override
@@ -126,8 +154,8 @@ public class GroupedTaskView extends TaskView {
         }
     }
 
-    public void updateSplitBoundsConfig(StagedSplitBounds stagedSplitBounds) {
-        mSplitBoundsConfig = stagedSplitBounds;
+    public void updateSplitBoundsConfig(SplitBounds splitBounds) {
+        mSplitBoundsConfig = splitBounds;
         invalidate();
     }
 
@@ -174,7 +202,7 @@ public class GroupedTaskView extends TaskView {
         // Callbacks run from remote animation when recents animation not currently running
         InteractionJankMonitorWrapper.begin(this,
                 InteractionJankMonitorWrapper.CUJ_SPLIT_SCREEN_ENTER, "Enter form GroupedTaskView");
-        recentsView.getSplitPlaceholder().launchTasks(this /*groupedTaskView*/,
+        recentsView.getSplitSelectController().launchTasks(this /*groupedTaskView*/,
                 success -> {
                     endCallback.executeAllAndDestroy();
                     InteractionJankMonitorWrapper.end(
@@ -189,8 +217,9 @@ public class GroupedTaskView extends TaskView {
 
     @Override
     public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
-        getRecentsView().getSplitPlaceholder().launchTasks(mTask.key.id, mSecondaryTask.key.id,
-                STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList, getSplitRatio());
+        getRecentsView().getSplitSelectController().launchTasks(mTask.key.id, mSecondaryTask.key.id,
+                SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList,
+                getSplitRatio());
     }
 
     @Override
@@ -208,16 +237,23 @@ public class GroupedTaskView extends TaskView {
     }
 
     @Override
+    public boolean containsTaskId(int taskId) {
+        return (mTask != null && mTask.key.id == taskId)
+                || (mSecondaryTask != null && mSecondaryTask.key.id == taskId);
+    }
+
+    @Override
     public TaskThumbnailView[] getThumbnails() {
         return new TaskThumbnailView[]{mSnapshotView, mSnapshotView2};
     }
 
     @Override
-    protected int getChildTaskIndexAtPosition(PointF position) {
-        if (isCoordInView(mIconView2, position) || isCoordInView(mSnapshotView2, position)) {
+    protected int getLastSelectedChildTaskIndex() {
+        if (isCoordInView(mIconView2, mLastTouchDownPosition)
+                || isCoordInView(mSnapshotView2, mLastTouchDownPosition)) {
             return 1;
         }
-        return super.getChildTaskIndexAtPosition(position);
+        return super.getLastSelectedChildTaskIndex();
     }
 
     private boolean isCoordInView(View v, PointF position) {
@@ -250,8 +286,7 @@ public class GroupedTaskView extends TaskView {
 
     @Override
     public void setOverlayEnabled(boolean overlayEnabled) {
-        super.setOverlayEnabled(overlayEnabled);
-        mSnapshotView2.setOverlayEnabled(overlayEnabled);
+        // Intentional no-op to prevent setting smart actions overlay on thumbnails
     }
 
     @Override
@@ -296,8 +331,8 @@ public class GroupedTaskView extends TaskView {
     }
 
     @Override
-    protected void setIconAndDimTransitionProgress(float progress, boolean invert) {
-        super.setIconAndDimTransitionProgress(progress, invert);
+    protected void setIconsAndBannersTransitionProgress(float progress, boolean invert) {
+        super.setIconsAndBannersTransitionProgress(progress, invert);
         // Value set by super call
         float scale = mIconView.getAlpha();
         mIconView2.setAlpha(scale);
@@ -312,5 +347,34 @@ public class GroupedTaskView extends TaskView {
         mIconView2.setIconColorTint(tintColor, amount);
         mSnapshotView2.setDimAlpha(amount);
         mDigitalWellBeingToast2.setBannerColorTint(tintColor, amount);
+    }
+
+    @Override
+    protected void applyThumbnailSplashAlpha() {
+        super.applyThumbnailSplashAlpha();
+        mSnapshotView2.setSplashAlpha(mTaskThumbnailSplashAlpha);
+    }
+
+    /**
+     *     Sets visibility for thumbnails and associated elements (DWB banners).
+     *     IconView is unaffected.
+     *
+     *     When setting INVISIBLE, sets the visibility for the last selected child task.
+     *     When setting VISIBLE (as a reset), sets the visibility for both tasks.
+     */
+    @Override
+    void setThumbnailVisibility(int visibility) {
+        if (visibility == VISIBLE) {
+            mSnapshotView.setVisibility(visibility);
+            mDigitalWellBeingToast.setBannerVisibility(visibility);
+            mSnapshotView2.setVisibility(visibility);
+            mDigitalWellBeingToast2.setBannerVisibility(visibility);
+        } else if (getLastSelectedChildTaskIndex() == 0) {
+            mSnapshotView.setVisibility(visibility);
+            mDigitalWellBeingToast.setBannerVisibility(visibility);
+        } else {
+            mSnapshotView2.setVisibility(visibility);
+            mDigitalWellBeingToast2.setBannerVisibility(visibility);
+        }
     }
 }

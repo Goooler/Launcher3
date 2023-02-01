@@ -20,20 +20,22 @@ import static android.content.Intent.ACTION_PACKAGE_ADDED;
 import static android.content.Intent.ACTION_PACKAGE_CHANGED;
 import static android.content.Intent.ACTION_PACKAGE_REMOVED;
 
-import static com.android.launcher3.Utilities.createHomeIntent;
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
-import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
 import static com.android.systemui.shared.system.PackageManagerWrapper.ACTION_PREFERRED_ACTIVITY_CHANGED;
 
-import android.content.BroadcastReceiver;
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.os.Bundle;
+import android.util.Log;
 import android.util.SparseIntArray;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.tracing.OverviewComponentObserverProto;
 import com.android.launcher3.tracing.TouchInteractionServiceProto;
@@ -50,9 +52,11 @@ import java.util.function.Consumer;
  * and provide callers the relevant classes.
  */
 public final class OverviewComponentObserver {
-    private final BroadcastReceiver mUserPreferenceChangeReceiver =
+    private static final String TAG = "OverviewComponentObserver";
+
+    private final SimpleBroadcastReceiver mUserPreferenceChangeReceiver =
             new SimpleBroadcastReceiver(this::updateOverviewTargets);
-    private final BroadcastReceiver mOtherHomeAppUpdateReceiver =
+    private final SimpleBroadcastReceiver mOtherHomeAppUpdateReceiver =
             new SimpleBroadcastReceiver(this::updateOverviewTargets);
 
     private final Context mContext;
@@ -95,8 +99,7 @@ public final class OverviewComponentObserver {
             mConfigChangesMap.append(fallbackComponent.hashCode(), fallbackInfo.configChanges);
         } catch (PackageManager.NameNotFoundException ignored) { /* Impossible */ }
 
-        mContext.registerReceiver(mUserPreferenceChangeReceiver,
-                new IntentFilter(ACTION_PREFERRED_ACTIVITY_CHANGED));
+        mUserPreferenceChangeReceiver.register(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
         updateOverviewTargets();
     }
 
@@ -110,11 +113,6 @@ public final class OverviewComponentObserver {
     public void onSystemUiStateChanged() {
         if (mDeviceState.isHomeDisabled() != mIsHomeDisabled) {
             updateOverviewTargets();
-        }
-
-        // Notify ALL_APPS touch controller when one handed mode state activated or deactivated
-        if (mDeviceState.isOneHandedModeEnabled()) {
-            mActivityInterface.onOneHandedModeStateChanged(mDeviceState.isOneHandedModeActive());
         }
     }
 
@@ -147,7 +145,12 @@ public final class OverviewComponentObserver {
             }
         }
 
-        if (!mDeviceState.isHomeDisabled() && (defaultHome == null || mIsDefaultHome)) {
+        // TODO(b/258022658): Remove temporary logging.
+        Log.i(TAG, "updateOverviewTargets: mIsHomeDisabled=" + mIsHomeDisabled
+                + ", isDefaultHomeNull=" + (defaultHome == null)
+                + ", mIsDefaultHome=" + mIsDefaultHome);
+
+        if (!mIsHomeDisabled && (defaultHome == null || mIsDefaultHome)) {
             // User default home is same as out home app. Use Overview integrated in Launcher.
             mActivityInterface = LauncherActivityInterface.INSTANCE;
             mIsHomeAndOverviewSame = true;
@@ -174,9 +177,8 @@ public final class OverviewComponentObserver {
                 unregisterOtherHomeAppUpdateReceiver();
 
                 mUpdateRegisteredPackage = defaultHome.getPackageName();
-                mContext.registerReceiver(mOtherHomeAppUpdateReceiver, getPackageFilter(
-                        mUpdateRegisteredPackage, ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED,
-                        ACTION_PACKAGE_REMOVED));
+                mOtherHomeAppUpdateReceiver.registerPkgActions(mContext, mUpdateRegisteredPackage,
+                        ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED);
             }
         }
         mOverviewChangeListener.accept(mIsHomeAndOverviewSame);
@@ -275,5 +277,35 @@ public final class OverviewComponentObserver {
         overviewComponentObserver.setOverviewActivityStarted(mActivityInterface.isStarted());
         overviewComponentObserver.setOverviewActivityResumed(mActivityInterface.isResumed());
         serviceProto.setOverviewComponentObvserver(overviewComponentObserver);
+    }
+
+    /**
+     * Starts the intent for the current home activity.
+     */
+    public static void startHomeIntentSafely(@NonNull Context context, @Nullable Bundle options) {
+        RecentsAnimationDeviceState deviceState = new RecentsAnimationDeviceState(context);
+        OverviewComponentObserver observer = new OverviewComponentObserver(context, deviceState);
+        Intent intent = observer.getHomeIntent();
+        observer.onDestroy();
+        deviceState.destroy();
+        startHomeIntentSafely(context, intent, options);
+    }
+
+    /**
+     * Starts the intent for the current home activity.
+     */
+    public static void startHomeIntentSafely(
+            @NonNull Context context, @NonNull Intent homeIntent, @Nullable Bundle options) {
+        try {
+            context.startActivity(homeIntent, options);
+        } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {
+            context.startActivity(createHomeIntent(), options);
+        }
+    }
+
+    private static Intent createHomeIntent() {
+        return new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
 }

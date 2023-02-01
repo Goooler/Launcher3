@@ -37,7 +37,6 @@ import com.android.launcher3.popup.ArrowPopup
 import com.android.launcher3.popup.RoundedArrowDrawable
 import com.android.launcher3.popup.SystemShortcut
 import com.android.launcher3.util.Themes
-import com.android.quickstep.KtR
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.views.TaskView.TaskIdAttributeContainer
 
@@ -49,11 +48,13 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
             taskContainer: TaskIdAttributeContainer,
             alignSecondRow: Boolean = false
         ): Boolean {
-            val activity = BaseDraggingActivity
-                .fromContext<BaseDraggingActivity>(taskContainer.taskView.context)
-            val taskMenuViewWithArrow = activity.layoutInflater
-                .inflate(
-                    KtR.layout.task_menu_with_arrow,
+            val activity =
+                BaseDraggingActivity.fromContext<BaseDraggingActivity>(
+                    taskContainer.taskView.context
+                )
+            val taskMenuViewWithArrow =
+                activity.layoutInflater.inflate(
+                    R.layout.task_menu_with_arrow,
                     activity.dragLayer,
                     false
                 ) as TaskMenuViewWithArrow<*>
@@ -64,11 +65,11 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
 
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
-    constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(
-        context,
-        attrs,
-        defStyleAttr
-    )
+    constructor(
+        context: Context,
+        attrs: AttributeSet,
+        defStyleAttr: Int
+    ) : super(context, attrs, defStyleAttr)
 
     init {
         clipToOutline = true
@@ -92,10 +93,10 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
 
     private var optionMeasuredHeight = 0
     private val arrowHorizontalPadding: Int
-        get() = if (taskView.isFocusedTask)
-            resources.getDimensionPixelSize(KtR.dimen.task_menu_horizontal_padding)
-        else
-            0
+        get() =
+            if (taskView.isFocusedTask)
+                resources.getDimensionPixelSize(R.dimen.task_menu_horizontal_padding)
+            else 0
 
     private var iconView: IconView? = null
     private var scrim: View? = null
@@ -119,7 +120,7 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
 
     override fun onFinishInflate() {
         super.onFinishInflate()
-        optionLayout = findViewById(KtR.id.menu_option_layout)
+        optionLayout = findViewById(R.id.menu_option_layout)
     }
 
     private fun populateAndShowForTask(
@@ -140,19 +141,20 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
     }
 
     private fun addScrim() {
-        scrim = View(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Themes.getAttrColor(context, R.attr.overviewScrimColor))
-            alpha = 0f
-        }
+        scrim =
+            View(context).apply {
+                layoutParams =
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                setBackgroundColor(Themes.getAttrColor(context, R.attr.overviewScrimColor))
+                alpha = 0f
+            }
         popupContainer.addView(scrim)
     }
 
-    /** @return true if successfully able to populate task view menu, false otherwise
-     */
+    /** @return true if successfully able to populate task view menu, false otherwise */
     private fun populateMenu(): Boolean {
         // Icon may not be loaded
         if (taskContainer.task.icon == null) return false
@@ -163,14 +165,14 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
 
     private fun addMenuOptions() {
         // Add the options
-        TaskOverlayFactory
-            .getEnabledShortcuts(taskView, mActivityContext.deviceProfile, taskContainer)
-            .forEach { this.addMenuOption(it) }
+        TaskOverlayFactory.getEnabledShortcuts(taskView, taskContainer).forEach {
+            this.addMenuOption(it)
+        }
 
         // Add the spaces between items
         val divider = ShapeDrawable(RectShape())
         divider.paint.color = resources.getColor(android.R.color.transparent)
-        val dividerSpacing = resources.getDimension(KtR.dimen.task_menu_spacing).toInt()
+        val dividerSpacing = resources.getDimension(R.dimen.task_menu_spacing).toInt()
         optionLayout.showDividers = SHOW_DIVIDER_MIDDLE
 
         // Set the orientation, which makes the menu show
@@ -186,9 +188,9 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
     }
 
     private fun addMenuOption(menuOption: SystemShortcut<*>) {
-        val menuOptionView = mActivityContext.layoutInflater.inflate(
-            KtR.layout.task_view_menu_option, this, false
-        ) as LinearLayout
+        val menuOptionView =
+            mActivityContext.layoutInflater.inflate(R.layout.task_view_menu_option, this, false)
+                as LinearLayout
         menuOption.setIconAndLabelFor(
             menuOptionView.findViewById(R.id.icon),
             menuOptionView.findViewById(R.id.text)
@@ -231,24 +233,25 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
     }
 
     /**
-     * Copy the iconView from taskView to dragLayer so it can stay on top of the scrim.
-     * It needs to be called after [getTargetObjectLocation] because [mTempRect] needs to be
-     * populated.
+     * Copy the iconView from taskView to dragLayer so it can stay on top of the scrim. It needs to
+     * be called after [getTargetObjectLocation] because [mTempRect] needs to be populated.
      */
     private fun copyIconToDragLayer(insets: Rect) {
-        iconView = IconView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                taskContainer.iconView.width,
-                taskContainer.iconView.height
-            )
-            x = mTempRect.left.toFloat() - insets.left
-            y = mTempRect.top.toFloat() - insets.top
-            drawable = taskContainer.iconView.drawable
-            setDrawableSize(
-                taskContainer.iconView.drawableWidth,
-                taskContainer.iconView.drawableHeight
-            )
-        }
+        iconView =
+            IconView(context).apply {
+                layoutParams =
+                    FrameLayout.LayoutParams(
+                        taskContainer.iconView.width,
+                        taskContainer.iconView.height
+                    )
+                x = mTempRect.left.toFloat() - insets.left
+                y = mTempRect.top.toFloat() - insets.top
+                drawable = taskContainer.iconView.drawable
+                setDrawableSize(
+                    taskContainer.iconView.drawableWidth,
+                    taskContainer.iconView.drawableHeight
+                )
+            }
 
         popupContainer.addView(iconView)
     }
@@ -282,12 +285,13 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
         // which means the arrow is left aligned with the menu
         val rightAlignedMenuStartX = mTempRect.left - widthWithArrow
         val leftAlignedMenuStartX = mTempRect.right + extraHorizontalSpace
-        mIsLeftAligned = if (mIsRtl) {
-            rightAlignedMenuStartX + insets.left < 0
-        } else {
-            leftAlignedMenuStartX + (widthWithArrow - extraHorizontalSpace) + insets.left <
+        mIsLeftAligned =
+            if (mIsRtl) {
+                rightAlignedMenuStartX + insets.left < 0
+            } else {
+                leftAlignedMenuStartX + (widthWithArrow - extraHorizontalSpace) + insets.left <
                     dragLayer.width - insets.right
-        }
+            }
 
         var menuStartX = if (mIsLeftAligned) leftAlignedMenuStartX else rightAlignedMenuStartX
 
@@ -312,8 +316,8 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
     override fun addArrow() {
         popupContainer.addView(mArrow)
         mArrow.x = getArrowX()
-        mArrow.y = y + (optionMeasuredHeight / 2) - (mArrowHeight / 2) +
-                extraSpaceForSecondRowAlignment
+        mArrow.y =
+            y + (optionMeasuredHeight / 2) - (mArrowHeight / 2) + extraSpaceForSecondRowAlignment
 
         updateArrowColor()
 
@@ -323,22 +327,19 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
     }
 
     private fun getArrowX(): Float {
-        return if (mIsLeftAligned)
-            x - mArrowHeight
-        else
-            x + measuredWidth + mArrowOffsetVertical
+        return if (mIsLeftAligned) x - mArrowHeight else x + measuredWidth + mArrowOffsetVertical
     }
 
     override fun updateArrowColor() {
-        mArrow.background = RoundedArrowDrawable(
-            mArrowWidth.toFloat(),
-            mArrowHeight.toFloat(),
-            mArrowPointRadius.toFloat(),
-            mIsLeftAligned,
-            mArrowColor
-        )
+        mArrow.background =
+            RoundedArrowDrawable(
+                mArrowWidth.toFloat(),
+                mArrowHeight.toFloat(),
+                mArrowPointRadius.toFloat(),
+                mIsLeftAligned,
+                mArrowColor
+            )
         elevation = mElevation
         mArrow.elevation = mElevation
     }
-
 }
