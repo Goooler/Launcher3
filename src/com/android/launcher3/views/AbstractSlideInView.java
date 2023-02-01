@@ -17,6 +17,8 @@ package com.android.launcher3.views;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
+import static com.android.launcher3.LauncherAnimUtils.SUCCESS_TRANSITION_PROGRESS;
+import static com.android.launcher3.LauncherAnimUtils.TABLET_BOTTOM_SHEET_SUCCESS_TRANSITION_PROGRESS;
 import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
 
 import android.animation.Animator;
@@ -31,6 +33,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.Interpolators;
@@ -39,6 +43,7 @@ import com.android.launcher3.touch.SingleAxisSwipeDetector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Extension of {@link AbstractFloatingView} with common methods for sliding in from bottom.
@@ -77,6 +82,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected float mTranslationShift = TRANSLATION_SHIFT_CLOSED;
 
     protected boolean mNoIntercept;
+    protected @Nullable OnCloseListener mOnCloseBeginListener;
     protected List<OnCloseListener> mOnCloseListeners = new ArrayList<>();
 
     public AbstractSlideInView(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -113,9 +119,16 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         return -1;
     }
 
+    /**
+     * Returns the range in height that the slide in view can be dragged.
+     */
+    protected float getShiftRange() {
+        return mContent.getHeight();
+    }
+
     protected void setTranslationShift(float translationShift) {
         mTranslationShift = translationShift;
-        mContent.setTranslationY(mTranslationShift * mContent.getHeight());
+        mContent.setTranslationY(mTranslationShift * getShiftRange());
         if (mColorScrim != null) {
             mColorScrim.setAlpha(1 - mTranslationShift);
         }
@@ -132,8 +145,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mSwipeDetector.setDetectableScrollConditions(
                 directionsToDetectScroll, false);
         mSwipeDetector.onTouchEvent(ev);
-        return mSwipeDetector.isDraggingOrSettling()
-                || !getPopupContainer().isEventOverView(mContent, ev);
+        return mSwipeDetector.isDraggingOrSettling() || !isEventOverContent(ev);
     }
 
     @Override
@@ -142,11 +154,21 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         if (ev.getAction() == MotionEvent.ACTION_UP && mSwipeDetector.isIdleState()
                 && !isOpeningAnimationRunning()) {
             // If we got ACTION_UP without ever starting swipe, close the panel.
-            if (!getPopupContainer().isEventOverView(mContent, ev)) {
+            if (!isEventOverContent(ev)) {
                 close(true);
             }
         }
         return true;
+    }
+
+    /**
+     * Returns {@code true} if the touch event is over the visible area of the bottom sheet.
+     *
+     * By default will check if the touch event is over {@code mContent}, subclasses should override
+     * this method if the visible area of the bottom sheet is different from {@code mContent}.
+     */
+    protected boolean isEventOverContent(MotionEvent ev) {
+        return getPopupContainer().isEventOverView(mContent, ev);
     }
 
     private boolean isOpeningAnimationRunning() {
@@ -160,7 +182,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
 
     @Override
     public boolean onDrag(float displacement) {
-        float range = mContent.getHeight();
+        float range = getShiftRange();
         displacement = Utilities.boundToRange(displacement, 0, range);
         setTranslationShift(displacement / range);
         return true;
@@ -168,7 +190,10 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
 
     @Override
     public void onDragEnd(float velocity) {
-        if ((mSwipeDetector.isFling(velocity) && velocity > 0) || mTranslationShift > 0.5f) {
+        float successfulShiftThreshold = mActivityContext.getDeviceProfile().isTablet
+                ? TABLET_BOTTOM_SHEET_SUCCESS_TRANSITION_PROGRESS : SUCCESS_TRANSITION_PROGRESS;
+        if ((mSwipeDetector.isFling(velocity) && velocity > 0)
+                || mTranslationShift > successfulShiftThreshold) {
             mScrollInterpolator = scrollInterpolatorForVelocity(velocity);
             mOpenCloseAnimator.setDuration(BaseSwipeDetector.calculateDuration(
                     velocity, TRANSLATION_SHIFT_CLOSED - mTranslationShift));
@@ -183,6 +208,11 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         }
     }
 
+    /** Callback invoked when the view is beginning to close (e.g. close animation is started). */
+    public void setOnCloseBeginListener(@Nullable OnCloseListener onCloseBeginListener) {
+        mOnCloseBeginListener = onCloseBeginListener;
+    }
+
     /** Registers an {@link OnCloseListener}. */
     public void addOnCloseListener(OnCloseListener listener) {
         mOnCloseListeners.add(listener);
@@ -192,6 +222,8 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         if (!mIsOpen) {
             return;
         }
+        Optional.ofNullable(mOnCloseBeginListener).ifPresent(OnCloseListener::onSlideInViewClosed);
+
         if (!animate) {
             mOpenCloseAnimator.cancel();
             setTranslationShift(TRANSLATION_SHIFT_CLOSED);
@@ -203,17 +235,22 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         mOpenCloseAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                mOpenCloseAnimator.removeListener(this);
                 onCloseComplete();
             }
         });
         if (mSwipeDetector.isIdleState()) {
             mOpenCloseAnimator
                     .setDuration(defaultDuration)
-                    .setInterpolator(Interpolators.ACCEL);
+                    .setInterpolator(getIdleInterpolator());
         } else {
             mOpenCloseAnimator.setInterpolator(mScrollInterpolator);
         }
         mOpenCloseAnimator.start();
+    }
+
+    protected Interpolator getIdleInterpolator() {
+        return Interpolators.ACCEL;
     }
 
     protected void onCloseComplete() {

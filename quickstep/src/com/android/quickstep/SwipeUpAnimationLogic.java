@@ -17,7 +17,6 @@ package com.android.quickstep;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL_1_5;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_SELECT;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -37,7 +36,6 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
-import com.android.quickstep.util.LauncherSplitScreenListener;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
@@ -73,17 +71,14 @@ public abstract class SwipeUpAnimationLogic implements
     // How much further we can drag past recents, as a factor of mTransitionDragLength.
     protected float mDragLengthFactor = 1;
 
-    protected boolean mIsSwipeForStagedSplit;
+    protected boolean mIsSwipeForSplit;
 
     public SwipeUpAnimationLogic(Context context, RecentsAnimationDeviceState deviceState,
             GestureState gestureState) {
         mContext = context;
         mDeviceState = deviceState;
         mGestureState = gestureState;
-
-        mIsSwipeForStagedSplit = ENABLE_SPLIT_SELECT.get() &&
-                LauncherSplitScreenListener.INSTANCE.getNoCreate()
-                        .getRunningSplitTaskIds().length > 1;
+        mIsSwipeForSplit = TopTaskTracker.INSTANCE.get(context).getRunningSplitTaskIds().length > 1;
 
         mTargetGluer = new RemoteTargetGluer(mContext, mGestureState.getActivityInterface());
         mRemoteTargetHandles = mTargetGluer.getRemoteTargetHandles();
@@ -177,23 +172,11 @@ public abstract class SwipeUpAnimationLogic implements
             // No-op
         }
 
-        public boolean shouldPlayAtomicWorkspaceReveal() {
-            return true;
-        }
-
         public void setAnimation(RectFSpringAnim anim) { }
 
         public void update(RectF currentRect, float progress, float radius) { }
 
         public void onCancel() { }
-
-        /**
-         * @return {@code true} if this factory supports animating an Activity to PiP window on
-         * swiping up to home.
-         */
-        public boolean supportSwipePipToHome() {
-            return false;
-        }
 
         /**
          * @param progress The progress of the animation to the home screen.
@@ -280,6 +263,13 @@ public abstract class SwipeUpAnimationLogic implements
         RectF cropRectF = new RectF(taskViewSimulator.getCurrentCropRect());
         // Move the startRect to Launcher space as floatingIconView runs in Launcher
         Matrix windowToHomePositionMap = new Matrix();
+
+        // If the start rect ends up overshooting too much to the left/right offscreen, bring it
+        // back to fullscreen. This can happen when the recentsScroll value isn't aligned with
+        // the pageScroll value for a given taskView, see b/228829958#comment12
+        mRemoteTargetHandles[0].getTaskViewSimulator().getOrientationState().getOrientationHandler()
+                .fixBoundsForHomeAnimStartRect(startRect, mDp);
+
         homeToWindowPositionMap.invert(windowToHomePositionMap);
         windowToHomePositionMap.mapRect(startRect);
 

@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_WORK_DISABLED_CARD;
+import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_WORK_EDU_CARD;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
@@ -32,26 +34,28 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.R;
-import com.android.launcher3.util.ItemInfoMatcher;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.function.Predicate;
 
 /**
- * Companion class for {@link AllAppsContainerView} to manage work tab and personal tab related
+ * Companion class for {@link BaseAllAppsContainerView} to manage work tab and personal tab
+ * related
  * logic based on {@link WorkProfileState}?
  */
 public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActivePageChangedListener {
     private static final String TAG = "WorkProfileManager";
 
+    public static final String KEY_WORK_EDU_STEP = "showed_work_profile_edu";
 
     public static final int STATE_ENABLED = 1;
     public static final int STATE_DISABLED = 2;
     public static final int STATE_TRANSITION = 3;
-
-
-    private final UserManager mUserManager;
 
     /**
      * Work profile manager states
@@ -62,24 +66,23 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
             STATE_TRANSITION
     })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface WorkProfileState {
-    }
+    public @interface WorkProfileState { }
 
-    private final AllAppsContainerView mAllApps;
-    private final WorkAdapterProvider mAdapterProvider;
-    private final ItemInfoMatcher mMatcher;
+    private final UserManager mUserManager;
+    private final BaseAllAppsContainerView<?> mAllApps;
+    private final Predicate<ItemInfo> mMatcher;
 
     private WorkModeSwitch mWorkModeSwitch;
 
     @WorkProfileState
     private int mCurrentState;
+    private SharedPreferences mPreferences;
 
-
-    public WorkProfileManager(UserManager userManager, AllAppsContainerView allApps,
-            SharedPreferences preferences) {
+    public WorkProfileManager(
+            UserManager userManager, BaseAllAppsContainerView<?> allApps, SharedPreferences prefs) {
         mUserManager = userManager;
         mAllApps = allApps;
-        mAdapterProvider = new WorkAdapterProvider(preferences);
+        mPreferences = prefs;
         mMatcher = mAllApps.mPersonalMatcher.negate();
     }
 
@@ -116,9 +119,8 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
 
     private void updateCurrentState(@WorkProfileState int currentState) {
         mCurrentState = currentState;
-        mAdapterProvider.updateCurrentState(currentState);
         if (getAH() != null) {
-            getAH().appsList.updateAdapterItems();
+            getAH().mAppsList.updateAdapterItems();
         }
         if (mWorkModeSwitch != null) {
             mWorkModeSwitch.updateCurrentState(currentState == STATE_ENABLED);
@@ -126,7 +128,7 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
     }
 
     /**
-     * Creates and attaches for profile toggle button to {@link AllAppsContainerView}
+     * Creates and attaches for profile toggle button to {@link BaseAllAppsContainerView}
      */
     public boolean attachWorkModeSwitch() {
         if (!mAllApps.getAppsStore().hasModelFlag(
@@ -147,9 +149,8 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
         mWorkModeSwitch.updateCurrentState(mCurrentState == STATE_ENABLED);
         return true;
     }
-
     /**
-     * Removes work profile toggle button from {@link AllAppsContainerView}
+     * Removes work profile toggle button from {@link BaseAllAppsContainerView}
      */
     public void detachWorkModeSwitch() {
         if (mWorkModeSwitch != null && mWorkModeSwitch.getParent() == mAllApps) {
@@ -158,12 +159,7 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
         mWorkModeSwitch = null;
     }
 
-
-    public WorkAdapterProvider getAdapterProvider() {
-        return mAdapterProvider;
-    }
-
-    public ItemInfoMatcher getMatcher() {
+    public Predicate<ItemInfo> getMatcher() {
         return mMatcher;
     }
 
@@ -172,11 +168,35 @@ public class WorkProfileManager implements PersonalWorkSlidingTabStrip.OnActiveP
         return mWorkModeSwitch;
     }
 
-    private AllAppsContainerView.AdapterHolder getAH() {
-        return mAllApps.mAH[AllAppsContainerView.AdapterHolder.WORK];
+    private BaseAllAppsContainerView<?>.AdapterHolder getAH() {
+        return mAllApps.mAH.get(BaseAllAppsContainerView.AdapterHolder.WORK);
     }
 
     public int getCurrentState() {
         return mCurrentState;
+    }
+
+    /**
+     * returns whether or not work apps should be visible in work tab.
+     */
+    public boolean shouldShowWorkApps() {
+        return mCurrentState != WorkProfileManager.STATE_DISABLED;
+    }
+
+    /**
+     * Adds work profile specific adapter items to adapterItems and returns number of items added
+     */
+    public int addWorkItems(ArrayList<AdapterItem> adapterItems) {
+        if (mCurrentState == WorkProfileManager.STATE_DISABLED) {
+            //add disabled card here.
+            adapterItems.add(new AdapterItem(VIEW_TYPE_WORK_DISABLED_CARD));
+        } else if (mCurrentState == WorkProfileManager.STATE_ENABLED && !isEduSeen()) {
+            adapterItems.add(new AdapterItem(VIEW_TYPE_WORK_EDU_CARD));
+        }
+        return adapterItems.size();
+    }
+
+    private boolean isEduSeen() {
+        return mPreferences.getInt(KEY_WORK_EDU_STEP, 0) != 0;
     }
 }

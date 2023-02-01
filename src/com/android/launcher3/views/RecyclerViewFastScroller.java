@@ -43,7 +43,7 @@ import android.widget.TextView;
 import androidx.annotation.RequiresApi;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.launcher3.BaseRecyclerView;
+import com.android.launcher3.FastScrollRecyclerView;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.graphics.FastScrollThumbDrawable;
@@ -119,7 +119,6 @@ public class RecyclerViewFastScroller extends View {
     // prevent jumping, this offset is applied as the user scrolls.
     protected int mTouchOffsetY;
     protected int mThumbOffsetY;
-    protected int mRvOffsetY;
 
     // Fast scroller popup
     private TextView mPopupView;
@@ -127,7 +126,7 @@ public class RecyclerViewFastScroller extends View {
     private String mPopupSectionName;
     private Insets mSystemGestureInsets;
 
-    protected BaseRecyclerView mRv;
+    protected FastScrollRecyclerView mRv;
     private RecyclerView.OnScrollListener mOnScrollListener;
 
     private int mDownX;
@@ -172,7 +171,12 @@ public class RecyclerViewFastScroller extends View {
         ta.recycle();
     }
 
-    public void setRecyclerView(BaseRecyclerView rv, TextView popupView) {
+    /** @return whether there is a RecyclerView bound to this scroller. */
+    public boolean hasRecyclerView() {
+        return mRv != null;
+    }
+
+    public void setRecyclerView(FastScrollRecyclerView rv, TextView popupView) {
         if (mRv != null && mOnScrollListener != null) {
             mRv.removeOnScrollListener(mOnScrollListener);
         }
@@ -202,16 +206,11 @@ public class RecyclerViewFastScroller extends View {
 
     public void setThumbOffsetY(int y) {
         if (mThumbOffsetY == y) {
-            int rvCurrentOffsetY = mRv.getCurrentScrollY();
-            if (mRvOffsetY != rvCurrentOffsetY) {
-                mRvOffsetY = mRv.getCurrentScrollY();
-            }
             return;
         }
         updatePopupY(y);
         mThumbOffsetY = y;
         invalidate();
-        mRvOffsetY = mRv.getCurrentScrollY();
     }
 
     public int getThumbOffsetY() {
@@ -306,6 +305,7 @@ public class RecyclerViewFastScroller extends View {
     }
 
     private void calcTouchOffsetAndPrepToFastScroll(int downY, int lastY) {
+        ActivityContext.lookupContext(getContext()).hideKeyboard();
         mIsDragging = true;
         if (mCanThumbDetach) {
             mIsThumbDetached = true;

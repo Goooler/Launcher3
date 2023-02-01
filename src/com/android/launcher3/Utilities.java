@@ -16,7 +16,11 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
 
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
@@ -36,7 +40,6 @@ import android.content.pm.ShortcutInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.LightingColorFilter;
@@ -48,12 +51,13 @@ import android.graphics.RectF;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.InsetDrawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Build.VERSION_CODES;
 import android.os.DeadObjectException;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Process;
 import android.os.TransactionTooLargeException;
 import android.provider.Settings;
 import android.text.Spannable;
@@ -69,30 +73,33 @@ import android.view.ViewConfiguration;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
 
+import androidx.annotation.ChecksSdkIntAtLeast;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
-import androidx.core.os.BuildCompat;
 
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.graphics.GridCustomizationsProvider;
 import com.android.launcher3.graphics.TintedDrawableSpan;
-import com.android.launcher3.icons.BitmapInfo;
-import com.android.launcher3.icons.FastBitmapDrawable;
-import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.ShortcutCachingLogic;
+import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
+import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -110,8 +117,6 @@ public final class Utilities {
     private static final Pattern sTrimPattern =
             Pattern.compile("^[\\s|\\p{javaSpaceChar}]*(.*)[\\s|\\p{javaSpaceChar}]*$");
 
-    private static final float[] sTmpFloatArray = new float[4];
-
     private static final int[] sLoc0 = new int[2];
     private static final int[] sLoc1 = new int[2];
     private static final Matrix sMatrix = new Matrix();
@@ -120,14 +125,20 @@ public final class Utilities {
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
     public static final Person[] EMPTY_PERSON_ARRAY = new Person[0];
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.P)
     public static final boolean ATLEAST_P = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.Q)
     public static final boolean ATLEAST_Q = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.R)
     public static final boolean ATLEAST_R = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
 
-    public static final boolean ATLEAST_S = BuildCompat.isAtLeastS()
-            || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.S)
+    public static final boolean ATLEAST_S = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.TIRAMISU, codename = "T")
+    public static final boolean ATLEAST_T = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
 
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
@@ -231,7 +242,7 @@ public final class Utilities {
             offsetPoints(coord, v.getLeft(), v.getTop());
             scale *= v.getScaleX();
 
-            v = (View) v.getParent();
+            v = v.getParent() instanceof View ? (View) v.getParent() : null;
         }
         return scale;
     }
@@ -261,6 +272,16 @@ public final class Utilities {
                 Math.min(points[1], points[3]),
                 Math.max(points[0], points[2]),
                 Math.max(points[1], points[3]));
+    }
+
+    /**
+     * Similar to {@link #mapCoordInSelfToDescendant(View descendant, View root, float[] coord)}
+     * but accepts a Rect instead of float[].
+     */
+    public static void mapRectInSelfToDescendant(View descendant, View root, Rect rect) {
+        float[] coords = new float[]{rect.left, rect.top, rect.right, rect.bottom};
+        mapCoordInSelfToDescendant(descendant, root, coords);
+        rect.set((int) coords[0], (int) coords[1], (int) coords[2], (int) coords[3]);
     }
 
     /**
@@ -485,6 +506,11 @@ public final class Utilities {
         return res.getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
 
+    /** Converts a pixel value (px) to scale pixel value (SP) for the current device. */
+    public static float pxToSp(float size) {
+        return size / Resources.getSystem().getDisplayMetrics().scaledDensity;
+    }
+
     public static float dpiFromPx(float size, int densityDpi) {
         float densityRatio = (float) densityDpi / DisplayMetrics.DENSITY_DEFAULT;
         return (size / densityRatio);
@@ -501,9 +527,10 @@ public final class Utilities {
     }
 
     public static int pxFromSp(float size, DisplayMetrics metrics, float scale) {
-        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
-                size, metrics) * scale);
+        float value = scale * TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, size, metrics);
+        return ResourceUtils.roundPxValueFromFloat(value);
     }
+
 
     public static String createDbSelectionQuery(String columnName, IntArray values) {
         return String.format(Locale.ENGLISH, "%s IN (%s)", columnName, values.toConcatString());
@@ -563,15 +590,6 @@ public final class Utilities {
     }
 
     /**
-     * Returns an intent for starting the default home activity
-     */
-    public static Intent createHomeIntent() {
-        return new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-    }
-
-    /**
      * Wraps a message with a TTS span, so that a different message is spoken than
      * what is getting displayed.
      * @param msg original message
@@ -608,6 +626,10 @@ public final class Utilities {
         // Use application context for shared preferences, so that we use a single cached instance
         return context.getApplicationContext().getSharedPreferences(
                 LauncherFiles.DEVICE_PREFERENCES_KEY, Context.MODE_PRIVATE);
+    }
+
+    public static boolean isWallpaperSupported(Context context) {
+        return context.getSystemService(WallpaperManager.class).isWallpaperSupported();
     }
 
     public static boolean isWallpaperAllowed(Context context) {
@@ -673,14 +695,23 @@ public final class Utilities {
     /**
      * Returns the full drawable for info without any flattening or pre-processing.
      *
-     * @param outObj this is set to the internal data associated with {@param info},
+     * @param shouldThemeIcon If true, will theme icons when applicable
+     * @param outObj this is set to the internal data associated with {@code info},
      *               eg {@link LauncherActivityInfo} or {@link ShortcutInfo}.
      */
+    @TargetApi(Build.VERSION_CODES.TIRAMISU)
     public static Drawable getFullDrawable(Context context, ItemInfo info, int width, int height,
-            Object[] outObj) {
+            boolean shouldThemeIcon, Object[] outObj) {
         Drawable icon = loadFullDrawableWithoutTheme(context, info, width, height, outObj);
-        if (icon instanceof BitmapInfo.Extender) {
-            icon = ((BitmapInfo.Extender) icon).getThemedDrawable(context);
+        if (ATLEAST_T && icon instanceof AdaptiveIconDrawable && shouldThemeIcon) {
+            AdaptiveIconDrawable aid = (AdaptiveIconDrawable) icon.mutate();
+            Drawable mono = aid.getMonochrome();
+            if (mono != null && Themes.isThemedIconEnabled(context)) {
+                int[] colors = ThemedIconDrawable.getColors(context);
+                mono = mono.mutate();
+                mono.setTint(colors[1]);
+                return new AdaptiveIconDrawable(new ColorDrawable(colors[0]), mono);
+            }
         }
         return icon;
     }
@@ -723,8 +754,7 @@ public final class Utilities {
             return icon;
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION
                 && info instanceof SearchActionItemInfo) {
-            return new AdaptiveIconDrawable(
-                    new FastBitmapDrawable(((SearchActionItemInfo) info).bitmap), null);
+            return ((SearchActionItemInfo) info).bitmap.newIcon(context);
         } else {
             return null;
         }
@@ -739,27 +769,23 @@ public final class Utilities {
     @TargetApi(Build.VERSION_CODES.O)
     public static Drawable getBadge(Context context, ItemInfo info, Object obj) {
         LauncherAppState appState = LauncherAppState.getInstance(context);
-        int iconSize = appState.getInvariantDeviceProfile().iconBitmapSize;
         if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
             boolean iconBadged = (info instanceof ItemInfoWithIcon)
                     && (((ItemInfoWithIcon) info).runtimeStatusFlags & FLAG_ICON_BADGED) > 0;
             if ((info.id == ItemInfo.NO_ID && !iconBadged)
                     || !(obj instanceof ShortcutInfo)) {
                 // The item is not yet added on home screen.
-                return new FixedSizeEmptyDrawable(iconSize);
+                return new ColorDrawable(Color.TRANSPARENT);
             }
             ShortcutInfo si = (ShortcutInfo) obj;
-            Bitmap badge = LauncherAppState.getInstance(appState.getContext())
-                    .getIconCache().getShortcutInfoBadge(si).icon;
-            float badgeSize = LauncherIcons.getBadgeSizeForIconSize(iconSize);
-            float insetFraction = (iconSize - badgeSize) / iconSize;
-            return new InsetDrawable(new FastBitmapDrawable(badge),
-                    insetFraction, insetFraction, 0, 0);
+            return LauncherAppState.getInstance(appState.getContext())
+                    .getIconCache().getShortcutInfoBadge(si).newIcon(context, FLAG_THEMED);
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
             return ((FolderAdaptiveIcon) obj).getBadge();
         } else {
-            return context.getPackageManager()
-                    .getUserBadgedIcon(new FixedSizeEmptyDrawable(iconSize), info.user);
+            return Process.myUserHandle().equals(info.user)
+                    ? new ColorDrawable(Color.TRANSPARENT)
+                    : context.getDrawable(R.drawable.ic_work_app_badge);
         }
     }
 
@@ -866,23 +892,46 @@ public final class Utilities {
         return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
     }
 
-    private static class FixedSizeEmptyDrawable extends ColorDrawable {
-
-        private final int mSize;
-
-        public FixedSizeEmptyDrawable(int size) {
-            super(Color.TRANSPARENT);
-            mSize = size;
+    /**
+     * Returns a list of screen-splitting options depending on the device orientation (split top for
+     * portrait, split left for landscape, split left and right for landscape tablets, etc.)
+     */
+    public static List<SplitPositionOption> getSplitPositionOptions(
+            DeviceProfile dp) {
+        List<SplitPositionOption> options = new ArrayList<>();
+        // Add both left and right options if we're in tablet mode
+        if (dp.isTablet && dp.isLandscape) {
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_left, R.string.split_screen_position_left,
+                    STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_right, R.string.split_screen_position_right,
+                    STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
+        } else {
+            if (dp.isSeascape()) {
+                // Add left/right options
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_right, R.string.split_screen_position_right,
+                        STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
+            } else if (dp.isLandscape) {
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_left, R.string.split_screen_position_left,
+                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            } else {
+                // Only add top option
+                options.add(new SplitPositionOption(
+                        R.drawable.ic_split_top, R.string.split_screen_position_top,
+                        STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            }
         }
+        return options;
+    }
 
-        @Override
-        public int getIntrinsicHeight() {
-            return mSize;
-        }
+    public static boolean bothNull(@Nullable Object a, @Nullable Object b) {
+        return a == null && b == null;
+    }
 
-        @Override
-        public int getIntrinsicWidth() {
-            return mSize;
-        }
+    public static boolean bothNonNull(@Nullable Object a, @Nullable Object b) {
+        return a != null && b != null;
     }
 }

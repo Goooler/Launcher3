@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -49,6 +50,8 @@ public abstract class ButtonDropTarget extends TextView
     private static final int[] sTempCords = new int[2];
     private static final int DRAG_VIEW_DROP_DURATION = 285;
     private static final float DRAG_VIEW_HOVER_OVER_OPACITY = 0.65f;
+    private static final int MAX_LINES_TEXT_MULTI_LINE = 2;
+    private static final int MAX_LINES_TEXT_SINGLE_LINE = 1;
 
     public static final int TOOLTIP_DEFAULT = 0;
     public static final int TOOLTIP_LEFT = 1;
@@ -72,6 +75,8 @@ public abstract class ButtonDropTarget extends TextView
     protected CharSequence mText;
     protected Drawable mDrawable;
     private boolean mTextVisible = true;
+    private boolean mIconVisible = true;
+    private boolean mTextMultiLine = true;
 
     private PopupWindow mToolTip;
     private int mToolTipLocation;
@@ -86,7 +91,7 @@ public abstract class ButtonDropTarget extends TextView
 
         Resources resources = getResources();
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
-        mDrawableSize = resources.getDimensionPixelSize(R.dimen.drop_target_text_size);
+        mDrawableSize = resources.getDimensionPixelSize(R.dimen.drop_target_button_drawable_size);
         mDrawablePadding = resources.getDimensionPixelSize(
                 R.dimen.drop_target_button_drawable_padding);
     }
@@ -109,8 +114,7 @@ public abstract class ButtonDropTarget extends TextView
         // drawableLeft and drawableStart.
         mDrawable = getContext().getDrawable(resId).mutate();
         mDrawable.setTintList(getTextColors());
-        centerIcon();
-        setCompoundDrawablesRelative(mDrawable, null, null, null);
+        updateIconVisibility();
     }
 
     public void setDropTargetBar(DropTargetBar dropTargetBar) {
@@ -140,7 +144,7 @@ public abstract class ButtonDropTarget extends TextView
                 y = -getMeasuredHeight();
                 message.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
                 if (mToolTipLocation == TOOLTIP_LEFT) {
-                    x = - getMeasuredWidth() - message.getMeasuredWidth() / 2;
+                    x = -getMeasuredWidth() - message.getMeasuredWidth() / 2;
                 } else {
                     x = getMeasuredWidth() / 2 + message.getMeasuredWidth() / 2;
                 }
@@ -175,7 +179,12 @@ public abstract class ButtonDropTarget extends TextView
 
     @Override
     public void onDragStart(DropTarget.DragObject dragObject, DragOptions options) {
-        mActive = !options.isKeyboardDrag && supportsDrop(dragObject.dragInfo);
+        if (options.isKeyboardDrag) {
+            mActive = false;
+        } else {
+            setupItemInfo(dragObject.dragInfo);
+            mActive = supportsDrop(dragObject.dragInfo);
+        }
         setVisibility(mActive ? View.VISIBLE : View.GONE);
 
         mAccessibleDrag = options.isAccessibleDrag;
@@ -186,6 +195,11 @@ public abstract class ButtonDropTarget extends TextView
     public final boolean acceptDrop(DragObject dragObject) {
         return supportsDrop(dragObject.dragInfo);
     }
+
+    /**
+     * Setups button for the specified ItemInfo.
+     */
+    protected abstract void setupItemInfo(ItemInfo info);
 
     protected abstract boolean supportsDrop(ItemInfo info);
 
@@ -218,6 +232,7 @@ public abstract class ButtonDropTarget extends TextView
         final Rect to = getIconRect(d);
         final float scale = (float) to.width() / dragView.getMeasuredWidth();
         dragView.detachContentView(/* reattachToPreviousParent= */ true);
+
         mDropTargetBar.deferOnDragEnd();
 
         Runnable onAnimationEndRunnable = () -> {
@@ -305,11 +320,47 @@ public abstract class ButtonDropTarget extends TextView
         if (mTextVisible != isVisible || !TextUtils.equals(newText, getText())) {
             mTextVisible = isVisible;
             setText(newText);
-            centerIcon();
-            setCompoundDrawablesRelative(mDrawable, null, null, null);
-            int drawablePadding = mTextVisible ? mDrawablePadding : 0;
-            setCompoundDrawablePadding(drawablePadding);
+            updateIconVisibility();
         }
+    }
+
+    /**
+     * Display button text over multiple lines when isMultiLine is true, single line otherwise.
+     */
+    public void setTextMultiLine(boolean isMultiLine) {
+        if (mTextMultiLine != isMultiLine) {
+            mTextMultiLine = isMultiLine;
+            setSingleLine(!isMultiLine);
+            setMaxLines(isMultiLine ? MAX_LINES_TEXT_MULTI_LINE : MAX_LINES_TEXT_SINGLE_LINE);
+            int inputType = InputType.TYPE_CLASS_TEXT;
+            if (isMultiLine) {
+                inputType |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+
+            }
+            setInputType(inputType);
+        }
+    }
+
+    protected boolean isTextMultiLine() {
+        return mTextMultiLine;
+    }
+
+    /**
+     * Sets the button icon visible when isVisible is true, hides it otherwise.
+     */
+    public void setIconVisible(boolean isVisible) {
+        if (mIconVisible != isVisible) {
+            mIconVisible = isVisible;
+            updateIconVisibility();
+        }
+    }
+
+    private void updateIconVisibility() {
+        if (mIconVisible) {
+            centerIcon();
+        }
+        setCompoundDrawablesRelative(mIconVisible ? mDrawable : null, null, null, null);
+        setCompoundDrawablePadding(mIconVisible && mTextVisible ? mDrawablePadding : 0);
     }
 
     @Override
@@ -323,11 +374,63 @@ public abstract class ButtonDropTarget extends TextView
         hideTooltip();
     }
 
+    /**
+     * Returns if the text will be truncated within the provided availableWidth.
+     */
     public boolean isTextTruncated(int availableWidth) {
-        availableWidth -= (getPaddingLeft() + getPaddingRight() + mDrawable.getIntrinsicWidth()
-                + getCompoundDrawablePadding());
-        CharSequence displayedText = TextUtils.ellipsize(mText, getPaint(), availableWidth,
+        availableWidth -= getPaddingLeft() + getPaddingRight();
+        if (mIconVisible) {
+            availableWidth -= mDrawable.getIntrinsicWidth() + getCompoundDrawablePadding();
+        }
+        if (availableWidth <= 0) {
+            return true;
+        }
+        CharSequence firstLine = TextUtils.ellipsize(mText, getPaint(), availableWidth,
                 TextUtils.TruncateAt.END);
-        return !mText.equals(displayedText);
+        if (!mTextMultiLine) {
+            return !TextUtils.equals(mText, firstLine);
+        }
+        if (TextUtils.equals(mText, firstLine)) {
+            // When multi-line is active, if it can display as one line, then text is not truncated.
+            return false;
+        }
+        CharSequence secondLine =
+                TextUtils.ellipsize(mText.subSequence(firstLine.length(), mText.length()),
+                        getPaint(), availableWidth, TextUtils.TruncateAt.END);
+        return !(TextUtils.equals(mText.subSequence(0, firstLine.length()), firstLine)
+                && TextUtils.equals(mText.subSequence(firstLine.length(), secondLine.length()),
+                secondLine));
+    }
+
+    /**
+     * Reduce the size of the text until it fits the measured width or reaches a minimum.
+     *
+     * The minimum size is defined by {@code R.dimen.button_drop_target_min_text_size} and
+     * it diminishes by intervals defined by
+     * {@code R.dimen.button_drop_target_resize_text_increment}
+     * This functionality is very similar to the option
+     * {@link TextView#setAutoSizeTextTypeWithDefaults(int)} but can't be used in this view because
+     * the layout width is {@code WRAP_CONTENT}.
+     *
+     * @return The biggest text size in SP that makes the text fit or if the text can't fit returns
+     *         the min available value
+     */
+    public float resizeTextToFit() {
+        float minSize = Utilities.pxToSp(getResources()
+                .getDimensionPixelSize(R.dimen.button_drop_target_min_text_size));
+        float step = Utilities.pxToSp(getResources()
+                .getDimensionPixelSize(R.dimen.button_drop_target_resize_text_increment));
+        float textSize = Utilities.pxToSp(getTextSize());
+
+        int availableWidth = getMeasuredWidth();
+        while (textSize > minSize) {
+            if (isTextTruncated(availableWidth)) {
+                textSize -= step;
+                setTextSize(textSize);
+            } else {
+                return textSize;
+            }
+        }
+        return minSize;
     }
 }
