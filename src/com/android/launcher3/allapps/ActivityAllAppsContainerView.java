@@ -347,6 +347,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 mAH.get(i).mRecyclerView.scrollToTop();
             }
         }
+        if (mTouchHandler != null) {
+            mTouchHandler.endFastScrolling();
+        }
         if (mHeader != null && mHeader.getVisibility() == VISIBLE) {
             mHeader.reset(animate);
         }
