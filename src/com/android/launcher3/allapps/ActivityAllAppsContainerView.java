@@ -155,6 +155,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private int mHeaderColor;
     private int mBottomSheetBackgroundColor;
     private int mTabsProtectionAlpha;
+    @Nullable private AllAppsTransitionController mAllAppsTransitionController;
 
     public ActivityAllAppsContainerView(Context context) {
         this(context, null);
@@ -292,6 +293,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         animateToSearchState(goingToSearch, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
     }
 
+    public void setAllAppsTransitionController(
+            AllAppsTransitionController allAppsTransitionController) {
+        mAllAppsTransitionController = allAppsTransitionController;
+    }
+
     private void animateToSearchState(boolean goingToSearch, long durationMs) {
         if (!mSearchTransitionController.isRunning() && goingToSearch == isSearching()) {
             return;
@@ -299,6 +305,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (goingToSearch) {
             // Fade out the button to pause work apps.
             mWorkManager.onActivePageChanged(SEARCH);
+        } else if (mAllAppsTransitionController != null) {
+            // If exiting search, revert predictive back scale on all apps
+            mAllAppsTransitionController.animateAllAppsToNoScale();
         }
         mSearchTransitionController.animateToSearchState(goingToSearch, durationMs,
                 /* onEndRunnable = */ () -> {
@@ -430,9 +439,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
 
-        RecyclerView.ItemDecoration decoration = getMainAdapterProvider().getDecorator();
-        getSearchRecyclerView().removeItemDecoration(decoration);
-        getSearchRecyclerView().addItemDecoration(decoration);
+        if (!FeatureFlags.ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES.get()) {
+            RecyclerView.ItemDecoration decoration = getMainAdapterProvider().getDecorator();
+            getSearchRecyclerView().removeItemDecoration(decoration);
+            getSearchRecyclerView().addItemDecoration(decoration);
+        }
 
         // replaceAppsRVcontainer() needs to use both mUsingTabs value to remove the old view AND
         // showTabs value to create new view. Hence the mUsingTabs new value assignment MUST happen
@@ -610,7 +621,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 (int) (mSearchContainer.getAlpha() * 255));
     }
 
-    /** @return true if the search bar is at the bottom of the container (as opposed to the top). */
+    /**
+     * It is up to the search container view created by {@link #inflateSearchBox()} to use the
+     * floating search bar flag to move itself to the bottom of this container. This method checks
+     * if that had been done; otherwise the flag will be ignored.
+     *
+     * @return true if the search bar is at the bottom of the container (as opposed to the top).
+     **/
     private boolean isSearchBarOnBottom() {
         return FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()
                 && ((RelativeLayout.LayoutParams) mSearchContainer.getLayoutParams()).getRule(
@@ -1086,15 +1103,26 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     @Override
     public void drawOnScrimWithScale(Canvas canvas, float scale) {
-        boolean isTablet = mActivityContext.getDeviceProfile().isTablet;
+        final boolean isTablet = mActivityContext.getDeviceProfile().isTablet;
+        final View panel = mBottomSheetBackground;
+        final float translationY = ((View) panel.getParent()).getTranslationY();
 
+        final float horizontalScaleOffset = (1 - scale) * panel.getWidth() / 2;
+        final float verticalScaleOffset = (1 - scale) * (panel.getHeight() - getHeight() / 2);
+
+        final float topNoScale = panel.getTop() + translationY;
+        final float topWithScale = topNoScale + verticalScaleOffset;
+        final float leftWithScale = panel.getLeft() + horizontalScaleOffset;
+        final float rightWithScale = panel.getRight() - horizontalScaleOffset;
         // Draw full background panel for tablets.
         if (isTablet) {
             mHeaderPaint.setColor(mBottomSheetBackgroundColor);
-            View panel = (View) mBottomSheetBackground;
-            float translationY = ((View) panel.getParent()).getTranslationY();
-            mTmpRectF.set(panel.getLeft(), panel.getTop() + translationY,
-                    panel.getRight(), panel.getBottom());
+
+            mTmpRectF.set(
+                    leftWithScale,
+                    topWithScale,
+                    rightWithScale,
+                    panel.getBottom());
             mTmpPath.reset();
             mTmpPath.addRoundRect(mTmpRectF, mBottomSheetCornerRadii, Direction.CW);
             canvas.drawPath(mTmpPath, mHeaderPaint);
@@ -1110,25 +1138,33 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (mHeaderPaint.getColor() == mScrimColor || mHeaderPaint.getColor() == 0) {
             return;
         }
-        final float offset = (getVisibleContainerView().getHeight() * (1 - scale) / 2);
-        final float bottom =
-                scale * (getHeaderBottom() + getVisibleContainerView().getPaddingTop()) + offset;
-        FloatingHeaderView headerView = getFloatingHeaderView();
+
+        // Draw header on background panel
+        final float headerBottomNoScale =
+                getHeaderBottom() + getVisibleContainerView().getPaddingTop();
+        final float headerHeightNoScale = headerBottomNoScale - topNoScale;
+        final float headerBottomWithScaleOnTablet = topWithScale + headerHeightNoScale * scale;
+        final float headerBottomOffset = (getVisibleContainerView().getHeight() * (1 - scale) / 2);
+        final float headerBottomWithScaleOnPhone = headerBottomNoScale * scale + headerBottomOffset;
+        final FloatingHeaderView headerView = getFloatingHeaderView();
         if (isTablet) {
             // Start adding header protection if search bar or tabs will attach to the top.
-            if (!isSearchBarOnBottom() || mUsingTabs) {
-                View panel = (View) mBottomSheetBackground;
-                float translationY = ((View) panel.getParent()).getTranslationY();
-                mTmpRectF.set(panel.getLeft(), panel.getTop() + translationY, panel.getRight(),
-                        bottom);
+            if (!FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get() || mUsingTabs) {
+                mTmpRectF.set(
+                        leftWithScale,
+                        topWithScale,
+                        rightWithScale,
+                        headerBottomWithScaleOnTablet);
                 mTmpPath.reset();
                 mTmpPath.addRoundRect(mTmpRectF, mBottomSheetCornerRadii, Direction.CW);
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             }
         } else {
-            canvas.drawRect(0, 0, canvas.getWidth(), bottom, mHeaderPaint);
+            canvas.drawRect(0, 0, canvas.getWidth(), headerBottomWithScaleOnPhone, mHeaderPaint);
         }
-        int tabsHeight = headerView.getPeripheralProtectionHeight();
+
+        // If tab exist (such as work profile), extend header with tab height
+        final int tabsHeight = headerView.getPeripheralProtectionHeight();
         if (mTabsProtectionAlpha > 0 && tabsHeight != 0) {
             if (DEBUG_HEADER_PROTECTION) {
                 mHeaderPaint.setColor(Color.BLUE);
@@ -1136,13 +1172,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             } else {
                 mHeaderPaint.setAlpha((int) (getAlpha() * mTabsProtectionAlpha));
             }
-            int left = 0;
-            int right = canvas.getWidth();
+            float left = 0f;
+            float right = canvas.getWidth();
             if (isTablet) {
-                left = mBottomSheetBackground.getLeft();
-                right = mBottomSheetBackground.getRight();
+                left = mBottomSheetBackground.getLeft() + horizontalScaleOffset;
+                right = mBottomSheetBackground.getRight() - horizontalScaleOffset;
             }
-            canvas.drawRect(left, bottom, right, bottom + tabsHeight, mHeaderPaint);
+
+            final float tabTopWithScale = isTablet
+                    ? headerBottomWithScaleOnTablet
+                    : headerBottomWithScaleOnPhone;
+            final float tabBottomWithScale = tabTopWithScale + tabsHeight * scale;
+
+            canvas.drawRect(
+                    left,
+                    tabTopWithScale,
+                    right,
+                    tabBottomWithScale,
+                    mHeaderPaint);
         }
     }
 

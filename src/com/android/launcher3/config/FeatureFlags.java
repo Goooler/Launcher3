@@ -86,15 +86,18 @@ public final class FeatureFlags {
             "ENABLE_DEVICE_SEARCH", true, "Allows on device search in all apps");
 
     public static final BooleanFlag ENABLE_FLOATING_SEARCH_BAR =
-            new DeviceFlag("ENABLE_FLOATING_SEARCH_BAR", true,
+            new DeviceFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
 
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
 
-    public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = new DeviceFlag(
-            "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", false,
+    public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = getDebugFlag(
+            "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", true,
             "Expand and collapse pause work button while scrolling");
+
+    public static final BooleanFlag ENABLE_RECENT_BLOCK = getDebugFlag("ENABLE_RECENT_BLOCK",
+            false, "Show recently tapped search target block in zero state");
 
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
@@ -320,8 +323,11 @@ public final class FeatureFlags {
             "SCROLL_TOP_TO_RESET", true, "Bring up IME and focus on "
             + "input when scroll to top if 'Always show keyboard' is enabled or in prefix state");
 
-    public static final BooleanFlag POPUP_MATERIAL_U = new DeviceFlag(
-            "POPUP_MATERIAL_U", false, "Switch popup UX to use material U");
+    public static final BooleanFlag ENABLE_MATERIAL_U_POPUP = getDebugFlag(
+            "ENABLE_MATERIAL_U_POPUP", false, "Switch popup UX to use material U");
+
+    public static final BooleanFlag ENABLE_SEARCH_UNINSTALLED_APPS = new DeviceFlag(
+            "ENABLE_SEARCH_UNINSTALLED_APPS", false, "Search uninstalled app results.");
 
     public static final BooleanFlag SHOW_HOME_GARDENING = getDebugFlag(
             "SHOW_HOME_GARDENING", false,
@@ -339,10 +345,6 @@ public final class FeatureFlags {
             "ENABLE_DOWNLOAD_APP_UX_V3", false, "Updates the download app UX"
             + " to have better visuals, improve contrast, and color");
 
-    public static final BooleanFlag ENABLE_TASKBAR_REVISED_THRESHOLDS = getDebugFlag(
-            "ENABLE_TASKBAR_REVISED_THRESHOLDS", true,
-            "Uses revised thresholds for transient taskbar.");
-
     public static final BooleanFlag FORCE_PERSISTENT_TASKBAR = getDebugFlag(
             "FORCE_PERSISTENT_TASKBAR", false, "Forces taskbar to be persistent, even in gesture"
                     + " nav mode and when transient taskbar is enabled.");
@@ -356,6 +358,9 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(
             "ENABLE_TRACKPAD_GESTURE", false, "Enables trackpad gesture.");
+
+    public static final BooleanFlag ENABLE_ICON_IN_TEXT_HEADER = getDebugFlag(
+            "ENABLE_ICON_IN_TEXT_HEADER", false, "Show icon in textheader");
 
     public static final BooleanFlag SHOW_DOT_PAGINATION = getDebugFlag(
             "SHOW_DOT_PAGINATION", false, "Enable showing dot pagination in workspace");
@@ -375,11 +380,17 @@ public final class FeatureFlags {
             "ENABLE_LAUNCH_FROM_STAGED_APP", true,
             "Enable the ability to tap a staged app during split select to launch it in full screen"
     );
+    public static final BooleanFlag ENABLE_HAPTICS_ALL_APPS = getDebugFlag(
+            "ENABLE_HAPTICS_ALL_APPS", false, "Enables haptics opening/closing All apps");
 
     public static final BooleanFlag ENABLE_FORCED_MONO_ICON = getDebugFlag(
             "ENABLE_FORCED_MONO_ICON", false,
             "Enable the ability to generate monochromatic icons, if it is not provided by the app"
     );
+
+    public static final BooleanFlag ENABLE_DREAM_TRANSITION = getDebugFlag(
+            "ENABLE_DREAM_TRANSITION", true,
+            "Enable the launcher transition when the device enters a dream");
 
     public static final BooleanFlag ENABLE_TASKBAR_EDU_TOOLTIP = getDebugFlag(
             "ENABLE_TASKBAR_EDU_TOOLTIP", true,
@@ -397,6 +408,15 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_GRID_ONLY_OVERVIEW = getDebugFlag(
             "ENABLE_GRID_ONLY_OVERVIEW", false,
             "Enable a grid-only overview without a focused task.");
+
+    public static final BooleanFlag RECEIVE_UNFOLD_EVENTS_FROM_SYSUI = getDebugFlag(
+            "RECEIVE_UNFOLD_EVENTS_FROM_SYSUI", true,
+            "Enables receiving unfold animation events from sysui instead of calculating "
+                    + "them in launcher process using hinge sensor values.");
+
+    public static final BooleanFlag ENABLE_KEYBOARD_QUICK_SWITCH = getDebugFlag(
+            "ENABLE_KEYBOARD_QUICK_SWITCH", true,
+            "Enables keyboard quick switching");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

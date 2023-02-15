@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.taskbar;
 
-import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -237,7 +236,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 isDesktopMode
                         ? new DesktopTaskbarRecentAppsController(this)
                         : TaskbarRecentAppsController.DEFAULT,
-                new TaskbarEduTooltipController(this));
+                new TaskbarEduTooltipController(this),
+                new KeyboardQuickSwitchController());
     }
 
     public void init(@NonNull TaskbarSharedState sharedState) {
@@ -248,6 +248,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         // Initialize controllers after all are constructed.
         mControllers.init(sharedState);
         updateSysuiStateFlags(sharedState.sysuiStateFlags, true /* fromInit */);
+        disableNavBarElements(sharedState.disableNavBarDisplayId, sharedState.disableNavBarState1,
+                sharedState.disableNavBarState2, false /* animate */);
+        onSystemBarAttributesChanged(sharedState.systemBarAttrsDisplayId,
+                sharedState.systemBarAttrsBehavior);
+        onNavButtonsDarkIntensityChanged(sharedState.navButtonsDarkIntensity);
+
 
         if (!mAddedWindow) {
             mWindowManager.addView(mDragLayer, mWindowLayoutParams);
@@ -565,6 +571,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         || isNavBarKidsModeActive());
         mControllers.stashedHandleViewController.setIsHomeButtonDisabled(
                 mControllers.navbarButtonsViewController.isHomeDisabled());
+        mControllers.stashedHandleViewController.updateStateForSysuiFlags(systemUiStateFlags);
         mControllers.taskbarKeyguardController.updateStateForSysuiFlags(systemUiStateFlags);
         mControllers.taskbarStashController.updateStateForSysuiFlags(
                 systemUiStateFlags, fromInit || !isUserSetupComplete());
@@ -1060,6 +1067,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     ~WindowManager.LayoutParams.PRIVATE_FLAG_EXCLUDE_FROM_SCREEN_MAGNIFICATION;
         }
         mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+    }
+
+    void notifyUpdateLayoutParams() {
+        if (mDragLayer.isAttachedToWindow()) {
+            mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+        }
     }
 
     public void showPopupMenuForIcon(BubbleTextView btv) {

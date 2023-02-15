@@ -90,8 +90,7 @@ public final class WidgetsListHeaderViewHolderBinderTest {
         }).when(mIconCache).getTitleNoCache(any());
         mViewHolderBinder = new WidgetsListHeaderViewHolderBinder(
                 LayoutInflater.from(mContext),
-                mOnHeaderClickListener,
-                new WidgetsListDrawableFactory(mContext));
+                mOnHeaderClickListener);
     }
 
     @Test
@@ -134,7 +133,7 @@ public final class WidgetsListHeaderViewHolderBinderTest {
         appInfo.title = appName;
         appInfo.bitmap = BitmapInfo.of(Bitmap.createBitmap(10, 10, Bitmap.Config.ALPHA_8), 0);
 
-        return new WidgetsListHeaderEntry(appInfo,
+        return WidgetsListHeaderEntry.create(appInfo,
                 /* titleSectionName= */ "",
                 generateWidgetItems(packageName, numOfWidgets));
     }

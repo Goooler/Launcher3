@@ -151,6 +151,9 @@
         <!-- Support attributes in FolderStyle -->
         <attr name="folderStyle" format="reference" />
 
+        <!-- Support attributes in AllAppsStyle. Defaults to AllAppsStyleDefault -->
+        <attr name="allAppsStyle" format="reference" />
+
         <!-- numAllAppsColumns defaults to numColumns, if not specified -->
         <attr name="numAllAppsColumns" format="integer" />
         <!-- Number of columns to use when extending the all-apps size,
@@ -219,6 +222,21 @@
 
     <declare-styleable name="PersonalWorkSlidingTabStrip">
         <attr name="alignOnIcon" format="boolean" />
+    </declare-styleable>
+
+    <!--  Responsive grids attributes  -->
+    <declare-styleable name="WorkspaceSpec">
+        <attr name="specType" format="integer">
+            <enum name="height" value="0" />
+            <enum name="width" value="1" />
+        </attr>
+        <attr name="maxAvailableSize" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="SpecSize">
+        <attr name="fixedSize" format="dimension" />
+        <attr name="ofAvailableSpace" format="float" />
+        <attr name="ofRemainderSpace" format="float" />
     </declare-styleable>
 
     <declare-styleable name="ProfileDisplayOption">
@@ -416,6 +434,10 @@
 
     <declare-styleable name="CellStyle">
         <attr name="iconDrawablePadding" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="AllAppsStyle">
+        <attr name="horizontalPadding" format="dimension" />
     </declare-styleable>
 
     <declare-styleable name="ShadowDrawable">

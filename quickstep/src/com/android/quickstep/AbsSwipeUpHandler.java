@@ -27,7 +27,6 @@ import static com.android.launcher3.PagedView.INVALID_PAGE;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_1_2;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_REVISED_THRESHOLDS;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_GESTURE;
@@ -51,6 +50,7 @@ import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHE
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.LAUNCHER_DESTROYED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
@@ -182,6 +182,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     if (mActivity != activity) {
                         return;
                     }
+                    ActiveGestureLog.INSTANCE.addLog("Launcher destroyed", LAUNCHER_DESTROYED);
                     mRecentsView = null;
                     mActivity = null;
                 }
@@ -366,17 +367,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         TaskbarUIController controller = mActivityInterface.getTaskbarController();
         mTaskbarAlreadyOpen = controller != null && !controller.isTaskbarStashed();
         mIsTaskbarAllAppsOpen = controller != null && controller.isTaskbarAllAppsOpen();
-        mTaskbarAppWindowThreshold = res
-                .getDimensionPixelSize(ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
-                        ? R.dimen.taskbar_app_window_threshold_v2
-                        : R.dimen.taskbar_app_window_threshold);
+        mTaskbarAppWindowThreshold =
+                res.getDimensionPixelSize(R.dimen.taskbar_app_window_threshold);
         boolean swipeWillNotShowTaskbar = mTaskbarAlreadyOpen;
         mTaskbarHomeOverviewThreshold = swipeWillNotShowTaskbar
                 ? 0
-                : res.getDimensionPixelSize(
-                        ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
-                                ? R.dimen.taskbar_home_overview_threshold_v2
-                                : R.dimen.taskbar_home_overview_threshold);
+                : res.getDimensionPixelSize(R.dimen.taskbar_home_overview_threshold);
         mTaskbarCatchUpThreshold = res.getDimensionPixelSize(R.dimen.taskbar_catch_up_threshold);
     }
 

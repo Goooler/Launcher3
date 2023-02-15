@@ -58,6 +58,8 @@ import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.system.smartspace.ILauncherUnlockAnimationController;
 import com.android.systemui.shared.system.smartspace.ISysuiUnlockAnimationController;
 import com.android.systemui.shared.system.smartspace.SmartspaceState;
+import com.android.systemui.unfold.progress.IUnfoldAnimation;
+import com.android.systemui.unfold.progress.IUnfoldTransitionListener;
 import com.android.wm.shell.back.IBackAnimation;
 import com.android.wm.shell.desktopmode.IDesktopMode;
 import com.android.wm.shell.onehanded.IOneHanded;
@@ -97,6 +99,7 @@ public class SystemUiProxy implements ISystemUiProxy {
     private IRecentTasks mRecentTasks;
     private IBackAnimation mBackAnimation;
     private IDesktopMode mDesktopMode;
+    private IUnfoldAnimation mUnfoldAnimation;
     private final DeathRecipient mSystemUiProxyDeathRecipient = () -> {
         MAIN_EXECUTOR.execute(() -> clearProxy());
     };
@@ -110,6 +113,7 @@ public class SystemUiProxy implements ISystemUiProxy {
     private IStartingWindowListener mStartingWindowListener;
     private ILauncherUnlockAnimationController mLauncherUnlockAnimationController;
     private IRecentTasksListener mRecentTasksListener;
+    private IUnfoldTransitionListener mUnfoldAnimationListener;
     private final LinkedHashMap<RemoteTransition, TransitionFilter> mRemoteTransitions =
             new LinkedHashMap<>();
     private IBinder mOriginalTransactionToken = null;
@@ -174,7 +178,8 @@ public class SystemUiProxy implements ISystemUiProxy {
             IOneHanded oneHanded, IShellTransitions shellTransitions,
             IStartingWindow startingWindow, IRecentTasks recentTasks,
             ISysuiUnlockAnimationController sysuiUnlockAnimationController,
-            IBackAnimation backAnimation, IDesktopMode desktopMode) {
+            IBackAnimation backAnimation, IDesktopMode desktopMode,
+            IUnfoldAnimation unfoldAnimation) {
         unlinkToDeath();
         mSystemUiProxy = proxy;
         mPip = pip;
@@ -186,6 +191,7 @@ public class SystemUiProxy implements ISystemUiProxy {
         mRecentTasks = recentTasks;
         mBackAnimation = backAnimation;
         mDesktopMode = desktopMode;
+        mUnfoldAnimation = unfoldAnimation;
         linkToDeath();
         // re-attach the listeners once missing due to setProxy has not been initialized yet.
         if (mPipAnimationListener != null && mPip != null) {
@@ -208,10 +214,13 @@ public class SystemUiProxy implements ISystemUiProxy {
         if (mBackAnimation != null && mBackToLauncherCallback != null) {
             setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
         }
+        if (unfoldAnimation != null && mUnfoldAnimationListener != null) {
+            setUnfoldAnimationListener(mUnfoldAnimationListener);
+        }
     }
 
     public void clearProxy() {
-        setProxy(null, null, null, null, null, null, null, null, null, null);
+        setProxy(null, null, null, null, null, null, null, null, null, null, null);
     }
 
     // TODO(141886704): Find a way to remove this
@@ -632,14 +641,20 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
-    public void startIntentsWithLegacyTransition(PendingIntent pendingIntent1, Bundle options1,
-            PendingIntent pendingIntent2, Bundle options2,
-            @SplitConfigurationOptions.StagePosition int sidePosition, float splitRatio,
-            RemoteAnimationAdapter adapter, InstanceId instanceId) {
+    /**
+     * Starts a pair of intents or shortcuts in split-screen using legacy transition. Passing a
+     * non-null shortcut info means to start the app as a shortcut.
+     */
+    public void startIntentsWithLegacyTransition(PendingIntent pendingIntent1,
+            @Nullable ShortcutInfo shortcutInfo1, @Nullable Bundle options1,
+            PendingIntent pendingIntent2, @Nullable ShortcutInfo shortcutInfo2,
+            @Nullable Bundle options2, @SplitConfigurationOptions.StagePosition int sidePosition,
+            float splitRatio, RemoteAnimationAdapter adapter, InstanceId instanceId) {
         if (mSystemUiProxy != null) {
             try {
-                mSplitScreen.startIntentsWithLegacyTransition(pendingIntent1, options1,
-                        pendingIntent2, options2, sidePosition, splitRatio, adapter, instanceId);
+                mSplitScreen.startIntentsWithLegacyTransition(pendingIntent1, shortcutInfo1,
+                        options1, pendingIntent2, shortcutInfo2, options2, sidePosition, splitRatio,
+                        adapter, instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntentsWithLegacyTransition");
             }
@@ -997,5 +1012,23 @@ public class SystemUiProxy implements ISystemUiProxy {
             }
         }
         return 0;
+    }
+
+    //
+    // Unfold transition
+    //
+
+    /** Sets the unfold animation lister to sysui. */
+    public void setUnfoldAnimationListener(IUnfoldTransitionListener callback) {
+        mUnfoldAnimationListener = callback;
+        if (mUnfoldAnimation == null) {
+            return;
+        }
+        try {
+            Log.d(TAG, "Registering unfold animation receiver");
+            mUnfoldAnimation.setListener(callback);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed call setUnfoldAnimationListener", e);
+        }
     }
 }

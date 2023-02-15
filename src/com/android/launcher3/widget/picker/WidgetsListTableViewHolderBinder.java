@@ -51,17 +51,14 @@ public final class WidgetsListTableViewHolderBinder
     private final LayoutInflater mLayoutInflater;
     private final OnClickListener mIconClickListener;
     private final OnLongClickListener mIconLongClickListener;
-    private final WidgetsListDrawableFactory mListDrawableFactory;
 
     public WidgetsListTableViewHolderBinder(
             LayoutInflater layoutInflater,
             OnClickListener iconClickListener,
-            OnLongClickListener iconLongClickListener,
-            WidgetsListDrawableFactory listDrawableFactory) {
+            OnLongClickListener iconLongClickListener) {
         mLayoutInflater = layoutInflater;
         mIconClickListener = iconClickListener;
         mIconLongClickListener = iconLongClickListener;
-        mListDrawableFactory = listDrawableFactory;
     }
 
     @Override
@@ -70,12 +67,8 @@ public final class WidgetsListTableViewHolderBinder
             Log.v(TAG, "\nonCreateViewHolder");
         }
 
-        WidgetsRowViewHolder viewHolder =
-                new WidgetsRowViewHolder(mLayoutInflater.inflate(
+        return new WidgetsRowViewHolder(mLayoutInflater.inflate(
                         R.layout.widgets_table_container, parent, false));
-        viewHolder.tableContainer.setBackgroundDrawable(
-                mListDrawableFactory.createContentBackgroundDrawable());
-        return viewHolder;
     }
 
     @Override
@@ -110,13 +103,8 @@ public final class WidgetsListTableViewHolderBinder
 
                 // When preview loads, notify adapter to rebind the item and possibly animate
                 widget.applyFromCellItem(widgetItem, 1f,
-                        bitmap -> {
-                        if (holder.getBindingAdapter() != null) {
-                            holder.getBindingAdapter().notifyItemChanged(
-                                    holder.getBindingAdapterPosition(),
-                                    Pair.create(widgetItem, bitmap));
-                            }
-                        }, holder.previewCache.get(widgetItem));
+                        bitmap -> holder.onPreviewLoaded(Pair.create(widgetItem, bitmap)),
+                        holder.previewCache.get(widgetItem));
             }
         }
     }
