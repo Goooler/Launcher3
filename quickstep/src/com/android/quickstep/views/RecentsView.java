@@ -1624,10 +1624,13 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         // If we are entering Overview as a result of initiating a split from somewhere else
         // (e.g. split from Home), we need to make sure the staged app is not drawn as a thumbnail.
-        int stagedTaskIdToBeRemovedFromGrid = mSplitSelectSource != null
-                ? mSplitSelectSource.alreadyRunningTaskId
-                : INVALID_TASK_ID;
-
+        int stagedTaskIdToBeRemovedFromGrid;
+        if (mSplitSelectSource != null) {
+            stagedTaskIdToBeRemovedFromGrid = mSplitSelectSource.alreadyRunningTaskId;
+            updateCurrentTaskActionsVisibility();
+        } else {
+            stagedTaskIdToBeRemovedFromGrid = INVALID_TASK_ID;
+        }
         // update the map of instance counts
         mFilterState.updateInstanceCountMap(taskGroups);
 
@@ -4837,6 +4840,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 passedOverviewThreshold[0] = passed;
                 performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY,
                         HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+                // Also update recents animation controller state if it is ongoing.
+                if (mRecentsAnimationController != null) {
+                    mRecentsAnimationController.setWillFinishToHome(!passed);
+                }
             }
         });
 

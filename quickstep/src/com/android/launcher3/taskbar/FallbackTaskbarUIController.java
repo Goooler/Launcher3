@@ -17,7 +17,6 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
-import static com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_DURATION;
 
 import android.animation.Animator;
 
@@ -43,6 +42,17 @@ public class FallbackTaskbarUIController extends TaskbarUIController {
                     // Handle tapping on live tile.
                     getRecentsView().setTaskLaunchListener(toState == RecentsState.DEFAULT
                             ? (() -> animateToRecentsState(RecentsState.BACKGROUND_APP)) : null);
+                }
+
+                @Override
+                public void onStateTransitionComplete(RecentsState finalState) {
+                    boolean finalStateDefault = finalState == RecentsState.DEFAULT;
+                    // TODO(b/268120202) Taskbar shows up on 3P home, currently we don't go to
+                    //  overview from 3P home. Either implement that or it'll change w/ contextual?
+                    boolean disallowLongClick = finalState == RecentsState.OVERVIEW_SPLIT_SELECT;
+                    Utilities.setOverviewDragState(mControllers,
+                            finalStateDefault /*disallowGlobalDrag*/, disallowLongClick,
+                            finalStateDefault /*allowInitialSplitSelection*/);
                 }
             };
 
@@ -82,7 +92,8 @@ public class FallbackTaskbarUIController extends TaskbarUIController {
     }
 
     private void animateToRecentsState(RecentsState toState) {
-        Animator anim = createAnimToRecentsState(toState, TASKBAR_STASH_DURATION);
+        Animator anim = createAnimToRecentsState(toState,
+                mControllers.taskbarStashController.getStashDuration());
         if (anim != null) {
             anim.start();
         }
