@@ -30,6 +30,7 @@ import android.annotation.ColorInt;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.TaskTransitionSpec;
+import android.view.View;
 import android.view.WindowManagerGlobal;
 
 import androidx.annotation.NonNull;
@@ -50,6 +51,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.RecentsAnimationCallbacks;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
@@ -313,6 +315,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     public void onTaskbarIconLaunched(ItemInfo item) {
+        super.onTaskbarIconLaunched(item);
         InstanceId instanceId = new InstanceIdSequence().newInstanceId();
         mLauncher.logAppLaunch(mControllers.taskbarActivityContext.getStatsLogManager(), item,
                 instanceId);
@@ -383,6 +386,21 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
+    public RecentsView getRecentsView() {
+        return mLauncher.getOverviewPanel();
+    }
+
+    @Override
+    public void launchSplitTasks(@NonNull View taskView, @NonNull GroupTask groupTask) {
+        mLauncher.launchSplitTasks(taskView, groupTask);
+    }
+
+    @Override
+    protected void onIconLayoutBoundsChanged() {
+        mTaskbarLauncherStateController.resetIconAlignment();
+    }
+
+    @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         super.dumpLogs(prefix, pw);
 
@@ -401,10 +419,5 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 "SYSUI_SURFACE_PROGRESS_INDEX");
 
         mTaskbarLauncherStateController.dumpLogs(prefix + "\t", pw);
-    }
-
-    @Override
-    public RecentsView getRecentsView() {
-        return mLauncher.getOverviewPanel();
     }
 }

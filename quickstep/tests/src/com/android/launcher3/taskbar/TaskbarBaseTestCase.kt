@@ -52,8 +52,9 @@ abstract class TaskbarBaseTestCase {
     @Mock lateinit var taskbarTranslationController: TaskbarTranslationController
     @Mock lateinit var taskbarOverlayController: TaskbarOverlayController
     @Mock lateinit var taskbarEduTooltipController: TaskbarEduTooltipController
+    @Mock lateinit var keyboardQuickSwitchController: KeyboardQuickSwitchController
 
-    lateinit var mTaskbarControllers: TaskbarControllers
+    lateinit var taskbarControllers: TaskbarControllers
 
     @Before
     open fun setup() {
@@ -65,7 +66,7 @@ abstract class TaskbarBaseTestCase {
          * includes that method to allow mocking it.
          */
         MockitoAnnotations.initMocks(this)
-        mTaskbarControllers =
+        taskbarControllers =
             TaskbarControllers(
                 taskbarActivityContext,
                 taskbarDragController,
@@ -90,6 +91,7 @@ abstract class TaskbarBaseTestCase {
                 taskbarTranslationController,
                 taskbarRecentAppsController,
                 taskbarEduTooltipController,
+                keyboardQuickSwitchController
             )
     }
 }

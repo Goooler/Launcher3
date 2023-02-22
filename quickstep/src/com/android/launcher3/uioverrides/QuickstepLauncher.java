@@ -50,6 +50,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.QUICK_SWITCH_STA
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.SplitConfigurationOptions.DEFAULT_SPLIT_RATIO;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
@@ -143,6 +144,7 @@ import com.android.launcher3.util.ObjectWrapper;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.PendingSplitSelectInfo;
 import com.android.launcher3.util.RunnableList;
+import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.launcher3.util.TouchController;
@@ -152,6 +154,7 @@ import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TouchInteractionService.TISBinder;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LauncherUnfoldAnimationController;
 import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.QuickstepOnboardingPrefs;
@@ -576,9 +579,9 @@ public class QuickstepLauncher extends Launcher {
         RecentsView recentsView = getOverviewPanel();
         // Check if there is already an instance of this app running, if so, initiate the split
         // using that.
-        recentsView.findLastActiveTaskAndRunCallback(
+        mSplitSelectStateController.findLastActiveTaskAndRunCallback(
                 splitSelectSource.intent.getComponent(),
-                (Consumer<Task>) foundTask -> {
+                foundTask -> {
                     splitSelectSource.alreadyRunningTaskId = foundTask == null
                             ? INVALID_TASK_ID
                             : foundTask.key.id;
@@ -592,8 +595,7 @@ public class QuickstepLauncher extends Launcher {
     }
 
     /** TODO(b/266482558) Migrate into SplitSelectStateController or someplace split specific. */
-    private void startSplitToHome(
-            SplitSelectSource source) {
+    private void startSplitToHome(SplitSelectSource source) {
         AbstractFloatingView.closeAllOpenViews(this);
         int splitPlaceholderSize = getResources().getDimensionPixelSize(
                 R.dimen.split_placeholder_size);
@@ -601,14 +603,14 @@ public class QuickstepLauncher extends Launcher {
                 R.dimen.split_placeholder_inset);
         Rect tempRect = new Rect();
 
-        SplitSelectStateController controller = getSplitSelectStateController();
-        controller.setInitialTaskSelect(source.intent, source.position.stagePosition,
-                source.itemInfo, source.splitEvent, source.alreadyRunningTaskId);
+        mSplitSelectStateController.setInitialTaskSelect(source.intent,
+                source.position.stagePosition, source.itemInfo, source.splitEvent,
+                source.alreadyRunningTaskId);
 
         RecentsView recentsView = getOverviewPanel();
         recentsView.getPagedOrientationHandler().getInitialSplitPlaceholderBounds(
                 splitPlaceholderSize, splitPlaceholderInset, getDeviceProfile(),
-                controller.getActiveSplitStagePosition(), tempRect);
+                mSplitSelectStateController.getActiveSplitStagePosition(), tempRect);
 
         PendingAnimation anim = new PendingAnimation(TABLET_HOME_TO_SPLIT.getDuration());
         RectF startingTaskRect = new RectF();
@@ -617,12 +619,12 @@ public class QuickstepLauncher extends Launcher {
         floatingTaskView.setAlpha(1);
         floatingTaskView.addStagingAnimation(anim, startingTaskRect, tempRect,
                 false /* fadeWithThumbnail */, true /* isStagedTask */);
-        controller.setFirstFloatingTaskView(floatingTaskView);
+        mSplitSelectStateController.setFirstFloatingTaskView(floatingTaskView);
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationCancel(Animator animation) {
                 getDragLayer().removeView(floatingTaskView);
-                controller.resetState();
+                mSplitSelectStateController.resetState();
             }
         });
         anim.buildAnim().start();
@@ -1153,14 +1155,12 @@ public class QuickstepLauncher extends Launcher {
         // Launcher to first restore into Overview state, wait for the relevant tasks and icons to
         // load in, and then proceed to OverviewSplitSelect.
         if (isInState(OVERVIEW_SPLIT_SELECT)) {
-            SplitSelectStateController splitSelectStateController =
-                    ((RecentsView) getOverviewPanel()).getSplitSelectController();
             // Launcher will restart in Overview and then transition to OverviewSplitSelect.
             outState.putIBinder(PENDING_SPLIT_SELECT_INFO, ObjectWrapper.wrap(
                     new PendingSplitSelectInfo(
-                            splitSelectStateController.getInitialTaskId(),
-                            splitSelectStateController.getActiveSplitStagePosition(),
-                            splitSelectStateController.getSplitEvent())
+                            mSplitSelectStateController.getInitialTaskId(),
+                            mSplitSelectStateController.getActiveSplitStagePosition(),
+                            mSplitSelectStateController.getSplitEvent())
             ));
             outState.putInt(RUNTIME_STATE, OVERVIEW.ordinal);
         }
@@ -1204,6 +1204,32 @@ public class QuickstepLauncher extends Launcher {
         super.dispatchDeviceProfileChanged();
         Trace.instantForTrack(TRACE_TAG_APP, "QuickstepLauncher#DeviceProfileChanged",
                 getDeviceProfile().toSmallString());
+    }
+
+    /**
+     * Launches the given {@link GroupTask} in splitscreen.
+     *
+     * If the second split task is missing, launches the first task normally.
+     */
+    public void launchSplitTasks(@NonNull View taskView, @NonNull GroupTask groupTask) {
+        if (groupTask.task2 == null) {
+            UI_HELPER_EXECUTOR.execute(() ->
+                    ActivityManagerWrapper.getInstance().startActivityFromRecents(
+                            groupTask.task1.key,
+                            getActivityLaunchOptions(taskView, null).options));
+            return;
+        }
+        mSplitSelectStateController.launchTasks(
+                groupTask.task1.key.id,
+                groupTask.task2.key.id,
+                SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT,
+                /* callback= */ success -> {},
+                /* freezeTaskList= */ true,
+                groupTask.mSplitBounds == null
+                        ? DEFAULT_SPLIT_RATIO
+                        : groupTask.mSplitBounds.appsStackedVertically
+                                ? groupTask.mSplitBounds.topTaskPercent
+                                : groupTask.mSplitBounds.leftTaskPercent);
     }
 
     private static final class LauncherTaskViewController extends

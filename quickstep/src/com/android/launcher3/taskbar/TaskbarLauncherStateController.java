@@ -17,7 +17,6 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
-import static com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_DURATION;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 import static com.android.systemui.animation.Interpolators.EMPHASIZED;
 
@@ -39,8 +38,8 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
-import com.android.launcher3.uioverrides.states.OverviewState;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
+import com.android.launcher3.util.window.RefreshRateTracker;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.views.RecentsView;
@@ -119,14 +118,10 @@ import java.util.StringJoiner;
                     mLauncherState = finalState;
                     updateStateForFlag(FLAG_TRANSITION_STATE_RUNNING, false);
                     applyState();
-                    boolean disallowGlobalDrag = finalState instanceof OverviewState;
                     boolean disallowLongClick = finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
-                    mControllers.taskbarDragController.setDisallowGlobalDrag(disallowGlobalDrag);
-                    mControllers.taskbarDragController.setDisallowLongClick(disallowLongClick);
-                    mControllers.taskbarAllAppsController.setDisallowGlobalDrag(disallowGlobalDrag);
-                    mControllers.taskbarAllAppsController.setDisallowLongClick(disallowLongClick);
-                    mControllers.taskbarPopupController.setAllowInitialSplitSelection(
-                            disallowGlobalDrag);
+                    com.android.launcher3.taskbar.Utilities.setOverviewDragState(
+                            mControllers, finalState.disallowTaskbarGlobalDrag(),
+                            disallowLongClick, finalState.allowTaskbarInitialSplitSelection());
                 }
             };
 
@@ -142,8 +137,7 @@ import java.util.StringJoiner;
         mIconAlphaForHome = mControllers.taskbarViewController
                 .getTaskbarIconAlpha().get(ALPHA_INDEX_HOME);
 
-        mIconAlignment.finishAnimation();
-        onIconAlignmentRatioChanged();
+        resetIconAlignment();
 
         mLauncher.getStateManager().addStateListener(mStateListener);
 
@@ -237,7 +231,7 @@ import java.util.StringJoiner;
     }
 
     public void applyState() {
-        applyState(TASKBAR_STASH_DURATION);
+        applyState(mControllers.taskbarStashController.getStashDuration());
     }
 
     public void applyState(long duration) {
@@ -245,7 +239,7 @@ import java.util.StringJoiner;
     }
 
     public Animator applyState(boolean start) {
-        return applyState(TASKBAR_STASH_DURATION, start);
+        return applyState(mControllers.taskbarStashController.getStashDuration(), start);
     }
 
     public Animator applyState(long duration, boolean start) {
@@ -332,8 +326,17 @@ import java.util.StringJoiner;
                         + mTaskbarBackgroundAlpha.value
                         + " -> " + backgroundAlpha + ": " + duration);
             }
-            animatorSet.play(mTaskbarBackgroundAlpha.animateToValue(backgroundAlpha)
-                    .setDuration(duration));
+
+            Animator taskbarBackgroundAlpha = mTaskbarBackgroundAlpha
+                    .animateToValue(backgroundAlpha)
+                    .setDuration(duration);
+            // Add a single frame delay to the taskbar bg to avoid too many moving parts during the
+            // app launch animation.
+            taskbarBackgroundAlpha.setStartDelay(
+                    (hasAnyFlag(changedFlags, FLAG_RESUMED) && !goingToLauncher)
+                            ? RefreshRateTracker.getSingleFrameMs(mLauncher)
+                            : 0);
+            animatorSet.play(taskbarBackgroundAlpha);
         }
 
         float cornerRoundness = goingToLauncher ? 0 : 1;
@@ -436,6 +439,14 @@ import java.util.StringJoiner;
         return (mState & FLAGS_LAUNCHER) != 0;
     }
 
+    /**
+     * Resets and updates the icon alignment.
+     */
+    protected void resetIconAlignment() {
+        mIconAlignment.finishAnimation();
+        onIconAlignmentRatioChanged();
+    }
+
     private void onIconAlignmentRatioChanged() {
         float currentValue = mIconAlphaForHome.getValue();
         boolean taskbarWillBeVisible = mIconAlignment.value < 1;
@@ -457,6 +468,10 @@ import java.util.StringJoiner;
     }
 
     private void updateIconAlphaForHome(float alpha) {
+        if (mControllers.taskbarActivityContext.isDestroyed()) {
+            Log.e("b/260135164", "updateIconAlphaForHome is called after Taskbar is destroyed",
+                    new Exception());
+        }
         mIconAlphaForHome.setValue(alpha);
         boolean hotseatVisible = alpha == 0
                 || (!mControllers.uiController.isHotseatIconOnTopWhenAligned()

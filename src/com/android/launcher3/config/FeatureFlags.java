@@ -230,10 +230,6 @@ public final class FeatureFlags {
             "ENABLE_ICON_LABEL_AUTO_SCALING", true,
             "Enables scaling/spacing for icon labels to make more characters visible");
 
-    public static final BooleanFlag ENABLE_ALL_APPS_IN_TASKBAR = getDebugFlag(
-            "ENABLE_ALL_APPS_IN_TASKBAR", true,
-            "Enables accessing All Apps from the system Taskbar.");
-
     public static final BooleanFlag ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT = getDebugFlag(
             "ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT", false,
             "Enables displaying the all apps button in the hotseat.");
@@ -359,6 +355,12 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(
             "ENABLE_TRACKPAD_GESTURE", false, "Enables trackpad gesture.");
 
+    public static final BooleanFlag ENABLE_ICON_IN_TEXT_HEADER = getDebugFlag(
+            "ENABLE_ICON_IN_TEXT_HEADER", false, "Show icon in textheader");
+
+    public static final BooleanFlag ENABLE_APP_ICON_FOR_INLINE_SHORTCUTS = getDebugFlag(
+            "ENABLE_APP_ICON_IN_INLINE_SHORTCUTS", false, "Show app icon for inline shortcut");
+
     public static final BooleanFlag SHOW_DOT_PAGINATION = getDebugFlag(
             "SHOW_DOT_PAGINATION", false, "Enable showing dot pagination in workspace");
 
@@ -410,6 +412,10 @@ public final class FeatureFlags {
             "RECEIVE_UNFOLD_EVENTS_FROM_SYSUI", true,
             "Enables receiving unfold animation events from sysui instead of calculating "
                     + "them in launcher process using hinge sensor values.");
+
+    public static final BooleanFlag ENABLE_KEYBOARD_QUICK_SWITCH = getDebugFlag(
+            "ENABLE_KEYBOARD_QUICK_SWITCH", true,
+            "Enables keyboard quick switching");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

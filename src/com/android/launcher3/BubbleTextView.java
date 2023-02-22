@@ -104,6 +104,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
 
     private float mTranslationXForTaskbarAlignmentAnimation = 0f;
+    private float mTranslationYForTaskbarAlignmentAnimation = 0f;
+
+    private float mTranslationXForTaskbarRevealAnimation = 0f;
+    private float mTranslationYForTaskbarRevealAnimation = 0f;
 
     private final PointF mTranslationForMoveFromCenterAnimation = new PointF(0, 0);
 
@@ -370,9 +374,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     protected void applyIconAndLabel(ItemInfoWithIcon info) {
-        boolean useTheme = mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
-                || mDisplay == DISPLAY_TASKBAR;
-        int flags = useTheme ? FLAG_THEMED : 0;
+        int flags = shouldUseTheme() ? FLAG_THEMED : 0;
         if (mHideBadge) {
             flags |= FLAG_NO_BADGE;
         }
@@ -382,6 +384,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 .getColor(android.R.color.system_accent3_200, getContext().getTheme());
         setIcon(iconDrawable);
         applyLabel(info);
+    }
+
+    protected boolean shouldUseTheme() {
+        return mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
+                || mDisplay == DISPLAY_TASKBAR;
     }
 
     @UiThread
@@ -952,11 +959,17 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void updateTranslation() {
-        super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x
+        super.setTranslationX(mTranslationForReorderBounce.x
+                + mTranslationForReorderPreview.x
                 + mTranslationForMoveFromCenterAnimation.x
-                + mTranslationXForTaskbarAlignmentAnimation);
-        super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y
-                + mTranslationForMoveFromCenterAnimation.y);
+                + mTranslationXForTaskbarAlignmentAnimation
+                + mTranslationXForTaskbarRevealAnimation
+        );
+        super.setTranslationY(mTranslationForReorderBounce.y
+                + mTranslationForReorderPreview.y
+                + mTranslationForMoveFromCenterAnimation.y
+                + mTranslationYForTaskbarAlignmentAnimation
+                + mTranslationYForTaskbarRevealAnimation);
     }
 
     public void setReorderBounceOffset(float x, float y) {
@@ -1010,6 +1023,51 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      */
     public float getTranslationXForTaskbarAlignmentAnimation() {
         return mTranslationXForTaskbarAlignmentAnimation;
+    }
+
+    /**
+     * Sets translationX for taskbar to launcher alignment animation
+     */
+    public void setTranslationYForTaskbarAlignmentAnimation(float translationY) {
+        mTranslationYForTaskbarAlignmentAnimation = translationY;
+        updateTranslation();
+    }
+
+    /**
+     * Returns translationY value for taskbar to launcher alignment animation
+     */
+    public float getTranslationYForTaskbarAlignmentAnimation() {
+        return mTranslationYForTaskbarAlignmentAnimation;
+    }
+
+    /**
+     * Sets translationX value for taskbar reveal animation
+     */
+    public void setTranslationXForTaskbarRevealAnimation(float translationX) {
+        mTranslationXForTaskbarRevealAnimation = translationX;
+        updateTranslation();
+    }
+
+    /**
+     * Returns translation values for taskbar reveal animation
+     */
+    public float getTranslationXForTaskbarRevealAnimation() {
+        return mTranslationXForTaskbarRevealAnimation;
+    }
+
+    /**
+     * Sets translationY value for taskbar reveal animation
+     */
+    public void setTranslationYForTaskbarRevealAnimation(float translationY) {
+        mTranslationYForTaskbarRevealAnimation = translationY;
+        updateTranslation();
+    }
+
+    /**
+     * Returns translationY values for taskbar reveal animation
+     */
+    public float getTranslationYForTaskbarRevealAnimation() {
+        return mTranslationYForTaskbarRevealAnimation;
     }
 
     public View getView() {

@@ -1947,7 +1947,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         Intent intent = new Intent(Intent.ACTION_CREATE_SHORTCUT).setComponent(info.componentName);
         setWaitingForResult(PendingRequestArgs.forIntent(REQUEST_CREATE_SHORTCUT, intent, info));
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "start: processShortcutFromDrop");
-        if (!info.activityInfo.startConfigActivity(this, REQUEST_CREATE_SHORTCUT)) {
+        if (!info.getActivityInfo(this).startConfigActivity(this, REQUEST_CREATE_SHORTCUT)) {
             handleActivityResult(REQUEST_CREATE_SHORTCUT, RESULT_CANCELED, null);
         }
     }
@@ -3211,7 +3211,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    public boolean shouldUseColorExtractionForPopup() {
+    public boolean canUseMultipleShadesForPopup() {
         return getTopOpenViewWithType(this, TYPE_FOLDER) == null
                 && getStateManager().getState() != LauncherState.ALL_APPS;
     }
