@@ -460,6 +460,7 @@ import java.util.StringJoiner;
         if (mControllers.taskbarActivityContext.isDestroyed()) {
             Log.e("b/260135164", "updateIconAlphaForHome is called after Taskbar is destroyed",
                     new Exception());
+            return;
         }
         mIconAlphaForHome.setValue(alpha);
         boolean hotseatVisible = alpha == 0
