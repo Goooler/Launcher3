@@ -17,7 +17,6 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
-import static com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_DURATION;
 
 import android.animation.Animator;
 
@@ -43,6 +42,17 @@ public class FallbackTaskbarUIController extends TaskbarUIController {
                     // Handle tapping on live tile.
                     getRecentsView().setTaskLaunchListener(toState == RecentsState.DEFAULT
                             ? (() -> animateToRecentsState(RecentsState.BACKGROUND_APP)) : null);
+                }
+
+                @Override
+                public void onStateTransitionComplete(RecentsState finalState) {
+                    boolean finalStateDefault = finalState == RecentsState.DEFAULT;
+                    // TODO(b/268120202) Taskbar shows up on 3P home, currently we don't go to
+                    //  overview from 3P home. Either implement that or it'll change w/ contextual?
+                    boolean disallowLongClick = finalState == RecentsState.OVERVIEW_SPLIT_SELECT;
+                    Utilities.setOverviewDragState(mControllers,
+                            finalStateDefault /*disallowGlobalDrag*/, disallowLongClick,
+                            finalStateDefault /*allowInitialSplitSelection*/);
                 }
             };
 
@@ -72,7 +82,8 @@ public class FallbackTaskbarUIController extends TaskbarUIController {
     public Animator createAnimToRecentsState(RecentsState toState, long duration) {
         boolean useStashedLauncherState = toState.hasOverviewActions();
         boolean stashedLauncherState =
-                useStashedLauncherState && !FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get();
+                useStashedLauncherState && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()
+                        && toState == RecentsState.MODAL_TASK;
         TaskbarStashController stashController = mControllers.taskbarStashController;
         // Set both FLAG_IN_STASHED_LAUNCHER_STATE and FLAG_IN_APP to ensure the state is respected.
         // For all other states, just use the current stashed-in-app setting (e.g. if long clicked).
@@ -82,7 +93,8 @@ public class FallbackTaskbarUIController extends TaskbarUIController {
     }
 
     private void animateToRecentsState(RecentsState toState) {
-        Animator anim = createAnimToRecentsState(toState, TASKBAR_STASH_DURATION);
+        Animator anim = createAnimToRecentsState(toState,
+                mControllers.taskbarStashController.getStashDuration());
         if (anim != null) {
             anim.start();
         }

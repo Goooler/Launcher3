@@ -27,7 +27,6 @@ import static com.android.launcher3.PagedView.INVALID_PAGE;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_1_2;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_REVISED_THRESHOLDS;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_GESTURE;
@@ -51,6 +50,7 @@ import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHE
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.LAUNCHER_DESTROYED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
@@ -182,6 +182,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     if (mActivity != activity) {
                         return;
                     }
+                    ActiveGestureLog.INSTANCE.addLog("Launcher destroyed", LAUNCHER_DESTROYED);
                     mRecentsView = null;
                     mActivity = null;
                 }
@@ -366,17 +367,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         TaskbarUIController controller = mActivityInterface.getTaskbarController();
         mTaskbarAlreadyOpen = controller != null && !controller.isTaskbarStashed();
         mIsTaskbarAllAppsOpen = controller != null && controller.isTaskbarAllAppsOpen();
-        mTaskbarAppWindowThreshold = res
-                .getDimensionPixelSize(ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
-                        ? R.dimen.taskbar_app_window_threshold_v2
-                        : R.dimen.taskbar_app_window_threshold);
-        boolean swipeWillNotShowTaskbar = mTaskbarAlreadyOpen;
+        mTaskbarAppWindowThreshold =
+                res.getDimensionPixelSize(R.dimen.taskbar_app_window_threshold);
+        boolean swipeWillNotShowTaskbar = mTaskbarAlreadyOpen || mGestureState.isTrackpadGesture();
         mTaskbarHomeOverviewThreshold = swipeWillNotShowTaskbar
                 ? 0
-                : res.getDimensionPixelSize(
-                        ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
-                                ? R.dimen.taskbar_home_overview_threshold_v2
-                                : R.dimen.taskbar_home_overview_threshold);
+                : res.getDimensionPixelSize(R.dimen.taskbar_home_overview_threshold);
         mTaskbarCatchUpThreshold = res.getDimensionPixelSize(R.dimen.taskbar_catch_up_threshold);
     }
 
@@ -681,7 +677,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             @Override
             public void onMotionPauseDetected() {
                 mHasMotionEverBeenPaused = true;
-                maybeUpdateRecentsAttachedState(true/* animate */, true/* moveFocusedTask */);
+                maybeUpdateRecentsAttachedState(true/* animate */, true/* moveRunningTask */);
                 Optional.ofNullable(mActivityInterface.getTaskbarController())
                         .ifPresent(TaskbarUIController::startTranslationSpring);
                 performHapticFeedback();
@@ -699,7 +695,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private void maybeUpdateRecentsAttachedState(boolean animate) {
-        maybeUpdateRecentsAttachedState(animate, false /* moveFocusedTask */);
+        maybeUpdateRecentsAttachedState(animate, false /* moveRunningTask */);
     }
 
     /**
@@ -709,9 +705,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
      *
      * Note this method has no effect unless the navigation mode is NO_BUTTON.
      * @param animate whether to animate when attaching RecentsView
-     * @param moveFocusedTask whether to move focused task to front when attaching
+     * @param moveRunningTask whether to move running task to front when attaching
      */
-    private void maybeUpdateRecentsAttachedState(boolean animate, boolean moveFocusedTask) {
+    private void maybeUpdateRecentsAttachedState(boolean animate, boolean moveRunningTask) {
         if (!mDeviceState.isFullyGesturalNavMode() || mRecentsView == null) {
             return;
         }
@@ -730,11 +726,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         } else {
             recentsAttachedToAppWindow = mHasMotionEverBeenPaused || mIsLikelyToStartNewTask;
         }
-        if (moveFocusedTask && !mAnimationFactory.hasRecentsEverAttachedToAppWindow()
+        if (moveRunningTask && !mAnimationFactory.hasRecentsEverAttachedToAppWindow()
                 && recentsAttachedToAppWindow) {
-            // Only move focused task if RecentsView has never been attached before, to avoid
+            // Only move running task if RecentsView has never been attached before, to avoid
             // TaskView jumping to new position as we move the tasks.
-            mRecentsView.moveFocusedTaskToFront();
+            mRecentsView.moveRunningTaskToFront();
         }
         mAnimationFactory.setRecentsAttachedToAppWindow(recentsAttachedToAppWindow, animate);
 
@@ -881,7 +877,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         if (DesktopTaskView.DESKTOP_MODE_SUPPORTED && targets.hasDesktopTasks()) {
             mRemoteTargetHandles = mTargetGluer.assignTargetsForDesktop(targets);
         } else {
-            mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(mContext, targets);
+            mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(targets);
         }
         mRecentsAnimationController = controller;
         mRecentsAnimationTargets = targets;
@@ -1165,6 +1161,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         }
 
         if (mDeviceState.isOverviewDisabled() && endTarget == RECENTS) {
+            return LAST_TASK;
+        }
+
+        if (DesktopTaskView.DESKTOP_MODE_SUPPORTED && endTarget == NEW_TASK) {
+            // TODO(b/268075592): add support for quickswitch to/from desktop
             return LAST_TASK;
         }
 
@@ -1597,7 +1598,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         final SwipePipToHomeAnimator.Builder builder = new SwipePipToHomeAnimator.Builder()
                 .setContext(mContext)
                 .setTaskId(runningTaskTarget.taskId)
-                .setComponentName(taskInfo.topActivity)
+                .setActivityInfo(taskInfo.topActivityInfo)
                 .setLeash(runningTaskTarget.leash)
                 .setSourceRectHint(
                         runningTaskTarget.taskInfo.pictureInPictureParams.getSourceRectHint())
@@ -2316,7 +2317,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             return displacement;
         }
 
-        if (mTaskbarAlreadyOpen || mIsTaskbarAllAppsOpen) {
+        if (mTaskbarAlreadyOpen || mIsTaskbarAllAppsOpen || mGestureState.isTrackpadGesture()) {
             return displacement;
         }
 

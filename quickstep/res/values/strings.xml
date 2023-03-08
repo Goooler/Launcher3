@@ -30,6 +30,9 @@
     <!-- Recents: The empty recents string. [CHAR LIMIT=NONE] -->
     <string name="recents_empty_message">No recent items</string>
 
+    <!-- Recents: The empty recents desktop tile string. [CHAR LIMIT=NONE] -->
+    <string name="recents_empty_desktop_message">No desktop items</string>
+
     <!-- Content description for the recent apps's accessibility option that opens its usage settings. [CHAR LIMIT=NONE] -->
     <string name="accessibility_app_usage_settings">App usage settings</string>
 
@@ -133,6 +136,10 @@
     <string name="home_gesture_intro_subtitle">Swipe up from the bottom of your screen. This gesture always takes you to the Home screen.</string>
     <!-- Introduction subtitle for the Home gesture tutorial that will be spoken by screen readers. [CHAR LIMIT=100] -->
     <string name="home_gesture_spoken_intro_subtitle">Swipe up with 2 fingers from the bottom of the screen. This gesture always takes you to the Home screen.</string>
+    <!-- Title of the gesture tutorial section educating users on how to go to the home screen. [CHAR LIMIT=100] -->
+    <string name="home_gesture_tutorial_title">Go home</string>
+    <!-- Subtitle of the gesture tutorial section educating users on how to go to the home screen [CHAR LIMIT=100] -->
+    <string name="home_gesture_tutorial_subtitle">To go to your home screen at any time, swipe up from the bottom of your screen</string>
 
     <!-- Feedback shown during interactive parts of Overview gesture tutorial when the gesture is started too far from the edge. [CHAR LIMIT=100] -->
     <string name="overview_gesture_feedback_swipe_too_far_from_edge">Make sure you swipe up from the bottom edge of the screen.</string>
@@ -193,7 +200,7 @@
     <!-- Title of "All Set" page [CHAR LIMIT=NONE] -->
     <string name="allset_title">All set!</string>
     <!-- Hint string at the bottom of "All Set" page [CHAR LIMIT=NONE] -->
-    <string name="allset_hint">Swipe up to go Home</string>
+    <string name="allset_hint">Swipe up to go home</string>
     <!-- Hint string at the bottom of "All Set" page for button navigation [CHAR LIMIT=NONE] -->
     <string name="allset_button_hint">Tap the home button to go to your home screen</string>
     <!-- Description of "All Set" page on the user's device [CHAR LIMIT=NONE] -->
@@ -211,7 +218,7 @@
     <!-- Label for a button that enters split screen selection mode. [CHAR_LIMIT=20] -->
     <string name="action_split">Split</string>
     <!-- Label for toast with instructions for split screen selection mode. [CHAR_LIMIT=50] -->
-    <string name="toast_split_select_app">Tap another app to use splitscreen</string>
+    <string name="toast_split_select_app">Tap another app to use split screen</string>
     <!-- Label for toast when app selected for split isn't supported. [CHAR_LIMIT=50] -->
     <string name="toast_split_app_unsupported">Choose another app to use split screen</string>
     <!-- Message shown when an action is blocked by a policy enforced by the app or the organization managing the device. [CHAR_LIMIT=NONE] -->
@@ -278,4 +285,12 @@
     <string name="move_drop_target_top_or_left">Move to top&#47;left</string>
     <!-- Label for moving drop target to the bottom or right side of the screen, depending on orientation (from the Taskbar only). -->
     <string name="move_drop_target_bottom_or_right">Move to bottom&#47;right</string>
+
+    <!-- Label for quick switch tile showing how many more apps are available [CHAR LIMIT=NONE] -->
+    <string name="quick_switch_overflow">{count, plural,
+            =1{Show # more app.}
+            other{Show # more apps.}
+        }</string>
+    <!-- Accessibility label for quick switch tiles showing split tasks [CHAR LIMIT=NONE] -->
+    <string name="quick_switch_split_task"><xliff:g id="app_name_1" example="Chrome">%1$s</xliff:g> and <xliff:g id="app_name_2" example="Gmail">%2$s</xliff:g></string>
 </resources>

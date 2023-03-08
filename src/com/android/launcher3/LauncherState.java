@@ -131,7 +131,11 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     public static final LauncherState OVERVIEW = new OverviewState(OVERVIEW_STATE_ORDINAL);
     public static final LauncherState OVERVIEW_MODAL_TASK = OverviewState.newModalTaskState(
             OVERVIEW_MODAL_TASK_STATE_ORDINAL);
-    public static final LauncherState QUICK_SWITCH =
+    /**
+     * State when user performs a quickswitch gesture from home/workspace to the most recent
+     * app
+     */
+    public static final LauncherState QUICK_SWITCH_FROM_HOME =
             OverviewState.newSwitchState(QUICK_SWITCH_STATE_ORDINAL);
     public static final LauncherState BACKGROUND_APP =
             OverviewState.newBackgroundState(BACKGROUND_APP_STATE_ORDINAL);
@@ -219,6 +223,20 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     /** Returns whether taskbar is aligned with the hotseat vs position inside apps */
     public boolean isTaskbarAlignedWithHotseat(Launcher launcher) {
         return true;
+    }
+
+    /**
+     * Returns whether taskbar global drag is disallowed in this state.
+     */
+    public boolean disallowTaskbarGlobalDrag() {
+        return false;
+    }
+
+    /**
+     * Returns whether the taskbar shortcut should trigger split selection mode.
+     */
+    public boolean allowTaskbarInitialSplitSelection() {
+        return false;
     }
 
     /**

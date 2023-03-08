@@ -45,6 +45,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
+import android.window.SplashScreen;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -199,9 +200,9 @@ public interface ActivityContext {
     }
 
     /**
-     * Returns {@code true} if popups should use color extraction.
+     * Returns {@code true} if popups can use a range of color shades instead of a singular color.
      */
-    default boolean shouldUseColorExtractionForPopup() {
+    default boolean canUseMultipleShadesForPopup() {
         return true;
     }
 
@@ -313,14 +314,21 @@ public interface ActivityContext {
      */
     default boolean startActivitySafely(
             View v, Intent intent, @Nullable ItemInfo item) {
-
+        Preconditions.assertUIThread();
         Context context = (Context) this;
         if (isAppBlockedForSafeMode() && !PackageManagerHelper.isSystemApp(context, intent)) {
             Toast.makeText(context, R.string.safemode_shortcut_error, Toast.LENGTH_SHORT).show();
             return false;
         }
 
-        Bundle optsBundle = (v != null) ? getActivityLaunchOptions(v, item).toBundle() : null;
+        Bundle optsBundle = null;
+        if (v != null) {
+            optsBundle = getActivityLaunchOptions(v, item).toBundle();
+        } else if (item != null && item.animationType == LauncherSettings.Animation.DEFAULT_NO_ICON
+                && Utilities.ATLEAST_T) {
+            optsBundle = ActivityOptions.makeBasic()
+                    .setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR).toBundle();
+        }
         UserHandle user = item == null ? null : item.user;
 
         // Prepare intent

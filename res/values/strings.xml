@@ -40,9 +40,6 @@
     <!-- Options for recent tasks -->
     <!-- Title for an option to enter split screen mode for a given app -->
     <string name="recent_task_option_split_screen">Split screen</string>
-    <string name="split_screen_position_top">Split top</string>
-    <string name="split_screen_position_left">Split left</string>
-    <string name="split_screen_position_right">Split right</string>
     <string name="split_app_info_accessibility">App info for %1$s</string>
 
     <!-- Widgets -->
@@ -66,6 +63,9 @@
     <!-- Accessibility spoken message announced when a widget gets added to the home screen using a
          button in a dialog. [CHAR_LIMIT=none] -->
     <string name="added_to_home_screen_accessibility_text"><xliff:g id="widget_name" example="Calendar month view">%1$s</xliff:g> widget added to home screen</string>
+    <!-- Widget suggestions header title in the full widgets picker for large screen devices
+    in landscape mode. [CHAR_LIMIT=50] -->
+    <string name="suggested_widgets_header_title">Suggestions</string>
     <!-- Label for showing the number of widgets an app has in the full widgets picker.
          [CHAR_LIMIT=25][ICU SYNTAX] -->
     <string name="widgets_count">
@@ -419,10 +419,12 @@
 
     <!--- heading shown when user opens work apps tab while work apps are paused -->
     <string name="work_apps_paused_title">Work apps are paused</string>
-    <!--- body shown when user opens work apps tab while work apps are paused -->
+    <!--- body shown when user opens work apps tab while work apps are paused.-->
+    <string name="work_apps_paused_info_body">You won’t receive notifications from your work apps</string>
+    <!--- body shown when user opens work apps tab while work apps are paused. -->
     <string name="work_apps_paused_body">Your work apps can’t send you notifications, use your battery, or access your location</string>
-    <!-- content description for paused work apps list -->
-    <string name="work_apps_paused_content_description">Work apps are off. Your work apps can’t send you notifications, use your battery, or access your location</string>
+    <!--- body shown when user opens work apps tab while work apps are paused and calls and texts are unavailable-->
+    <string name="work_apps_paused_telephony_unavailable_body">You won’t receive phone calls, text messages, or notifications from your work apps</string>
     <!-- string shown in educational banner about work profile -->
     <string name="work_apps_paused_edu_banner">Work apps are badged and visible to your IT admin</string>
     <!-- button string shown to dismiss work tab education -->
@@ -431,7 +433,7 @@
     <!-- button string shown pause work profile -->
     <string name="work_apps_pause_btn_text">Pause work apps</string>
     <!-- button string shown enable work profile -->
-    <string name="work_apps_enable_btn_text">Turn on work apps</string>
+    <string name="work_apps_enable_btn_text">Unpause</string>
 
     <!-- A hint shown in launcher settings develop options filter box -->
     <string name="developer_options_filter_hint">Filter</string>

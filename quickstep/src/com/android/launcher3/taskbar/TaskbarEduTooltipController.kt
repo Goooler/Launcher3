@@ -28,7 +28,6 @@ import com.airbnb.lottie.LottieProperty.COLOR_FILTER
 import com.airbnb.lottie.model.KeyPath
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import com.android.launcher3.Utilities.IS_RUNNING_IN_TEST_HARNESS
 import com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_EDU_TOOLTIP
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_EDU_OPEN
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
@@ -56,7 +55,8 @@ annotation class TaskbarEduTooltipStep
 class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
     LoggableTaskbarController {
 
-    private val isTooltipEnabled = !IS_RUNNING_IN_TEST_HARNESS && ENABLE_TASKBAR_EDU_TOOLTIP.get()
+    private val isTooltipEnabled: Boolean
+        get() = !Utilities.isRunningInTestHarness() && ENABLE_TASKBAR_EDU_TOOLTIP.get()
     private val isOpen: Boolean
         get() = tooltip?.isOpen ?: false
 
@@ -110,11 +110,22 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
         tooltipStep = TOOLTIP_STEP_NONE
         inflateTooltip(R.layout.taskbar_edu_features)
         tooltip?.run {
-            findViewById<LottieAnimationView>(R.id.splitscreen_animation).supportLightTheme()
-            findViewById<LottieAnimationView>(R.id.suggestions_animation).supportLightTheme()
-            findViewById<LottieAnimationView>(R.id.settings_animation).supportLightTheme()
-            findViewById<View>(R.id.settings_edu).visibility =
-                if (DisplayController.isTransientTaskbar(activityContext)) GONE else VISIBLE
+            val splitscreenAnim = findViewById<LottieAnimationView>(R.id.splitscreen_animation)
+            val suggestionsAnim = findViewById<LottieAnimationView>(R.id.suggestions_animation)
+            val settingsAnim = findViewById<LottieAnimationView>(R.id.settings_animation)
+            val settingsEdu = findViewById<View>(R.id.settings_edu)
+            splitscreenAnim.supportLightTheme()
+            suggestionsAnim.supportLightTheme()
+            settingsAnim.supportLightTheme()
+            if (DisplayController.isTransientTaskbar(activityContext)) {
+                splitscreenAnim.setAnimation(R.raw.taskbar_edu_splitscreen_transient)
+                suggestionsAnim.setAnimation(R.raw.taskbar_edu_suggestions_transient)
+                settingsEdu.visibility = GONE
+            } else {
+                splitscreenAnim.setAnimation(R.raw.taskbar_edu_splitscreen_persistent)
+                suggestionsAnim.setAnimation(R.raw.taskbar_edu_suggestions_persistent)
+                settingsEdu.visibility = VISIBLE
+            }
 
             findViewById<View>(R.id.done_button)?.setOnClickListener { hide() }
             if (DisplayController.isTransientTaskbar(activityContext)) {

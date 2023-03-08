@@ -618,8 +618,6 @@ class GridSizeMigrationUtilTest {
         assertThat(locMap[testPackage3]).isEqualTo(1)
         assertThat(locMap[testPackage4]).isEqualTo(1)
         assertThat(locMap[testPackage5]).isEqualTo(2)
-
-        disableNewMigrationLogic()
     }
 
     /**
@@ -684,7 +682,6 @@ class GridSizeMigrationUtilTest {
         assertThat(locMap[testPackage3]).isEqualTo(0)
         assertThat(locMap[testPackage4]).isEqualTo(0)
         assertThat(locMap[testPackage5]).isEqualTo(0)
-        disableNewMigrationLogic()
     }
 
     /** Migrating from a larger grid to a smaller, we reflow from page 0 */
@@ -745,25 +742,9 @@ class GridSizeMigrationUtilTest {
         assertThat(locMap[testPackage3]).isEqualTo(0)
         assertThat(locMap[testPackage4]).isEqualTo(0)
         assertThat(locMap[testPackage5]).isEqualTo(0)
-
-        disableNewMigrationLogic()
     }
 
     private fun enableNewMigrationLogic(srcGridSize: String) {
-        context
-            .getSharedPreferences(FeatureFlags.FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(FeatureFlags.ENABLE_NEW_MIGRATION_LOGIC.key, true)
-            .commit()
         LauncherPrefs.get(context).putSync(WORKSPACE_SIZE.to(srcGridSize))
-        FeatureFlags.initialize(context)
-    }
-
-    private fun disableNewMigrationLogic() {
-        context
-            .getSharedPreferences(FeatureFlags.FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(FeatureFlags.ENABLE_NEW_MIGRATION_LOGIC.key, false)
-            .commit()
     }
 }

@@ -59,7 +59,6 @@
         <item name="folderHintColor">@color/folder_hint_text_color_dark</item>
         <item name="loadingIconColor">#CCFFFFFF</item>
         <item name="iconOnlyShortcutColor">?android:attr/textColorSecondary</item>
-        <item name="workProfileOverlayTextColor">#FF212121</item>
         <item name="eduHalfSheetBGColor">?android:attr/colorAccent</item>
         <item name="workspaceAccentColor">@color/workspace_accent_color_light</item>
         <item name="dropTargetHoverTextColor">@color/workspace_text_color_dark</item>
@@ -114,7 +113,6 @@
         <item name="isMainColorDark">true</item>
         <item name="loadingIconColor">#99FFFFFF</item>
         <item name="iconOnlyShortcutColor">#B3FFFFFF</item>
-        <item name="workProfileOverlayTextColor">@android:color/white</item>
         <item name="eduHalfSheetBGColor">#DD000000</item>
         <item name="overviewScrimColor">@color/overview_scrim_dark</item>
         <item name="preloadIconAccentColor">@color/preload_icon_accent_color_dark</item>
@@ -176,10 +174,14 @@
         <item name="android:colorPrimaryDark">#E8EAED</item>
         <item name="android:textColorSecondary">?android:attr/textColorPrimary</item>
         <item name="android:colorEdgeEffect">?android:attr/textColorSecondary</item>
+        <item name="widgetPickerHeaderAppTitleColor">@color/app_title_text_light</item>
+        <item name="widgetPickerHeaderAppSubtitleColor">@color/app_subtitle_text_light</item>
     </style>
     <style name="WidgetContainerTheme.Dark" parent="AppTheme.Dark">
         <item name="android:colorEdgeEffect">?android:attr/textColorSecondary</item>
         <item name="android:colorPrimaryDark">#616161</item> <!-- Gray 700 -->
+        <item name="widgetPickerHeaderAppTitleColor">@color/app_title_text_dark</item>
+        <item name="widgetPickerHeaderAppSubtitleColor">@color/app_subtitle_text_dark</item>
     </style>
 
     <style name="FastScrollerPopup" parent="@android:style/TextAppearance.DeviceDefault.DialogWindowTitle">
@@ -302,6 +304,10 @@
 
     <style name="CellStyleDefault">
         <item name="iconDrawablePadding">7dp</item>
+    </style>
+
+    <style name="AllAppsStyleDefault">
+        <item name="horizontalPadding">16dp</item>
     </style>
 
 </resources>

@@ -286,25 +286,25 @@
     <dimen name="taskbar_back_button_left_margin_kids">48dp</dimen>
     <dimen name="taskbar_home_button_left_margin_kids">48dp</dimen>
     <dimen name="taskbar_icon_size_kids">32dp</dimen>
+    <dimen name="taskbar_all_apps_button_translation_x_offset">6dp</dimen>
+
 
     <!-- Transient taskbar -->
     <dimen name="transient_taskbar_size">72dp</dimen>
+    <dimen name="transient_taskbar_min_width">150dp</dimen>
     <dimen name="transient_taskbar_icon_size">48dp</dimen>
     <dimen name="transient_taskbar_margin">24dp</dimen>
     <dimen name="transient_taskbar_shadow_blur">40dp</dimen>
     <dimen name="transient_taskbar_key_shadow_distance">10dp</dimen>
     <dimen name="transient_taskbar_stashed_size">32dp</dimen>
+    <dimen name="transient_taskbar_all_apps_button_translation_x_offset">4dp</dimen>
     <!-- An additional touch slop to prevent x-axis movement during the swipe up to show taskbar -->
     <dimen name="transient_taskbar_clamped_offset_bound">16dp</dimen>
     <!-- Taskbar swipe up thresholds -->
-    <dimen name="taskbar_nav_threshold">40dp</dimen>
-    <dimen name="taskbar_app_window_threshold">150dp</dimen>
-    <dimen name="taskbar_home_overview_threshold">225dp</dimen>
+    <dimen name="taskbar_nav_threshold">30dp</dimen>
+    <dimen name="taskbar_app_window_threshold">100dp</dimen>
+    <dimen name="taskbar_home_overview_threshold">180dp</dimen>
     <dimen name="taskbar_catch_up_threshold">300dp</dimen>
-
-    <dimen name="taskbar_nav_threshold_v2">30dp</dimen>
-    <dimen name="taskbar_app_window_threshold_v2">100dp</dimen>
-    <dimen name="taskbar_home_overview_threshold_v2">200dp</dimen>
 
     <!--  Taskbar 3 button spacing  -->
     <dimen name="taskbar_button_space_inbetween">24dp</dimen>
@@ -332,4 +332,16 @@
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->
     <!--     starting_surface_exit_animation_window_shift_length -->
     <dimen name="starting_surface_exit_animation_window_shift_length">20dp</dimen>
+
+    <!-- Keyboard Quick Switch -->
+    <dimen name="keyboard_quick_switch_border_width">4dp</dimen>
+    <dimen name="keyboard_quick_switch_taskview_width">104dp</dimen>
+    <dimen name="keyboard_quick_switch_taskview_height">134dp</dimen>
+    <dimen name="keyboard_quick_switch_recents_icon_size">20dp</dimen>
+    <dimen name="keyboard_quick_switch_margin_top">56dp</dimen>
+    <dimen name="keyboard_quick_switch_margin_ends">16dp</dimen>
+    <dimen name="keyboard_quick_switch_view_spacing">16dp</dimen>
+    <dimen name="keyboard_quick_switch_split_view_spacing">2dp</dimen>
+    <dimen name="keyboard_quick_switch_view_radius">28dp</dimen>
+    <dimen name="keyboard_quick_switch_task_view_radius">16dp</dimen>
 </resources>

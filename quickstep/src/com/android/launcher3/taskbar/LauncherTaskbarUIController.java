@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.taskbar;
 
-import static android.view.InsetsState.ITYPE_EXTRA_NAVIGATION_BAR;
-
 import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_EDU_TOOLTIP;
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
@@ -26,10 +24,10 @@ import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITION
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
-import android.annotation.ColorInt;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.TaskTransitionSpec;
+import android.view.View;
 import android.view.WindowManagerGlobal;
 
 import androidx.annotation.NonNull;
@@ -41,7 +39,6 @@ import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
@@ -50,10 +47,10 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.RecentsAnimationCallbacks;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
-import java.util.Set;
 
 /**
  * A data source which integrates with a Launcher instance
@@ -85,7 +82,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             };
 
     // Initialized in init.
-    private AnimatedFloat mTaskbarOverrideBackgroundAlpha;
     private TaskbarKeyguardController mKeyguardController;
     private final TaskbarLauncherStateController
             mTaskbarLauncherStateController = new TaskbarLauncherStateController();
@@ -99,8 +95,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         super.init(taskbarControllers);
 
         mTaskbarLauncherStateController.init(mControllers, mLauncher);
-        mTaskbarOverrideBackgroundAlpha = mControllers.taskbarDragLayerController
-                .getOverrideBackgroundAlpha();
 
         mLauncher.setTaskbarUIController(this);
         mKeyguardController = taskbarControllers.taskbarKeyguardController;
@@ -203,15 +197,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public Animator createAnimToLauncher(@NonNull LauncherState toState,
             @NonNull RecentsAnimationCallbacks callbacks, long duration) {
-        AnimatorSet set = new AnimatorSet();
-        Animator taskbarState = mTaskbarLauncherStateController
-                .createAnimToLauncher(toState, callbacks, duration);
-        long halfDuration = Math.round(duration * 0.5f);
-        Animator translation =
-                mControllers.taskbarTranslationController.createAnimToLauncher(halfDuration);
-
-        set.playTogether(taskbarState, translation);
-        return set;
+        return mTaskbarLauncherStateController.createAnimToLauncher(toState, callbacks, duration);
     }
 
     public boolean isDraggingItem() {
@@ -236,17 +222,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 WindowManagerGlobal.getWindowManagerService().clearTaskTransitionSpec();
             } else {
                 // Adjust task transition spec to account for taskbar being visible
-                @ColorInt int taskAnimationBackgroundColor =
-                        DisplayController.isTransientTaskbar(mLauncher)
-                                ? mLauncher.getColor(R.color.transient_taskbar_background)
-                                : mLauncher.getColor(R.color.taskbar_background);
-
-                TaskTransitionSpec customTaskAnimationSpec = new TaskTransitionSpec(
-                        taskAnimationBackgroundColor,
-                        Set.of(ITYPE_EXTRA_NAVIGATION_BAR)
-                );
-                WindowManagerGlobal.getWindowManagerService()
-                        .setTaskTransitionSpec(customTaskAnimationSpec);
+                WindowManagerGlobal.getWindowManagerService().setTaskTransitionSpec(
+                        new TaskTransitionSpec(
+                                mLauncher.getColor(R.color.taskbar_background)));
             }
         } catch (RemoteException e) {
             // This shouldn't happen but if it does task animations won't look good until the
@@ -254,13 +232,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             Log.e(TAG, "Failed to update task transition spec to account for new taskbar state",
                     e);
         }
-    }
-
-    /**
-     * Sets whether the background behind the taskbar/nav bar should be hidden.
-     */
-    public void forceHideBackground(boolean forceHide) {
-        mTaskbarOverrideBackgroundAlpha.updateValue(forceHide ? 0 : 1);
     }
 
     /**
@@ -292,7 +263,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * Returns {@code true} if a Taskbar education should be shown on application launch.
      */
     public boolean shouldShowEduOnAppLaunch() {
-        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+        if (Utilities.isRunningInTestHarness()) {
             return false;
         }
 
@@ -313,24 +284,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     public void onTaskbarIconLaunched(ItemInfo item) {
+        super.onTaskbarIconLaunched(item);
         InstanceId instanceId = new InstanceIdSequence().newInstanceId();
         mLauncher.logAppLaunch(mControllers.taskbarActivityContext.getStatsLogManager(), item,
                 instanceId);
-    }
-
-    @Override
-    public void setSystemGestureInProgress(boolean inProgress) {
-        super.setSystemGestureInProgress(inProgress);
-        if (DisplayController.isTransientTaskbar(mLauncher)) {
-            forceHideBackground(false);
-            return;
-        }
-        if (!FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
-            // Launcher's ScrimView will draw the background throughout the gesture. But once the
-            // gesture ends, start drawing taskbar's background again since launcher might stop
-            // drawing.
-            forceHideBackground(inProgress);
-        }
     }
 
     /**
@@ -383,13 +340,24 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
+    public RecentsView getRecentsView() {
+        return mLauncher.getOverviewPanel();
+    }
+
+    @Override
+    public void launchSplitTasks(@NonNull View taskView, @NonNull GroupTask groupTask) {
+        mLauncher.launchSplitTasks(taskView, groupTask);
+    }
+
+    @Override
+    protected void onIconLayoutBoundsChanged() {
+        mTaskbarLauncherStateController.resetIconAlignment();
+    }
+
+    @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         super.dumpLogs(prefix, pw);
 
-        pw.println(String.format(
-                "%s\tmTaskbarOverrideBackgroundAlpha=%.2f",
-                prefix,
-                mTaskbarOverrideBackgroundAlpha.value));
         pw.println(String.format("%s\tTaskbar in-app display progress:", prefix));
         mTaskbarInAppDisplayProgressMultiProp.dump(
                 prefix + "\t",
@@ -401,10 +369,5 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 "SYSUI_SURFACE_PROGRESS_INDEX");
 
         mTaskbarLauncherStateController.dumpLogs(prefix + "\t", pw);
-    }
-
-    @Override
-    public RecentsView getRecentsView() {
-        return mLauncher.getOverviewPanel();
     }
 }

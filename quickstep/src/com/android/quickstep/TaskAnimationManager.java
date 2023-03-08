@@ -40,6 +40,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -230,7 +231,6 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         if (ENABLE_SHELL_TRANSITIONS) {
             RemoteTransition transition = newRemoteTransition(mCallbacks,
-                    mController != null ? mController.getController() : null,
                     mCtx.getIApplicationThread());
             final ActivityOptions options = ActivityOptions.makeRemoteTransition(transition);
             // Allowing to pause Home if Home is top activity and Recents is not Home. So when user
@@ -238,6 +238,12 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             // to let the transition controller collect Home activity.
             CachedTaskInfo cti = gestureState.getRunningTask();
             boolean homeIsOnTop = cti != null && cti.isHomeTask();
+            if (DesktopTaskView.DESKTOP_MODE_SUPPORTED) {
+                if (cti != null && cti.isFreeformTask()) {
+                    // No transient launch when desktop task is on top
+                    homeIsOnTop = true;
+                }
+            }
             if (!homeIsOnTop) {
                 options.setTransientLaunch();
             }

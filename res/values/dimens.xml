@@ -21,7 +21,6 @@
     <!-- Dynamic Grid -->
     <dimen name="dynamic_grid_edge_margin">10.77dp</dimen>
     <dimen name="dynamic_grid_left_right_margin">8dp</dimen>
-    <dimen name="dynamic_grid_icon_drawable_padding">7dp</dimen>
     <!-- Minimum amount of next page visible in spring loaded mode -->
     <dimen name="dynamic_grid_spring_loaded_min_next_space_visible">24dp</dimen>
 
@@ -131,7 +130,6 @@
     <dimen name="all_apps_content_fade_in_offset">150dp</dimen>
     <dimen name="all_apps_tip_bottom_margin">8dp</dimen>
     <dimen name="all_apps_height_extra">6dp</dimen>
-    <dimen name="all_apps_bottom_sheet_horizontal_padding">0dp</dimen>
     <dimen name="all_apps_paged_view_top_padding">40dp</dimen>
 
     <dimen name="all_apps_icon_drawable_padding">8dp</dimen>
@@ -157,6 +155,7 @@
     <dimen name="work_edu_card_margin">16dp</dimen>
     <dimen name="work_edu_card_radius">16dp</dimen>
     <dimen name="work_edu_card_bottom_margin">26dp</dimen>
+    <dimen name="work_apps_paused_button_stroke">1dp</dimen>
 
     <dimen name="work_card_margin">24dp</dimen>
     <!-- (x) icon button inside work edu card -->
@@ -193,6 +192,7 @@
     <dimen name="widget_list_header_view_vertical_padding">20dp</dimen>
     <dimen name="widget_list_entry_spacing">2dp</dimen>
     <dimen name="widget_list_horizontal_margin">16dp</dimen>
+    <dimen name="widget_list_horizontal_margin_large_screen">24dp</dimen>
 
     <dimen name="widget_preview_shadow_blur">0.5dp</dimen>
     <dimen name="widget_preview_key_shadow_distance">1dp</dimen>
@@ -349,7 +349,7 @@
     <dimen name="developer_options_filter_margins">10dp</dimen>
 
     <!-- Theming related -->
-    <dimen name="default_dialog_corner_radius">8dp</dimen>
+    <dimen name="default_dialog_corner_radius">26dp</dimen>
     <dimen name="dialogCornerRadius">@dimen/default_dialog_corner_radius</dimen>
 
     <!-- Onboarding bottomsheet related -->
@@ -416,10 +416,6 @@
     <dimen name="split_instructions_elevation">1dp</dimen>
     <dimen name="split_instructions_horizontal_padding">24dp</dimen>
     <dimen name="split_instructions_vertical_padding">12dp</dimen>
-    <dimen name="split_instructions_bottom_margin_tablet_landscape">32dp</dimen>
-    <dimen name="split_instructions_bottom_margin_tablet_portrait">44dp</dimen>
-    <dimen name="split_instructions_bottom_margin_twopanels_landscape">33dp</dimen>
-    <dimen name="split_instructions_bottom_margin_twopanels_portrait">51dp</dimen>
     <dimen name="split_instructions_bottom_margin_phone_landscape">24dp</dimen>
     <dimen name="split_instructions_bottom_margin_phone_portrait">60dp</dimen>
     
