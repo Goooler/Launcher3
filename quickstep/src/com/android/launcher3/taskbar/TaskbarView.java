@@ -125,7 +125,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 && resources.getBoolean(R.bool.start_align_taskbar);
 
         int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
-        int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
+        int actualIconSize = mActivityContext.getDeviceProfile().taskbarIconSize;
 
         mIconTouchSize = Math.max(actualIconSize,
                 resources.getDimensionPixelSize(R.dimen.taskbar_icon_min_touch_size));
@@ -425,19 +425,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
-        mControllerCallbacks.onInterceptTouchEvent(ev);
-        return super.onInterceptTouchEvent(ev);
-    }
-
-    @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (mIconLayoutBounds.left <= event.getX()
-                && event.getX() <= mIconLayoutBounds.right
-                && !DisplayController.isTransientTaskbar(mActivityContext)) {
-            // Don't allow long pressing between icons, or above/below them
-            // unless its transient taskbar.
-            mControllerCallbacks.clearTouchInProgress();
+        if (mIconLayoutBounds.left <= event.getX() && event.getX() <= mIconLayoutBounds.right) {
+            // Don't allow long pressing between icons, or above/below them.
             return true;
         }
         if (mControllerCallbacks.onTouchEvent(event)) {
