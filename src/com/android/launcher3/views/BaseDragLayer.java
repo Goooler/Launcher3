@@ -18,7 +18,6 @@ package com.android.launcher3.views;
 
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
-import static android.view.MotionEvent.ACTION_OUTSIDE;
 import static android.view.MotionEvent.ACTION_UP;
 
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
@@ -261,10 +260,7 @@ public abstract class BaseDragLayer<T extends Context & ActivityContext>
             mTouchCompleteListener = null;
         }
 
-        if (mActiveController != null && ev.getAction() != ACTION_OUTSIDE) {
-            // For some reason, once we intercept touches and have an mActiveController, we won't
-            // get onInterceptTouchEvent() for ACTION_OUTSIDE. Thus, we must recalculate a new
-            // TouchController (if any) to handle the ACTION_OUTSIDE here in onTouchEvent() as well.
+        if (mActiveController != null) {
             return mActiveController.onControllerTouchEvent(ev);
         } else {
             // In case no child view handled the touch event, we may not get onIntercept anymore
@@ -559,7 +555,7 @@ public abstract class BaseDragLayer<T extends Context & ActivityContext>
             DeviceProfile dp = mActivity.getDeviceProfile();
             if (dp.isTaskbarPresent) {
                 // Ignore taskbar gesture insets to avoid interfering with TouchControllers.
-                gestureInsetBottom = Math.max(0, gestureInsetBottom - dp.taskbarHeight);
+                gestureInsetBottom = Math.max(0, gestureInsetBottom - dp.taskbarSize);
             }
             mSystemGestureRegion.set(
                     Math.max(gestureInsets.left, imeInset.left),

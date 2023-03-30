@@ -126,10 +126,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -261,10 +258,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -396,10 +390,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.left: 10.0px (3.8095238dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -531,10 +522,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.left: 10.0px (3.8095238dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -667,10 +655,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1224.0px (612.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 240.0px (120.0dp)\n" +
                     "\tworkspacePadding.left: 181.0px (90.5dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -803,10 +788,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1224.0px (612.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 240.0px (120.0dp)\n" +
                     "\tworkspacePadding.left: 181.0px (90.5dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -939,10 +921,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1300.0px (650.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 108.0px (54.0dp)\n" +
                     "\tworkspacePadding.left: 36.0px (18.0dp)\n" +
                     "\tworkspacePadding.top: 132.0px (66.0dp)\n" +
@@ -1075,10 +1054,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1300.0px (650.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 108.0px (54.0dp)\n" +
                     "\tworkspacePadding.left: 36.0px (18.0dp)\n" +
                     "\tworkspacePadding.top: 132.0px (66.0dp)\n" +
@@ -1216,10 +1192,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 30.0px (11.428572dp)\n" +
@@ -1356,10 +1329,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 30.0px (11.428572dp)\n" +
@@ -1496,10 +1466,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 24.0px (9.142858dp)\n" +
@@ -1632,10 +1599,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
-                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
-                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 24.0px (9.142858dp)\n" +

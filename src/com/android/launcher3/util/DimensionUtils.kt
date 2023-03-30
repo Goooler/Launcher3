@@ -37,7 +37,7 @@ object DimensionUtils {
         // Taskbar for large screen
         if (!isPhoneMode) {
             p.x = ViewGroup.LayoutParams.MATCH_PARENT
-            p.y = deviceProfile.taskbarHeight
+            p.y = deviceProfile.taskbarSize
             return p
         }
 

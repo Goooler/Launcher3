@@ -64,7 +64,7 @@ class FullscreenDrawParamsTest : FakeInvariantDeviceProfileTest() {
             canvasHeight,
             dp.widthPx,
             dp.heightPx,
-            dp.taskbarHeight,
+            dp.taskbarSize,
             dp.isTablet,
             currentRotation,
             isRtl
@@ -99,7 +99,7 @@ class FullscreenDrawParamsTest : FakeInvariantDeviceProfileTest() {
             canvasHeight,
             dp.widthPx,
             dp.heightPx,
-            dp.taskbarHeight,
+            dp.taskbarSize,
             dp.isTablet,
             currentRotation,
             isRtl
@@ -134,7 +134,7 @@ class FullscreenDrawParamsTest : FakeInvariantDeviceProfileTest() {
             canvasHeight,
             dp.widthPx,
             dp.heightPx,
-            dp.taskbarHeight,
+            dp.taskbarSize,
             dp.isTablet,
             currentRotation,
             isRtl
@@ -169,7 +169,7 @@ class FullscreenDrawParamsTest : FakeInvariantDeviceProfileTest() {
             canvasHeight,
             dp.widthPx,
             dp.heightPx,
-            dp.taskbarHeight,
+            dp.taskbarSize,
             dp.isTablet,
             currentRotation,
             isRtl

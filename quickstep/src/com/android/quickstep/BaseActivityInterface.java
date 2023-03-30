@@ -306,7 +306,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         out.x = dp.widthPx;
         out.y = dp.heightPx;
         if (dp.isTablet && !DisplayController.isTransientTaskbar(context)) {
-            out.y -= dp.taskbarHeight;
+            out.y -= dp.taskbarSize;
         }
     }
 
@@ -365,7 +365,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         calculateTaskSize(context, dp, outRect, orientedState);
         boolean isGridOnlyOverview = dp.isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get();
         int claimedSpaceBelow = isGridOnlyOverview
-                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarHeight
+                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarSize
                 : (dp.heightPx - outRect.bottom - dp.getInsets().bottom);
         int minimumHorizontalPadding = 0;
         if (!isGridOnlyOverview) {

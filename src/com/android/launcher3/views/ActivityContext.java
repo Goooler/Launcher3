@@ -45,7 +45,6 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
-import android.window.SplashScreen;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -321,15 +320,7 @@ public interface ActivityContext {
             return false;
         }
 
-        Bundle optsBundle = null;
-        if (v != null) {
-            optsBundle = getActivityLaunchOptions(v, item).toBundle();
-        } else if (android.os.Build.VERSION.SDK_INT >= 33
-                && item != null
-                && item.animationType == LauncherSettings.Animation.DEFAULT_NO_ICON) {
-            optsBundle = ActivityOptions.makeBasic()
-                    .setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR).toBundle();
-        }
+        Bundle optsBundle = (v != null) ? getActivityLaunchOptions(v, item).toBundle() : null;
         UserHandle user = item == null ? null : item.user;
 
         // Prepare intent

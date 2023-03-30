@@ -32,6 +32,7 @@ import android.view.WindowInsets;
 import android.view.animation.Interpolator;
 import android.widget.Toast;
 
+import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.core.view.ViewCompat;
@@ -181,6 +182,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
      * Measures the dimension of this view and its children by taking system insets, navigation bar,
      * status bar, into account.
      */
+    @GuardedBy("MainThread")
     protected void doMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         int widthUsed;

@@ -89,7 +89,7 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     private final SparseArray<ViewHolderBinder> mViewHolderBinders = new SparseArray<>();
     private final WidgetListBaseRowEntryComparator mRowComparator =
             new WidgetListBaseRowEntryComparator();
-    @Nullable private WidgetsTwoPaneSheet.HeaderChangeListener mHeaderChangeListener;
+    @Nullable private final WidgetsFullSheet.HeaderChangeListener mHeaderChangeListener;
 
     private final List<WidgetsListBaseEntry> mAllEntries = new ArrayList<>();
     private ArrayList<WidgetsListBaseEntry> mVisibleEntries = new ArrayList<>();
@@ -107,7 +107,8 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     public WidgetsListAdapter(Context context, LayoutInflater layoutInflater,
             IntSupplier emptySpaceHeightProvider, OnClickListener iconClickListener,
             OnLongClickListener iconLongClickListener,
-            boolean isTwoPane) {
+            WidgetsFullSheet.HeaderChangeListener headerChangeListener) {
+        mHeaderChangeListener = headerChangeListener;
         mContext = context;
         mMaxHorizontalSpan = WidgetSizes.getWidgetSizePx(
                 ActivityContext.lookupContext(context).getDeviceProfile(),
@@ -121,15 +122,10 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
                 VIEW_TYPE_WIDGETS_HEADER,
                 new WidgetsListHeaderViewHolderBinder(
                         layoutInflater, /* onHeaderClickListener= */ this,
-                        isTwoPane));
+                        headerChangeListener != null));
         mViewHolderBinders.put(
                 VIEW_TYPE_WIDGETS_SPACE,
                 new WidgetsSpaceViewHolderBinder(emptySpaceHeightProvider));
-    }
-
-    public void setHeaderChangeListener(WidgetsTwoPaneSheet.HeaderChangeListener
-            headerChangeListener) {
-        mHeaderChangeListener = headerChangeListener;
     }
 
     @Override

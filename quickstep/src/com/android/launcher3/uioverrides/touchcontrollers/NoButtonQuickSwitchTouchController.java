@@ -20,7 +20,6 @@ import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_ACTIONS;
 import static com.android.launcher3.LauncherState.QUICK_SWITCH_FROM_HOME;
-import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.anim.AlphaUpdateListener.ALPHA_CUTOFF_THRESHOLD;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.Interpolators.ACCEL_0_75;
@@ -160,9 +159,6 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
             return false;
         }
         if ((ev.getEdgeFlags() & Utilities.EDGE_NAV_BAR) == 0) {
-            return false;
-        }
-        if (isTrackpadMultiFingerSwipe(ev)) {
             return false;
         }
         int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();

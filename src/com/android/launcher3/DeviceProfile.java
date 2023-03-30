@@ -44,7 +44,6 @@ import android.view.Surface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.CellLayout.ContainerType;
 import com.android.launcher3.DevicePaddings.DevicePadding;
@@ -263,10 +262,10 @@ public class DeviceProfile {
     public boolean isTaskbarPresent;
     // Whether Taskbar will inset the bottom of apps by taskbarSize.
     public boolean isTaskbarPresentInApps;
-    public final int taskbarHeight;
-    public final int stashedTaskbarHeight;
-    public final int taskbarBottomMargin;
-    public final int taskbarIconSize;
+    public int taskbarSize;
+    public int transientTaskbarSize;
+    public int stashedTaskbarSize;
+    public int transientTaskbarMargin;
 
     // DragController
     public int flingToDeleteThresholdVelocity;
@@ -329,21 +328,17 @@ public class DeviceProfile {
             }
         }
 
-        if (DisplayController.isTransientTaskbar(context)) {
-            float invTransientIconSizeDp = inv.transientTaskbarIconSize[mTypeIndex];
-            taskbarIconSize = pxFromDp(invTransientIconSizeDp, mMetrics);
-            taskbarHeight = taskbarIconSize
-                    + (2 * res.getDimensionPixelSize(R.dimen.transient_taskbar_padding));
-            stashedTaskbarHeight =
-                    res.getDimensionPixelSize(R.dimen.transient_taskbar_stashed_height);
-            taskbarBottomMargin =
-                    res.getDimensionPixelSize(R.dimen.transient_taskbar_bottom_margin);
-        } else {
-            taskbarIconSize = pxFromDp(ResourcesCompat.getFloat(res, R.dimen.taskbar_icon_size),
-                    mMetrics);
-            taskbarHeight = res.getDimensionPixelSize(R.dimen.taskbar_size);
-            stashedTaskbarHeight = res.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
-            taskbarBottomMargin = 0;
+        if (isTaskbarPresent) {
+            transientTaskbarSize = res.getDimensionPixelSize(R.dimen.transient_taskbar_size);
+            transientTaskbarMargin = res.getDimensionPixelSize(R.dimen.transient_taskbar_margin);
+            if (DisplayController.isTransientTaskbar(context)) {
+                taskbarSize = transientTaskbarSize;
+                stashedTaskbarSize =
+                        res.getDimensionPixelSize(R.dimen.transient_taskbar_stashed_size);
+            } else {
+                taskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_size);
+                stashedTaskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
+            }
         }
 
         edgeMarginPx = res.getDimensionPixelSize(R.dimen.dynamic_grid_edge_margin);
@@ -1426,7 +1421,7 @@ public class DeviceProfile {
      * Returns the number of pixels the taskbar is translated from the bottom of the screen.
      */
     public int getTaskbarOffsetY() {
-        int taskbarIconBottomSpace = (taskbarHeight - iconSizePx) / 2;
+        int taskbarIconBottomSpace = (taskbarSize - iconSizePx) / 2;
         int launcherIconBottomSpace =
                 Math.min((hotseatCellHeightPx - iconSizePx) / 2, gridVisualizationPaddingY);
         return getHotseatBarBottomPadding() + launcherIconBottomSpace - taskbarIconBottomSpace;
@@ -1437,7 +1432,7 @@ public class DeviceProfile {
      */
     public int getOverviewActionsClaimedSpaceBelow() {
         if (isTaskbarPresent) {
-            return taskbarHeight + taskbarBottomMargin * 2;
+            return transientTaskbarSize + transientTaskbarMargin * 2;
         }
         return mInsets.bottom;
     }
@@ -1475,7 +1470,7 @@ public class DeviceProfile {
                     mInsets.top + availableHeightPx);
         } else {
             // Folders should only appear below the drop target bar and above the hotseat
-            int hotseatTop = isTaskbarPresent ? taskbarHeight : hotseatBarSizePx;
+            int hotseatTop = isTaskbarPresent ? taskbarSize : hotseatBarSizePx;
             return new Rect(mInsets.left + edgeMarginPx,
                     mInsets.top + dropTargetBarSizePx + edgeMarginPx,
                     mInsets.left + availableWidthPx - edgeMarginPx,
@@ -1676,10 +1671,7 @@ public class DeviceProfile {
 
         writer.println(prefix + "\tisTaskbarPresent:" + isTaskbarPresent);
         writer.println(prefix + "\tisTaskbarPresentInApps:" + isTaskbarPresentInApps);
-        writer.println(prefix + pxToDpStr("taskbarHeight", taskbarHeight));
-        writer.println(prefix + pxToDpStr("stashedTaskbarHeight", stashedTaskbarHeight));
-        writer.println(prefix + pxToDpStr("taskbarBottomMargin", taskbarBottomMargin));
-        writer.println(prefix + pxToDpStr("taskbarIconSize", taskbarIconSize));
+        writer.println(prefix + pxToDpStr("taskbarSize", taskbarSize));
 
         writer.println(prefix + pxToDpStr("desiredWorkspaceHorizontalMarginPx",
                 desiredWorkspaceHorizontalMarginPx));

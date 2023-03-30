@@ -268,10 +268,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mDotParams.scale = 0f;
         mForceHideDot = false;
         setBackground(null);
-        if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get()
-                || FeatureFlags.ENABLE_TWOLINE_DEVICESEARCH.get()) {
-            setMaxLines(1);
-        }
+        setSingleLine(true);
+        setMaxLines(1);
 
         setTag(null);
         if (mIconLoadRequest != null) {

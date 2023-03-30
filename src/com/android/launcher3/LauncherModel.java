@@ -285,10 +285,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action) ||
                 Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
             UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.WORK_TAB_MISSING, "onBroadcastIntent intentAction: " + action +
-                        " user: " + user);
-            }
             if (user != null) {
                 if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE.equals(action) ||
                         Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action)) {
