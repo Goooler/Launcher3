@@ -171,15 +171,23 @@ public class InstallSessionHelper {
             }
             return null;
         }
-        String pkg = sessionInfo.getInstallerPackageName();
+        return isTrustedPackage(sessionInfo.getInstallerPackageName(), getUserHandle(sessionInfo))
+                ? sessionInfo : null;
+    }
+
+    /**
+     * Returns true if the provided packageName can be trusted for user configurations
+     */
+    public boolean isTrustedPackage(String pkg, UserHandle user) {
         synchronized (mSessionVerifiedMap) {
             if (!mSessionVerifiedMap.containsKey(pkg)) {
-                boolean hasSystemFlag = new PackageManagerHelper(mAppContext).getApplicationInfo(
-                        pkg, getUserHandle(sessionInfo), ApplicationInfo.FLAG_SYSTEM) != null;
-                mSessionVerifiedMap.put(pkg, DEBUG || hasSystemFlag);
+                boolean hasSystemFlag = DEBUG || mAppContext.getPackageName().equals(pkg)
+                        || new PackageManagerHelper(mAppContext)
+                                .getApplicationInfo(pkg, user, ApplicationInfo.FLAG_SYSTEM) != null;
+                mSessionVerifiedMap.put(pkg, hasSystemFlag);
             }
         }
-        return mSessionVerifiedMap.get(pkg) ? sessionInfo : null;
+        return mSessionVerifiedMap.get(pkg);
     }
 
     @NonNull

@@ -27,12 +27,14 @@ import static org.junit.Assume.assumeTrue;
 import android.content.Intent;
 
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.Until;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.tapl.LaunchedAppState;
 import com.android.launcher3.tapl.LauncherInstrumentation.NavigationModel;
 import com.android.launcher3.tapl.Overview;
@@ -57,6 +59,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     private static final String APP_NAME = "LauncherTestApp";
     private static final String CALCULATOR_APP_PACKAGE =
             resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR);
+    private static final String READ_DEVICE_CONFIG_PERMISSION =
+            "android.permission.READ_DEVICE_CONFIG";
 
     @Before
     public void setUp() throws Exception {
@@ -180,35 +184,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         OverviewActions actionsView =
                 mLauncher.goHome().switchToOverview().getOverviewActions();
         actionsView.clickAndDismissScreenshot();
-    }
-
-    @Test
-    @PortraitLandscape
-    public void testSplitFromOverview() {
-        assumeTrue(!mLauncher.isTablet());
-
-        startTestActivity(2);
-        startTestActivity(3);
-
-        mLauncher.goHome().switchToOverview().getCurrentTask()
-                .tapMenu()
-                .tapSplitMenuItem()
-                .getTestActivityTask(2)
-                .open();
-    }
-
-    @Test
-    @PortraitLandscape
-    public void testSplitFromOverviewForTablet() {
-        assumeTrue(mLauncher.isTablet());
-
-        startTestActivity(2);
-        startTestActivity(3);
-
-        mLauncher.goHome().switchToOverview().getOverviewActions()
-                .clickSplit()
-                .getTestActivityTask(2)
-                .open();
     }
 
     private int getCurrentOverviewPage(Launcher launcher) {
@@ -370,6 +345,9 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @PortraitLandscape
     @NavigationModeSwitch
     public void testPressBack() throws Exception {
+        InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity(
+                READ_DEVICE_CONFIG_PERMISSION);
+        assumeFalse(FeatureFlags.ENABLE_BACK_SWIPE_LAUNCHER_ANIMATION.get());
         mLauncher.getWorkspace().switchToAllApps();
         mLauncher.pressBack();
         mLauncher.getWorkspace();

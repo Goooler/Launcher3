@@ -18,7 +18,7 @@ package com.android.quickstep;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Surface.ROTATION_0;
 
-import static com.android.launcher3.Utilities.isTrackpadMotionEvent;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
@@ -233,15 +233,7 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
      * @return whether the coordinates of the {@param event} is in the swipe up gesture region.
      */
     public boolean isInSwipeUpTouchRegion(MotionEvent event, BaseActivityInterface activity) {
-        boolean inBarArea = mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(),
-                event.getY());
-        if (inBarArea) {
-            return true;
-        }
-        if (isTrackpadMotionEvent(event)) {
-            return !activity.isResumed();
-        }
-        return false;
+        return isInSwipeUpTouchRegion(event, 0, activity);
     }
 
     /**
@@ -250,15 +242,11 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
      */
     public boolean isInSwipeUpTouchRegion(MotionEvent event, int pointerIndex,
             BaseActivityInterface activity) {
-        boolean inBarArea = mOrientationTouchTransformer.touchInValidSwipeRegions(
-                event.getX(pointerIndex), event.getY(pointerIndex));
-        if (inBarArea) {
+        if (isTrackpadMultiFingerSwipe(event)) {
             return true;
         }
-        if (isTrackpadMotionEvent(event)) {
-            return !activity.isResumed();
-        }
-        return false;
+        return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(pointerIndex),
+                event.getY(pointerIndex));
     }
 
     @Override

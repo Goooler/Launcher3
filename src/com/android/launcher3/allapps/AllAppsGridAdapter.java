@@ -21,7 +21,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 
-import androidx.annotation.Px;
 import androidx.core.view.accessibility.AccessibilityEventCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.core.view.accessibility.AccessibilityRecordCompat;
@@ -29,6 +28,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.Adapter;
 
+import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.util.ScrollableLayoutManager;
 import com.android.launcher3.views.ActivityContext;
 
@@ -73,8 +73,8 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
 
 
     public AllAppsGridAdapter(T activityContext, LayoutInflater inflater,
-            AlphabeticalAppsList apps, BaseAdapterProvider[] adapterProviders) {
-        super(activityContext, inflater, apps, adapterProviders);
+            AlphabeticalAppsList apps, SearchAdapterProvider<?> adapterProvider) {
+        super(activityContext, inflater, apps, adapterProvider);
         mGridLayoutMgr = new AppsGridLayoutManager(mActivityContext);
         mGridLayoutMgr.setSpanSizeLookup(new GridSpanSizer());
         setAppsPerRow(activityContext.getDeviceProfile().numShownAllAppsColumns);
@@ -145,19 +145,6 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
         }
 
         /**
-         * We need to extend all apps' RecyclerView's bottom by 5% of view height to ensure extra
-         * roll(s) of app icons is rendered at the bottom, so that they can fill the bottom gap
-         * created during predictive back's scale animation from all apps to home.
-         */
-        @Override
-        protected void calculateExtraLayoutSpace(RecyclerView.State state, int[] extraLayoutSpace) {
-            super.calculateExtraLayoutSpace(state, extraLayoutSpace);
-            @Px int extraSpacePx = (int) (getHeight()
-                    * (1 - AllAppsTransitionController.SWIPE_ALL_APPS_TO_HOME_MIN_SCALE) / 2);
-            extraLayoutSpace[1] = Math.max(extraLayoutSpace[1], extraSpacePx);
-        }
-
-        /**
          * Returns the number of rows before {@param adapterPosition}, including this position
          * which should not be counted towards the collection info.
          */
@@ -195,11 +182,9 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
     public void setAppsPerRow(int appsPerRow) {
         mAppsPerRow = appsPerRow;
         int totalSpans = mAppsPerRow;
-        for (BaseAdapterProvider adapterProvider : mAdapterProviders) {
-            for (int itemPerRow : adapterProvider.getSupportedItemsPerRowArray()) {
-                if (totalSpans % itemPerRow != 0) {
-                    totalSpans *= itemPerRow;
-                }
+        for (int itemPerRow : mAdapterProvider.getSupportedItemsPerRowArray()) {
+            if (totalSpans % itemPerRow != 0) {
+                totalSpans *= itemPerRow;
             }
         }
         mGridLayoutMgr.setSpanCount(totalSpans);
@@ -226,9 +211,8 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
             if (isIconViewType(viewType)) {
                 return totalSpans / mAppsPerRow;
             } else {
-                BaseAdapterProvider adapterProvider = getAdapterProvider(viewType);
-                if (adapterProvider != null) {
-                    return totalSpans / adapterProvider.getItemsPerRow(viewType, mAppsPerRow);
+                if (mAdapterProvider.isViewSupported(viewType)) {
+                    return totalSpans / mAdapterProvider.getItemsPerRow(viewType, mAppsPerRow);
                 }
 
                 // Section breaks span the full width

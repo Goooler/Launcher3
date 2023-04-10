@@ -21,7 +21,7 @@ import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_UP;
 import static android.view.WindowManager.LayoutParams.FLAG_SLIPPERY;
 
-import static com.android.launcher3.Utilities.isTrackpadMotionEvent;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMotionEvent;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPE_DOWN_WORKSPACE_NOTISHADE_OPEN;
 
 import android.graphics.PointF;
@@ -91,10 +91,11 @@ public class StatusBarTouchController implements TouchController {
             if (!mCanIntercept) {
                 return false;
             }
+            mDownEvents.clear();
             mDownEvents.put(pid, new PointF(ev.getX(), ev.getY()));
         } else if (ev.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN) {
-           // Check!! should only set it only when threshold is not entered.
-           mDownEvents.put(pid, new PointF(ev.getX(idx), ev.getY(idx)));
+            // Check!! should only set it only when threshold is not entered.
+            mDownEvents.put(pid, new PointF(ev.getX(idx), ev.getY(idx)));
         }
         if (!mCanIntercept) {
             return false;

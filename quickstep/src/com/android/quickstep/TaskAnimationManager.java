@@ -22,7 +22,6 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_INITIALIZED;
 import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_STARTED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.START_RECENTS_ANIMATION;
-import static com.android.systemui.shared.system.RemoteTransitionCompat.newRemoteTransition;
 
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -31,7 +30,6 @@ import android.content.Intent;
 import android.os.SystemProperties;
 import android.util.Log;
 import android.view.RemoteAnimationTarget;
-import android.window.RemoteTransition;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -40,6 +38,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -50,7 +49,7 @@ import java.util.HashMap;
 
 public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAnimationListener {
     public static final boolean ENABLE_SHELL_TRANSITIONS =
-            SystemProperties.getBoolean("persist.wm.debug.shell_transit", false);
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit", true);
     public static final boolean SHELL_TRANSITIONS_ROTATION = ENABLE_SHELL_TRANSITIONS
             && SystemProperties.getBoolean("persist.wm.debug.shell_transit_rotate", false);
 
@@ -187,12 +186,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                         return;
                     }
                 } else if (nonAppTargets.length > 0) {
-                    TaskViewUtils.createSplitAuxiliarySurfacesAnimator(
-                            nonAppTargets /* nonApps */,
-                            true /*shown*/, dividerAnimator -> {
-                                dividerAnimator.start();
-                                dividerAnimator.end();
-                            });
+                    TaskViewUtils.createSplitAuxiliarySurfacesAnimator(nonAppTargets /* nonApps */,
+                            true /*shown*/, null /* animatorHandler */);
                 }
                 if (mController != null) {
                     if (mLastAppearedTaskTarget == null
@@ -229,20 +224,23 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mCallbacks.addListener(listener);
 
         if (ENABLE_SHELL_TRANSITIONS) {
-            RemoteTransition transition = newRemoteTransition(mCallbacks,
-                    mController != null ? mController.getController() : null,
-                    mCtx.getIApplicationThread());
-            final ActivityOptions options = ActivityOptions.makeRemoteTransition(transition);
+            final ActivityOptions options = ActivityOptions.makeBasic();
             // Allowing to pause Home if Home is top activity and Recents is not Home. So when user
             // start home when recents animation is playing, the home activity can be resumed again
             // to let the transition controller collect Home activity.
             CachedTaskInfo cti = gestureState.getRunningTask();
             boolean homeIsOnTop = cti != null && cti.isHomeTask();
+            if (DesktopTaskView.DESKTOP_MODE_SUPPORTED) {
+                if (cti != null && cti.isFreeformTask()) {
+                    // No transient launch when desktop task is on top
+                    homeIsOnTop = true;
+                }
+            }
             if (!homeIsOnTop) {
                 options.setTransientLaunch();
             }
             options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
-            UI_HELPER_EXECUTOR.execute(() -> mCtx.startActivity(intent, options.toBundle()));
+            SystemUiProxy.INSTANCE.getNoCreate().startRecentsActivity(intent, options, mCallbacks);
         } else {
             UI_HELPER_EXECUTOR.execute(() -> ActivityManagerWrapper.getInstance()
                     .startRecentsActivity(intent, eventTime, mCallbacks, null, null));

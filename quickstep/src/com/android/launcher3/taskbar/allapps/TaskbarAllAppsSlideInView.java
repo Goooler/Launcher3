@@ -23,10 +23,12 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.animation.Interpolator;
+import android.window.OnBackInvokedDispatcher;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsViewController.TaskbarAllAppsCallbacks;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.views.AbstractSlideInView;
@@ -69,6 +71,13 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         } else {
             mTranslationShift = TRANSLATION_SHIFT_OPENED;
         }
+
+        if (FeatureFlags.ENABLE_BACK_SWIPE_LAUNCHER_ANIMATION.get()) {
+            mAppsView.getAppsRecyclerViewContainer().setOutlineProvider(mViewOutlineProvider);
+            mAppsView.getAppsRecyclerViewContainer().setClipToOutline(true);
+            findOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, this);
+        }
     }
 
     /** The apps container inside this view. */
@@ -79,6 +88,9 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     @Override
     protected void handleClose(boolean animate) {
         handleClose(animate, mAllAppsCallbacks.getCloseDuration());
+        if (FeatureFlags.ENABLE_BACK_SWIPE_LAUNCHER_ANIMATION.get()) {
+            findOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(this);
+        }
     }
 
     @Override
@@ -100,7 +112,28 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         DeviceProfile dp = mActivityContext.getDeviceProfile();
         setShiftRange(dp.allAppsShiftRange);
 
+        setContentBackgroundWithParent(
+                getContext().getDrawable(R.drawable.bg_rounded_corner_bottom_sheet),
+                mAppsView.getBottomSheetBackground());
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
         mActivityContext.addOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mActivityContext.removeOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    protected void onScaleProgressChanged() {
+        super.onScaleProgressChanged();
+        mAppsView.setClipChildren(!mIsBackProgressing);
+        mAppsView.getAppsRecyclerViewContainer().setClipChildren(!mIsBackProgressing);
     }
 
     @Override

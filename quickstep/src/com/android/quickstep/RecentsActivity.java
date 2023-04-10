@@ -134,7 +134,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
 
         SplitSelectStateController controller =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
-                        /* depthController */ null, getStatsLogManager());
+                         null /* depthController */, getStatsLogManager(),
+                        SystemUiProxy.INSTANCE.get(this), RecentsModel.INSTANCE.get(this));
         mDragLayer.recreateControllers();
         mFallbackRecentsView.init(mActionsView, controller);
 
@@ -266,7 +267,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 new RemoteAnimationAdapter(wrapper, RECENTS_LAUNCH_DURATION,
                         RECENTS_LAUNCH_DURATION - STATUS_BAR_TRANSITION_DURATION
                                 - STATUS_BAR_TRANSITION_PRE_DELAY),
-                new RemoteTransition(wrapper.toRemoteTransition(), getIApplicationThread()));
+                new RemoteTransition(wrapper.toRemoteTransition(), getIApplicationThread(),
+                        "LaunchFromRecents"));
         final ActivityOptionsWrapper activityOptions = new ActivityOptionsWrapper(options,
                 onEndCallback);
         activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
@@ -404,7 +406,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 getMainThreadHandler(), mAnimationToHomeFactory, true);
         ActivityOptions options = ActivityOptions.makeRemoteAnimation(
                 new RemoteAnimationAdapter(runner, HOME_APPEAR_DURATION, 0),
-                new RemoteTransition(runner.toRemoteTransition(), getIApplicationThread()));
+                new RemoteTransition(runner.toRemoteTransition(), getIApplicationThread(),
+                        "StartHomeFromRecents"));
         startHomeIntentSafely(this, options.toBundle());
     }
 

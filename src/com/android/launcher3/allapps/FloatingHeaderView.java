@@ -32,7 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.BaseAllAppsContainerView.AdapterHolder;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.views.ActivityContext;
@@ -72,8 +72,8 @@ public class FloatingHeaderView extends LinearLayout implements
                     moved(current);
                     applyVerticalMove();
                     if (headerCollapsed != mHeaderCollapsed) {
-                        BaseAllAppsContainerView<?> parent =
-                                (BaseAllAppsContainerView<?>) getParent();
+                        ActivityAllAppsContainerView<?> parent =
+                                (ActivityAllAppsContainerView<?>) getParent();
                         parent.invalidateHeader();
                     }
                 }
@@ -191,7 +191,7 @@ public class FloatingHeaderView extends LinearLayout implements
         updateExpectedHeight();
 
         if (mMaxTranslation != oldMaxHeight || mFloatingRowsCollapsed) {
-            BaseAllAppsContainerView<?> parent = (BaseAllAppsContainerView<?>) getParent();
+            ActivityAllAppsContainerView parent = (ActivityAllAppsContainerView) getParent();
             if (parent != null) {
                 parent.setupHeader();
             }
@@ -228,7 +228,7 @@ public class FloatingHeaderView extends LinearLayout implements
         updateExpectedHeight();
 
         mTabsHidden = tabsHidden;
-        mTabLayout.setVisibility(tabsHidden ? View.GONE : View.VISIBLE);
+        maybeSetTabVisibility(VISIBLE);
         mMainRV = mainRV;
         mWorkRV = workRV;
         mSearchRV = searchRV;
@@ -250,6 +250,12 @@ public class FloatingHeaderView extends LinearLayout implements
                 rvType == AdapterHolder.MAIN ? mMainRV
                 : rvType == AdapterHolder.WORK ? mWorkRV : mSearchRV;
         mCurrentRV.addOnScrollListener(mOnScrollListener);
+        maybeSetTabVisibility(rvType == AdapterHolder.SEARCH ? GONE : VISIBLE);
+    }
+
+    /** Update tab visibility to the given state, only if tabs are active (work profile exists). */
+    void maybeSetTabVisibility(int visibility) {
+        mTabLayout.setVisibility(mTabsHidden ? GONE : visibility);
     }
 
     private void updateExpectedHeight() {

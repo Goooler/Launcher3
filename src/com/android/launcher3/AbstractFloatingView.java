@@ -24,7 +24,9 @@ import static com.android.launcher3.compat.AccessibilityManagerCompat.isAccessib
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.Context;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.MotionEvent;
@@ -32,6 +34,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
+import android.window.OnBackAnimationCallback;
 
 import androidx.annotation.IntDef;
 
@@ -46,7 +49,9 @@ import java.lang.annotation.RetentionPolicy;
 /**
  * Base class for a View which shows a floating UI on top of the launcher UI.
  */
-public abstract class AbstractFloatingView extends LinearLayout implements TouchController {
+@TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+public abstract class AbstractFloatingView extends LinearLayout implements TouchController,
+        OnBackAnimationCallback {
 
     @IntDef(flag = true, value = {
             TYPE_FOLDER,
@@ -63,11 +68,13 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             TYPE_TASK_MENU,
             TYPE_OPTIONS_POPUP,
             TYPE_ICON_SURFACE,
+            TYPE_OPTIONS_POPUP_DIALOG,
             TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP,
             TYPE_WIDGETS_EDUCATION_DIALOG,
             TYPE_TASKBAR_EDUCATION_DIALOG,
             TYPE_TASKBAR_ALL_APPS,
-            TYPE_OPTIONS_POPUP_DIALOG
+            TYPE_ADD_TO_HOME_CONFIRMATION,
+            TYPE_TASKBAR_OVERLAY_PROXY
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FloatingViewType {}
@@ -87,14 +94,14 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public static final int TYPE_TASK_MENU = 1 << 11;
     public static final int TYPE_OPTIONS_POPUP = 1 << 12;
     public static final int TYPE_ICON_SURFACE = 1 << 13;
-    public static final int TYPE_OPTIONS_POPUP_DIALOG = 1 << 18;
+    public static final int TYPE_OPTIONS_POPUP_DIALOG = 1 << 14;
 
-    public static final int TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP = 1 << 14;
-    public static final int TYPE_WIDGETS_EDUCATION_DIALOG = 1 << 15;
-    public static final int TYPE_TASKBAR_EDUCATION_DIALOG = 1 << 16;
-    public static final int TYPE_TASKBAR_ALL_APPS = 1 << 17;
-    public static final int TYPE_ADD_TO_HOME_CONFIRMATION = 1 << 18;
-    public static final int TYPE_TASKBAR_OVERLAY_PROXY = 1 << 19;
+    public static final int TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP = 1 << 15;
+    public static final int TYPE_WIDGETS_EDUCATION_DIALOG = 1 << 16;
+    public static final int TYPE_TASKBAR_EDUCATION_DIALOG = 1 << 17;
+    public static final int TYPE_TASKBAR_ALL_APPS = 1 << 18;
+    public static final int TYPE_ADD_TO_HOME_CONFIRMATION = 1 << 19;
+    public static final int TYPE_TASKBAR_OVERLAY_PROXY = 1 << 20;
 
     public static final int TYPE_ALL = TYPE_FOLDER | TYPE_ACTION_POPUP
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_WIDGETS_FULL_SHEET
@@ -163,10 +170,14 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
 
     protected abstract boolean isOfType(@FloatingViewType int type);
 
-    /** @return Whether the back is consumed. If false, Launcher will handle the back as well. */
-    public boolean onBackPressed() {
-        close(true);
+    /** Return true if this view can consume back press. */
+    public boolean canHandleBack() {
         return true;
+    }
+
+    @Override
+    public void onBackInvoked() {
+        close(true);
     }
 
     @Override

@@ -37,6 +37,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.celllayout.CellPosMapper;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.logging.FileLog;
@@ -165,9 +166,9 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
 
     @NonNull
     public ModelWriter getWriter(final boolean hasVerticalHotseat, final boolean verifyChanges,
-            @Nullable final Callbacks owner) {
+            CellPosMapper cellPosMapper, @Nullable final Callbacks owner) {
         return new ModelWriter(mApp.getContext(), this, mBgDataModel,
-                hasVerticalHotseat, verifyChanges, owner);
+                hasVerticalHotseat, verifyChanges, cellPosMapper, owner);
     }
 
     @Override
@@ -284,6 +285,10 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action) ||
                 Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
             UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
+            if (TestProtocol.sDebugTracing) {
+                Log.d(TestProtocol.WORK_TAB_MISSING, "onBroadcastIntent intentAction: " + action +
+                        " user: " + user);
+            }
             if (user != null) {
                 if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE.equals(action) ||
                         Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action)) {

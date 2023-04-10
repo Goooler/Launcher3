@@ -16,12 +16,14 @@
 
 package com.android.launcher3.widget;
 
+import static android.view.View.MeasureSpec.getSize;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_TRAY;
 import static com.android.launcher3.Utilities.ATLEAST_S;
+import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_WIDGET_CENTERING;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -117,6 +119,8 @@ public class WidgetCell extends LinearLayout {
     private TextView mWidgetName;
     private TextView mWidgetDims;
     private TextView mWidgetDescription;
+    private Consumer<Bitmap> mCallback;
+    private @Nullable Bitmap mCachedPreview;
 
     protected WidgetItem mItem;
 
@@ -314,7 +318,7 @@ public class WidgetCell extends LinearLayout {
                 setScaleToFit(1.0f);
             }
             // When the drag start, translations need to be set to zero to center the view
-            setTranslationForCentering(0f, 0f);
+            getTranslateDelegate().setTranslation(INDEX_WIDGET_CENTERING, 0f, 0f);
         }
     }
 
@@ -428,6 +432,8 @@ public class WidgetCell extends LinearLayout {
      */
     private void ensurePreviewWithCallback(Consumer<Bitmap> callback,
             @Nullable Bitmap cachedPreview) {
+        mCallback = callback;
+        mCachedPreview = cachedPreview;
         if (mAppWidgetHostViewPreview != null) {
             int containerWidth = (int) (mTargetPreviewWidth * mPreviewContainerScale);
             int containerHeight = (int) (mTargetPreviewHeight * mPreviewContainerScale);
@@ -464,9 +470,11 @@ public class WidgetCell extends LinearLayout {
             } else {
                 mAppWidgetHostViewPreview.setScaleToFit(mAppWidgetHostViewScale);
             }
-            mAppWidgetHostViewPreview.setTranslationForCentering(
+            mAppWidgetHostViewPreview.getTranslateDelegate().setTranslation(
+                    INDEX_WIDGET_CENTERING,
                     -(params.width - (params.width * mPreviewContainerScale)) / 2.0f,
                     -(params.height - (params.height * mPreviewContainerScale)) / 2.0f);
+            mWidgetImageContainer.removeAllViews();
             mWidgetImageContainer.addView(mAppWidgetHostViewPreview, /* index= */ 0);
             mWidgetImage.setVisibility(View.GONE);
             applyPreview(null);
@@ -576,5 +584,20 @@ public class WidgetCell extends LinearLayout {
                         / appWidgetContentWidth,
                 (mTargetPreviewHeight - verticalPadding) * mPreviewContainerScale
                         / appWidgetContentHeight);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int padding = getPaddingLeft() + getPaddingRight();
+        int allowedWidth = getSize(widthMeasureSpec) - padding;
+
+        // Here we prevent having clipped widgets when they're too large as the preview width is
+        // larger than the max allowed width. We then re-do the preview with the new preview width
+        if (allowedWidth > 0 && mCachedPreview == null && allowedWidth < mTargetPreviewWidth) {
+            mTargetPreviewWidth = allowedWidth;
+            ensurePreviewWithCallback(mCallback, null);
+        }
+
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 }
