@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <!-- Copyright (C) 2023 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +12,8 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<!-- Applies to large tablet screens portrait -->
-<resources>
-    <!-- Taskbar -->
-    <!-- Align the Taskbar to the start (Left/Right) of the device when 3 button nav is enabled. -->
-    <bool name="start_align_taskbar">true</bool>
-</resources>
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/gesture_tutorial_menu_button_radius" />
+</shape>

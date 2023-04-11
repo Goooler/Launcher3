@@ -54,6 +54,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     private boolean mHasSprungOnceThisGesture;
     private @Nullable ValueAnimator mSpringBounce;
     private boolean mGestureEnded;
+    private boolean mGestureInProgress;
     private boolean mAnimationToHomeRunning;
 
     private final boolean mIsTransientTaskbar;
@@ -123,6 +124,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
 
     private void reset() {
         mGestureEnded = false;
+        mGestureInProgress = false;
         mHasSprungOnceThisGesture = false;
     }
 
@@ -131,6 +133,27 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
      */
     public TransitionCallback getTransitionCallback() {
         return mCallback;
+    }
+
+    /**
+     * Returns {@code true} if we should reset the animation back to zero.
+     *
+     * Returns {@code false} if there is a gesture in progress, or if we are already animating
+     * to 0 within the specified duration.
+     */
+    public boolean shouldResetBackToZero(long duration) {
+        if (mGestureInProgress) {
+            return false;
+        }
+        if (mSpringBounce != null && mSpringBounce.isRunning()) {
+            long springDuration = mSpringBounce.getDuration();
+            long current = mSpringBounce.getCurrentPlayTime();
+            return (springDuration - current >= duration);
+        }
+        if (mTranslationYForSwipe.isAnimatingToValue(0)) {
+            return mTranslationYForSwipe.getRemainingTime() >= duration;
+        }
+        return true;
     }
 
     /**
@@ -173,6 +196,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
             mAnimationToHomeRunning = false;
             cancelSpringIfExists();
             reset();
+            mGestureInProgress = true;
         }
         /**
          * Called when there is movement to move the taskbar.
@@ -196,6 +220,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
                 mGestureEnded = true;
                 startSpring();
             }
+            mGestureInProgress = false;
         }
     }
 
@@ -207,6 +232,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
         pw.println(prefix + "\tmHasSprungOnceThisGesture=" + mHasSprungOnceThisGesture);
         pw.println(prefix + "\tmAnimationToHomeRunning=" + mAnimationToHomeRunning);
         pw.println(prefix + "\tmGestureEnded=" + mGestureEnded);
+        pw.println(prefix + "\tmGestureInProgress=" + mGestureInProgress);
         pw.println(prefix + "\tmSpringBounce is running=" + (mSpringBounce != null
                 && mSpringBounce.isRunning()));
     }

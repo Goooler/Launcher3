@@ -32,12 +32,12 @@ import android.view.WindowInsets;
 import android.view.animation.Interpolator;
 import android.widget.Toast;
 
-import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.core.view.ViewCompat;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.Insettable;
@@ -61,7 +61,7 @@ import com.android.launcher3.views.ArrowTipView;
  */
 public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
         implements OnClickListener, OnLongClickListener, DragSource,
-        PopupDataProvider.PopupDataChangeListener, Insettable {
+        PopupDataProvider.PopupDataChangeListener, Insettable, OnDeviceProfileChangeListener {
     /** The default number of cells that can fit horizontally in a widget sheet. */
     public static final int DEFAULT_MAX_HORIZONTAL_SPANS = 4;
 
@@ -85,7 +85,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
         mWidgetCellHorizontalPadding = getResources().getDimensionPixelSize(
                 R.dimen.widget_cell_horizontal_padding);
         mNavBarScrimPaint = new Paint();
-        mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
+        mNavBarScrimPaint.setColor(Themes.getNavBarScrimColor(mActivityContext));
     }
 
     protected int getScrimColor(Context context) {
@@ -99,12 +99,23 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
                 .normalizeWindowInsets(getContext(), getRootWindowInsets(), new Rect());
         mNavBarScrimHeight = getNavBarScrimHeight(windowInsets);
         mActivityContext.getPopupDataProvider().setChangeListener(this);
+        mActivityContext.addOnDeviceProfileChangeListener(this);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mActivityContext.getPopupDataProvider().setChangeListener(null);
+        mActivityContext.removeOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    public void onDeviceProfileChanged(DeviceProfile dp) {
+        int navBarScrimColor = Themes.getNavBarScrimColor(mActivityContext);
+        if (mNavBarScrimPaint.getColor() != navBarScrimColor) {
+            mNavBarScrimPaint.setColor(navBarScrimColor);
+            invalidate();
+        }
     }
 
     @Override
@@ -182,7 +193,6 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
      * Measures the dimension of this view and its children by taking system insets, navigation bar,
      * status bar, into account.
      */
-    @GuardedBy("MainThread")
     protected void doMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         int widthUsed;

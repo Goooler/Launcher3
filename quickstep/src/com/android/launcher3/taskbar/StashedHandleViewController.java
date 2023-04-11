@@ -49,7 +49,8 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     public static final int ALPHA_INDEX_STASHED = 0;
     public static final int ALPHA_INDEX_HOME_DISABLED = 1;
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 2;
-    private static final int NUM_ALPHA_CHANNELS = 3;
+    public static final int ALPHA_INDEX_HIDDEN_WHILE_DREAMING = 3;
+    private static final int NUM_ALPHA_CHANNELS = 4;
 
     /**
      * The SharedPreferences key for whether the stashed handle region is dark.
@@ -111,13 +112,11 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
             mStashedHandleWidth =
                     resources.getDimensionPixelSize(R.dimen.taskbar_stashed_small_screen);
         } else {
-            mTaskbarSize = deviceProfile.taskbarSize;
+            mTaskbarSize = deviceProfile.taskbarHeight;
             mStashedHandleWidth = resources
                     .getDimensionPixelSize(R.dimen.taskbar_stashed_handle_width);
         }
-        int taskbarBottomMargin = DisplayController.isTransientTaskbar(mActivity)
-                ? resources.getDimensionPixelSize(R.dimen.transient_taskbar_margin)
-                : 0;
+        int taskbarBottomMargin = deviceProfile.taskbarBottomMargin;
         mStashedHandleView.getLayoutParams().height = mTaskbarSize + taskbarBottomMargin;
 
         mTaskbarStashedHandleAlpha.get(ALPHA_INDEX_STASHED).setValue(

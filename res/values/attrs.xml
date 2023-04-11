@@ -379,6 +379,15 @@
         <!-- defaults to hotseatQsbSpace, if not specified -->
         <attr name="hotseatQsbSpaceTwoPanelPortrait" format="float" />
 
+        <!-- defaults to res.taskbar_icon_size, if not specified -->
+        <attr name="transientTaskbarIconSize" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeLandscape" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeTwoPanelLandscape" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeTwoPanelPortrait" format="float" />
+
         <attr name="iconImageSize" format="float" />
         <!-- defaults to iconImageSize, if not specified -->
         <attr name="iconSizeLandscape" format="float" />
@@ -394,6 +403,16 @@
         <attr name="iconTextSizeTwoPanelPortrait" format="float" />
         <!-- defaults to iconTextSize, if not specified -->
         <attr name="iconTextSizeTwoPanelLandscape" format="float" />
+
+        <!-- If true, used to layout taskbar in 3 button navigation mode. -->
+        <!-- defaults to false if not specified -->
+        <attr name="startAlignTaskbar" format="boolean" />
+        <!-- defaults to startAlignTaskbar, if not specified -->
+        <attr name="startAlignTaskbarLandscape" format="boolean" />
+        <!-- defaults to startAlignTaskbarLandscape, if not specified -->
+        <attr name="startAlignTaskbarTwoPanelLandscape" format="boolean" />
+        <!-- defaults to startAlignTaskbar, if not specified -->
+        <attr name="startAlignTaskbarTwoPanelPortrait" format="boolean" />
 
         <!-- If set, this display option is used to determine the default grid -->
         <attr name="canBeDefault" format="boolean" />

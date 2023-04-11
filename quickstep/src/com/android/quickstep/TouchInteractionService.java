@@ -22,6 +22,7 @@ import static android.view.MotionEvent.ACTION_POINTER_DOWN;
 import static android.view.MotionEvent.ACTION_POINTER_UP;
 import static android.view.MotionEvent.ACTION_UP;
 
+import static com.android.launcher3.Launcher.INTENT_ACTION_ALL_APPS_TOGGLE;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
@@ -72,7 +73,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
-import com.android.app.viewcapture.SettingsAwareViewCapture;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
@@ -514,7 +514,7 @@ public class TouchInteractionService extends Service
 
         if (isHomeAndOverviewSame) {
             Intent intent = new Intent(mOverviewComponentObserver.getHomeIntent())
-                    .setAction(Intent.ACTION_ALL_APPS);
+                    .setAction(INTENT_ACTION_ALL_APPS_TOGGLE);
             RemoteAction allAppsAction = new RemoteAction(
                     Icon.createWithResource(this, R.drawable.ic_apps),
                     getString(R.string.all_apps_label),
@@ -910,10 +910,6 @@ public class TouchInteractionService extends Service
 
     private void logInputConsumerSelectionReason(
             InputConsumer consumer, CompoundString reasonString) {
-        if (!FeatureFlags.ENABLE_INPUT_CONSUMER_REASON_LOGGING.get()) {
-            ActiveGestureLog.INSTANCE.addLog("setInputConsumer: " + consumer.getName());
-            return;
-        }
         ActiveGestureLog.INSTANCE.addLog(new CompoundString("setInputConsumer: ")
                 .append(consumer.getName())
                 .append(". reason(s):")
@@ -1235,10 +1231,6 @@ public class TouchInteractionService extends Service
                 createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
             }
             mTaskbarManager.dumpLogs("", pw);
-
-            if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
-                SettingsAwareViewCapture.getInstance(this).dump(pw, fd, this);
-            }
         }
     }
 

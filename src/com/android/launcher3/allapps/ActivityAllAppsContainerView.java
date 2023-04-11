@@ -184,7 +184,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 this, mActivityContext.getStatsLogManager());
         mAH = Arrays.asList(null, null, null);
         mNavBarScrimPaint = new Paint();
-        mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
+        mNavBarScrimPaint.setColor(Themes.getNavBarScrimColor(mActivityContext));
 
         AllAppsStore.OnUpdateListener onAppsUpdated = this::onAppsUpdated;
         if (TestProtocol.sDebugTracing) {
@@ -192,7 +192,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     onAppsUpdated);
         }
         mAllAppsStore.addUpdateListener(onAppsUpdated);
-        mActivityContext.addOnDeviceProfileChangeListener(this);
 
         // This is a focus listener that proxies focus from a view into the list view.  This is to
         // work around the search box from getting first focus and showing the cursor.
@@ -261,6 +260,18 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mBottomSheetBackgroundColor = value.data;
         updateBackground(mActivityContext.getDeviceProfile());
         mSearchUiManager.initializeSearch(this);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mActivityContext.addOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mActivityContext.removeOnDeviceProfileChangeListener(this);
     }
 
     public SearchUiManager getSearchUiManager() {
@@ -347,16 +358,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     public boolean shouldContainerScroll(MotionEvent ev) {
         BaseDragLayer dragLayer = mActivityContext.getDragLayer();
-        // IF the MotionEvent is inside the search box, and the container keeps on receiving
-        // touch input, container should move down.
-        if (dragLayer.isEventOverView(mSearchContainer, ev)) {
-            return true;
-        }
-        // Scroll if not within the container view (e.g. over large-screen scrim).
-        if (!dragLayer.isEventOverView(getVisibleContainerView(), ev)) {
-            return true;
-        }
-        if (dragLayer.isEventOverView(mBottomSheetHandleArea, ev)) {
+        // IF the MotionEvent is inside the search box or handle area, and the container keeps on
+        // receiving touch input, container should move down.
+        if (dragLayer.isEventOverView(mSearchContainer, ev)
+                || dragLayer.isEventOverView(mBottomSheetHandleArea, ev)) {
             return true;
         }
         AllAppsRecyclerView rv = getActiveRecyclerView();
@@ -368,10 +373,30 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 && dragLayer.isEventOverView(rv.getScrollbar(), ev)) {
             return false;
         }
+        // Scroll if not within the container view (e.g. over large-screen scrim).
+        if (!dragLayer.isEventOverView(getVisibleContainerView(), ev)) {
+            return true;
+        }
         return rv.shouldContainerScroll(ev, dragLayer);
     }
 
+    /**
+     * Resets the UI to be ready for fresh interactions in the future. Exits search and returns to
+     * A-Z apps list.
+     *
+     * @param animate Whether to animate the header during the reset (e.g. switching profile tabs).
+     **/
     public void reset(boolean animate) {
+        reset(animate, true);
+    }
+
+    /**
+     * Resets the UI to be ready for fresh interactions in the future.
+     *
+     * @param animate Whether to animate the header during the reset (e.g. switching profile tabs).
+     * @param exitSearch Whether to force exit the search state and return to A-Z apps list.
+     **/
+    public void reset(boolean animate, boolean exitSearch) {
         for (int i = 0; i < mAH.size(); i++) {
             if (mAH.get(i).mRecyclerView != null) {
                 mAH.get(i).mRecyclerView.scrollToTop();
@@ -385,10 +410,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
         // Reset the base recycler view after transitioning home.
         updateHeaderScroll(0);
-        // Reset the search bar after transitioning home.
-        mSearchUiManager.resetSearch();
-        // Animate to A-Z with 0 time to reset the animation with proper state management.
-        animateToSearchState(false, 0);
+        if (exitSearch) {
+            // Reset the search bar after transitioning home.
+            mSearchUiManager.resetSearch();
+            // Animate to A-Z with 0 time to reset the animation with proper state management.
+            animateToSearchState(false, 0);
+        }
     }
 
     @Override
@@ -432,7 +459,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
         // Header keeps track of active recycler view to properly render header protection.
         mHeader.setActiveRV(currentActivePage);
-        reset(true /* animate */);
+        reset(true /* animate */, !isSearching() /* exitSearch */);
 
         mWorkManager.onActivePageChanged(currentActivePage);
     }
@@ -450,12 +477,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         boolean showTabs = shouldShowTabs();
         if (showTabs == mUsingTabs && !force) {
-            return;
-        }
-
-        if (isSearching()) {
-            mUsingTabs = showTabs;
-            mWorkManager.detachWorkModeSwitch();
             return;
         }
 
@@ -523,7 +544,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mAllAppsStore.registerIconContainer(mAH.get(AdapterHolder.SEARCH).mRecyclerView);
     }
 
-    protected View replaceAppsRVContainer(boolean showTabs) {
+    private void replaceAppsRVContainer(boolean showTabs) {
         for (int i = AdapterHolder.MAIN; i <= AdapterHolder.WORK; i++) {
             AdapterHolder adapterHolder = mAH.get(i);
             if (adapterHolder.mRecyclerView != null) {
@@ -577,7 +598,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             layoutBelowSearchContainer(getSearchRecyclerView(), /* tabs= */ false);
         }
 
-        return rvContainer;
+        updateSearchResultsVisibility();
     }
 
     void setupHeader() {
@@ -810,6 +831,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             }
         }
         updateBackground(dp);
+
+        int navBarScrimColor = Themes.getNavBarScrimColor(mActivityContext);
+        if (mNavBarScrimPaint.getColor() != navBarScrimColor) {
+            mNavBarScrimPaint.setColor(navBarScrimColor);
+            invalidate();
+        }
     }
 
     protected void updateBackground(DeviceProfile deviceProfile) {

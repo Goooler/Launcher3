@@ -268,8 +268,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mDotParams.scale = 0f;
         mForceHideDot = false;
         setBackground(null);
-        setSingleLine(true);
-        setMaxLines(1);
+        if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get()
+                || FeatureFlags.ENABLE_TWOLINE_DEVICESEARCH.get()) {
+            setMaxLines(1);
+        }
 
         setTag(null);
         if (mIconLoadRequest != null) {
@@ -870,7 +872,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             if (mIcon instanceof PreloadIconDrawable) {
                 preloadIconDrawable = (PreloadIconDrawable) mIcon;
                 preloadIconDrawable.setLevel(progressLevel);
-                preloadIconDrawable.setIsDisabled(!info.isAppStartable());
+                preloadIconDrawable.setIsDisabled(ENABLE_DOWNLOAD_APP_UX_V2.get()
+                        ? info.getProgressLevel() == 0
+                        : !info.isAppStartable());
             } else {
                 preloadIconDrawable = makePreloadIcon();
                 setIcon(preloadIconDrawable);
@@ -895,8 +899,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         final PreloadIconDrawable preloadDrawable = newPendingIcon(getContext(), info);
 
         preloadDrawable.setLevel(progressLevel);
-        preloadDrawable.setIsDisabled(!info.isAppStartable());
-
+        preloadDrawable.setIsDisabled(ENABLE_DOWNLOAD_APP_UX_V2.get()
+                ? info.getProgressLevel() == 0
+                : !info.isAppStartable());
         return preloadDrawable;
     }
 
