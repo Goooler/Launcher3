@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"ປັດເພື່ອກັບຄືນ"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"ເພື່ອກັບໄປໜ້າຈໍຫຼ້າສຸດ, ໃຫ້ປັດຈາກຂອບຊ້າຍ ຫຼື ຂວາໄປຫາທາງກາງຂອງໜ້າຈໍ."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"ເພື່ອກັບໄປໜ້າຈໍຫຼ້າສຸດ, ໃຫ້ປັດດ້ວຍ 2 ນິ້ວຈາກຂອບຊ້າຍ ຫຼື ຂວາໄປຫາທາງກາງຂອງໜ້າຈໍ."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"ກັບຄືນ"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"ກະລຸນາກວດສອບວ່າທ່ານປັດຂຶ້ນຈາກຂອບລຸ່ມສຸດຂອງໜ້າຈໍ."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"ກະລຸນາກວດສອບວ່າທ່ານບໍ່ຢຸດຊົ່ວຄາວກ່ອນປ່ອຍນິ້ວ."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"ກະລຸນາກວດສອບວ່າທ່ານປັດຂຶ້ນໄປຊື່ໆ."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"ປັດເພື່ອສະຫຼັບແອັບ"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"ເພື່ອສະຫຼັບລະຫວ່າງແອັບ, ໃຫ້ປັດຂຶ້ນຈາກລຸ່ມສຸດຂອງໜ້າຈໍທ່ານ, ກົດຄ້າງໄວ້, ຈາກນັ້ນປ່ອຍ."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"ເພື່ອສະຫຼັບລະຫວ່າງແອັບ, ໃຫ້ປັດຂຶ້ນດ້ວຍ 2 ນິ້ວຈາກລຸ່ມສຸດຂອງໜ້າຈໍທ່ານ, ກົດຄ້າງໄວ້ແລ້ວປ່ອຍ."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"ສະຫຼັບແອັບ"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"ທຸກຢ່າງພ້ອມແລ້ວ"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"ແລ້ວໆ"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"ການຕັ້ງຄ່າ"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"ຂ້າມ"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"ໝຸນໜ້າຈໍ"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"ແຖບໜ້າວຽກ Education"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"ສະແດງການສຶກສາແຖບໜ້າວຽກແລ້ວ"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"ປິດການສຶກສາແຖບໜ້າວຽກແລ້ວ"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"ລາກແອັບໄປດ້ານຂ້າງເພື່ອໃຊ້ 2 ແອັບໃນເວລາດຽວກັນ"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"ປັດຂຶ້ນຊ້າໆເພື່ອສະແດງແຖບໜ້າວຽກ"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"ຮັບການແນະນຳແອັບໂດຍອີງໃສ່ສິ່ງທີ່ເຮັດປະຈຳຂອງທ່ານ"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"ເປີດການນຳທາງແບບທ່າທາງໃນການຕັ້ງຄ່າເພື່ອເຊື່ອງແຖບໜ້າວຽກໄວ້ໂດຍອັດຕະໂນມັດ"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"ເຮັດສິ່ງຕ່າງໆໄດ້ຫຼາຍຂຶ້ນດ້ວຍແຖບໜ້າວຽກ"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"ຕໍ່ໄປ"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"ກັບຄືນ"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"ປິດ"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"ແລ້ວໆ"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"ໜ້າຫຼັກ"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"ການແຈ້ງເຕືອນ"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"ການຕັ້ງຄ່າດ່ວນ"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"ແຖບໜ້າວຽກ"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"ແຖບໜ້າວຽກທີ່ສະແດງຢູ່"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"ແຖບໜ້າວຽກທີ່ເຊື່ອງໄວ້ຢູ່"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"ແຖບການນຳທາງ"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ຍ້າຍໄປຊ້າຍ/ເທິງ"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"ຍ້າຍໄປຂວາ/ລຸ່ມ"</string>

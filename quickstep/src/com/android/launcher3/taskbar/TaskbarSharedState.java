@@ -15,6 +15,10 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.taskbar.LauncherTaskbarUIController.DISPLAY_PROGRESS_COUNT;
+
+import android.app.PendingIntent;
+
 /**
  * State shared across different taskbar instance
  */
@@ -38,4 +42,10 @@ public class TaskbarSharedState {
     public boolean setupUIVisible = false;
 
     public boolean allAppsVisible = false;
+
+    // LauncherTaskbarUIController#mTaskbarInAppDisplayProgressMultiProp
+    public float[] inAppDisplayProgressMultiPropValues = new float[DISPLAY_PROGRESS_COUNT];
+
+    // Taskbar System Action
+    public PendingIntent taskbarSystemActionPendingIntent;
 }

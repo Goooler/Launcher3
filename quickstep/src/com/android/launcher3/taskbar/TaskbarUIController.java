@@ -17,6 +17,8 @@ package com.android.launcher3.taskbar;
 
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 
 import android.content.Intent;
@@ -30,16 +32,15 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
-import com.android.systemui.shared.recents.model.Task;
 
 import java.io.PrintWriter;
-import java.util.function.Consumer;
 
 /**
  * Base class for providing different taskbar UI
@@ -124,6 +125,12 @@ public class TaskbarUIController {
     }
 
     /**
+     * SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values.
+     */
+    public void updateStateForSysuiFlags(int sysuiFlags) {
+    }
+
+    /**
      * Returns {@code true} iff taskbar is stashed.
      */
     public boolean isTaskbarStashed() {
@@ -167,6 +174,11 @@ public class TaskbarUIController {
         return true;
     }
 
+    /** Returns {@code true} if Taskbar is currently within overview. */
+    protected boolean isInOverview() {
+        return false;
+    }
+
     @CallSuper
     protected void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(String.format(
@@ -189,8 +201,12 @@ public class TaskbarUIController {
         if (recentsView == null) {
             return;
         }
+
+        ComponentKey componentToBeStaged = new ComponentKey(
+                splitSelectSource.itemInfo.getTargetComponent(),
+                splitSelectSource.itemInfo.user);
         recentsView.getSplitSelectController().findLastActiveTaskAndRunCallback(
-                splitSelectSource.intent.getComponent(),
+                componentToBeStaged,
                 foundTask -> {
                     splitSelectSource.alreadyRunningTaskId = foundTask == null
                             ? INVALID_TASK_ID
@@ -206,8 +222,9 @@ public class TaskbarUIController {
      */
     public void triggerSecondAppForSplit(ItemInfoWithIcon info, Intent intent, View startingView) {
         RecentsView recents = getRecentsView();
+        ComponentKey secondAppComponent = new ComponentKey(info.getTargetComponent(), info.user);
         recents.getSplitSelectController().findLastActiveTaskAndRunCallback(
-                info.getTargetComponent(),
+                secondAppComponent,
                 foundTask -> {
                     if (foundTask != null) {
                         TaskView foundTaskView = recents.getTaskViewByTaskId(foundTask.key.id);
@@ -227,7 +244,8 @@ public class TaskbarUIController {
                                     taskAttributes.getIconView().getDrawable(),
                                     taskAttributes.getThumbnailView(),
                                     taskAttributes.getThumbnailView().getThumbnail(),
-                                    null /* intent */);
+                                    null /* intent */,
+                                    null /* user */);
                             return;
                         }
                     }
@@ -239,7 +257,8 @@ public class TaskbarUIController {
                             new BitmapDrawable(info.bitmap.icon),
                             startingView,
                             null /* thumbnail */,
-                            intent);
+                            intent,
+                            info.user);
                 }
         );
     }
@@ -273,4 +292,30 @@ public class TaskbarUIController {
      * No-op if the view is not yet open.
      */
     public void launchSplitTasks(@NonNull View taskview, @NonNull GroupTask groupTask) { }
+
+    /**
+     * Returns the matching view (if any) in the taskbar.
+     * @param view The view to match.
+     */
+    public @Nullable View findMatchingView(View view) {
+        if (!(view.getTag() instanceof ItemInfo)) {
+            return null;
+        }
+        ItemInfo info = (ItemInfo) view.getTag();
+        if (info.container != CONTAINER_HOTSEAT && info.container != CONTAINER_HOTSEAT_PREDICTION) {
+            return null;
+        }
+
+        // Taskbar has the same items as the hotseat and we can use screenId to find the match.
+        int screenId = info.screenId;
+        View[] views = mControllers.taskbarViewController.getIconViews();
+        for (int i = views.length - 1; i >= 0; --i) {
+            if (views[i] != null
+                    && views[i].getTag() instanceof ItemInfo
+                    && ((ItemInfo) views[i].getTag()).screenId == screenId) {
+                return views[i];
+            }
+        }
+        return null;
+    }
 }

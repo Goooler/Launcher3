@@ -45,6 +45,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
+import android.window.SplashScreen;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -52,6 +53,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
+import com.android.launcher3.DropTargetHandler;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -188,6 +190,13 @@ public interface ActivityContext {
     }
 
     /**
+     * Handler for actions taken on drop targets that require launcher
+     */
+    default DropTargetHandler getDropTargetHandler() {
+        return null;
+    }
+
+    /**
      * Returns the FolderIcon with the given item id, if it exists.
      */
     default @Nullable FolderIcon findFolderIcon(final int folderIconId) {
@@ -320,7 +329,15 @@ public interface ActivityContext {
             return false;
         }
 
-        Bundle optsBundle = (v != null) ? getActivityLaunchOptions(v, item).toBundle() : null;
+        Bundle optsBundle = null;
+        if (v != null) {
+            optsBundle = getActivityLaunchOptions(v, item).toBundle();
+        } else if (android.os.Build.VERSION.SDK_INT >= 33
+                && item != null
+                && item.animationType == LauncherSettings.Animation.DEFAULT_NO_ICON) {
+            optsBundle = ActivityOptions.makeBasic()
+                    .setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR).toBundle();
+        }
         UserHandle user = item == null ? null : item.user;
 
         // Prepare intent
@@ -428,9 +445,7 @@ public interface ActivityContext {
                 StrictMode.setVmPolicy(oldPolicy);
             }
         } catch (SecurityException e) {
-            if (!onErrorStartingShortcut(intent, info)) {
-                throw e;
-            }
+            throw e;
         }
     }
 
@@ -448,16 +463,6 @@ public interface ActivityContext {
         } catch (SecurityException | IllegalStateException e) {
             Log.e(TAG, "Failed to start shortcut", e);
         }
-    }
-
-    /**
-     * Invoked when a shortcut fails to launch.
-     * @param intent Shortcut intent that failed to start.
-     * @param info Shortcut information.
-     * @return {@code true} if the error is handled by this callback.
-     */
-    default boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
-        return false;
     }
 
     default CellPosMapper getCellPosMapper() {

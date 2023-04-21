@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"ආපසු යාමට ස්වයිප් කරන්න"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"අවසාන තිරයට ආපසු යාමට, වම් හෝ දකුණු දාරයෙන් තිරයේ මැදට ස්වයිප් කරන්න."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"අවසාන තිරයට ආපසු යාමට, වම් හෝ දකුණු දාරයෙන් තිරයේ මැදට ඇඟිලි 2කින් ස්වයිප් කරන්න."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"ආපසු යන්න"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"ඔබ තිරයේ පහළ දාරයේ සිට ඉහළට ස්වයිප් කරන බව සහතික කර ගන්න."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"යාමට ඉඩ හැරීමට පෙර ඔබ විරාමයක් නොගන්නා බව සහතික කර ගන්න."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"ඔබ කෙලින්ම ඉහළට ස්වයිප් කරන බව සහතික කර ගන්න."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"යෙදුම් මාරු කිරීමට ස්වයිප් කරන්න"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"යෙදුම් අතර මාරු වීමට, ඔබගේ තිරයේ පහළම සිට උඩට ස්වයිප් කර, අල්ලාගෙන සිට, අනතුරුව මුදා හරින්න."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"යෙදුම් අතර මාරු වීමට, ඔබගේ තිරයේ පහළම සිට උඩට ඇඟිලි 2කින් ස්වයිප් කර, අල්ලාගෙන සිට, අනතුරුව මුදා හරින්න."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"යෙදුම් මාරු කරන්න"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"සියල්ල සකසා ඇත"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"නිමයි"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"සැකසීම්"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"මඟ හරින්න"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"තිරය කරකවන්න"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"කාර්ය තීරු අධ්‍යාපනය"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"කාර්ය තීරු අධ්‍යාපනය දිස් විය"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"කාර්ය තීරු අධ්‍යාපනය වසා ඇත"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"එකවර යෙදුම් 2ක් භාවිතා කිරීමට යෙදුමක් පැත්තට අදින්න"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"කාර්ය තීරුව පෙන්වීමට ඉහළට සෙමින් ස්වයිප් කරන්න"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"ඔබේ දිනචරියාව මත පදනම්ව යෙදුම් යෝජනා ලබා ගන්න"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"කාර්ය තීරුව ස්වයංක්‍රීයව සැඟවීමට සැකසීම් තුළ අභින සංචලනය සක්‍රීය කරන්න"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"කාර්ය තීරුව සමග තවත් කරන්න"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"ඊළඟ"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"ආපසු"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"වසන්න"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"නිමයි"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"මුල් පිටුව"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"දැනුම්දීම්"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"ඉක්මන් සැකසීම්"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"කාර්ය තීරුව"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"කාර්ය තීරුව පෙන්වා ඇත"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"කාර්ය තීරුව සඟවා ඇත"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"සංචලන තීරුව"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ඉහළ/වම වෙත ගෙන යන්න"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"පහළ/දකුණ වෙත ගෙන යන්න"</string>

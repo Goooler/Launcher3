@@ -41,6 +41,10 @@ public class LauncherSettings {
          * An animation using the view's background.
          */
         public static final int VIEW_BACKGROUND = 1;
+        /**
+         * The default animation for a given view/item info type, but without the splash icon.
+         */
+        public static final int DEFAULT_NO_ICON = 2;
     }
 
     /**
@@ -127,29 +131,12 @@ public class LauncherSettings {
         public static final int ITEM_TYPE_SEARCH_ACTION = 9;
 
         /**
-         * The icon package name in Intent.ShortcutIconResource
-         * <P>Type: TEXT</P>
-         */
-        public static final String ICON_PACKAGE = "iconPackage";
-
-        /**
-         * The icon resource name in Intent.ShortcutIconResource
-         * <P>Type: TEXT</P>
-         */
-        public static final String ICON_RESOURCE = "iconResource";
-
-        /**
          * The custom icon bitmap.
          * <P>Type: BLOB</P>
          */
         public static final String ICON = "icon";
 
         public static final String TABLE_NAME = "favorites";
-
-        /**
-         * Backup table created when the favorites table is modified during grid migration
-         */
-        public static final String BACKUP_TABLE_NAME = "favorites_bakup";
 
         /**
          * Backup table created when user hotseat is moved to workspace for hybrid hotseat
@@ -171,12 +158,6 @@ public class LauncherSettings {
          */
         public static final Uri CONTENT_URI = Uri.parse("content://"
                 + LauncherProvider.AUTHORITY + "/" + TABLE_NAME);
-
-        /**
-         * The content:// style URL for "favorites_bakup" table
-         */
-        public static final Uri BACKUP_CONTENT_URI = Uri.parse("content://"
-                + LauncherProvider.AUTHORITY + "/" + BACKUP_TABLE_NAME);
 
         /**
          * The content:// style URL for "favorites_preview" table
@@ -353,8 +334,6 @@ public class LauncherSettings {
                     "spanY INTEGER," +
                     "itemType INTEGER," +
                     "appWidgetId INTEGER NOT NULL DEFAULT -1," +
-                    "iconPackage TEXT," +
-                    "iconResource TEXT," +
                     "icon BLOB," +
                     "appWidgetProvider TEXT," +
                     "modified INTEGER NOT NULL DEFAULT 0," +
@@ -376,7 +355,6 @@ public class LauncherSettings {
                 LauncherProvider.AUTHORITY + "/settings");
 
         public static final String METHOD_CLEAR_EMPTY_DB_FLAG = "clear_empty_db_flag";
-        public static final String METHOD_WAS_EMPTY_DB_CREATED = "get_empty_db_flag";
 
         public static final String METHOD_DELETE_EMPTY_FOLDERS = "delete_empty_folders";
 
@@ -385,35 +363,25 @@ public class LauncherSettings {
 
         public static final String METHOD_CREATE_EMPTY_DB = "create_empty_db";
 
-        public static final String METHOD_SET_USE_TEST_WORKSPACE_LAYOUT_FLAG =
-                "set_use_test_workspace_layout_flag";
-        public static final String ARG_DEFAULT_WORKSPACE_LAYOUT_TEST = "default_test_workspace";
-        public static final String ARG_DEFAULT_WORKSPACE_LAYOUT_TEST2 = "default_test2_workspace";
-
-        public static final String METHOD_CLEAR_USE_TEST_WORKSPACE_LAYOUT_FLAG =
-                "clear_use_test_workspace_layout_flag";
-
         public static final String METHOD_LOAD_DEFAULT_FAVORITES = "load_default_favorites";
 
         public static final String METHOD_REMOVE_GHOST_WIDGETS = "remove_ghost_widgets";
 
         public static final String METHOD_NEW_TRANSACTION = "new_db_transaction";
 
-        public static final String METHOD_REFRESH_BACKUP_TABLE = "refresh_backup_table";
-
         public static final String METHOD_REFRESH_HOTSEAT_RESTORE_TABLE = "restore_hotseat_table";
-
-        public static final String METHOD_RESTORE_BACKUP_TABLE = "restore_backup_table";
 
         public static final String METHOD_UPDATE_CURRENT_OPEN_HELPER = "update_current_open_helper";
 
         public static final String METHOD_PREP_FOR_PREVIEW = "prep_for_preview";
 
-        public static final String METHOD_SWITCH_DATABASE = "switch_database";
-
         public static final String EXTRA_VALUE = "value";
 
         public static final String EXTRA_DB_NAME = "db_name";
+
+        public static final String LAYOUT_DIGEST_KEY = "launcher3.layout.provider.blob";
+        public static final String LAYOUT_DIGEST_LABEL = "launcher-layout";
+        public static final String LAYOUT_DIGEST_TAG = "ignore";
 
         public static Bundle call(ContentResolver cr, String method) {
             return call(cr, method, null /* arg */);

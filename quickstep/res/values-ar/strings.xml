@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"مرِّر سريعًا للرجوع."</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"للرجوع إلى الشاشة السابقة، مرِّر سريعًا من الحافة اليسرى أو الحافة اليمنى إلى وسط الشاشة."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"للرجوع إلى الشاشة السابقة، عليك التمرير سريعًا بإصبعين من الحافة اليسرى أو اليمنى نحو وسط الشاشة."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"الرجوع"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"تأكّد من التمرير سريعًا من الحافة السفلى للشاشة إلى أعلاها."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"تأكّد من عدم التوقّف قليلاً قبل رفع إصبعك."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"تأكّد من التمرير إلى الأعلى مباشرةً."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"التمرير سريعًا للتبديل بين التطبيقات"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"للتبديل بين التطبيقات، مرِّر سريعًا من أسفل الشاشة لأعلاها مع تثبيت إصبعك ثم ارفعه."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"للتبديل بين التطبيقات، مرِّر سريعًا من أسفل الشاشة إلى أعلاها بإصبعين مع تثبيتهما، ثم ارفعهما."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"تبديل التطبيقات"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"اكتمل التدريب على الإيماءة"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"تم"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"الإعدادات"</string>
@@ -89,21 +91,17 @@
     <string name="toast_split_select_app" msgid="8464310533320556058">"انقر على تطبيق آخر لاستخدام وضع تقسيم الشاشة."</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"اختَر تطبيقًا آخر لاستخدام وضع تقسيم الشاشة."</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"لا يسمح التطبيق أو لا تسمح مؤسستك بهذا الإجراء."</string>
-    <string name="skip_tutorial_dialog_title" msgid="2725643161260038458">"هل تريد تخطي الدليل التوجيهي؟"</string>
+    <string name="skip_tutorial_dialog_title" msgid="2725643161260038458">"هل تريد تخطي الدليل التوجيهي للتنقّل؟"</string>
     <string name="skip_tutorial_dialog_subtitle" msgid="544063326241955662">"يمكنك العثور على هذا الدليل التوجيهي لاحقًا في التطبيق \"<xliff:g id="NAME">%1$s</xliff:g>\""</string>
     <string name="gesture_tutorial_action_button_label_cancel" msgid="3809842569351264108">"إلغاء"</string>
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"التخطي"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"تدوير الشاشة"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"التعريف بشريط التطبيقات"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"ظهرت لوحة تعليم استخدام شريط المهام."</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"تم إغلاق لوحة تعليم استخدام شريط المهام."</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"اسحب تطبيقًا إلى جانب الشاشة لاستخدام تطبيقََين في آنٍ واحد."</string>
-    <string name="taskbar_edu_stashing" msgid="5645461372669217294">"مرِّر ببطء للأعلى لإظهار شريط التطبيقات."</string>
+    <string name="taskbar_edu_stashing" msgid="5645461372669217294">"مرِّر ببطء للأعلى لإظهار شريط التطبيقات"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"احصل على اقتراحات التطبيقات بناءً على سلسلة إجراءاتك."</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"فعِّل خيار \"التنقُّل بالإيماءات\" في \"الإعدادات\" لإخفاء شريط التطبيقات تلقائيًا."</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"إنجاز المزيد باستخدام شريط التطبيقات"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"الشاشة التالية"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"رجوع"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"إغلاق"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"تم"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"الرئيسية"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"الإشعارات"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"إعدادات سريعة"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"شريط التطبيقات"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"تم إظهار شريط التطبيقات"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"تم إخفاء شريط التطبيقات"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"شريط التنقل"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"الانتقال إلى يمين الشاشة أو أعلاها"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"الانتقال إلى يسار الشاشة أو أسفلها"</string>

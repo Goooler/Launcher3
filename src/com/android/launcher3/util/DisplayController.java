@@ -19,10 +19,12 @@ import static android.content.Intent.ACTION_CONFIGURATION_CHANGED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 
+import static com.android.launcher3.LauncherPrefs.TASKBAR_PINNING;
 import static com.android.launcher3.Utilities.dpiFromPx;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_PINNING;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TRANSIENT_TASKBAR;
-import static com.android.launcher3.config.FeatureFlags.FORCE_PERSISTENT_TASKBAR;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
@@ -44,6 +46,7 @@ import androidx.annotation.AnyThread;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
@@ -55,6 +58,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 
 /**
  * Utility class to cache properties of default display to avoid a system RPC on every call.
@@ -65,6 +69,9 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private static final String TAG = "DisplayController";
     private static final boolean DEBUG = false;
     private static boolean sTransientTaskbarStatusForTests;
+
+    // TODO(b/254119092) remove all logs with this tag
+    public static final String TASKBAR_NOT_DESTROYED_TAG = "b/254119092";
 
     public static final MainThreadInitializedObject<DisplayController> INSTANCE =
             new MainThreadInitializedObject<>(DisplayController::new);
@@ -96,9 +103,12 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private Info mInfo;
     private boolean mDestroyed = false;
 
+    private final LauncherPrefs mPrefs;
+
     private DisplayController(Context context) {
         mContext = context;
         mDM = context.getSystemService(DisplayManager.class);
+        mPrefs = LauncherPrefs.get(context);
 
         Display display = mDM.getDisplay(DEFAULT_DISPLAY);
         if (Utilities.ATLEAST_S) {
@@ -139,11 +149,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         // TODO(b/258604917): When running in test harness, use !sTransientTaskbarStatusForTests
         //  once tests are updated to expect new persistent behavior such as not allowing long press
         //  to stash.
-        if (!Utilities.IS_RUNNING_IN_TEST_HARNESS && FORCE_PERSISTENT_TASKBAR.get()) {
+        if (!Utilities.isRunningInTestHarness()
+                && ENABLE_TASKBAR_PINNING.get()
+                && mPrefs.get(TASKBAR_PINNING)) {
             return false;
         }
         return getInfo().navigationMode == NavigationMode.NO_BUTTON
-                && (Utilities.IS_RUNNING_IN_TEST_HARNESS
+                && (Utilities.isRunningInTestHarness()
                     ? sTransientTaskbarStatusForTests
                     : ENABLE_TRANSIENT_TASKBAR.get());
     }
@@ -206,6 +218,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     @Override
     @TargetApi(Build.VERSION_CODES.S)
     public final void onConfigurationChanged(Configuration config) {
+        Log.d(TASKBAR_NOT_DESTROYED_TAG, "DisplayController#onConfigurationChanged: " + config);
         Display display = mWindowContext.getDisplay();
         if (config.densityDpi != mInfo.densityDpi
                 || config.fontScale != mInfo.fontScale
@@ -272,7 +285,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             change |= CHANGE_SUPPORTED_BOUNDS;
         }
         if (DEBUG) {
-            Log.d(TAG, "handleInfoChange - change: 0b" + Integer.toBinaryString(change));
+            Log.d(TAG, "handleInfoChange - change: " + getChangeFlagsString(change));
         }
 
         if (change != 0) {
@@ -386,9 +399,30 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             return dpiFromPx(Math.min(bounds.bounds.width(), bounds.bounds.height()), densityDpi);
         }
 
+        /**
+         * Returns all displays for the device
+         */
+        public Set<CachedDisplayInfo> getAllDisplays() {
+            return Collections.unmodifiableSet(mPerDisplayBounds.keySet());
+        }
+
         public int getDensityDpi() {
             return densityDpi;
         }
+    }
+
+    /**
+     * Returns the given binary flags as a human-readable string.
+     * @see #CHANGE_ALL
+     */
+    public String getChangeFlagsString(int change) {
+        StringJoiner result = new StringJoiner("|");
+        appendFlag(result, change, CHANGE_ACTIVE_SCREEN, "CHANGE_ACTIVE_SCREEN");
+        appendFlag(result, change, CHANGE_ROTATION, "CHANGE_ROTATION");
+        appendFlag(result, change, CHANGE_DENSITY, "CHANGE_DENSITY");
+        appendFlag(result, change, CHANGE_SUPPORTED_BOUNDS, "CHANGE_SUPPORTED_BOUNDS");
+        appendFlag(result, change, CHANGE_NAVIGATION_MODE, "CHANGE_NAVIGATION_MODE");
+        return result.toString();
     }
 
     /**

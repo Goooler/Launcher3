@@ -15,25 +15,23 @@
  */
 package com.android.launcher3.taskbar
 
-import android.graphics.PorterDuff.Mode.SRC_ATOP
-import android.graphics.PorterDuffColorFilter
+import android.os.Bundle
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.annotation.IntDef
 import androidx.annotation.LayoutRes
 import com.airbnb.lottie.LottieAnimationView
-import com.airbnb.lottie.LottieProperty.COLOR_FILTER
-import com.airbnb.lottie.model.KeyPath
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import com.android.launcher3.Utilities.IS_RUNNING_IN_TEST_HARNESS
-import com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_EDU_TOOLTIP
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_EDU_OPEN
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP
+import com.android.quickstep.util.LottieAnimationColorUtils
 import java.io.PrintWriter
 
 /** First EDU step for swiping up to show transient Taskbar. */
@@ -56,10 +54,12 @@ annotation class TaskbarEduTooltipStep
 class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
     LoggableTaskbarController {
 
-    private val isTooltipEnabled = !IS_RUNNING_IN_TEST_HARNESS && ENABLE_TASKBAR_EDU_TOOLTIP.get()
+    private val isTooltipEnabled: Boolean
+        get() = !Utilities.isRunningInTestHarness()
     private val isOpen: Boolean
         get() = tooltip?.isOpen ?: false
-
+    val isBeforeTooltipFeaturesStep: Boolean
+        get() = isTooltipEnabled && tooltipStep <= TOOLTIP_STEP_FEATURES
     private lateinit var controllers: TaskbarControllers
 
     @TaskbarEduTooltipStep
@@ -130,7 +130,7 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
             findViewById<View>(R.id.done_button)?.setOnClickListener { hide() }
             if (DisplayController.isTransientTaskbar(activityContext)) {
                 (layoutParams as ViewGroup.MarginLayoutParams).bottomMargin +=
-                    activityContext.deviceProfile.taskbarSize
+                    activityContext.deviceProfile.taskbarHeight
             }
             show()
         }
@@ -153,6 +153,7 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
             FLAG_AUTOHIDE_SUSPEND_EDU_OPEN,
             true
         )
+
         tooltip.onCloseCallback = {
             this.tooltip = null
             controllers.taskbarAutohideSuspendController.updateFlag(
@@ -161,10 +162,46 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
             )
             controllers.taskbarStashController.updateAndAnimateTransientTaskbar(true)
         }
+        tooltip.accessibilityDelegate = createAccessibilityDelegate()
 
         overlayContext.layoutInflater.inflate(contentResId, tooltip.content, true)
         this.tooltip = tooltip
     }
+
+    private fun createAccessibilityDelegate() =
+        object : View.AccessibilityDelegate() {
+            override fun performAccessibilityAction(
+                host: View?,
+                action: Int,
+                args: Bundle?
+            ): Boolean {
+                if (action == R.id.close) {
+                    hide()
+                    return true
+                }
+                return super.performAccessibilityAction(host, action, args)
+            }
+
+            override fun onPopulateAccessibilityEvent(host: View?, event: AccessibilityEvent?) {
+                super.onPopulateAccessibilityEvent(host, event)
+                if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                    event.text?.add(host?.context?.getText(R.string.taskbar_edu_a11y_title))
+                }
+            }
+
+            override fun onInitializeAccessibilityNodeInfo(
+                host: View?,
+                info: AccessibilityNodeInfo?
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info?.addAction(
+                    AccessibilityNodeInfo.AccessibilityAction(
+                        R.id.close,
+                        host?.context?.getText(R.string.taskbar_edu_close)
+                    )
+                )
+            }
+        }
 
     override fun dumpLogs(prefix: String?, pw: PrintWriter?) {
         pw?.println(prefix + "TaskbarEduTooltipController:")
@@ -199,11 +236,5 @@ private fun LottieAnimationView.supportLightTheme() {
         return
     }
 
-    addLottieOnCompositionLoadedListener {
-        DARK_TO_LIGHT_COLORS.forEach { (key, color) ->
-            addValueCallback(KeyPath("**", key, "**"), COLOR_FILTER) {
-                PorterDuffColorFilter(context.getColor(color), SRC_ATOP)
-            }
-        }
-    }
+    LottieAnimationColorUtils.updateColors(this, DARK_TO_LIGHT_COLORS, context.theme)
 }

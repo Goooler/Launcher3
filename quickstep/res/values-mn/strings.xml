@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"Буцахын тулд шудрах"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"Сүүлийн дэлгэц рүү буцахын тулд дэлгэцийн зүүн эсвэл баруун булангаас дунд хэсэг рүү шударна уу."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"Сүүлийн дэлгэц рүү буцахын тулд 2 хуруугаараа дэлгэцийн голоос зүүн эсвэл баруун ирмэг рүү шударна уу."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Буцах"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"Та дэлгэцийн доод булангаас дээш шударна уу."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"Та суллахаасаа өмнө түр зогсоож болохгүй."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"Та чигээрээ шударна уу."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"Аппуудыг сэлгэхийн тулд шудрах"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"Аппуудын хооронд сэлгэхийн тулд дэлгэцийнхээ доод хэсгээс дээш шударч, удаан дараад, суллана уу."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"Аппуудын хооронд сэлгэхийн тулд 2 хуруугаараа дэлгэцийнхээ доод хэсгээс дээш шударч, удаан дараад, суллана уу."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"Аппуудыг сэлгэх"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"Бүгдийг тохируулсан"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"Дууссан"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"Тохиргоо"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"Алгасах"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"Дэлгэцийг эргүүлэх"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"Ажлын хэсгийн боловсрол"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"Боловсролын ажлын талбар гарч ирсэн"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"Боловсролын ажлын талбарыг хаасан"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"2 аппыг зэрэг ашиглахын тулд аппыг хажуу тийш чирнэ үү"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Ажлын хэсгийг харуулахын тулд аажмаар дээш шударна уу"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"Таны хэвшилд тулгуурлан санал болгож буй аппуудыг аваарай"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"Ажлын хэсгийг автоматаар хаахын тулд Тохиргоонд зангааны навигацыг асаана уу"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Ажлын хэсгийн тусламжтай илүү ихийг хийгээрэй"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"Дараах"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"Буцах"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Хаах"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Дууссан"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Гэр"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"Мэдэгдэл"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"Шуурхай тохиргоо"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"Ажлын хэсэг"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Ажлын хэсгийг харуулсан"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Ажлын хэсгийг нуусан"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Навигацын самбар"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Зүүн дээд хэсэг рүү зөөх"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Баруун доод хэсэг рүү зөөх"</string>

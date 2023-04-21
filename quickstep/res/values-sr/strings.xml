@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"Превуците да бисте се вратили уназад"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"Да бисте се вратили на последњи екран, превуците од леве или десне ивице до средине екрана."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"Да бисте се вратили на последњи екран, превуците помоћу два прста од леве или десне ивице до средине екрана."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Назад"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"Обавезно превуците нагоре од доње ивице екрана."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"Никако не стајте пре отпуштања."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"Обавезно превуците право нагоре."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"Превуците да бисте заменили апликације"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"За прелазак са једне апликације на другу превуците нагоре од дна екрана, задржите, па пустите."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"За прелазак између апликација превуците помоћу два прста нагоре од дна екрана, задржите, па пустите."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"Пређите на другу апликацију"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"То је то"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"Готово"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"Подешавања"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"Прескочи"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"Ротирајте екран"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"Упутства на траци задатака"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"Едукативно окно из траке задатака се појавило"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"Едукативно окно из траке задатака је затворено"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"Превуците на страну да бисте користили 2 апликације одједном"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Накратко превуците нагоре да бисте приказали траку задатака"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"Добијајте предлоге апликација на основу рутине"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"Укључите навигацију помоћу покрета у Подешавањима ради аутоматског скривања траке задатака"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Урадите више помоћу траке задатака"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"Даље"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"Назад"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Затвори"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Готово"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Почетна"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"Обавештења"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"Брза подешавања"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"Трака задатака"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Трака задатака је приказана"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Трака задатака је скривена"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Трака за навигацију"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Премести горе лево"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Премести доле десно"</string>

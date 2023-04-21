@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"နောက်ပြန်သွားရန် ပွတ်ဆွဲပါ"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"နောက်ဆုံးဖန်သားပြင်သို့ ပြန်သွားရန် ဘယ်ဘက် (သို့) ညာဘက်အစွန်မှ ဖန်သားပြင်အလယ်သို့ ပွတ်ဆွဲပါ။"</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"ပြီးခဲ့သည့်ဖန်သားပြင်သို့သွားရန် ဘယ်ဘက် (သို့) ညာဘက်အစွန်းမှ ဖန်သားပြင်အလယ်သို့ လက် ၂ ချောင်းဖြင့် ပွတ်ဆွဲပါ။"</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"နောက်သို့"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"ဖန်သားပြင် အောက်ခြေအစွန်မှ အပေါ်သို့ ပွတ်ဆွဲကြောင်း သေချာပါစေ။"</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"လက်မလွှတ်ခင် ခဏရပ်ခြင်းမရှိကြောင်း သေချာပါစေ။"</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"အပေါ်တည့်တည့်သို့ ပွတ်ဆွဲကြောင်း သေချာပါစေ။"</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"အက်ပ်များပြောင်းရန် ပွတ်ဆွဲပါ"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"အက်ပ်တစ်ခုမှတစ်ခုသို့ ပြောင်းရန် စခရင်အောက်ခြေမှ အပေါ်သို့ ပွတ်ဆွဲ၍ ဖိထားပြီးနောက် လွှတ်ပါ။"</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"အက်ပ်များကြားပြောင်းရန် ဖန်သားပြင်အောက်မှ အပေါ်သို့ လက် ၂ ချောင်းဖြင့်ဆွဲ၍ ထိန်းထားပြီး လွှတ်ပါ။"</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"အက်ပ်များ ကူးပြောင်းရန်"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"အားလုံးအဆင်သင့်ဖြစ်ပါပြီ"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"ပြီးပြီ"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"ဆက်တင်များ"</string>
@@ -95,25 +97,23 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"ကျော်ရန်"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"ဖန်သားပြင်လှည့်ရန်"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"လုပ်ဆောင်စရာဘား ပညာပေး"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"ပညာရေး လုပ်ဆောင်စရာဘား ပြထားသည်"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"ပညာရေး လုပ်ဆောင်စရာဘား ပိတ်ထားသည်"</string>
-    <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"အက်ပ် ၂ ခုကို တစ်ပြိုက်တည်းသုံးရန် အက်ပ်ကို ဘေးသို့ ဖိဆွဲပါ"</string>
+    <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"အက်ပ် ၂ ခု တစ်ပြိုင်တည်းသုံးရန် အက်ပ်ကို ဘေးသို့ ဖိဆွဲပါ"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Taskbar ပြရန် အပေါ်သို့ ဖြည်းဖြည်းပွတ်ဆွဲပါ"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"ပုံမှန်အစီအစဉ်ပေါ် အခြေခံ၍ အက်ပ်အကြံပြုချက်များကို ရယူပါ"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"Taskbar ကို အော်တိုဝှက်ရန် ဆက်တင်များတွင် လက်ဟန်ဖြင့်လမ်းညွှန်ခြင်း ဖွင့်နိုင်သည်"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Taskbar ဖြင့် ပိုမိုလုပ်ဆောင်နိုင်ခြင်း"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"ရှေ့သို့"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"နောက်သို့"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"ပိတ်ရန်"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"ပြီးပြီ"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"ပင်မစာမျက်နှာ"</string>
-    <string name="taskbar_button_a11y" msgid="5241161324875094465">"အများသုံးစွဲနိုင်မှု"</string>
+    <string name="taskbar_button_a11y" msgid="5241161324875094465">"အများသုံးနိုင်မှု"</string>
     <string name="taskbar_button_back" msgid="8558862226461164514">"နောက်သို့"</string>
     <string name="taskbar_button_ime_switcher" msgid="1730244360907588541">"IME ပြောင်းစနစ်"</string>
     <string name="taskbar_button_recents" msgid="7273376136216613134">"လတ်တလောများ"</string>
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"အကြောင်းကြားချက်"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"အမြန်ဆက်တင်များ"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"လုပ်ဆောင်စရာဘား"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Taskbar ပြထားသည်"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Taskbar ဖျောက်ထားသည်"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"လမ်းညွှန်ဘား"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"အပေါ်/ဘယ်ဘက်သို့ ရွှေ့ရန်"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"အောက်ခြေ/ညာဘက်သို့ ရွှေ့ရန်"</string>

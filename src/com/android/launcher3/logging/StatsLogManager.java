@@ -636,6 +636,12 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User scrolled up on the search result page.")
         LAUNCHER_ALLAPPS_SEARCH_SCROLLED_UP(1286),
+
+        @UiEvent(doc = "User or automatic timeout has hidden transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_HIDE(1330),
+
+        @UiEvent(doc = "User has swiped upwards from the gesture handle to show transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_SHOW(1331),
         ;
 
         // ADD MORE
@@ -764,6 +770,13 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets the input type of the log message.
+         */
+        default StatsLogger withInputType(int inputType) {
+            return this;
+        }
+
+        /**
          * Builds the final message and logs it as {@link EventEnum}.
          */
         default void log(EventEnum event) {
@@ -784,6 +797,7 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         enum LatencyType {
             UNKNOWN(0),
+            // example: launcher restart that happens via daily backup and restore
             COLD(1),
             HOT(2),
             TIMEOUT(3),
@@ -791,7 +805,9 @@ public class StatsLogManager implements ResourceBasedOverride {
             COLD_USERWAITING(5),
             ATOMIC(6),
             CONTROLLED(7),
-            CACHED(8);
+            CACHED(8),
+            // example: device is rebooting via power key or shell command `adb reboot`
+            COLD_DEVICE_REBOOTING(9);
             private final int mId;
 
             LatencyType(int id) {

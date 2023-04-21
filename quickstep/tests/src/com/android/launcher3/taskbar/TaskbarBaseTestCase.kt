@@ -40,7 +40,6 @@ abstract class TaskbarBaseTestCase {
     @Mock lateinit var taskbarKeyguardController: TaskbarKeyguardController
     @Mock lateinit var stashedHandleViewController: StashedHandleViewController
     @Mock lateinit var taskbarStashController: TaskbarStashController
-    @Mock lateinit var taskbarEduController: TaskbarEduController
     @Mock lateinit var taskbarAutohideSuspendController: TaskbarAutohideSuspendController
     @Mock lateinit var taskbarPopupController: TaskbarPopupController
     @Mock
@@ -50,9 +49,11 @@ abstract class TaskbarBaseTestCase {
     @Mock lateinit var voiceInteractionWindowController: VoiceInteractionWindowController
     @Mock lateinit var taskbarRecentAppsController: TaskbarRecentAppsController
     @Mock lateinit var taskbarTranslationController: TaskbarTranslationController
+    @Mock lateinit var taskbarSpringOnStashController: TaskbarSpringOnStashController
     @Mock lateinit var taskbarOverlayController: TaskbarOverlayController
     @Mock lateinit var taskbarEduTooltipController: TaskbarEduTooltipController
     @Mock lateinit var keyboardQuickSwitchController: KeyboardQuickSwitchController
+    @Mock lateinit var taskbarPinningController: TaskbarDividerPopupController
 
     lateinit var taskbarControllers: TaskbarControllers
 
@@ -80,7 +81,6 @@ abstract class TaskbarBaseTestCase {
                 taskbarKeyguardController,
                 stashedHandleViewController,
                 taskbarStashController,
-                taskbarEduController,
                 taskbarAutohideSuspendController,
                 taskbarPopupController,
                 taskbarForceVisibleImmersiveController,
@@ -89,9 +89,11 @@ abstract class TaskbarBaseTestCase {
                 taskbarInsetsController,
                 voiceInteractionWindowController,
                 taskbarTranslationController,
+                taskbarSpringOnStashController,
                 taskbarRecentAppsController,
                 taskbarEduTooltipController,
-                keyboardQuickSwitchController
+                keyboardQuickSwitchController,
+                taskbarPinningController,
             )
     }
 }

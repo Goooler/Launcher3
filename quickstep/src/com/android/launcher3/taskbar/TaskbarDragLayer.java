@@ -71,7 +71,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
 
     public void init(TaskbarDragLayerController.TaskbarDragLayerCallbacks callbacks) {
         mControllerCallbacks = callbacks;
-
+        mBackgroundRenderer.updateStashedHandleWidth(mActivity.getDeviceProfile(), getResources());
         recreateControllers();
     }
 
@@ -114,22 +114,6 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
         // Unlike super class, we want to be able to find controllers when touches occur in the
         // gesture area. For example, this allows Folder to close itself when touching the Taskbar.
         return true;
-    }
-
-    @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mControllerCallbacks != null) {
-            mControllerCallbacks.tryStashBasedOnMotionEvent(ev);
-        }
-        return super.onInterceptTouchEvent(ev);
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent ev) {
-        if (mControllerCallbacks != null) {
-            mControllerCallbacks.tryStashBasedOnMotionEvent(ev);
-        }
-        return super.onTouchEvent(ev);
     }
 
     @Override
@@ -184,6 +168,14 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
         invalidate();
     }
 
+    /*
+     * Sets the translation of the background during the spring on stash animation.
+     */
+    protected void setBackgroundTranslationYForStash(float translationY) {
+        mBackgroundRenderer.setTranslationYForStash(translationY);
+        invalidate();
+    }
+
     /** Returns the bounds in DragLayer coordinates of where the transient background was drawn. */
     protected RectF getLastDrawnTransientRect() {
         return mBackgroundRenderer.getLastDrawnTransientRect();
@@ -207,5 +199,14 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
             }
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    /**
+     * Sets the width percentage to inset the transient taskbar's background from the left and from
+     * the right.
+     */
+    public void setBackgroundHorizontalInsets(float insetPercentage) {
+        mBackgroundRenderer.setBackgroundHorizontalInsets(insetPercentage);
+        invalidate();
     }
 }

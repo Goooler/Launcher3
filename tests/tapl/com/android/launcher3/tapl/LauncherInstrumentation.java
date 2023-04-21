@@ -177,6 +177,7 @@ public final class LauncherInstrumentation {
     private static final String OVERVIEW_RES_ID = "overview_panel";
     private static final String WIDGETS_RES_ID = "primary_widgets_list_view";
     private static final String CONTEXT_MENU_RES_ID = "popup_container";
+    private static final String OPEN_FOLDER_RES_ID = "folder_content";
     static final String TASKBAR_RES_ID = "taskbar_view";
     private static final String SPLIT_PLACEHOLDER_RES_ID = "split_placeholder";
     public static final int WAIT_TIME_MS = 30000;
@@ -560,6 +561,7 @@ public final class LauncherInstrumentation {
 
     private String getVisibleStateMessage() {
         if (hasLauncherObject(CONTEXT_MENU_RES_ID)) return "Context Menu";
+        if (hasLauncherObject(OPEN_FOLDER_RES_ID)) return "Open Folder";
         if (hasLauncherObject(WIDGETS_RES_ID)) return "Widgets";
         if (hasSystemLauncherObject(OVERVIEW_RES_ID)) return "Overview";
         if (hasLauncherObject(WORKSPACE_RES_ID)) return "Workspace";
@@ -1012,8 +1014,6 @@ public final class LauncherInstrumentation {
                 if (hasLauncherObject(WORKSPACE_RES_ID)) {
                     log(action = "already at home");
                 } else {
-                    log("Hierarchy before swiping up to home:");
-                    dumpViewHierarchy();
                     action = "swiping up to home";
 
                     swipeToState(
@@ -1835,6 +1835,10 @@ public final class LauncherInstrumentation {
         getTestInfo(TestProtocol.REQUEST_VIEW_LEAK);
     }
 
+    public void printViewLeak() {
+        getTestInfo(TestProtocol.PRINT_VIEW_LEAK);
+    }
+
     public ArrayList<ComponentName> getRecentTasks() {
         ArrayList<ComponentName> tasks = new ArrayList<>();
         ArrayList<String> components = getTestInfo(TestProtocol.REQUEST_RECENT_TASKS_LIST)
@@ -1847,27 +1851,6 @@ public final class LauncherInstrumentation {
 
     public void clearLauncherData() {
         getTestInfo(TestProtocol.REQUEST_CLEAR_DATA);
-    }
-
-    /**
-     * Reloads the workspace with a test layout that includes the Test Activity app icon on the
-     * hotseat.
-     */
-    public void useTestWorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_TEST_WORKSPACE_LAYOUT);
-    }
-
-    /**
-     * Reloads the workspace with a test layout that includes Maps/Play on workspace, and
-     * Dialer/Messaging/Chrome/Camera on hotseat.
-     */
-    public void useTest2WorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_TEST2_WORKSPACE_LAYOUT);
-    }
-
-    /** Reloads the workspace with the default layout defined by the user's grid size selection. */
-    public void useDefaultWorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_DEFAULT_WORKSPACE_LAYOUT);
     }
 
     /** Shows the taskbar if it is hidden, otherwise does nothing. */

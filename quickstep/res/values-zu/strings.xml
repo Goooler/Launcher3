@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"Swayipha ukuze uye emuva"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"Ukuze ubuyele emuva esikrinini sokugcina, swapha kusuka emngceleni wesobunxele noma wesokudla kuya phakathi kwesikrini."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"Ukuze ubuyele esikrinini sokugcina, swayipha ngeminwe emi-2 ukusuka kwesokunxele noma kwesokudla emphethweni uye phakathi kwesikrini."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Iya emuva"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"Qiniseka ukuthi uswayiphela phezulu kusuka emngceleni ophansi wesikrini."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"Qiniseka ukuthi awumisi ngaphambi kokudedela."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"Qiniseka ukuthi uswayiphela ngqo phezulu."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"Swayipha ukuze ushintshe ama-app"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"Ukuze ushintshe phakathi kwama-app, swayiphela phezulu kusuka ngezansi kwesikrini sakho, bese uyadedela."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"Ukuze ushintshe phakathi kwama-app, swayiphela phezulu ngeminwe emi-2 kusukela phansi esikrinini sakho, ubambe, bese uyakhulula."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"Shintsha ama-app"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"Konke kusethiwe"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"Kwenziwe"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"Amasethingi"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"Yeqa"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"Zungezisa isikrini"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"Imfundo ye-taskbar"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"Imfuno yebha yomsebenzi ivelile"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"Imfundo yebha yomsebenzi ivaliwe"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"Hudula i-app ukusebenzisa ama-app ama-2 ngesikhathi esisodwa"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Swayiphela phezulu kancane ukuze ubonise i-Taskbar"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"Thola iziphakamiso ze-app ngokusekelwe kumjikelezo wakho"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"Vula ukufuna kokuthinta Kumasethingi ukuze ufihle ngokuzenzakalela ibha yomsebenzi"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Yenza okwengeziwe nge-Taskbar"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"Okulandelayo"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"Emuva"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Vala"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Kwenziwe"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Ikhaya"</string>
@@ -114,11 +112,11 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"Izaziso"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"Amasethingi Asheshayo"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"I-Taskbar"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Ibha yomsebenzi ibonisiwe"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Ibha yomsebenzi ifihliwe"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Ibha yokufuna"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Hamba phezulu/kwesokunxele"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Hamba phansi/kwesokudla"</string>
-    <!-- no translation found for quick_switch_overflow (6935266023013283353) -->
-    <skip />
-    <!-- no translation found for quick_switch_split_task (5598194724255333896) -->
-    <skip />
+    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Bonisa i-app e-# ngaphezulu.}one{Bonisa ama-app angu-# ngaphezulu.}other{Bonisa ama-app angu-# ngaphezulu.}}"</string>
+    <string name="quick_switch_split_task" msgid="5598194724255333896">"I-<xliff:g id="APP_NAME_1">%1$s</xliff:g> ne-<xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
 </resources>

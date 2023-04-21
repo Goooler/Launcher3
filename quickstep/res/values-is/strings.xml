@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"Strjúktu til að fara til baka"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"Til að fara til baka á síðasta skjá skaltu strjúka frá vinstri eða hægri brún að miðju skjásins."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"Strjúktu frá vinstri eða hægri brún að miðju skjásins með 2 fingrum til að fara aftur á síðasta skjá."</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Til baka"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"Passaðu að strjúka upp frá neðri brún skjásins."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"Passaðu að stoppa ekki áður en þú sleppir."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"Passaðu að strjúka beint upp."</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"Strjúktu til að skipta á milli forrita"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"Strjúktu upp frá neðri hluta skjásins, haltu og slepptu svo til að skipta á milli forrita."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"Strjúktu upp frá neðri brún skjásins með 2 fingrum, haltu og slepptu til að skipta á milli forrita."</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"Skipta um forrit"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"Allt til reiðu"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"Lokið"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"Stillingar"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"Sleppa"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"Snúa skjánum"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"Leiðsögn verkefnastiku"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"Leiðsögn verkefnastiku sýnileg"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"Leiðsögn verkefnastiku lokað"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"Dragðu forrit til hliðar til að nota 2 forrit í einu"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Strjúktu hægt upp til að birta forritastikuna"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"Fáðu forritatillögur sem byggjast á rútínunni þinni"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"Kveiktu á bendingastjórnun í stillingunum til að fela forritastikuna sjálfkrafa"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Nýttu forritastikuna betur"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"Áfram"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"Til baka"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Loka"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Lokið"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Heim"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"Tilkynningar"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"Flýtistillingar"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"Verkstika"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Forritastika sýnd"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Forritastika falin"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Yfirlitsstika"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Færa efst/til vinstri"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Færa neðst/til hægri"</string>

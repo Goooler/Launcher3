@@ -53,6 +53,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"អូស​ដើម្បី​ថយក្រោយ"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"ដើម្បី​ត្រឡប់ទៅ​អេក្រង់​ចុងក្រោយវិញ សូមអូស​ពីគែម​ខាងឆ្វេង ឬខាងស្ដាំ​ទៅផ្នែកកណ្ដាល​នៃអេក្រង់​។"</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"ដើម្បី​ត្រឡប់​ទៅ​អេក្រង់​ចុងក្រោយ​វិញ អូស​ដោយ​ប្រើ​ម្រាមដៃពីរ​ពី​គែម​ខាង​ឆ្វេង ឬ​ខាង​ស្ដាំ​ទៅផ្នែក​​កណ្ដាលនៃ​អេក្រង់។"</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"ថយ​ក្រោយ"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"ត្រូវប្រាកដថា​អ្នកអូសឡើងលើ​ពីគែមខាងក្រោម​នៃអេក្រង់​។"</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"ត្រូវប្រាកដថា​អ្នកមិនផ្អាក មុនពេល​ដកដៃ​។"</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"ត្រូវប្រាកដថា​អ្នកអូស​ត្រង់ឡើងលើ​។"</string>
@@ -71,6 +72,7 @@
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"អូស​ដើម្បីប្ដូរ​កម្មវិធី"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"ដើម្បីប្ដូររវាងកម្មវិធី សូមអូសឡើងលើពីផ្នែកខាងក្រោមនៃអេក្រង់របស់អ្នក រួចចុចឱ្យជាប់ បន្ទាប់មកដកដៃចេញ។"</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"ដើម្បីប្ដូរកម្មវិធី អូសឡើងលើ​ដោយប្រើម្រាមដៃពីរពី​ផ្នែក​ខាងក្រោមនៃ​អេក្រង់របស់អ្នក សង្កត់ ហើយ​លែងវិញ។"</string>
+    <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"ប្ដូរ​កម្មវិធី"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"រួចហើយ"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"រួចរាល់"</string>
     <string name="gesture_tutorial_action_button_label_settings" msgid="2923621047916486604">"ការកំណត់"</string>
@@ -95,15 +97,11 @@
     <string name="gesture_tutorial_action_button_label_skip" msgid="394452764989751960">"រំលង"</string>
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"បង្វិលអេក្រង់"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"ការអប់រំលើរបារកិច្ចការ"</string>
-    <string name="taskbar_edu_opened" msgid="3950252793551919129">"ការបង្រៀនអំពីរបារកិច្ចការបានបង្ហាញ"</string>
-    <string name="taskbar_edu_closed" msgid="126643734478892862">"ការបង្រៀនអំពីរបារកិច្ចការត្រូវបានបិទ"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"អូសកម្មវិធីទៅចំហៀង ដើម្បីប្រើកម្មវិធី 2 ក្នុងពេលតែមួយ"</string>
     <string name="taskbar_edu_stashing" msgid="5645461372669217294">"អូសឡើងលើយឺតៗ ដើម្បីបង្ហាញរបារកិច្ចការ"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"ទទួលការណែនាំកម្មវិធីដោយផ្អែកលើទម្លាប់របស់អ្នក"</string>
     <string name="taskbar_edu_settings_persistent" msgid="1387372982791296151">"បើកការរុករក​ដោយប្រើចលនានៅក្នុងការកំណត់ ដើម្បីលាក់របារកិច្ចការដោយស្វ័យប្រវត្តិ"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"ធ្វើបានកាន់តែច្រើនដោយប្រើរបារកិច្ចការ"</string>
-    <string name="taskbar_edu_next" msgid="4007618274426775841">"បន្ទាប់"</string>
-    <string name="taskbar_edu_previous" msgid="459202320127201702">"ថយក្រោយ"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"បិទ"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"រួចរាល់"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"ទំព័រដើម"</string>
@@ -114,6 +112,8 @@
     <string name="taskbar_button_notifications" msgid="7471740351507357318">"ការ​ជូនដំណឹង"</string>
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"ការកំណត់រហ័ស"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"របារកិច្ចការ"</string>
+    <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"បានបង្ហាញរបារកិច្ចការ"</string>
+    <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"បានលាក់របារកិច្ចការ"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"របាររុករក"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ផ្លាស់ទីទៅខាងលើ/ឆ្វេង"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"ផ្លាស់ទីទៅខាងក្រោម/ស្ដាំ"</string>

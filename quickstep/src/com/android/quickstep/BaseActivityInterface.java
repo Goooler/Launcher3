@@ -16,6 +16,7 @@
 package com.android.quickstep;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_BACKGROUND_COLOR;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -187,7 +188,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract boolean allowMinimizeSplitScreen();
 
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
-        return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons();
+        return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons()
+                || isTrackpadMultiFingerSwipe(ev);
     }
 
     /**
@@ -244,6 +246,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             float maxScale = res.getFloat(R.dimen.overview_max_scale);
             int taskMargin = dp.overviewTaskMarginPx;
             calculateTaskSizeInternal(
+                    context,
                     dp,
                     dp.overviewTaskThumbnailTopMarginPx,
                     dp.getOverviewActionsClaimedSpace(),
@@ -259,10 +262,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         float maxScale = res.getFloat(R.dimen.overview_max_scale);
         Rect gridRect = new Rect();
         calculateGridSize(dp, gridRect);
-        calculateTaskSizeInternal(dp, gridRect, maxScale, Gravity.CENTER, outRect);
+        calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
     }
 
-    private void calculateTaskSizeInternal(DeviceProfile dp, int claimedSpaceAbove,
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp, int claimedSpaceAbove,
             int claimedSpaceBelow, int minimumHorizontalPadding, float maxScale, int gravity,
             Rect outRect) {
         Rect insets = dp.getInsets();
@@ -275,12 +278,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 minimumHorizontalPadding,
                 claimedSpaceBelow);
 
-        calculateTaskSizeInternal(dp, potentialTaskRect, maxScale, gravity, outRect);
+        calculateTaskSizeInternal(context, dp, potentialTaskRect, maxScale, gravity, outRect);
     }
 
-    private void calculateTaskSizeInternal(DeviceProfile dp,
+    private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
             Rect potentialTaskRect, float maxScale, int gravity, Rect outRect) {
-        PointF taskDimension = getTaskDimension(dp);
+        PointF taskDimension = getTaskDimension(context, dp);
 
         float scale = Math.min(
                 potentialTaskRect.width() / taskDimension.x,
@@ -292,20 +295,20 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         Gravity.apply(gravity, outWidth, outHeight, potentialTaskRect, outRect);
     }
 
-    private static PointF getTaskDimension(DeviceProfile dp) {
+    private static PointF getTaskDimension(Context context, DeviceProfile dp) {
         PointF dimension = new PointF();
-        getTaskDimension(dp, dimension);
+        getTaskDimension(context, dp, dimension);
         return dimension;
     }
 
     /**
      * Gets the dimension of the task in the current system state.
      */
-    public static void getTaskDimension(DeviceProfile dp, PointF out) {
+    public static void getTaskDimension(Context context, DeviceProfile dp, PointF out) {
         out.x = dp.widthPx;
         out.y = dp.heightPx;
-        if (dp.isTablet) {
-            out.y -= dp.taskbarSize;
+        if (dp.isTablet && !DisplayController.isTransientTaskbar(context)) {
+            out.y -= dp.taskbarHeight;
         }
     }
 
@@ -339,7 +342,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         float rowHeight = (potentialTaskRect.height() + dp.overviewTaskThumbnailTopMarginPx
                 - dp.overviewRowSpacing) / 2f;
 
-        PointF taskDimension = getTaskDimension(dp);
+        PointF taskDimension = getTaskDimension(context, dp);
         float scale = (rowHeight - dp.overviewTaskThumbnailTopMarginPx) / taskDimension.y;
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
@@ -350,6 +353,13 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     /**
+     * Calculates the task size for the desktop task
+     */
+    public final void calculateDesktopTaskSize(Context context, DeviceProfile dp, Rect outRect) {
+        calculateFocusTaskSize(context, dp, outRect);
+    }
+
+    /**
      * Calculates the modal taskView size for the provided device configuration
      */
     public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect,
@@ -357,7 +367,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         calculateTaskSize(context, dp, outRect, orientedState);
         boolean isGridOnlyOverview = dp.isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get();
         int claimedSpaceBelow = isGridOnlyOverview
-                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarSize
+                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarHeight
                 : (dp.heightPx - outRect.bottom - dp.getInsets().bottom);
         int minimumHorizontalPadding = 0;
         if (!isGridOnlyOverview) {
@@ -366,6 +376,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                     Math.round((dp.availableWidthPx - outRect.width() * maxScale) / 2);
         }
         calculateTaskSizeInternal(
+                context,
                 dp,
                 dp.overviewTaskMarginPx,
                 claimedSpaceBelow,

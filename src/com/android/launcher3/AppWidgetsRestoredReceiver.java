@@ -2,6 +2,7 @@ package com.android.launcher3;
 
 import static android.os.Process.myUserHandle;
 
+import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.BroadcastReceiver;
@@ -15,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.LauncherSettings.Favorites;
+import com.android.launcher3.model.DatabaseHelper;
 import com.android.launcher3.model.LoaderTask;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
@@ -50,11 +52,11 @@ public class AppWidgetsRestoredReceiver extends BroadcastReceiver {
      * Updates the app widgets whose id has changed during the restore process.
      */
     @WorkerThread
-    public static void restoreAppWidgetIds(Context context, int[] oldWidgetIds, int[] newWidgetIds,
-            @NonNull LauncherWidgetHolder holder) {
+    public static void restoreAppWidgetIds(Context context, DatabaseHelper helper,
+            int[] oldWidgetIds, int[] newWidgetIds, @NonNull AppWidgetHost host) {
         if (WidgetsModel.GO_DISABLE_WIDGETS) {
             Log.e(TAG, "Skipping widget ID remap as widgets not supported");
-            holder.deleteHost();
+            host.deleteHost();
             return;
         }
         if (!RestoreDbTask.isPending(context)) {
@@ -63,7 +65,7 @@ public class AppWidgetsRestoredReceiver extends BroadcastReceiver {
             Log.e(TAG, "Skipping widget ID remap as DB already in use");
             for (int widgetId : newWidgetIds) {
                 Log.d(TAG, "Deleting widgetId: " + widgetId);
-                holder.deleteAppWidgetId(widgetId);
+                host.deleteAppWidgetId(widgetId);
             }
             return;
         }
@@ -89,29 +91,25 @@ public class AppWidgetsRestoredReceiver extends BroadcastReceiver {
             String oldWidgetId = Integer.toString(oldWidgetIds[i]);
             final String where = "appWidgetId=? and (restored & 1) = 1 and profileId=?";
             final String[] args = new String[] { oldWidgetId, Long.toString(mainProfileId) };
-            int result = new ContentWriter(context, new ContentWriter.CommitParams(where, args))
+            int result = new ContentWriter(context,
+                            new ContentWriter.CommitParams(helper, where, args))
                     .put(LauncherSettings.Favorites.APPWIDGET_ID, newWidgetIds[i])
                     .put(LauncherSettings.Favorites.RESTORED, state)
                     .commit();
             if (result == 0) {
-                Cursor cursor = cr.query(Favorites.CONTENT_URI,
+                Cursor cursor = helper.getWritableDatabase().query(
+                        Favorites.TABLE_NAME,
                         new String[] {Favorites.APPWIDGET_ID},
-                        "appWidgetId=?", new String[] { oldWidgetId }, null);
+                        "appWidgetId=?", new String[] { oldWidgetId }, null, null, null);
                 try {
                     if (!cursor.moveToFirst()) {
                         // The widget no long exists.
-                        holder.deleteAppWidgetId(newWidgetIds[i]);
+                        host.deleteAppWidgetId(newWidgetIds[i]);
                     }
                 } finally {
                     cursor.close();
                 }
             }
-            // attempt to update widget id in backup table as well
-            new ContentWriter(context, ContentWriter.CommitParams.backupCommitParams(
-                    "appWidgetId=? and profileId=?", args))
-                    .put(LauncherSettings.Favorites.APPWIDGET_ID, newWidgetIds[i])
-                    .put(LauncherSettings.Favorites.RESTORED, state)
-                    .commit();
         }
 
         LauncherAppState app = LauncherAppState.getInstanceNoCreate();

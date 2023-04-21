@@ -76,6 +76,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 147.0px (56.0dp)\n" +
                     "\ticonTextSizePx: 38.0px (14.476191dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 4\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 195.0px (74.28571dp)\n" +
                     "\tfolderCellHeightPx: 230.0px (87.61905dp)\n" +
                     "\tfolderChildIconSizePx: 147.0px (56.0dp)\n" +
@@ -124,7 +126,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -206,6 +211,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 147.0px (56.0dp)\n" +
                     "\ticonTextSizePx: 38.0px (14.476191dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 4\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 195.0px (74.28571dp)\n" +
                     "\tfolderCellHeightPx: 230.0px (87.61905dp)\n" +
                     "\tfolderChildIconSizePx: 147.0px (56.0dp)\n" +
@@ -254,7 +261,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -336,15 +346,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 147.0px (56.0dp)\n" +
                     "\ticonTextSizePx: 0.0px (0.0dp)\n" +
                     "\ticonDrawablePaddingPx: 0.0px (0.0dp)\n" +
-                    "\tfolderCellWidthPx: 142.0px (54.095238dp)\n" +
-                    "\tfolderCellHeightPx: 168.0px (64.0dp)\n" +
-                    "\tfolderChildIconSizePx: 108.0px (41.142857dp)\n" +
-                    "\tfolderChildTextSizePx: 28.0px (10.666667dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 7.0px (2.6666667dp)\n" +
+                    "\tinv.numFolderRows: 4\n" +
+                    "\tinv.numFolderColumns: 4\n" +
+                    "\tfolderCellWidthPx: 173.0px (65.90476dp)\n" +
+                    "\tfolderCellHeightPx: 205.0px (78.09524dp)\n" +
+                    "\tfolderChildIconSizePx: 131.0px (49.904762dp)\n" +
+                    "\tfolderChildTextSizePx: 34.0px (12.952381dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 9.0px (3.4285715dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 21.0px (8.0dp)\n" +
-                    "\tfolderTopPadding: 63.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 147.0px (56.0dp)\n" +
+                    "\tfolderTopPadding: 56.0px (21.333334dp)\n" +
+                    "\tfolderFooterHeight: 131.0px (49.904762dp)\n" +
                     "\tbottomSheetTopPadding: 114.0px (43.42857dp)\n" +
                     "\tbottomSheetOpenDuration: 267\n" +
                     "\tbottomSheetCloseDuration: 267\n" +
@@ -384,7 +396,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.left: 10.0px (3.8095238dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -466,15 +481,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 147.0px (56.0dp)\n" +
                     "\ticonTextSizePx: 0.0px (0.0dp)\n" +
                     "\ticonDrawablePaddingPx: 0.0px (0.0dp)\n" +
-                    "\tfolderCellWidthPx: 128.0px (48.761906dp)\n" +
-                    "\tfolderCellHeightPx: 152.0px (57.904762dp)\n" +
-                    "\tfolderChildIconSizePx: 98.0px (37.333332dp)\n" +
-                    "\tfolderChildTextSizePx: 25.0px (9.523809dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 6.0px (2.2857144dp)\n" +
+                    "\tinv.numFolderRows: 4\n" +
+                    "\tinv.numFolderColumns: 4\n" +
+                    "\tfolderCellWidthPx: 163.0px (62.095238dp)\n" +
+                    "\tfolderCellHeightPx: 192.0px (73.14286dp)\n" +
+                    "\tfolderChildIconSizePx: 123.0px (46.857143dp)\n" +
+                    "\tfolderChildTextSizePx: 32.0px (12.190476dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 8.0px (3.047619dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 21.0px (8.0dp)\n" +
-                    "\tfolderTopPadding: 63.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 147.0px (56.0dp)\n" +
+                    "\tfolderTopPadding: 53.0px (20.190475dp)\n" +
+                    "\tfolderFooterHeight: 123.0px (46.857143dp)\n" +
                     "\tbottomSheetTopPadding: 114.0px (43.42857dp)\n" +
                     "\tbottomSheetOpenDuration: 267\n" +
                     "\tbottomSheetCloseDuration: 267\n" +
@@ -514,7 +531,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:false\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 0.0px (0.0dp)\n" +
                     "\tworkspacePadding.left: 10.0px (3.8095238dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -597,15 +617,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 120.0px (60.0dp)\n" +
                     "\ticonTextSizePx: 28.0px (14.0dp)\n" +
                     "\ticonDrawablePaddingPx: 14.0px (7.0dp)\n" +
-                    "\tfolderCellWidthPx: 397.0px (198.5dp)\n" +
-                    "\tfolderCellHeightPx: 371.0px (185.5dp)\n" +
-                    "\tfolderChildIconSizePx: 99.0px (49.5dp)\n" +
-                    "\tfolderChildTextSizePx: 23.0px (11.5dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 80.0px (40.0dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 3\n" +
+                    "\tfolderCellWidthPx: 240.0px (120.0dp)\n" +
+                    "\tfolderCellHeightPx: 208.0px (104.0dp)\n" +
+                    "\tfolderChildIconSizePx: 120.0px (60.0dp)\n" +
+                    "\tfolderChildTextSizePx: 28.0px (14.0dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 16.0px (8.0dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 0.0px (0.0dp)\n" +
                     "\tfolderTopPadding: 48.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 0.0px (0.0dp)\n" +
+                    "\tfolderFooterHeight: 112.0px (56.0dp)\n" +
                     "\tbottomSheetTopPadding: 104.0px (52.0dp)\n" +
                     "\tbottomSheetOpenDuration: 500\n" +
                     "\tbottomSheetCloseDuration: 500\n" +
@@ -645,7 +667,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1224.0px (612.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 240.0px (120.0dp)\n" +
                     "\tworkspacePadding.left: 181.0px (90.5dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -728,15 +753,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 120.0px (60.0dp)\n" +
                     "\ticonTextSizePx: 28.0px (14.0dp)\n" +
                     "\ticonDrawablePaddingPx: 14.0px (7.0dp)\n" +
-                    "\tfolderCellWidthPx: 397.0px (198.5dp)\n" +
-                    "\tfolderCellHeightPx: 371.0px (185.5dp)\n" +
-                    "\tfolderChildIconSizePx: 99.0px (49.5dp)\n" +
-                    "\tfolderChildTextSizePx: 23.0px (11.5dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 80.0px (40.0dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 3\n" +
+                    "\tfolderCellWidthPx: 240.0px (120.0dp)\n" +
+                    "\tfolderCellHeightPx: 208.0px (104.0dp)\n" +
+                    "\tfolderChildIconSizePx: 120.0px (60.0dp)\n" +
+                    "\tfolderChildTextSizePx: 28.0px (14.0dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 16.0px (8.0dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 0.0px (0.0dp)\n" +
                     "\tfolderTopPadding: 48.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 0.0px (0.0dp)\n" +
+                    "\tfolderFooterHeight: 112.0px (56.0dp)\n" +
                     "\tbottomSheetTopPadding: 104.0px (52.0dp)\n" +
                     "\tbottomSheetOpenDuration: 500\n" +
                     "\tbottomSheetCloseDuration: 500\n" +
@@ -776,7 +803,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1224.0px (612.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 240.0px (120.0dp)\n" +
                     "\tworkspacePadding.left: 181.0px (90.5dp)\n" +
                     "\tworkspacePadding.top: 0.0px (0.0dp)\n" +
@@ -859,15 +889,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 120.0px (60.0dp)\n" +
                     "\ticonTextSizePx: 28.0px (14.0dp)\n" +
                     "\ticonDrawablePaddingPx: 14.0px (7.0dp)\n" +
-                    "\tfolderCellWidthPx: 408.0px (204.0dp)\n" +
-                    "\tfolderCellHeightPx: 648.0px (324.0dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 3\n" +
+                    "\tfolderCellWidthPx: 204.0px (102.0dp)\n" +
+                    "\tfolderCellHeightPx: 240.0px (120.0dp)\n" +
                     "\tfolderChildIconSizePx: 120.0px (60.0dp)\n" +
                     "\tfolderChildTextSizePx: 28.0px (14.0dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 163.0px (81.5dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 27.0px (13.5dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 0.0px (0.0dp)\n" +
                     "\tfolderTopPadding: 48.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 0.0px (0.0dp)\n" +
+                    "\tfolderFooterHeight: 112.0px (56.0dp)\n" +
                     "\tbottomSheetTopPadding: 704.0px (352.0dp)\n" +
                     "\tbottomSheetOpenDuration: 500\n" +
                     "\tbottomSheetCloseDuration: 500\n" +
@@ -907,7 +939,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1300.0px (650.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 108.0px (54.0dp)\n" +
                     "\tworkspacePadding.left: 36.0px (18.0dp)\n" +
                     "\tworkspacePadding.top: 132.0px (66.0dp)\n" +
@@ -990,15 +1025,17 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 120.0px (60.0dp)\n" +
                     "\ticonTextSizePx: 28.0px (14.0dp)\n" +
                     "\ticonDrawablePaddingPx: 14.0px (7.0dp)\n" +
-                    "\tfolderCellWidthPx: 408.0px (204.0dp)\n" +
-                    "\tfolderCellHeightPx: 648.0px (324.0dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 3\n" +
+                    "\tfolderCellWidthPx: 204.0px (102.0dp)\n" +
+                    "\tfolderCellHeightPx: 240.0px (120.0dp)\n" +
                     "\tfolderChildIconSizePx: 120.0px (60.0dp)\n" +
                     "\tfolderChildTextSizePx: 28.0px (14.0dp)\n" +
-                    "\tfolderChildDrawablePaddingPx: 163.0px (81.5dp)\n" +
+                    "\tfolderChildDrawablePaddingPx: 27.0px (13.5dp)\n" +
                     "\tfolderCellLayoutBorderSpacePx: 0.0px (0.0dp)\n" +
                     "\tfolderContentPaddingLeftRight: 0.0px (0.0dp)\n" +
                     "\tfolderTopPadding: 48.0px (24.0dp)\n" +
-                    "\tfolderFooterHeight: 0.0px (0.0dp)\n" +
+                    "\tfolderFooterHeight: 112.0px (56.0dp)\n" +
                     "\tbottomSheetTopPadding: 704.0px (352.0dp)\n" +
                     "\tbottomSheetOpenDuration: 500\n" +
                     "\tbottomSheetCloseDuration: 500\n" +
@@ -1038,7 +1075,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 1300.0px (650.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 108.0px (54.0dp)\n" +
                     "\tworkspacePadding.left: 36.0px (18.0dp)\n" +
                     "\tworkspacePadding.top: 132.0px (66.0dp)\n" +
@@ -1126,6 +1166,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 141.0px (53.714287dp)\n" +
                     "\ticonTextSizePx: 34.0px (12.952381dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 189.0px (72.0dp)\n" +
                     "\tfolderCellHeightPx: 219.0px (83.42857dp)\n" +
                     "\tfolderChildIconSizePx: 141.0px (53.714287dp)\n" +
@@ -1174,7 +1216,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 30.0px (11.428572dp)\n" +
@@ -1261,6 +1306,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 141.0px (53.714287dp)\n" +
                     "\ticonTextSizePx: 34.0px (12.952381dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 189.0px (72.0dp)\n" +
                     "\tfolderCellHeightPx: 219.0px (83.42857dp)\n" +
                     "\tfolderChildIconSizePx: 141.0px (53.714287dp)\n" +
@@ -1309,7 +1356,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 30.0px (11.428572dp)\n" +
@@ -1396,6 +1446,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 141.0px (53.714287dp)\n" +
                     "\ticonTextSizePx: 34.0px (12.952381dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 189.0px (72.0dp)\n" +
                     "\tfolderCellHeightPx: 219.0px (83.42857dp)\n" +
                     "\tfolderChildIconSizePx: 141.0px (53.714287dp)\n" +
@@ -1444,7 +1496,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 24.0px (9.142858dp)\n" +
@@ -1527,6 +1582,8 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\ticonSizePx: 141.0px (53.714287dp)\n" +
                     "\ticonTextSizePx: 34.0px (12.952381dp)\n" +
                     "\ticonDrawablePaddingPx: 18.0px (6.857143dp)\n" +
+                    "\tinv.numFolderRows: 3\n" +
+                    "\tinv.numFolderColumns: 4\n" +
                     "\tfolderCellWidthPx: 189.0px (72.0dp)\n" +
                     "\tfolderCellHeightPx: 219.0px (83.42857dp)\n" +
                     "\tfolderChildIconSizePx: 141.0px (53.714287dp)\n" +
@@ -1575,7 +1632,10 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
                     "\thotseatQsbWidth: 0.0px (0.0dp)\n" +
                     "\tisTaskbarPresent:false\n" +
                     "\tisTaskbarPresentInApps:true\n" +
-                    "\ttaskbarSize: 0.0px (0.0dp)\n" +
+                    "\ttaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\tstashedTaskbarHeight: 0.0px (0.0dp)\n" +
+                    "\ttaskbarBottomMargin: 0.0px (0.0dp)\n" +
+                    "\ttaskbarIconSize: 0.0px (0.0dp)\n" +
                     "\tdesiredWorkspaceHorizontalMarginPx: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.left: 21.0px (8.0dp)\n" +
                     "\tworkspacePadding.top: 24.0px (9.142858dp)\n" +

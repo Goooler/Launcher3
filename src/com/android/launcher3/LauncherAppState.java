@@ -31,7 +31,11 @@ import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.LauncherApps;
 import android.os.UserHandle;
 import android.util.Log;
+import android.util.SparseArray;
+import android.widget.RemoteViews;
 
+import androidx.annotation.GuardedBy;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.config.FeatureFlags;
@@ -44,6 +48,7 @@ import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.InstallSessionTracker;
 import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
@@ -68,6 +73,12 @@ public class LauncherAppState implements SafeCloseable {
     private final IconCache mIconCache;
     private final InvariantDeviceProfile mInvariantDeviceProfile;
     private final RunnableList mOnTerminateCallback = new RunnableList();
+
+    // WORKAROUND: b/269335387 remove this after widget background listener is enabled
+    /* Array of RemoteViews cached by Launcher process */
+    @GuardedBy("itself")
+    @NonNull
+    public final SparseArray<RemoteViews> mCachedRemoteViews = new SparseArray<>();
 
     public static LauncherAppState getInstance(final Context context) {
         return INSTANCE.get(context);
@@ -106,25 +117,27 @@ public class LauncherAppState implements SafeCloseable {
         }
         mOnTerminateCallback.add(() -> mContext.unregisterReceiver(modelChangeReceiver));
 
-        CustomWidgetManager.INSTANCE.get(mContext)
-                .setWidgetRefreshCallback(mModel::refreshAndBindWidgetsAndShortcuts);
-
         SafeCloseable userChangeListener = UserCache.INSTANCE.get(mContext)
                 .addUserChangeListener(mModel::forceReload);
         mOnTerminateCallback.add(userChangeListener::close);
 
-        IconObserver observer = new IconObserver();
-        SafeCloseable iconChangeTracker = mIconProvider.registerIconChangeListener(
-                observer, MODEL_EXECUTOR.getHandler());
-        mOnTerminateCallback.add(iconChangeTracker::close);
-        MODEL_EXECUTOR.execute(observer::verifyIconChanged);
-        LauncherPrefs.get(context).addListener(observer, THEMED_ICONS);
-        mOnTerminateCallback.add(
-                () -> LauncherPrefs.get(mContext).removeListener(observer, THEMED_ICONS));
+        LockedUserState.get(context).runOnUserUnlocked(() -> {
+            CustomWidgetManager.INSTANCE.get(mContext)
+                    .setWidgetRefreshCallback(mModel::refreshAndBindWidgetsAndShortcuts);
 
-        InstallSessionTracker installSessionTracker =
-                InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(mModel);
-        mOnTerminateCallback.add(installSessionTracker::unregister);
+            IconObserver observer = new IconObserver();
+            SafeCloseable iconChangeTracker = mIconProvider.registerIconChangeListener(
+                    observer, MODEL_EXECUTOR.getHandler());
+            mOnTerminateCallback.add(iconChangeTracker::close);
+            MODEL_EXECUTOR.execute(observer::verifyIconChanged);
+            LauncherPrefs.get(context).addListener(observer, THEMED_ICONS);
+            mOnTerminateCallback.add(
+                    () -> LauncherPrefs.get(mContext).removeListener(observer, THEMED_ICONS));
+
+            InstallSessionTracker installSessionTracker =
+                    InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(mModel);
+            mOnTerminateCallback.add(installSessionTracker::unregister);
+        });
 
         // Register an observer to rebind the notification listener when dots are re-enabled.
         SettingsCache settingsCache = SettingsCache.INSTANCE.get(mContext);

@@ -50,13 +50,24 @@
     <attr name="folderTextColor" format="color" />
     <attr name="folderHintColor" format="color" />
     <attr name="isFolderDarkText" format="boolean" />
-    <attr name="workProfileOverlayTextColor" format="color" />
     <attr name="workspaceAccentColor" format="color" />
     <attr name="dropTargetHoverTextColor" format="color" />
     <attr name="preloadIconAccentColor" format="color" />
     <attr name="preloadIconBackgroundColor" format="color" />
+    <attr name="widgetPickerTitleColor" format="color"/>
+    <attr name="widgetPickerPrimarySurfaceColor" format="color"/>
+    <attr name="widgetPickerSecondarySurfaceColor" format="color"/>
     <attr name="widgetPickerHeaderAppTitleColor" format="color"/>
     <attr name="widgetPickerHeaderAppSubtitleColor" format="color"/>
+    <attr name="widgetPickerHeaderBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconColor" format="color"/>
+    <attr name="widgetPickerTabBackgroundSelected" format="color"/>
+    <attr name="widgetPickerTabBackgroundUnselected" format="color"/>
+    <attr name="widgetPickerSearchTextColor" format="color"/>
+    <attr name="widgetPickerSelectedTabTextColor" format="color"/>
+    <attr name="widgetPickerUnselectedTabTextColor" format="color"/>
+    <attr name="widgetPickerCollapseHandleColor" format="color"/>
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
@@ -381,6 +392,15 @@
         <!-- defaults to hotseatQsbSpace, if not specified -->
         <attr name="hotseatQsbSpaceTwoPanelPortrait" format="float" />
 
+        <!-- defaults to res.taskbar_icon_size, if not specified -->
+        <attr name="transientTaskbarIconSize" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeLandscape" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeTwoPanelLandscape" format="float" />
+        <!-- defaults to transientTaskbarIconSize, if not specified -->
+        <attr name="transientTaskbarIconSizeTwoPanelPortrait" format="float" />
+
         <attr name="iconImageSize" format="float" />
         <!-- defaults to iconImageSize, if not specified -->
         <attr name="iconSizeLandscape" format="float" />
@@ -396,6 +416,16 @@
         <attr name="iconTextSizeTwoPanelPortrait" format="float" />
         <!-- defaults to iconTextSize, if not specified -->
         <attr name="iconTextSizeTwoPanelLandscape" format="float" />
+
+        <!-- If true, used to layout taskbar in 3 button navigation mode. -->
+        <!-- defaults to false if not specified -->
+        <attr name="startAlignTaskbar" format="boolean" />
+        <!-- defaults to startAlignTaskbar, if not specified -->
+        <attr name="startAlignTaskbarLandscape" format="boolean" />
+        <!-- defaults to startAlignTaskbarLandscape, if not specified -->
+        <attr name="startAlignTaskbarTwoPanelLandscape" format="boolean" />
+        <!-- defaults to startAlignTaskbar, if not specified -->
+        <attr name="startAlignTaskbarTwoPanelPortrait" format="boolean" />
 
         <!-- If set, this display option is used to determine the default grid -->
         <attr name="canBeDefault" format="boolean" />
