@@ -15,16 +15,26 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.content.Context.RECEIVER_NOT_EXPORTED;
 import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
+import static com.android.launcher3.LauncherPrefs.TASKBAR_PINNING;
+import static com.android.launcher3.LauncherPrefs.TASKBAR_PINNING_KEY;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
+import static com.android.launcher3.util.DisplayController.TASKBAR_NOT_DESTROYED_TAG;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 
+import android.annotation.SuppressLint;
+import android.app.PendingIntent;
 import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
@@ -32,6 +42,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.SystemProperties;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
@@ -40,6 +51,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
@@ -51,15 +63,19 @@ import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
 import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
 
 import java.io.PrintWriter;
+import java.util.StringJoiner;
 
 /**
  * Class to manage taskbar lifecycle
  */
 public class TaskbarManager {
+    private static final String TAG = "TaskbarManager";
+    private static final boolean DEBUG = false;
 
     public static final boolean FLAG_HIDE_NAVBAR_WINDOW =
             SystemProperties.getBoolean("persist.wm.debug.hide_navbar_window", false);
@@ -111,6 +127,24 @@ public class TaskbarManager {
 
     private boolean mUserUnlocked = false;
 
+    public static final int SYSTEM_ACTION_ID_TASKBAR = 499;
+
+    /**
+     * For Taskbar broadcast intent filter.
+     */
+    public static final String ACTION_SHOW_TASKBAR = "ACTION_SHOW_TASKBAR";
+
+    private final SimpleBroadcastReceiver mTaskbarBroadcastReceiver =
+            new SimpleBroadcastReceiver(this::showTaskbarFromBroadcast);
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener
+            mTaskbarPinningPreferenceChangeListener = (sharedPreferences, key) -> {
+                if (TASKBAR_PINNING_KEY.equals(key)) {
+                    recreateTaskbar();
+                }
+            };
+
+    @SuppressLint("WrongConstant")
     public TaskbarManager(TouchInteractionService service) {
         mDisplayController = DisplayController.INSTANCE.get(service);
         Display display =
@@ -126,6 +160,8 @@ public class TaskbarManager {
 
             @Override
             public void onConfigurationChanged(Configuration newConfig) {
+                debugWhyTaskbarNotDestroyed(
+                        "TaskbarManager#mComponentCallbacks.onConfigurationChanged: " + newConfig);
                 DeviceProfile dp = mUserUnlocked
                         ? LauncherAppState.getIDP(mContext).getDeviceProfile(mContext)
                         : null;
@@ -143,9 +179,14 @@ public class TaskbarManager {
                     DeviceProfile oldDp = mTaskbarActivityContext.getDeviceProfile();
                     boolean isOrientationChange =
                             (configDiff & ActivityInfo.CONFIG_ORIENTATION) != 0;
+
+                    int newOrientation = newConfig.windowConfiguration.getRotation();
+                    int oldOrientation = mOldConfig.windowConfiguration.getRotation();
                     int oldWidth = isOrientationChange ? oldDp.heightPx : oldDp.widthPx;
                     int oldHeight = isOrientationChange ? oldDp.widthPx : oldDp.heightPx;
-                    if (dp.widthPx == oldWidth && dp.heightPx == oldHeight) {
+
+                    if ((dp.widthPx == oldWidth && dp.heightPx == oldHeight)
+                            || (newOrientation == oldOrientation)) {
                         configDiffForRecreate &= ~ActivityInfo.CONFIG_SCREEN_SIZE;
                     }
                 }
@@ -158,6 +199,9 @@ public class TaskbarManager {
                     }
                 }
 
+                debugWhyTaskbarNotDestroyed("ComponentCallbacks#onConfigurationChanged() "
+                        + "configDiffForRecreate="
+                        + Configuration.configurationDiffToString(configDiffForRecreate));
                 if ((configDiffForRecreate & configsRequiringRecreate) != 0) {
                     recreateTaskbar();
                 } else {
@@ -186,6 +230,8 @@ public class TaskbarManager {
                 mNavMode = info.navigationMode;
                 recreateTaskbar();
             }
+            debugWhyTaskbarNotDestroyed("DisplayInfoChangeListener#"
+                    + mDisplayController.getChangeFlagsString(flags));
         };
         mNavMode = mDisplayController.getInfo().navigationMode;
         mDisplayController.addChangeListener(mDispInfoChangeListener);
@@ -195,16 +241,40 @@ public class TaskbarManager {
                 mNavBarKidsModeListener);
         mContext.registerComponentCallbacks(mComponentCallbacks);
         mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
+        UI_HELPER_EXECUTOR.execute(() -> {
+            mSharedState.taskbarSystemActionPendingIntent = PendingIntent.getBroadcast(
+                    mContext,
+                    SYSTEM_ACTION_ID_TASKBAR,
+                    new Intent(ACTION_SHOW_TASKBAR).setPackage(mContext.getPackageName()),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            mContext.registerReceiver(
+                    mTaskbarBroadcastReceiver,
+                    new IntentFilter(ACTION_SHOW_TASKBAR),
+                    RECEIVER_NOT_EXPORTED);
+        });
 
+        debugWhyTaskbarNotDestroyed("TaskbarManager created");
         recreateTaskbar();
     }
 
     private void destroyExistingTaskbar() {
+        debugWhyTaskbarNotDestroyed("destroyExistingTaskbar: " + mTaskbarActivityContext);
         if (mTaskbarActivityContext != null) {
+            LauncherPrefs.get(mContext).removeListener(mTaskbarPinningPreferenceChangeListener,
+                    TASKBAR_PINNING);
             mTaskbarActivityContext.onDestroy();
             if (!FLAG_HIDE_NAVBAR_WINDOW) {
                 mTaskbarActivityContext = null;
             }
+        }
+    }
+
+    /**
+     * Show Taskbar upon receiving broadcast
+     */
+    private void showTaskbarFromBroadcast(Intent intent) {
+        if (ACTION_SHOW_TASKBAR.equals(intent.getAction()) && mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.showTaskbarFromBroadcast();
         }
     }
 
@@ -234,7 +304,12 @@ public class TaskbarManager {
         if (mActivity == activity) {
             return;
         }
+        if (mActivity != null) {
+            mActivity.removeOnDeviceProfileChangeListener(mDebugActivityDeviceProfileChanged);
+        }
         mActivity = activity;
+        debugWhyTaskbarNotDestroyed("Set mActivity=" + mActivity);
+        mActivity.addOnDeviceProfileChangeListener(mDebugActivityDeviceProfileChanged);
         UnfoldTransitionProgressProvider unfoldTransitionProgressProvider =
                 getUnfoldTransitionProgressProviderForActivity(activity);
         mUnfoldProgressProvider.setSourceProvider(unfoldTransitionProgressProvider);
@@ -278,7 +353,9 @@ public class TaskbarManager {
      */
     public void clearActivity(@NonNull StatefulActivity activity) {
         if (mActivity == activity) {
+            mActivity.removeOnDeviceProfileChangeListener(mDebugActivityDeviceProfileChanged);
             mActivity = null;
+            debugWhyTaskbarNotDestroyed("clearActivity");
             if (mTaskbarActivityContext != null) {
                 mTaskbarActivityContext.setUIController(TaskbarUIController.DEFAULT);
             }
@@ -298,8 +375,12 @@ public class TaskbarManager {
 
         destroyExistingTaskbar();
 
-        boolean isTaskBarEnabled = dp != null && isTaskbarPresent(dp);
-        if (!isTaskBarEnabled) {
+        boolean isTaskbarEnabled = dp != null && isTaskbarPresent(dp);
+        debugWhyTaskbarNotDestroyed("recreateTaskbar: isTaskbarEnabled=" + isTaskbarEnabled
+                + " [dp != null (i.e. mUserUnlocked)]=" + (dp != null)
+                + " FLAG_HIDE_NAVBAR_WINDOW=" + FLAG_HIDE_NAVBAR_WINDOW
+                + " dp.isTaskbarPresent=" + (dp == null ? "null" : dp.isTaskbarPresent));
+        if (!isTaskbarEnabled) {
             SystemUiProxy.INSTANCE.get(mContext)
                     .notifyTaskbarStatus(/* visible */ false, /* stashed */ false);
             return;
@@ -317,9 +398,17 @@ public class TaskbarManager {
             mTaskbarActivityContext.setUIController(
                     createTaskbarUIControllerForActivity(mActivity));
         }
+
+        // We to wait until user unlocks the device to attach listener.
+        LauncherPrefs.get(mContext).addListener(mTaskbarPinningPreferenceChangeListener,
+                TASKBAR_PINNING);
     }
 
     public void onSystemUiFlagsChanged(int systemUiStateFlags) {
+        if (DEBUG) {
+            Log.d(TAG, "SysUI flags changed: " + formatFlagChange(systemUiStateFlags,
+                    mSharedState.sysuiStateFlags, QuickStepContract::getSystemUiStateString));
+        }
         mSharedState.sysuiStateFlags = systemUiStateFlags;
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.updateSysuiStateFlags(systemUiStateFlags, false /* fromInit */);
@@ -396,6 +485,13 @@ public class TaskbarManager {
      * Called when the manager is no longer needed
      */
     public void destroy() {
+        debugWhyTaskbarNotDestroyed("TaskbarManager#destroy()");
+        if (mActivity != null) {
+            mActivity.removeOnDeviceProfileChangeListener(mDebugActivityDeviceProfileChanged);
+        }
+
+        UI_HELPER_EXECUTOR.execute(
+                () -> mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext));
         destroyExistingTaskbar();
         mDisplayController.removeChangeListener(mDispInfoChangeListener);
         SettingsCache.INSTANCE.get(mContext).unregister(USER_SETUP_COMPLETE_URI,
@@ -418,4 +514,46 @@ public class TaskbarManager {
             mTaskbarActivityContext.dumpLogs(prefix + "\t", pw);
         }
     }
+
+    /** Temp logs for b/254119092. */
+    public void debugWhyTaskbarNotDestroyed(String debugReason) {
+        StringJoiner log = new StringJoiner("\n");
+        log.add(debugReason);
+
+        boolean activityTaskbarPresent = mActivity != null
+                && mActivity.getDeviceProfile().isTaskbarPresent;
+        boolean contextTaskbarPresent = mUserUnlocked
+                && LauncherAppState.getIDP(mContext).getDeviceProfile(mContext).isTaskbarPresent;
+        if (activityTaskbarPresent == contextTaskbarPresent) {
+            log.add("mActivity and mContext agree taskbarIsPresent=" + contextTaskbarPresent);
+            Log.d(TASKBAR_NOT_DESTROYED_TAG, log.toString());
+            return;
+        }
+
+        log.add("mActivity and mContext device profiles have different values, add more logs.");
+
+        log.add("\tmActivity logs:");
+        log.add("\t\tmActivity=" + mActivity);
+        if (mActivity != null) {
+            log.add("\t\tmActivity.getResources().getConfiguration()="
+                    + mActivity.getResources().getConfiguration());
+            log.add("\t\tmActivity.getDeviceProfile().isTaskbarPresent="
+                    + activityTaskbarPresent);
+        }
+        log.add("\tmContext logs:");
+        log.add("\t\tmContext=" + mContext);
+        log.add("\t\tmContext.getResources().getConfiguration()="
+                + mContext.getResources().getConfiguration());
+        if (mUserUnlocked) {
+            log.add("\t\tLauncherAppState.getIDP().getDeviceProfile(mContext).isTaskbarPresent="
+                    + contextTaskbarPresent);
+        } else {
+            log.add("\t\tCouldn't get DeviceProfile because !mUserUnlocked");
+        }
+
+        Log.d(TASKBAR_NOT_DESTROYED_TAG, log.toString());
+    }
+
+    private final DeviceProfile.OnDeviceProfileChangeListener mDebugActivityDeviceProfileChanged =
+            dp -> debugWhyTaskbarNotDestroyed("mActivity onDeviceProfileChanged");
 }

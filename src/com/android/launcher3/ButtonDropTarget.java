@@ -18,10 +18,9 @@ package com.android.launcher3;
 
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-import static com.android.launcher3.LauncherState.NORMAL;
-
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.text.InputType;
@@ -34,12 +33,15 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.views.ActivityContext;
 
 /**
  * Implements a DropTarget.
@@ -57,8 +59,8 @@ public abstract class ButtonDropTarget extends TextView
     public static final int TOOLTIP_LEFT = 1;
     public static final int TOOLTIP_RIGHT = 2;
 
-    protected final Launcher mLauncher;
-
+    protected final ActivityContext mActivityContext;
+    protected final DropTargetHandler mDropTargetHandler;
     protected DropTargetBar mDropTargetBar;
 
     /** Whether this drop target is active for the current drag */
@@ -81,13 +83,17 @@ public abstract class ButtonDropTarget extends TextView
     private PopupWindow mToolTip;
     private int mToolTipLocation;
 
+    public ButtonDropTarget(Context context) {
+        this(context, null, 0);
+    }
     public ButtonDropTarget(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
     public ButtonDropTarget(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        mLauncher = Launcher.getLauncher(context);
+        mActivityContext = ActivityContext.lookupContext(context);
+        mDropTargetHandler = mActivityContext.getDropTargetHandler();
 
         Resources resources = getResources();
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
@@ -208,7 +214,8 @@ public abstract class ButtonDropTarget extends TextView
     @Override
     public boolean isDropEnabled() {
         return mActive && (mAccessibleDrag ||
-                mLauncher.getDragController().getDistanceDragged() >= mDragDistanceThreshold);
+                mActivityContext.getDragController().getDistanceDragged()
+                        >= mDragDistanceThreshold);
     }
 
     @Override
@@ -227,7 +234,8 @@ public abstract class ButtonDropTarget extends TextView
             // FlingAnimation handles the animation and then calls completeDrop().
             return;
         }
-        final DragLayer dragLayer = mLauncher.getDragLayer();
+
+        final DragLayer dragLayer = mDropTargetHandler.getDragLayer();
         final DragView dragView = d.dragView;
         final Rect to = getIconRect(d);
         final float scale = (float) to.width() / dragView.getMeasuredWidth();
@@ -238,8 +246,9 @@ public abstract class ButtonDropTarget extends TextView
         Runnable onAnimationEndRunnable = () -> {
             completeDrop(d);
             mDropTargetBar.onDragEnd();
-            mLauncher.getStateManager().goToState(NORMAL);
+            mDropTargetHandler.onDropAnimationComplete();
         };
+
 
         dragLayer.animateView(d.dragView, to, scale, 0.1f, 0.1f,
                 DRAG_VIEW_DROP_DURATION,
@@ -259,10 +268,10 @@ public abstract class ButtonDropTarget extends TextView
     @Override
     public void getHitRectRelativeToDragLayer(android.graphics.Rect outRect) {
         super.getHitRect(outRect);
-        outRect.bottom += mLauncher.getDeviceProfile().dropTargetDragPaddingPx;
+        outRect.bottom += mActivityContext.getDeviceProfile().dropTargetDragPaddingPx;
 
         sTempCords[0] = sTempCords[1] = 0;
-        mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, sTempCords);
+        mActivityContext.getDragLayer().getDescendantCoordRelativeToSelf(this, sTempCords);
         outRect.offsetTo(sTempCords[0], sTempCords[1]);
     }
 
@@ -271,7 +280,7 @@ public abstract class ButtonDropTarget extends TextView
         int viewHeight = dragObject.dragView.getMeasuredHeight();
         int drawableWidth = mDrawable.getIntrinsicWidth();
         int drawableHeight = mDrawable.getIntrinsicHeight();
-        DragLayer dragLayer = mLauncher.getDragLayer();
+        DragLayer dragLayer = mDropTargetHandler.getDragLayer();
 
         // Find the rect to animate to (the view is center aligned)
         Rect to = new Rect();
@@ -312,7 +321,7 @@ public abstract class ButtonDropTarget extends TextView
 
     @Override
     public void onClick(View v) {
-        mLauncher.getAccessibilityDelegate().handleAccessibleDrop(this, null, null);
+        mDropTargetHandler.onClick(this);
     }
 
     public void setTextVisible(boolean isVisible) {
@@ -403,6 +412,18 @@ public abstract class ButtonDropTarget extends TextView
     }
 
     /**
+     * Returns if the text will be clipped vertically within the provided availableHeight.
+     */
+    @VisibleForTesting
+    protected boolean isTextClippedVertically(int availableHeight) {
+        Paint.FontMetricsInt fontMetricsInt = getPaint().getFontMetricsInt();
+        int lineCount = (getLineCount() <= 0) ? 1 : getLineCount();
+        int textHeight = lineCount * (fontMetricsInt.bottom - fontMetricsInt.top);
+
+        return textHeight + getPaddingTop() + getPaddingBottom() >= availableHeight;
+    }
+
+    /**
      * Reduce the size of the text until it fits the measured width or reaches a minimum.
      *
      * The minimum size is defined by {@code R.dimen.button_drop_target_min_text_size} and
@@ -423,7 +444,9 @@ public abstract class ButtonDropTarget extends TextView
         float textSize = Utilities.pxToSp(getTextSize());
 
         int availableWidth = getMeasuredWidth();
-        while (isTextTruncated(availableWidth)) {
+        int availableHeight = getMeasuredHeight();
+
+        while (isTextTruncated(availableWidth) || isTextClippedVertically(availableHeight)) {
             textSize -= step;
             if (textSize < minSize) {
                 textSize = minSize;

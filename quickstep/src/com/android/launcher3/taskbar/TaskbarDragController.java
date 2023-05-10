@@ -55,7 +55,6 @@ import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.accessibility.DragViewStateAnnouncer;
 import com.android.launcher3.anim.Interpolators;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragDriver;
 import com.android.launcher3.dragndrop.DragOptions;
@@ -159,7 +158,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             if (iconShift != null) {
                 dragView.animateShift(-iconShift.x, -iconShift.y);
             }
-            btv.getIcon().setIsDisabled(true);
+            btv.setIconDisabled(true);
             mControllers.taskbarAutohideSuspendController.updateFlag(
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING, true);
         });
@@ -188,12 +187,10 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
         DragOptions dragOptions = new DragOptions();
         dragOptions.preDragCondition = null;
-        if (FeatureFlags.ENABLE_TASKBAR_POPUP_MENU.get()) {
-            PopupContainerWithArrow<BaseTaskbarContext> popupContainer =
-                    mControllers.taskbarPopupController.showForIcon(btv);
-            if (popupContainer != null) {
-                dragOptions.preDragCondition = popupContainer.createPreDragCondition(false);
-            }
+        PopupContainerWithArrow<BaseTaskbarContext> popupContainer =
+                mControllers.taskbarPopupController.showForIcon(btv);
+        if (popupContainer != null) {
+            dragOptions.preDragCondition = popupContainer.createPreDragCondition(false);
         }
         if (dragOptions.preDragCondition == null) {
             dragOptions.preDragCondition = new DragOptions.PreDragCondition() {
@@ -208,8 +205,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 public void onPreDragStart(DropTarget.DragObject dragObject) {
                     mDragView = dragObject.dragView;
 
-                    if (FeatureFlags.ENABLE_TASKBAR_POPUP_MENU.get()
-                            && !shouldStartDrag(0)) {
+                    if (!shouldStartDrag(0)) {
                         mDragView.setOnAnimationEndCallback(() -> {
                             // Drag might be cancelled during the DragView animation, so check
                             // mIsPreDrag again.
@@ -312,15 +308,12 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         // Pre-drag has ended, start the global system drag.
         if (mDisallowGlobalDrag) {
             AbstractFloatingView.closeAllOpenViewsExcept(mActivity, TYPE_TASKBAR_ALL_APPS);
-        } else {
-            AbstractFloatingView.closeAllOpenViews(mActivity);
+            return;
         }
-
         startSystemDrag((BubbleTextView) mDragObject.originalView);
     }
 
     private void startSystemDrag(BubbleTextView btv) {
-        if (mDisallowGlobalDrag) return;
         View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(btv) {
 
             @Override
@@ -416,6 +409,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                         .log(StatsLogManager.LauncherEvent.LAUNCHER_ITEM_DRAG_STARTED);
             }
         }
+
+        // Wait to close until after system drag has started, if applicable.
+        AbstractFloatingView.closeAllOpenViews(mActivity);
     }
 
     private void onSystemDragStarted(BubbleTextView btv) {
@@ -453,13 +449,16 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     private void maybeOnDragEnd() {
         if (!isDragging()) {
-            ((BubbleTextView) mDragObject.originalView).getIcon().setIsDisabled(false);
+            ((BubbleTextView) mDragObject.originalView).setIconDisabled(false);
             mControllers.taskbarAutohideSuspendController.updateFlag(
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING, false);
             mActivity.onDragEnd();
-            // Note, this must be done last to ensure no AutohideSuspendFlags are active, as that
-            // will prevent us from stashing until the timeout.
-            mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+            if (mReturnAnimator == null) {
+                // Upon successful drag, immediately stash taskbar.
+                // Note, this must be done last to ensure no AutohideSuspendFlags are active, as
+                // that will prevent us from stashing until the timeout.
+                mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+            }
         }
     }
 
@@ -493,8 +492,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                     callOnDragEnd();
                     dragView.remove();
                     dragView.clearAnimation();
+                    // Do this after callOnDragEnd(), because we use mReturnAnimator != null to
+                    // imply the drag was canceled rather than successful.
                     mReturnAnimator = null;
-
                 }
             });
             mReturnAnimator.start();
@@ -556,6 +556,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 syncGroup.add(viewRoot, null /* runnable */);
                 syncGroup.addTransaction(transaction);
                 syncGroup.markSyncReady();
+                // Do this after maybeOnDragEnd(), because we use mReturnAnimator != null to imply
+                // the drag was canceled rather than successful.
                 mReturnAnimator = null;
             }
         });

@@ -95,7 +95,11 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
                     i -> MAIN_EXECUTOR.execute(() ->
                             sHolders.forEach(h -> h.mAppWidgetRemovedCallback.accept(i))),
                     () -> MAIN_EXECUTOR.execute(() ->
-                            sHolders.forEach(h -> h.mProviderChangedListeners.forEach(
+                            sHolders.forEach(h ->
+                                    // Listeners might remove themselves from the list during the
+                                    // iteration. Creating a copy of the list to avoid exceptions
+                                    // for concurrent modification.
+                                    new ArrayList<>(h.mProviderChangedListeners).forEach(
                                     ProviderChangedListener::notifyWidgetProvidersChanged))),
                     UI_HELPER_EXECUTOR.getLooper());
             if (!WidgetsModel.GO_DISABLE_WIDGETS) {
@@ -155,7 +159,6 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
         } else if (KEY_VIEWS_UPDATE.equals(key)) {
             // For views update, remove all previous updates, except the provider
             pendingUpdate.remoteViews = (RemoteViews) data;
-            pendingUpdate.changedViews.clear();
         } else if (KEY_VIEW_DATA_CHANGED.equals(key)) {
             pendingUpdate.changedViews.add((Integer) data);
         }
@@ -168,6 +171,7 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
     @Override
     public void deleteAppWidgetId(int appWidgetId) {
         super.deleteAppWidgetId(appWidgetId);
+        mViews.remove(appWidgetId);
         sListeners.remove(appWidgetId);
     }
 
@@ -196,7 +200,7 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
     @Override
     public void addProviderChangeListener(
             @NonNull LauncherWidgetHolder.ProviderChangedListener listener) {
-        mProviderChangedListeners.add(listener);
+        MAIN_EXECUTOR.execute(() -> mProviderChangedListeners.add(listener));
     }
 
     /**
@@ -206,7 +210,7 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
     @Override
     public void removeProviderChangeListener(
             LauncherWidgetHolder.ProviderChangedListener listener) {
-        mProviderChangedListeners.remove(listener);
+        MAIN_EXECUTOR.execute(() -> mProviderChangedListeners.remove(listener));
     }
 
     /**
@@ -260,6 +264,7 @@ public final class QuickstepWidgetHolder extends LauncherWidgetHolder {
      */
     @Override
     public void clearViews() {
+        mViews.clear();
         for (int i = sListeners.size() - 1; i >= 0; i--) {
             sListeners.valueAt(i).mListeningHolders.remove(this);
         }

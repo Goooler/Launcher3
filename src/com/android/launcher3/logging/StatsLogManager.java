@@ -636,6 +636,12 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User scrolled up on the search result page.")
         LAUNCHER_ALLAPPS_SEARCH_SCROLLED_UP(1286),
+
+        @UiEvent(doc = "User or automatic timeout has hidden transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_HIDE(1330),
+
+        @UiEvent(doc = "User has swiped upwards from the gesture handle to show transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_SHOW(1331),
         ;
 
         // ADD MORE
@@ -646,6 +652,39 @@ public class StatsLogManager implements ResourceBasedOverride {
             mId = id;
         }
 
+        public int getId() {
+            return mId;
+        }
+    }
+
+    /** Launcher's latency events. */
+    public enum LauncherLatencyEvent implements EventEnum {
+        // Details of below 6 events with prefix of "LAUNCHER_LATENCY_STARTUP_" are discussed in
+        // go/launcher-startup-latency
+        @UiEvent(doc = "The total duration of launcher startup latency.")
+        LAUNCHER_LATENCY_STARTUP_TOTAL_DURATION(1362),
+
+        @UiEvent(doc = "The duration of launcher activity's onCreate().")
+        LAUNCHER_LATENCY_STARTUP_ACTIVITY_ON_CREATE(1363),
+
+        @UiEvent(doc =
+                "The duration to inflate launcher root view in launcher activity's onCreate().")
+        LAUNCHER_LATENCY_STARTUP_VIEW_INFLATION(1364),
+
+        @UiEvent(doc = "The duration of synchronous loading workspace")
+        LAUNCHER_LATENCY_STARTUP_WORKSPACE_LOADER_SYNC(1366),
+
+        @UiEvent(doc = "The duration of asynchronous loading workspace")
+        LAUNCHER_LATENCY_STARTUP_WORKSPACE_LOADER_ASYNC(1367),
+        ;
+
+        private final int mId;
+
+        LauncherLatencyEvent(int id) {
+            mId = id;
+        }
+
+        @Override
         public int getId() {
             return mId;
         }
@@ -764,6 +803,13 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets the input type of the log message.
+         */
+        default StatsLogger withInputType(int inputType) {
+            return this;
+        }
+
+        /**
          * Builds the final message and logs it as {@link EventEnum}.
          */
         default void log(EventEnum event) {
@@ -784,6 +830,7 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         enum LatencyType {
             UNKNOWN(0),
+            // example: launcher restart that happens via daily backup and restore
             COLD(1),
             HOT(2),
             TIMEOUT(3),
@@ -791,7 +838,12 @@ public class StatsLogManager implements ResourceBasedOverride {
             COLD_USERWAITING(5),
             ATOMIC(6),
             CONTROLLED(7),
-            CACHED(8);
+            CACHED(8),
+            // example: device is rebooting via power key or shell command `adb reboot`
+            COLD_DEVICE_REBOOTING(9),
+            // Tracking warm startup latency:
+            // https://developer.android.com/topic/performance/vitals/launch-time#warm
+            WARM(10);
             private final int mId;
 
             LatencyType(int id) {
@@ -836,6 +888,12 @@ public class StatsLogManager implements ResourceBasedOverride {
          * Sets sub event type.
          */
         default StatsLatencyLogger withSubEventType(int type) {
+            return this;
+        }
+
+
+        /** Sets cardinality of the event. */
+        default StatsLatencyLogger withCardinality(int cardinality) {
             return this;
         }
 

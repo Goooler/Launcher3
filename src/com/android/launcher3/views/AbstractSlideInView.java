@@ -30,17 +30,22 @@ import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Property;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.animation.Interpolator;
+import android.window.BackEvent;
 
-import androidx.annotation.FloatRange;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
+import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Utilities;
@@ -76,6 +81,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
             };
     protected static final float TRANSLATION_SHIFT_CLOSED = 1f;
     protected static final float TRANSLATION_SHIFT_OPENED = 0f;
+    private static final float VIEW_NO_SCALE = 1f;
 
     protected final T mActivityContext;
 
@@ -93,9 +99,23 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected @Nullable OnCloseListener mOnCloseBeginListener;
     protected List<OnCloseListener> mOnCloseListeners = new ArrayList<>();
 
-    private final AnimatedFloat mSlidInViewScale = new AnimatedFloat(this::onScaleProgressChanged);
-    private boolean mIsBackProgressing;
+    protected final AnimatedFloat mSlideInViewScale =
+            new AnimatedFloat(this::onScaleProgressChanged, VIEW_NO_SCALE);
+    protected boolean mIsBackProgressing;
     @Nullable private Drawable mContentBackground;
+    @Nullable private View mContentBackgroundParentView;
+
+    protected final ViewOutlineProvider mViewOutlineProvider = new ViewOutlineProvider() {
+        @Override
+        public void getOutline(View view, Outline outline) {
+            outline.setRect(
+                    0,
+                    0,
+                    view.getMeasuredWidth(),
+                    view.getMeasuredHeight() + getBottomOffsetPx()
+            );
+        }
+    };
 
     public AbstractSlideInView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -115,10 +135,6 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         });
         int scrimColor = getScrimColor(context);
         mColorScrim = scrimColor != -1 ? createColorScrim(context, scrimColor) : null;
-    }
-
-    protected void setContentBackground(Drawable drawable) {
-        mContentBackground = drawable;
     }
 
     protected void attachToContainer() {
@@ -179,17 +195,18 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     }
 
     @Override
-    public void onBackProgressed(@FloatRange(from = 0.0, to = 1.0) float progress) {
-        super.onBackProgressed(progress);
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    public void onBackProgressed(BackEvent backEvent) {
+        final float progress = backEvent.getProgress();
         float deceleratedProgress =
                 Interpolators.PREDICTIVE_BACK_DECELERATED_EASE.getInterpolation(progress);
         mIsBackProgressing = progress > 0f;
-        mSlidInViewScale.updateValue(PREDICTIVE_BACK_MIN_SCALE
+        mSlideInViewScale.updateValue(PREDICTIVE_BACK_MIN_SCALE
                 + (1 - PREDICTIVE_BACK_MIN_SCALE) * (1 - deceleratedProgress));
     }
 
-    private void onScaleProgressChanged() {
-        float scaleProgress = mSlidInViewScale.value;
+    protected void onScaleProgressChanged() {
+        float scaleProgress = mSlideInViewScale.value;
         SCALE_PROPERTY.set(this, scaleProgress);
         setClipChildren(!mIsBackProgressing);
         mContent.setClipChildren(!mIsBackProgressing);
@@ -209,7 +226,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     }
 
     protected void animateSlideInViewToNoScale() {
-        mSlidInViewScale.animateToValue(1f)
+        mSlideInViewScale.animateToValue(1f)
                 .setDuration(REVERT_SWIPE_ALL_APPS_TO_HOME_ANIMATION_DURATION_MS)
                 .start();
     }
@@ -220,24 +237,35 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
         super.dispatchDraw(canvas);
     }
 
+    /**
+     * Set slide in view's background {@link Drawable} which will be draw onto a parent view in
+     * {@link #dispatchDraw(Canvas)}
+     */
+    protected void setContentBackgroundWithParent(
+            @NonNull Drawable drawable, @NonNull View parentView) {
+        mContentBackground = drawable;
+        mContentBackgroundParentView = parentView;
+    }
+
     /** Draw scaled background during predictive back animation. */
-    protected void drawScaledBackground(Canvas canvas) {
-        if (mContentBackground == null) {
+    private void drawScaledBackground(Canvas canvas) {
+        if (mContentBackground == null || mContentBackgroundParentView == null) {
             return;
         }
         mContentBackground.setBounds(
-                mContent.getLeft(),
-                mContent.getTop() + (int) mContent.getTranslationY(),
-                mContent.getRight(),
-                mContent.getBottom() + (mIsBackProgressing ? getBottomOffsetPx() : 0));
+                mContentBackgroundParentView.getLeft(),
+                mContentBackgroundParentView.getTop() + (int) mContent.getTranslationY(),
+                mContentBackgroundParentView.getRight(),
+                mContentBackgroundParentView.getBottom()
+                        + (mIsBackProgressing ? getBottomOffsetPx() : 0));
         mContentBackground.draw(canvas);
     }
 
     /** Return extra space revealed during predictive back animation. */
     @Px
     protected int getBottomOffsetPx() {
-        return (int) (getMeasuredHeight()
-                * (1 - PREDICTIVE_BACK_MIN_SCALE) / 2);
+        final int height = getMeasuredHeight();
+        return (int) ((height / PREDICTIVE_BACK_MIN_SCALE - height) / 2);
     }
 
     /**

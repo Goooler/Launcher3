@@ -39,6 +39,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.ArrayMap;
 import android.util.Pair;
@@ -182,9 +183,16 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
     }
 
     private PreferenceCategory newCategory(String title) {
+        return newCategory(title, null);
+    }
+
+    private PreferenceCategory newCategory(String title, @Nullable String summary) {
         PreferenceCategory category = new PreferenceCategory(getContext());
         category.setOrder(Preference.DEFAULT_ORDER);
         category.setTitle(title);
+        if (!TextUtils.isEmpty(summary)) {
+            category.setSummary(summary);
+        }
         mPreferenceScreen.addPreference(category);
         return category;
     }
@@ -195,7 +203,7 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
         }
 
         mFlagTogglerPrefUi = new FlagTogglerPrefUi(this);
-        mFlagTogglerPrefUi.applyTo(newCategory("Feature flags"));
+        mFlagTogglerPrefUi.applyTo(newCategory("Feature flags", "Long press to reset"));
     }
 
     @Override
@@ -294,17 +302,27 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
         }
         PreferenceCategory sandboxCategory = newCategory("Gesture Navigation Sandbox");
         sandboxCategory.setSummary("Learn and practice navigation gestures");
+        Preference launchTutorialStepMenuPreference = new Preference(context);
+        launchTutorialStepMenuPreference.setKey("launchTutorialStepMenu");
+        launchTutorialStepMenuPreference.setTitle("Launch Gesture Tutorial Steps menu");
+        launchTutorialStepMenuPreference.setSummary("Select a gesture tutorial step.");
+        launchTutorialStepMenuPreference.setOnPreferenceClickListener(preference -> {
+            startActivity(launchSandboxIntent.putExtra("use_tutorial_menu", true));
+            return true;
+        });
+        sandboxCategory.addPreference(launchTutorialStepMenuPreference);
         Preference launchOnboardingTutorialPreference = new Preference(context);
         launchOnboardingTutorialPreference.setKey("launchOnboardingTutorial");
         launchOnboardingTutorialPreference.setTitle("Launch Onboarding Tutorial");
         launchOnboardingTutorialPreference.setSummary("Learn the basic navigation gestures.");
         launchOnboardingTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {
-                            "HOME_NAVIGATION",
-                            "BACK_NAVIGATION",
-                            "OVERVIEW_NAVIGATION"}));
+            startActivity(launchSandboxIntent
+                    .putExtra("use_tutorial_menu", false)
+                    .putExtra("tutorial_steps",
+                            new String[] {
+                                    "HOME_NAVIGATION",
+                                    "BACK_NAVIGATION",
+                                    "OVERVIEW_NAVIGATION"}));
             return true;
         });
         sandboxCategory.addPreference(launchOnboardingTutorialPreference);
@@ -313,9 +331,9 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
         launchBackTutorialPreference.setTitle("Launch Back Tutorial");
         launchBackTutorialPreference.setSummary("Learn how to use the Back gesture");
         launchBackTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {"BACK_NAVIGATION"}));
+            startActivity(launchSandboxIntent
+                    .putExtra("use_tutorial_menu", false)
+                    .putExtra("tutorial_steps", new String[] {"BACK_NAVIGATION"}));
             return true;
         });
         sandboxCategory.addPreference(launchBackTutorialPreference);
@@ -324,9 +342,9 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
         launchHomeTutorialPreference.setTitle("Launch Home Tutorial");
         launchHomeTutorialPreference.setSummary("Learn how to use the Home gesture");
         launchHomeTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {"HOME_NAVIGATION"}));
+            startActivity(launchSandboxIntent
+                    .putExtra("use_tutorial_menu", false)
+                    .putExtra("tutorial_steps", new String[] {"HOME_NAVIGATION"}));
             return true;
         });
         sandboxCategory.addPreference(launchHomeTutorialPreference);
@@ -335,35 +353,12 @@ public class DeveloperOptionsFragment extends PreferenceFragmentCompat {
         launchOverviewTutorialPreference.setTitle("Launch Overview Tutorial");
         launchOverviewTutorialPreference.setSummary("Learn how to use the Overview gesture");
         launchOverviewTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {"OVERVIEW_NAVIGATION"}));
+            startActivity(launchSandboxIntent
+                    .putExtra("use_tutorial_menu", false)
+                    .putExtra("tutorial_steps", new String[] {"OVERVIEW_NAVIGATION"}));
             return true;
         });
         sandboxCategory.addPreference(launchOverviewTutorialPreference);
-        Preference launchAssistantTutorialPreference = new Preference(context);
-        launchAssistantTutorialPreference.setKey("launchAssistantTutorial");
-        launchAssistantTutorialPreference.setTitle("Launch Assistant Tutorial");
-        launchAssistantTutorialPreference.setSummary("Learn how to use the Assistant gesture");
-        launchAssistantTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {"ASSISTANT"}));
-            return true;
-        });
-        sandboxCategory.addPreference(launchAssistantTutorialPreference);
-        Preference launchSandboxModeTutorialPreference = new Preference(context);
-        launchSandboxModeTutorialPreference.setKey("launchSandboxMode");
-        launchSandboxModeTutorialPreference.setTitle("Launch Sandbox Mode");
-        launchSandboxModeTutorialPreference.setSummary("Practice navigation gestures");
-        launchSandboxModeTutorialPreference.setOnPreferenceClickListener(preference -> {
-            startActivity(launchSandboxIntent.putExtra(
-                    "tutorial_steps",
-                    new String[] {"SANDBOX_MODE"}));
-            return true;
-        });
-        sandboxCategory.addPreference(launchSandboxModeTutorialPreference);
-
         Preference launchSecondaryDisplayPreference = new Preference(context);
         launchSecondaryDisplayPreference.setKey("launchSecondaryDisplay");
         launchSecondaryDisplayPreference.setTitle("Launch Secondary Display");

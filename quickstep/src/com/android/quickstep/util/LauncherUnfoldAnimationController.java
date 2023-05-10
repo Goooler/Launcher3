@@ -27,10 +27,15 @@ import android.view.WindowManager;
 
 import androidx.core.view.OneShotPreDrawListener;
 
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.Hotseat;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.Workspace;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.HorizontalInsettableView;
+import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.unfold.PreemptiveUnfoldTransitionProgressProvider;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider.TransitionProgressListener;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
@@ -40,11 +45,11 @@ import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
 /**
  * Controls animations that are happening during unfolding foldable devices
  */
-public class LauncherUnfoldAnimationController {
+public class LauncherUnfoldAnimationController implements OnDeviceProfileChangeListener {
 
     // Percentage of the width of the quick search bar that will be reduced
     // from the both sides of the bar when progress is 0
-    private static final float MAX_WIDTH_INSET_FRACTION = 0.15f;
+    private static final float MAX_WIDTH_INSET_FRACTION = 0.04f;
     private static final FloatProperty<Workspace<?>> WORKSPACE_SCALE_PROPERTY =
             WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_UNFOLD_ANIMATION);
     private static final FloatProperty<Hotseat> HOTSEAT_SCALE_PROPERTY =
@@ -55,9 +60,11 @@ public class LauncherUnfoldAnimationController {
     private final NaturalRotationUnfoldProgressProvider mNaturalOrientationProgressProvider;
     private final UnfoldMoveFromCenterHotseatAnimator mUnfoldMoveFromCenterHotseatAnimator;
     private final UnfoldMoveFromCenterWorkspaceAnimator mUnfoldMoveFromCenterWorkspaceAnimator;
+    private PreemptiveUnfoldTransitionProgressProvider mPreemptiveProgressProvider = null;
+    private Boolean mIsTablet = null;
 
     private static final String TRACE_WAIT_TO_HANDLE_UNFOLD_TRANSITION =
-            "waitingOneFrameBeforeHandlingUnfoldAnimation";
+            "LauncherUnfoldAnimationController#waitingForTheNextFrame";
 
     @Nullable
     private HorizontalInsettableView mQsbInsettable;
@@ -68,8 +75,19 @@ public class LauncherUnfoldAnimationController {
             UnfoldTransitionProgressProvider unfoldTransitionProgressProvider,
             RotationChangeProvider rotationChangeProvider) {
         mLauncher = launcher;
-        mProgressProvider = new ScopedUnfoldTransitionProgressProvider(
-                unfoldTransitionProgressProvider);
+
+        if (FeatureFlags.PREEMPTIVE_UNFOLD_ANIMATION_START.get()) {
+            mPreemptiveProgressProvider = new PreemptiveUnfoldTransitionProgressProvider(
+                    unfoldTransitionProgressProvider, launcher.getMainThreadHandler());
+            mPreemptiveProgressProvider.init();
+
+            mProgressProvider = new ScopedUnfoldTransitionProgressProvider(
+                    mPreemptiveProgressProvider);
+        } else {
+            mProgressProvider = new ScopedUnfoldTransitionProgressProvider(
+                    unfoldTransitionProgressProvider);
+        }
+
         mUnfoldMoveFromCenterHotseatAnimator = new UnfoldMoveFromCenterHotseatAnimator(launcher,
                 windowManager, rotationChangeProvider);
         mUnfoldMoveFromCenterWorkspaceAnimator = new UnfoldMoveFromCenterWorkspaceAnimator(launcher,
@@ -85,6 +103,8 @@ public class LauncherUnfoldAnimationController {
         // Animated only in natural orientation
         mNaturalOrientationProgressProvider.addCallback(new QsbAnimationListener());
         mNaturalOrientationProgressProvider.addCallback(mUnfoldMoveFromCenterHotseatAnimator);
+
+        mLauncher.addOnDeviceProfileChangeListener(this);
     }
 
     /**
@@ -96,17 +116,21 @@ public class LauncherUnfoldAnimationController {
             mQsbInsettable = (HorizontalInsettableView) hotseat.getQsb();
         }
 
-        handleTransitionOnNextFrame();
+        mProgressProvider.setReadyToHandleTransition(true);
     }
 
-    private void handleTransitionOnNextFrame() {
+    private void preemptivelyStartAnimationOnNextFrame() {
         Trace.asyncTraceBegin(Trace.TRACE_TAG_APP,
                 TRACE_WAIT_TO_HANDLE_UNFOLD_TRANSITION, /* cookie= */ 0);
+
+        // Start the animation (and apply the transformations) in pre-draw listener to make sure
+        // that the views are laid out as some transformations depend on the view sizes and position
         OneShotPreDrawListener.add(mLauncher.getWorkspace(),
                 () -> {
                     Trace.asyncTraceEnd(Trace.TRACE_TAG_APP,
                             TRACE_WAIT_TO_HANDLE_UNFOLD_TRANSITION, /* cookie= */ 0);
-                    mProgressProvider.setReadyToHandleTransition(true);
+                    mPreemptiveProgressProvider.preemptivelyStartTransition(
+                            /* initialProgress= */ 0f);
                 });
     }
 
@@ -124,12 +148,32 @@ public class LauncherUnfoldAnimationController {
     public void onDestroy() {
         mProgressProvider.destroy();
         mNaturalOrientationProgressProvider.destroy();
+        mLauncher.removeOnDeviceProfileChangeListener(this);
     }
 
-    /** Called when launcher finished binding its items. */
+    /**
+     * Called when launcher has finished binding its items
+     */
     public void updateRegisteredViewsIfNeeded() {
         mUnfoldMoveFromCenterHotseatAnimator.updateRegisteredViewsIfNeeded();
         mUnfoldMoveFromCenterWorkspaceAnimator.updateRegisteredViewsIfNeeded();
+    }
+
+    @Override
+    public void onDeviceProfileChanged(DeviceProfile dp) {
+        if (!FeatureFlags.PREEMPTIVE_UNFOLD_ANIMATION_START.get()) {
+            return;
+        }
+
+        if (mIsTablet != null && dp.isTablet != mIsTablet) {
+            if (dp.isTablet && SystemUiProxy.INSTANCE.get(mLauncher).isActive()) {
+                // Preemptively start the unfold animation to make sure that we have drawn
+                // the first frame of the animation before the screen gets unblocked
+                preemptivelyStartAnimationOnNextFrame();
+            }
+        }
+
+        mIsTablet = dp.isTablet;
     }
 
     private class QsbAnimationListener implements TransitionProgressListener {
@@ -156,6 +200,8 @@ public class LauncherUnfoldAnimationController {
 
     private class LauncherScaleAnimationListener implements TransitionProgressListener {
 
+        private static final float SCALE_LAUNCHER_FROM = 0.92f;
+
         @Override
         public void onTransitionStarted() {
             mLauncher.getWorkspace().setPivotToScaleWithSelf(mLauncher.getHotseat());
@@ -168,7 +214,7 @@ public class LauncherUnfoldAnimationController {
 
         @Override
         public void onTransitionProgress(float progress) {
-            setScale(MathUtils.constrainedMap(0.85f, 1, 0, 1, progress));
+            setScale(MathUtils.constrainedMap(SCALE_LAUNCHER_FROM, 1, 0, 1, progress));
         }
 
         private void setScale(float value) {

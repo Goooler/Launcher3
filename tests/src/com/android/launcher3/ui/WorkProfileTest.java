@@ -18,6 +18,9 @@ package com.android.launcher3.ui;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.allapps.AllAppsStore.DEFER_UPDATES_TEST;
+import static com.android.launcher3.testing.shared.TestProtocol.WORK_TAB_MISSING;
+import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
+import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -35,6 +38,8 @@ import com.android.launcher3.allapps.WorkEduCard;
 import com.android.launcher3.allapps.WorkPausedCard;
 import com.android.launcher3.allapps.WorkProfileManager;
 import com.android.launcher3.tapl.LauncherInstrumentation;
+import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 
 import org.junit.After;
 import org.junit.Before;
@@ -65,8 +70,14 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
         String[] tokens = output.split("\\s+");
         mProfileUserId = Integer.parseInt(tokens[tokens.length - 1]);
         output = mDevice.executeShellCommand("am start-user " + mProfileUserId);
+        StringBuilder logStr = new StringBuilder().append("profileId: ").append(mProfileUserId);
+        for (String str : tokens) {
+            logStr.append(str).append("\n");
+        }
         updateWorkProfileSetupSuccessful("am start-user", output);
 
+        Log.d(WORK_TAB_MISSING, "workProfileSuccessful? " + mWorkProfileSetupSuccessful +
+                " shellCmd: " + logStr);
         if (!mWorkProfileSetupSuccessful) {
             return; // no need to setup launcher since all tests will skip.
         }
@@ -83,22 +94,22 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
 
     @After
     public void removeWorkProfile() throws Exception {
-        mDevice.executeShellCommand("pm remove-user " + mProfileUserId);
-    }
-
-    @After
-    public void resumeAppStoreUpdate() {
+        Log.d(TestProtocol.WORK_TAB_MISSING, "WorkProfileTest teardown");
         executeOnLauncher(launcher -> {
             if (launcher == null || launcher.getAppsView() == null) {
                 return;
             }
             launcher.getAppsView().getAppsStore().disableDeferUpdates(DEFER_UPDATES_TEST);
         });
+        mDevice.executeShellCommand("pm remove-user " + mProfileUserId);
     }
 
     private void waitForWorkTabSetup() {
+        // Added for b/243688989 flake to determine if we really are in allApps or not at this point
+        mLauncher.getAllApps();
         waitForLauncherCondition("Work tab not setup", launcher -> {
             if (launcher.getAppsView().getContentView() instanceof AllAppsPagedView) {
+                Log.d(WORK_TAB_MISSING, "Deferring AppsStore updates");
                 launcher.getAppsView().getAppsStore().enableDeferUpdates(DEFER_UPDATES_TEST);
                 return true;
             }
@@ -107,6 +118,7 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
     }
 
     @Test
+    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/243688989
     public void workTabExists() {
         assumeTrue(mWorkProfileSetupSuccessful);
         waitForWorkTabSetup();
@@ -167,6 +179,7 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
     }
 
     @Test
+    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/243688989
     public void testEdu() {
         assumeTrue(mWorkProfileSetupSuccessful);
         waitForWorkTabSetup();

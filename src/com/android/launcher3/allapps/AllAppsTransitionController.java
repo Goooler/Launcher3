@@ -21,8 +21,10 @@ import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
+import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_BOTTOM_SHEET_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 import static com.android.launcher3.util.SystemUiController.FLAG_DARK_NAV;
@@ -355,7 +357,7 @@ public class AllAppsTransitionController
             });
         }
 
-        if(FeatureFlags.ENABLE_HAPTICS_ALL_APPS.get() && config.userControlled
+        if(FeatureFlags.ENABLE_PREMIUM_HAPTICS_ALL_APPS.get() && config.userControlled
                 && Utilities.ATLEAST_S) {
             if (toState == ALL_APPS) {
                 builder.addOnFrameListener(
@@ -385,8 +387,9 @@ public class AllAppsTransitionController
         builder.add(anim);
 
         setAlphas(toState, config, builder);
-
-        if (ALL_APPS.equals(toState) && mLauncher.isInState(NORMAL) && !(Utilities.ATLEAST_S)) {
+        // This controls both haptics for tapping on QSB and going to all apps.
+        if (ALL_APPS.equals(toState) && mLauncher.isInState(NORMAL) &&
+                !FeatureFlags.ENABLE_PREMIUM_HAPTICS_ALL_APPS.get()) {
             mLauncher.getAppsView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY,
                     HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
         }
@@ -409,8 +412,12 @@ public class AllAppsTransitionController
         setter.setFloat(getAppsViewPullbackAlpha(), MultiPropertyFactory.MULTI_PROPERTY_VALUE,
                 hasAllAppsContent ? 1 : 0, allAppsFade);
 
-        boolean shouldProtectHeader =
-                ALL_APPS == state || mLauncher.getStateManager().getState() == ALL_APPS;
+        setter.setFloat(mLauncher.getAppsView(),
+                ActivityAllAppsContainerView.BOTTOM_SHEET_ALPHA, hasAllAppsContent ? 1 : 0,
+                config.getInterpolator(ANIM_ALL_APPS_BOTTOM_SHEET_FADE, INSTANT));
+
+        boolean shouldProtectHeader = !config.hasAnimationFlag(StateAnimationConfig.SKIP_SCRIM)
+                && (ALL_APPS == state || mLauncher.getStateManager().getState() == ALL_APPS);
         mScrimView.setDrawingController(shouldProtectHeader ? mAppsView : null);
     }
 
@@ -520,7 +527,6 @@ public class AllAppsTransitionController
      */
     private void onProgressAnimationEnd() {
         if (Float.compare(mProgress, 1f) == 0) {
-            mAppsView.reset(false /* animate */);
             if (mShouldControlKeyboard) {
                 mLauncher.getAppsView().getSearchUiManager().getEditText().hideKeyboard();
             }

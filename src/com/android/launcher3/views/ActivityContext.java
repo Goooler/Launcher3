@@ -53,6 +53,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
+import com.android.launcher3.DropTargetHandler;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -185,6 +186,13 @@ public interface ActivityContext {
      * Controller for supporting item drag-and-drop
      */
     default <T extends DragController> T getDragController() {
+        return null;
+    }
+
+    /**
+     * Handler for actions taken on drop targets that require launcher
+     */
+    default DropTargetHandler getDropTargetHandler() {
         return null;
     }
 
@@ -324,8 +332,9 @@ public interface ActivityContext {
         Bundle optsBundle = null;
         if (v != null) {
             optsBundle = getActivityLaunchOptions(v, item).toBundle();
-        } else if (item != null && item.animationType == LauncherSettings.Animation.DEFAULT_NO_ICON
-                && Utilities.ATLEAST_T) {
+        } else if (android.os.Build.VERSION.SDK_INT >= 33
+                && item != null
+                && item.animationType == LauncherSettings.Animation.DEFAULT_NO_ICON) {
             optsBundle = ActivityOptions.makeBasic()
                     .setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR).toBundle();
         }
@@ -436,9 +445,7 @@ public interface ActivityContext {
                 StrictMode.setVmPolicy(oldPolicy);
             }
         } catch (SecurityException e) {
-            if (!onErrorStartingShortcut(intent, info)) {
-                throw e;
-            }
+            throw e;
         }
     }
 
@@ -456,16 +463,6 @@ public interface ActivityContext {
         } catch (SecurityException | IllegalStateException e) {
             Log.e(TAG, "Failed to start shortcut", e);
         }
-    }
-
-    /**
-     * Invoked when a shortcut fails to launch.
-     * @param intent Shortcut intent that failed to start.
-     * @param info Shortcut information.
-     * @return {@code true} if the error is handled by this callback.
-     */
-    default boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
-        return false;
     }
 
     default CellPosMapper getCellPosMapper() {

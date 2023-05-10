@@ -17,6 +17,7 @@ package com.android.launcher3.uioverrides;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
+import static com.android.launcher3.icons.FastBitmapDrawable.getDisabledColorFilter;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -54,6 +55,7 @@ import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.icons.LauncherIcons;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemLongClickListener;
@@ -361,6 +363,19 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     }
 
     @Override
+    public void setIconDisabled(boolean isDisabled) {
+        super.setIconDisabled(isDisabled);
+        mIconRingPaint.setColorFilter(isDisabled ? getDisabledColorFilter() : null);
+        invalidate();
+    }
+
+    @Override
+    protected void setItemInfo(ItemInfoWithIcon itemInfo) {
+        super.setItemInfo(itemInfo);
+        setIconDisabled(itemInfo.isDisabled());
+    }
+
+    @Override
     public void getSourceVisualDragBounds(Rect bounds) {
         super.getSourceVisualDragBounds(bounds);
         if (!mIsPinned) {
@@ -387,8 +402,9 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         PredictedAppIcon icon = (PredictedAppIcon) LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.predicted_app_icon, parent, false);
         icon.applyFromWorkspaceItem(info);
-        icon.setOnClickListener(ItemClickHandler.INSTANCE);
-        icon.setOnFocusChangeListener(Launcher.getLauncher(parent.getContext()).getFocusHandler());
+        Launcher launcher = Launcher.getLauncher(parent.getContext());
+        icon.setOnClickListener(launcher.getItemOnClickListener());
+        icon.setOnFocusChangeListener(launcher.getFocusHandler());
         return icon;
     }
 

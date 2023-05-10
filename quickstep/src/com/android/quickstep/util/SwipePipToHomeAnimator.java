@@ -37,6 +37,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.icons.IconProvider;
 import com.android.quickstep.TaskAnimationManager;
 import com.android.systemui.shared.pip.PipSurfaceTransactionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
@@ -93,6 +94,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
      * @param taskId Task id associated with this animator, see also {@link #getTaskId()}
      * @param activityInfo {@link ActivityInfo} associated with this animator,
      *                      see also {@link #getComponentName()}
+     * @param appIconSizePx The size in pixel for the app icon in content overlay
      * @param leash {@link SurfaceControl} this animator operates on
      * @param sourceRectHint See the definition in {@link android.app.PictureInPictureParams}
      * @param appBounds Bounds of the application, sourceRectHint is based on this bounds
@@ -110,6 +112,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
     private SwipePipToHomeAnimator(@NonNull Context context,
             int taskId,
             @NonNull ActivityInfo activityInfo,
+            int appIconSizePx,
             @NonNull SurfaceControl leash,
             @Nullable Rect sourceRectHint,
             @NonNull Rect appBounds,
@@ -121,7 +124,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             int cornerRadius,
             int shadowRadius,
             @NonNull View view) {
-        super(startBounds, new RectF(destinationBoundsTransformed), context, null);
+        super(new DefaultSpringConfig(context, null, startBounds,
+                new RectF(destinationBoundsTransformed)));
         mTaskId = taskId;
         mActivityInfo = activityInfo;
         mLeash = leash;
@@ -152,7 +156,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             if (SystemProperties.getBoolean(
                     "persist.wm.debug.enable_pip_app_icon_overlay", true)) {
                 mPipContentOverlay = new PipContentOverlay.PipAppIconOverlay(view.getContext(),
-                        mAppBounds, mActivityInfo);
+                        mAppBounds, new IconProvider(context).getIcon(mActivityInfo),
+                        appIconSizePx);
             }  else {
                 mPipContentOverlay = new PipContentOverlay.PipColorOverlay(view.getContext());
             }
@@ -316,6 +321,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         private Context mContext;
         private int mTaskId;
         private ActivityInfo mActivityInfo;
+        private int mAppIconSizePx;
         private SurfaceControl mLeash;
         private Rect mSourceRectHint;
         private Rect mDisplayCutoutInsets;
@@ -341,6 +347,11 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
         public Builder setActivityInfo(ActivityInfo activityInfo) {
             mActivityInfo = activityInfo;
+            return this;
+        }
+
+        public Builder setAppIconSizePx(int appIconSizePx) {
+            mAppIconSizePx = appIconSizePx;
             return this;
         }
 
@@ -424,8 +435,8 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
                     mAppBounds.inset(mDisplayCutoutInsets);
                 }
             }
-            return new SwipePipToHomeAnimator(mContext, mTaskId, mActivityInfo, mLeash,
-                    mSourceRectHint, mAppBounds,
+            return new SwipePipToHomeAnimator(mContext, mTaskId, mActivityInfo, mAppIconSizePx,
+                    mLeash, mSourceRectHint, mAppBounds,
                     mHomeToWindowPositionMap, mStartBounds, mDestinationBounds,
                     mFromRotation, mDestinationBoundsTransformed,
                     mCornerRadius, mShadowRadius, mAttachedView);

@@ -309,7 +309,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
         }
 
         @Override
-        public void updateFinalShift() {
+        public void onCurrentShiftUpdated() {
             mRemoteTargetHandles[0].getPlaybackController()
                     .setProgress(mCurrentShift.value, mDragLengthFactor);
             mRemoteTargetHandles[0].getTaskViewSimulator().apply(
@@ -354,7 +354,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
                     mFakeIconView.setVisibility(View.VISIBLE);
                     mFakeIconView.update(rect, progress,
                             1f - SHAPE_PROGRESS_DURATION /* shapeProgressStart */,
-                            radius, 255,
+                            radius,
                             false, /* isOpening */
                             mFakeIconView, mDp);
                     mFakeIconView.setAlpha(1);

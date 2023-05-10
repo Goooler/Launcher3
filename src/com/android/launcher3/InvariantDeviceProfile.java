@@ -26,8 +26,6 @@ import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUN
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.annotation.TargetApi;
-import android.appwidget.AppWidgetHostView;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -35,13 +33,11 @@ import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
 import android.graphics.Point;
 import android.graphics.PointF;
-import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SparseArray;
-import android.util.TypedValue;
 import android.util.Xml;
 import android.view.Display;
 
@@ -52,17 +48,16 @@ import androidx.annotation.VisibleForTesting;
 import androidx.annotation.XmlRes;
 import androidx.core.content.res.ResourcesCompat;
 
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
-import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Partner;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.WindowManagerProxy;
 
@@ -76,6 +71,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class InvariantDeviceProfile {
 
@@ -110,7 +106,7 @@ public class InvariantDeviceProfile {
     static final int INDEX_TWO_PANEL_PORTRAIT = 2;
     static final int INDEX_TWO_PANEL_LANDSCAPE = 3;
 
-    /** These resources are used to override the device profile  */
+    /** These resources are used to override the device profile */
     private static final String RES_GRID_NUM_ROWS = "grid_num_rows";
     private static final String RES_GRID_NUM_COLUMNS = "grid_num_columns";
     private static final String RES_GRID_ICON_SIZE_DP = "grid_icon_size_dp";
@@ -149,7 +145,9 @@ public class InvariantDeviceProfile {
     public float[] allAppsIconTextSize;
     public PointF[] allAppsBorderSpaces;
 
-    private SparseArray<TypedValue> mExtraAttrs;
+    public float[] transientTaskbarIconSize;
+
+    public boolean[] startAlignTaskbar;
 
     /**
      * Number of icons inside the hotseat area.
@@ -180,10 +178,12 @@ public class InvariantDeviceProfile {
     protected boolean isScalable;
     @XmlRes
     public int devicePaddingId = INVALID_RESOURCE_HANDLE;
+    @XmlRes
+    public int workspaceSpecsId = INVALID_RESOURCE_HANDLE;
 
     public String dbFile;
     public int defaultLayoutId;
-    int demoModeLayoutId;
+    public int demoModeLayoutId;
     public boolean[] inlineQsb = new boolean[COUNT_SIZES];
 
     /**
@@ -192,7 +192,6 @@ public class InvariantDeviceProfile {
     public List<DeviceProfile> supportedProfiles = Collections.EMPTY_LIST;
 
     public Point defaultWallpaperSize;
-    public Rect defaultWidgetPadding;
 
     private final ArrayList<OnIDPChangeListener> mChangeListeners = new ArrayList<>();
 
@@ -354,11 +353,10 @@ public class InvariantDeviceProfile {
 
         isScalable = closestProfile.isScalable;
         devicePaddingId = closestProfile.devicePaddingId;
+        workspaceSpecsId = closestProfile.mWorkspaceSpecsId;
         this.deviceType = deviceType;
 
         inlineNavButtonsEndSpacing = closestProfile.inlineNavButtonsEndSpacing;
-
-        mExtraAttrs = closestProfile.extraAttrs;
 
         iconSize = displayOption.iconSizes;
         float maxIconSize = iconSize[0];
@@ -395,6 +393,10 @@ public class InvariantDeviceProfile {
         allAppsIconTextSize = displayOption.allAppsIconTextSizes;
 
         inlineQsb = closestProfile.inlineQsb;
+
+        transientTaskbarIconSize = displayOption.transientTaskbarIconSize;
+
+        startAlignTaskbar = displayOption.startAlignTaskbar;
 
         // If the partner customization apk contains any grid overrides, apply them
         // Supported overrides: numRows, numColumns, iconSize
@@ -441,9 +443,6 @@ public class InvariantDeviceProfile {
                     deviceProfile.numShownHotseatIcons = numMinShownHotseatIconsForTablet;
                     deviceProfile.recalculateHotseatWidthAndBorderSpace();
                 });
-
-        ComponentName cn = new ComponentName(context.getPackageName(), getClass().getName());
-        defaultWidgetPadding = AppWidgetHostView.getDefaultPaddingForWidget(context, cn, null);
     }
 
     public void addOnChangeListener(OnIDPChangeListener listener) {
@@ -491,9 +490,8 @@ public class InvariantDeviceProfile {
                 if ((type == XmlPullParser.START_TAG)
                         && GridOption.TAG_NAME.equals(parser.getName())) {
 
-                    GridOption gridOption = new GridOption(context, Xml.asAttributeSet(parser),
-                            deviceType);
-                    if (gridOption.isEnabled || allowDisabledGrid) {
+                    GridOption gridOption = new GridOption(context, Xml.asAttributeSet(parser));
+                    if (gridOption.isEnabled(deviceType) || allowDisabledGrid) {
                         final int displayDepth = parser.getDepth();
                         while (((type = parser.next()) != XmlPullParser.END_TAG
                                 || parser.getDepth() > displayDepth)
@@ -515,7 +513,7 @@ public class InvariantDeviceProfile {
         if (!TextUtils.isEmpty(gridName)) {
             for (DisplayOption option : profiles) {
                 if (gridName.equals(option.grid.name)
-                        && (option.grid.isEnabled || allowDisabledGrid)) {
+                        && (option.grid.isEnabled(deviceType) || allowDisabledGrid)) {
                     filteredProfiles.add(option);
                 }
             }
@@ -538,6 +536,16 @@ public class InvariantDeviceProfile {
      * @return all the grid options that can be shown on the device
      */
     public List<GridOption> parseAllGridOptions(Context context) {
+        return parseAllDefinedGridOptions(context)
+                .stream()
+                .filter(go -> go.isEnabled(deviceType))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * @return all the grid options that can be shown on the device
+     */
+    public static List<GridOption> parseAllDefinedGridOptions(Context context) {
         List<GridOption> result = new ArrayList<>();
 
         try (XmlResourceParser parser = context.getResources().getXml(R.xml.device_profiles)) {
@@ -547,11 +555,7 @@ public class InvariantDeviceProfile {
                     || parser.getDepth() > depth) && type != XmlPullParser.END_DOCUMENT) {
                 if ((type == XmlPullParser.START_TAG)
                         && GridOption.TAG_NAME.equals(parser.getName())) {
-                    GridOption option =
-                            new GridOption(context, Xml.asAttributeSet(parser), deviceType);
-                    if (option.isEnabled) {
-                        result.add(option);
-                    }
+                    result.add(new GridOption(context, Xml.asAttributeSet(parser)));
                 }
             }
         } catch (IOException | XmlPullParserException e) {
@@ -770,7 +774,7 @@ public class InvariantDeviceProfile {
         public final int numRows;
         public final int numColumns;
         public final int numSearchContainerColumns;
-        public final boolean isEnabled;
+        public final int deviceCategory;
 
         private final int numFolderRows;
         private final int numFolderColumns;
@@ -795,10 +799,9 @@ public class InvariantDeviceProfile {
 
         private final boolean isScalable;
         private final int devicePaddingId;
+        private final int mWorkspaceSpecsId;
 
-        private final SparseArray<TypedValue> extraAttrs;
-
-        public GridOption(Context context, AttributeSet attrs, @DeviceType int deviceType) {
+        public GridOption(Context context, AttributeSet attrs) {
             TypedArray a = context.obtainStyledAttributes(
                     attrs, R.styleable.GridDisplayOption);
             name = a.getString(R.styleable.GridDisplayOption_name);
@@ -838,7 +841,7 @@ public class InvariantDeviceProfile {
 
             inlineNavButtonsEndSpacing =
                     a.getResourceId(R.styleable.GridDisplayOption_inlineNavButtonsEndSpacing,
-                    R.dimen.taskbar_button_margin_default);
+                            R.dimen.taskbar_button_margin_default);
 
             numFolderRows = a.getInt(
                     R.styleable.GridDisplayOption_numFolderRows, numRows);
@@ -855,16 +858,15 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_isScalable, false);
             devicePaddingId = a.getResourceId(
                     R.styleable.GridDisplayOption_devicePaddingId, INVALID_RESOURCE_HANDLE);
-
-            int deviceCategory = a.getInt(R.styleable.GridDisplayOption_deviceCategory,
+            deviceCategory = a.getInt(R.styleable.GridDisplayOption_deviceCategory,
                     DEVICE_CATEGORY_ALL);
-            isEnabled = (deviceType == TYPE_PHONE
-                        && ((deviceCategory & DEVICE_CATEGORY_PHONE) == DEVICE_CATEGORY_PHONE))
-                    || (deviceType == TYPE_TABLET
-                        && ((deviceCategory & DEVICE_CATEGORY_TABLET) == DEVICE_CATEGORY_TABLET))
-                    || (deviceType == TYPE_MULTI_DISPLAY
-                        && ((deviceCategory & DEVICE_CATEGORY_MULTI_DISPLAY)
-                            == DEVICE_CATEGORY_MULTI_DISPLAY));
+
+            if (FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE.get()) {
+                mWorkspaceSpecsId = a.getResourceId(
+                        R.styleable.GridDisplayOption_workspaceSpecsId, INVALID_RESOURCE_HANDLE);
+            } else {
+                mWorkspaceSpecsId = INVALID_RESOURCE_HANDLE;
+            }
 
             int inlineForRotation = a.getInt(R.styleable.GridDisplayOption_inlineQsb,
                     DONT_INLINE_QSB);
@@ -880,8 +882,20 @@ public class InvariantDeviceProfile {
                             == INLINE_QSB_FOR_TWO_PANEL_LANDSCAPE;
 
             a.recycle();
-            extraAttrs = Themes.createValueMap(context, attrs,
-                    IntArray.wrap(R.styleable.GridDisplayOption));
+        }
+
+        public boolean isEnabled(@DeviceType int deviceType) {
+            switch (deviceType) {
+                case TYPE_PHONE:
+                    return (deviceCategory & DEVICE_CATEGORY_PHONE) == DEVICE_CATEGORY_PHONE;
+                case TYPE_TABLET:
+                    return (deviceCategory & DEVICE_CATEGORY_TABLET) == DEVICE_CATEGORY_TABLET;
+                case TYPE_MULTI_DISPLAY:
+                    return (deviceCategory & DEVICE_CATEGORY_MULTI_DISPLAY)
+                            == DEVICE_CATEGORY_MULTI_DISPLAY;
+                default:
+                    return false;
+            }
         }
     }
 
@@ -908,8 +922,14 @@ public class InvariantDeviceProfile {
         private final float[] allAppsIconTextSizes = new float[COUNT_SIZES];
         private final PointF[] allAppsBorderSpaces = new PointF[COUNT_SIZES];
 
+        private final float[] transientTaskbarIconSize = new float[COUNT_SIZES];
+
+        private final boolean[] startAlignTaskbar = new boolean[COUNT_SIZES];
+
         DisplayOption(GridOption grid, Context context, AttributeSet attrs) {
             this.grid = grid;
+
+            Resources res = context.getResources();
 
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ProfileDisplayOption);
 
@@ -1101,8 +1121,7 @@ public class InvariantDeviceProfile {
 
             hotseatBarBottomSpace[INDEX_DEFAULT] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatBarBottomSpace,
-                    ResourcesCompat.getFloat(context.getResources(),
-                            R.dimen.hotseat_bar_bottom_space_default));
+                    ResourcesCompat.getFloat(res, R.dimen.hotseat_bar_bottom_space_default));
             hotseatBarBottomSpace[INDEX_LANDSCAPE] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatBarBottomSpaceLandscape,
                     hotseatBarBottomSpace[INDEX_DEFAULT]);
@@ -1115,8 +1134,7 @@ public class InvariantDeviceProfile {
 
             hotseatQsbSpace[INDEX_DEFAULT] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatQsbSpace,
-                    ResourcesCompat.getFloat(context.getResources(),
-                            R.dimen.hotseat_qsb_space_default));
+                    ResourcesCompat.getFloat(res, R.dimen.hotseat_qsb_space_default));
             hotseatQsbSpace[INDEX_LANDSCAPE] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatQsbSpaceLandscape,
                     hotseatQsbSpace[INDEX_DEFAULT]);
@@ -1126,6 +1144,31 @@ public class InvariantDeviceProfile {
             hotseatQsbSpace[INDEX_TWO_PANEL_PORTRAIT] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatQsbSpaceTwoPanelPortrait,
                     hotseatQsbSpace[INDEX_DEFAULT]);
+
+            transientTaskbarIconSize[INDEX_DEFAULT] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_transientTaskbarIconSize,
+                    ResourcesCompat.getFloat(res, R.dimen.taskbar_icon_size));
+            transientTaskbarIconSize[INDEX_LANDSCAPE] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_transientTaskbarIconSizeLandscape,
+                    transientTaskbarIconSize[INDEX_DEFAULT]);
+            transientTaskbarIconSize[INDEX_TWO_PANEL_LANDSCAPE] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_transientTaskbarIconSizeTwoPanelLandscape,
+                    transientTaskbarIconSize[INDEX_DEFAULT]);
+            transientTaskbarIconSize[INDEX_TWO_PANEL_PORTRAIT] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_transientTaskbarIconSizeTwoPanelPortrait,
+                    transientTaskbarIconSize[INDEX_DEFAULT]);
+
+            startAlignTaskbar[INDEX_DEFAULT] = a.getBoolean(
+                    R.styleable.ProfileDisplayOption_startAlignTaskbar, false);
+            startAlignTaskbar[INDEX_LANDSCAPE] = a.getBoolean(
+                    R.styleable.ProfileDisplayOption_startAlignTaskbarLandscape,
+                    startAlignTaskbar[INDEX_DEFAULT]);
+            startAlignTaskbar[INDEX_TWO_PANEL_LANDSCAPE] = a.getBoolean(
+                    R.styleable.ProfileDisplayOption_startAlignTaskbarTwoPanelLandscape,
+                    startAlignTaskbar[INDEX_LANDSCAPE]);
+            startAlignTaskbar[INDEX_TWO_PANEL_PORTRAIT] = a.getBoolean(
+                    R.styleable.ProfileDisplayOption_startAlignTaskbarTwoPanelPortrait,
+                    startAlignTaskbar[INDEX_DEFAULT]);
 
             a.recycle();
         }
@@ -1148,6 +1191,8 @@ public class InvariantDeviceProfile {
                 allAppsIconSizes[i] = 0;
                 allAppsIconTextSizes[i] = 0;
                 allAppsBorderSpaces[i] = new PointF();
+                transientTaskbarIconSize[i] = 0;
+                startAlignTaskbar[i] = false;
             }
         }
 
@@ -1168,6 +1213,7 @@ public class InvariantDeviceProfile {
                 allAppsIconTextSizes[i] *= w;
                 allAppsBorderSpaces[i].x *= w;
                 allAppsBorderSpaces[i].y *= w;
+                transientTaskbarIconSize[i] *= w;
             }
 
             return this;
@@ -1190,6 +1236,8 @@ public class InvariantDeviceProfile {
                 allAppsIconTextSizes[i] += p.allAppsIconTextSizes[i];
                 allAppsBorderSpaces[i].x += p.allAppsBorderSpaces[i].x;
                 allAppsBorderSpaces[i].y += p.allAppsBorderSpaces[i].y;
+                transientTaskbarIconSize[i] += p.transientTaskbarIconSize[i];
+                startAlignTaskbar[i] |= p.startAlignTaskbar[i];
             }
 
             return this;

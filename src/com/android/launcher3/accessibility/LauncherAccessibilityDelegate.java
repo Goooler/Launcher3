@@ -174,7 +174,7 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
             mContext.getDragLayer().getDescendantRectRelativeToSelf(host, pos);
             ArrowPopup popup = OptionsPopupView.show(mContext, new RectF(pos), actions, false);
             popup.requestFocus();
-            popup.setOnCloseCallback(() -> {
+            popup.addOnCloseCallback(() -> {
                 host.requestFocus();
                 host.sendAccessibilityEvent(TYPE_VIEW_FOCUSED);
                 host.performAccessibilityAction(ACTION_ACCESSIBILITY_FOCUS, null);
@@ -408,6 +408,14 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                         LauncherSettings.Favorites.CONTAINER_DESKTOP,
                         screenId, coordinates[0], coordinates[1]);
                 mContext.bindItems(Collections.singletonList(info), true, accessibility);
+            } else if (item instanceof FolderInfo fi) {
+                mContext.getModelWriter().addItemToDatabase(fi,
+                        LauncherSettings.Favorites.CONTAINER_DESKTOP, screenId, coordinates[0],
+                        coordinates[1]);
+                fi.contents.forEach(member -> {
+                    mContext.getModelWriter().addItemToDatabase(member, fi.id, -1, -1, -1);
+                });
+                mContext.bindItems(Collections.singletonList(fi), true, accessibility);
             }
         }));
         return true;

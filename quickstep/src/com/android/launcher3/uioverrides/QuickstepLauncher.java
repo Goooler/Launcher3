@@ -40,6 +40,9 @@ import static com.android.launcher3.config.FeatureFlags.RECEIVE_UNFOLD_EVENTS_FR
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.popup.QuickstepSystemShortcut.getSplitSelectShortcutByPosition;
+import static com.android.launcher3.popup.SystemShortcut.APP_INFO;
+import static com.android.launcher3.popup.SystemShortcut.INSTALL;
+import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.ALL_APPS_PAGE_PROGRESS_INDEX;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.MINUS_ONE_PAGE_PROGRESS_INDEX;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.WIDGETS_PAGE_PROGRESS_INDEX;
@@ -71,6 +74,7 @@ import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.display.DisplayManager;
 import android.media.permission.SafeCloseable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.IBinder;
@@ -80,7 +84,6 @@ import android.view.Display;
 import android.view.HapticFeedbackConstants;
 import android.view.RemoteAnimationTarget;
 import android.view.View;
-import android.view.WindowManagerGlobal;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedDispatcher;
@@ -89,6 +92,7 @@ import android.window.SplashScreen;
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.android.app.viewcapture.SettingsAwareViewCapture;
 import com.android.launcher3.AbstractFloatingView;
@@ -96,7 +100,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.OnBackPressedHandler;
 import com.android.launcher3.QuickstepAccessibilityDelegate;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
@@ -186,6 +189,8 @@ import com.android.systemui.unfold.updates.RotationChangeProvider;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -194,7 +199,7 @@ import java.util.stream.Stream;
 public class QuickstepLauncher extends Launcher {
 
     public static final boolean ENABLE_PIP_KEEP_CLEAR_ALGORITHM =
-            SystemProperties.getBoolean("persist.wm.debug.enable_pip_keep_clear_algorithm", false);
+            SystemProperties.getBoolean("persist.wm.debug.enable_pip_keep_clear_algorithm", true);
 
     public static final boolean GO_LOW_RAM_RECENTS_ENABLED = false;
 
@@ -313,6 +318,12 @@ public class QuickstepLauncher extends Launcher {
         return mHotseatPredictionController;
     }
 
+    @Override
+    public void enableHotseatEdu(boolean enable) {
+        super.enableHotseatEdu(enable);
+        mHotseatPredictionController.enableHotseatEdu(enable);
+    }
+
     /**
      * Builds the {@link QuickstepTransitionManager} instance to use for managing transitions.
      */
@@ -385,22 +396,30 @@ public class QuickstepLauncher extends Launcher {
 
     @Override
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
-        Stream<SystemShortcut.Factory> base = Stream.of(WellbeingModel.SHORTCUT_FACTORY);
-        if (ENABLE_SPLIT_FROM_WORKSPACE.get() && mDeviceProfile.isTablet) {
-            RecentsView recentsView = getOverviewPanel();
-            // TODO(b/266482558): Pull it out of PagedOrentationHandler for split from workspace.
-            List<SplitPositionOption> positions =
-                    recentsView.getPagedOrientationHandler().getSplitPositionOptions(
-                            mDeviceProfile);
-            List<SystemShortcut.Factory<QuickstepLauncher>> splitShortcuts = new ArrayList<>();
-            for (SplitPositionOption position : positions) {
-                splitShortcuts.add(getSplitSelectShortcutByPosition(position));
-            }
-            base = Stream.concat(base, splitShortcuts.stream());
+        // Order matters as it affects order of appearance in popup container
+        List<SystemShortcut.Factory> shortcuts = new ArrayList(Arrays.asList(
+                APP_INFO, WellbeingModel.SHORTCUT_FACTORY, mHotseatPredictionController));
+        shortcuts.addAll(getSplitShortcuts());
+        shortcuts.add(WIDGETS);
+        shortcuts.add(INSTALL);
+        return shortcuts.stream();
+    }
+
+    private List<SystemShortcut.Factory<QuickstepLauncher>> getSplitShortcuts() {
+
+        if (!ENABLE_SPLIT_FROM_WORKSPACE.get() || !mDeviceProfile.isTablet) {
+            return Collections.emptyList();
         }
-        return Stream.concat(
-                Stream.of(mHotseatPredictionController),
-                Stream.concat(base, super.getSupportedShortcuts()));
+        RecentsView recentsView = getOverviewPanel();
+        // TODO(b/266482558): Pull it out of PagedOrentationHandler for split from workspace.
+        List<SplitPositionOption> positions =
+                recentsView.getPagedOrientationHandler().getSplitPositionOptions(
+                        mDeviceProfile);
+        List<SystemShortcut.Factory<QuickstepLauncher>> splitShortcuts = new ArrayList<>();
+        for (SplitPositionOption position : positions) {
+            splitShortcuts.add(getSplitSelectShortcutByPosition(position));
+        }
+        return splitShortcuts;
     }
 
     /**
@@ -408,15 +427,18 @@ public class QuickstepLauncher extends Launcher {
      */
     private void onStateOrResumeChanging(boolean inTransition) {
         LauncherState state = getStateManager().getState();
-        if (!ENABLE_PIP_KEEP_CLEAR_ALGORITHM) {
-            boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
-            if (started) {
-                DeviceProfile profile = getDeviceProfile();
-                boolean willUserBeActive =
-                        (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
-                boolean visible = (state == NORMAL || state == OVERVIEW)
-                        && (willUserBeActive || isUserActive())
-                        && !profile.isVerticalBarLayout();
+        boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
+        if (started) {
+            DeviceProfile profile = getDeviceProfile();
+            boolean willUserBeActive =
+                    (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
+            boolean visible = (state == NORMAL || state == OVERVIEW)
+                    && (willUserBeActive || isUserActive())
+                    && !profile.isVerticalBarLayout();
+            if (ENABLE_PIP_KEEP_CLEAR_ALGORITHM)  {
+                SystemUiProxy.INSTANCE.get(this)
+                        .setLauncherKeepClearAreaHeight(visible, profile.hotseatBarSizePx);
+            } else {
                 SystemUiProxy.INSTANCE.get(this).setShelfHeight(visible, profile.hotseatBarSizePx);
             }
         }
@@ -621,7 +643,7 @@ public class QuickstepLauncher extends Launcher {
         PendingAnimation anim = new PendingAnimation(TABLET_HOME_TO_SPLIT.getDuration());
         RectF startingTaskRect = new RectF();
         final FloatingTaskView floatingTaskView = FloatingTaskView.getFloatingTaskView(this,
-                source.view, null /* thumbnail */, source.drawable, startingTaskRect);
+                source.getView(), null /* thumbnail */, source.getDrawable(), startingTaskRect);
         floatingTaskView.setAlpha(1);
         floatingTaskView.addStagingAnimation(anim, startingTaskRect, tempRect,
                 false /* fadeWithThumbnail */, true /* isStagedTask */);
@@ -725,52 +747,59 @@ public class QuickstepLauncher extends Launcher {
 
     @Override
     protected void registerBackDispatcher() {
+        if (!FeatureFlags.ENABLE_BACK_SWIPE_LAUNCHER_ANIMATION.get()) {
+            super.registerBackDispatcher();
+            return;
+        }
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT,
                 new OnBackAnimationCallback() {
 
-                    @Nullable OnBackPressedHandler mActiveOnBackPressedHandler;
+                    @Nullable OnBackAnimationCallback mActiveOnBackAnimationCallback;
 
                     @Override
                     public void onBackStarted(@NonNull BackEvent backEvent) {
-                        if (mActiveOnBackPressedHandler != null) {
-                            mActiveOnBackPressedHandler.onBackCancelled();
+                        if (mActiveOnBackAnimationCallback != null) {
+                            mActiveOnBackAnimationCallback.onBackCancelled();
                         }
-                        mActiveOnBackPressedHandler = getOnBackPressedHandler();
-                        mActiveOnBackPressedHandler.onBackStarted();
+                        mActiveOnBackAnimationCallback = getOnBackAnimationCallback();
+                        mActiveOnBackAnimationCallback.onBackStarted(backEvent);
                     }
 
+                    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                     @Override
                     public void onBackInvoked() {
-                        // Recreate mActiveOnBackPressedHandler if necessary to avoid NPE because:
+                        // Recreate mActiveOnBackAnimationCallback if necessary to avoid NPE
+                        // because:
                         // 1. b/260636433: In 3-button-navigation mode, onBackStarted() is not
                         // called on ACTION_DOWN before onBackInvoked() is called in ACTION_UP.
                         // 2. Launcher#onBackPressed() will call onBackInvoked() without calling
                         // onBackInvoked() beforehand.
-                        if (mActiveOnBackPressedHandler == null) {
-                            mActiveOnBackPressedHandler = getOnBackPressedHandler();
+                        if (mActiveOnBackAnimationCallback == null) {
+                            mActiveOnBackAnimationCallback = getOnBackAnimationCallback();
                         }
-                        mActiveOnBackPressedHandler.onBackInvoked();
-                        mActiveOnBackPressedHandler = null;
+                        mActiveOnBackAnimationCallback.onBackInvoked();
+                        mActiveOnBackAnimationCallback = null;
                         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onBackInvoked");
                     }
 
                     @Override
                     public void onBackProgressed(@NonNull BackEvent backEvent) {
-                        if (!FeatureFlags.IS_STUDIO_BUILD && mActiveOnBackPressedHandler == null) {
+                        if (!FeatureFlags.IS_STUDIO_BUILD
+                                && mActiveOnBackAnimationCallback == null) {
                             return;
                         }
-                        mActiveOnBackPressedHandler
-                                .onBackProgressed(backEvent.getProgress());
+                        mActiveOnBackAnimationCallback.onBackProgressed(backEvent);
                     }
 
                     @Override
                     public void onBackCancelled() {
-                        if (!FeatureFlags.IS_STUDIO_BUILD && mActiveOnBackPressedHandler == null) {
+                        if (!FeatureFlags.IS_STUDIO_BUILD
+                                && mActiveOnBackAnimationCallback == null) {
                             return;
                         }
-                        mActiveOnBackPressedHandler.onBackCancelled();
-                        mActiveOnBackPressedHandler = null;
+                        mActiveOnBackAnimationCallback.onBackCancelled();
+                        mActiveOnBackAnimationCallback = null;
                     }
                 });
     }
@@ -944,8 +973,8 @@ public class QuickstepLauncher extends Launcher {
         return mTaskbarUIController;
     }
 
-    public SplitSelectStateController getSplitSelectStateController() {
-        return mSplitSelectStateController;
+    public SplitToWorkspaceController getSplitToWorkspaceController() {
+        return mSplitToWorkspaceController;
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -1034,7 +1063,8 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks) {
+    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks,
+            int workspaceItemCount, boolean isBindSync) {
         pendingTasks.add(() -> {
             // This is added in pending task as we need to wait for views to be positioned
             // correctly before registering them for the animation.
@@ -1044,7 +1074,7 @@ public class QuickstepLauncher extends Launcher {
                 mLauncherUnfoldAnimationController.updateRegisteredViewsIfNeeded();
             }
         });
-        super.onInitialBindComplete(boundPages, pendingTasks);
+        super.onInitialBindComplete(boundPages, pendingTasks, workspaceItemCount, isBindSync);
     }
 
     @Override
@@ -1153,6 +1183,11 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
+    public void tryClearAccessibilityFocus(View view) {
+        view.clearAccessibilityFocus();
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
@@ -1208,10 +1243,20 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
+    protected void onDeviceProfileInitiated() {
+        super.onDeviceProfileInitiated();
+        SystemUiProxy.INSTANCE.get(this).setLauncherAppIconSize(mDeviceProfile.iconSizePx);
+    }
+
+    @Override
     public void dispatchDeviceProfileChanged() {
         super.dispatchDeviceProfileChanged();
         Trace.instantForTrack(TRACE_TAG_APP, "QuickstepLauncher#DeviceProfileChanged",
                 getDeviceProfile().toSmallString());
+        SystemUiProxy.INSTANCE.get(this).setLauncherAppIconSize(mDeviceProfile.iconSizePx);
+        if (mTaskbarManager != null) {
+            mTaskbarManager.debugWhyTaskbarNotDestroyed("QuickstepLauncher#onDeviceProfileChanged");
+        }
     }
 
     /**
@@ -1273,5 +1318,8 @@ public class QuickstepLauncher extends Launcher {
         writer.println("\nQuickstepLauncher:");
         writer.println(prefix + "\tmOrientationState: " + (recentsView == null ? "recentsNull" :
                 recentsView.getPagedViewOrientedState()));
+        if (recentsView != null) {
+            recentsView.getSplitSelectController().dump(prefix, writer);
+        }
     }
 }

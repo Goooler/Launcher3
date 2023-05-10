@@ -50,6 +50,7 @@ import com.android.launcher3.model.CacheDataUpdatedTask;
 import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.model.LauncherBinder;
 import com.android.launcher3.model.LoaderTask;
+import com.android.launcher3.model.ModelDbController;
 import com.android.launcher3.model.ModelDelegate;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.PackageIncrementalDownloadUpdatedTask;
@@ -93,6 +94,8 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
 
     @NonNull
     private final LauncherAppState mApp;
+    @NonNull
+    private final ModelDbController mModelDbController;
     @NonNull
     private final Object mLock = new Object();
     @Nullable
@@ -143,6 +146,7 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
             @NonNull final IconCache iconCache, @NonNull final AppFilter appFilter,
             final boolean isPrimaryInstance) {
         mApp = app;
+        mModelDbController = new ModelDbController(context);
         mBgAllAppsList = new AllAppsList(iconCache, appFilter);
         mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel,
                 isPrimaryInstance);
@@ -151,6 +155,10 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     @NonNull
     public ModelDelegate getModelDelegate() {
         return mModelDelegate;
+    }
+
+    public ModelDbController getModelDbController() {
+        return mModelDbController;
     }
 
     /**
@@ -285,6 +293,10 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action) ||
                 Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
             UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
+            if (TestProtocol.sDebugTracing) {
+                Log.d(TestProtocol.WORK_TAB_MISSING, "onBroadcastIntent intentAction: " + action +
+                        " user: " + user);
+            }
             if (user != null) {
                 if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE.equals(action) ||
                         Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action)) {
@@ -371,12 +383,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     public void addCallbacks(@NonNull final Callbacks callbacks) {
         Preconditions.assertUIThread();
         synchronized (mCallbacksList) {
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.NULL_INT_SET, "addCallbacks pointer: "
-                        + callbacks
-                        + ", name: "
-                        + callbacks.getClass().getName(), new Exception());
-            }
             mCallbacksList.add(callbacks);
         }
     }
@@ -411,12 +417,15 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                 if (bindDirectly) {
                     // Divide the set of loaded items into those that we are binding synchronously,
                     // and everything else that is to be bound normally (asynchronously).
-                    launcherBinder.bindWorkspace(bindAllCallbacks);
+                    launcherBinder.bindWorkspace(bindAllCallbacks, /* isBindSync= */ true);
                     // For now, continue posting the binding of AllApps as there are other
                     // issues that arise from that.
                     launcherBinder.bindAllApps();
                     launcherBinder.bindDeepShortcuts();
                     launcherBinder.bindWidgets();
+                    if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
+                        mModelDelegate.bindAllModelExtras(callbacksList);
+                    }
                     return true;
                 } else {
                     stopLoader();

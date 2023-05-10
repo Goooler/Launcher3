@@ -48,6 +48,7 @@ public class ViewOnDrawExecutor implements OnDrawListener, Runnable,
     public void attachTo(Launcher launcher) {
         mOnClearCallback = launcher::clearPendingExecutor;
         mAttachedView = launcher.getWorkspace();
+
         mAttachedView.addOnAttachStateChangeListener(this);
 
         if (mAttachedView.isAttachedToWindow()) {

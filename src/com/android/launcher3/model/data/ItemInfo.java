@@ -90,6 +90,7 @@ public class ItemInfo {
      * {@link Favorites#ITEM_TYPE_SHORTCUT},
      * {@link Favorites#ITEM_TYPE_DEEP_SHORTCUT}
      * {@link Favorites#ITEM_TYPE_FOLDER},
+     * {@link Favorites#ITEM_TYPE_APP_PAIR},
      * {@link Favorites#ITEM_TYPE_APPWIDGET} or
      * {@link Favorites#ITEM_TYPE_CUSTOM_APPWIDGET}.
      */
@@ -304,6 +305,13 @@ public class ItemInfo {
      */
     public boolean isPredictedItem() {
         return container == CONTAINER_HOTSEAT_PREDICTION || container == CONTAINER_PREDICTION;
+    }
+
+    /**
+     * Returns if an Item is in the hotseat.
+     */
+    public boolean isInHotseat() {
+        return container == CONTAINER_HOTSEAT || container == CONTAINER_HOTSEAT_PREDICTION;
     }
 
     /**

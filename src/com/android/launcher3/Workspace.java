@@ -25,6 +25,7 @@ import static com.android.launcher3.LauncherState.FLAG_WORKSPACE_INACCESSIBLE;
 import static com.android.launcher3.LauncherState.HINT_STATE;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -951,10 +952,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return mScreenOrder;
     }
 
-    protected View getFirstPagePinnedItem() {
-        return mFirstPagePinnedItem;
-    }
-
     /**
      * Returns the screen ID of a page that is shown together with the given page screen ID when the
      * two panel UI is enabled.
@@ -1062,6 +1059,29 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         if (pageShift >= 0) {
             setCurrentPage(currentPage - pageShift);
         }
+    }
+
+    /**
+     * Needed here because launcher has a fullscreen exclusion rect and doesn't pilfer the pointers.
+     */
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (isTrackpadMultiFingerSwipe(ev)) {
+            return false;
+        }
+        return super.onInterceptTouchEvent(ev);
+    }
+
+    /**
+     * Needed here because launcher has a fullscreen exclusion rect and doesn't pilfer the pointers.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        if (isTrackpadMultiFingerSwipe(ev)) {
+            return false;
+        }
+        return super.onTouchEvent(ev);
     }
 
     /**
@@ -2892,9 +2912,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         Rect r = estimateItemPosition(layout, targetCell[0], targetCell[1], spanX, spanY);
         if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET) {
             DeviceProfile profile = mLauncher.getDeviceProfile();
-            if (profile.shouldInsetWidgets() && finalView instanceof NavigableAppWidgetHostView) {
-                Rect widgetPadding = new Rect();
-                ((NavigableAppWidgetHostView) finalView).getWidgetInset(profile, widgetPadding);
+            if (finalView instanceof NavigableAppWidgetHostView) {
+                Rect widgetPadding = profile.widgetPadding;
                 r.left -= widgetPadding.left;
                 r.right += widgetPadding.right;
                 r.top -= widgetPadding.top;
