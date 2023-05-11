@@ -51,16 +51,17 @@ import com.android.launcher3.tapl.Folder;
 import com.android.launcher3.tapl.FolderIcon;
 import com.android.launcher3.tapl.HomeAllApps;
 import com.android.launcher3.tapl.HomeAppIcon;
-import com.android.launcher3.tapl.HomeAppIconMenu;
 import com.android.launcher3.tapl.HomeAppIconMenuItem;
 import com.android.launcher3.tapl.Widgets;
 import com.android.launcher3.tapl.Workspace;
+import com.android.launcher3.util.LauncherLayoutBuilder;
 import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.TISBindRule;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 import com.android.launcher3.widget.picker.WidgetsRecyclerView;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -84,6 +85,8 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Rule
     public TISBindRule mTISBindRule = new TISBindRule();
 
+    private AutoCloseable mLauncherLayout;
+
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -100,6 +103,13 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         // Check that we switched to home.
         test.mLauncher.getWorkspace();
         AbstractLauncherUiTest.checkDetectedLeaks(test.mLauncher);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        if (mLauncherLayout != null) {
+            mLauncherLayout.close();
+        }
     }
 
     // Please don't add negative test cases for methods that fail only after a long wait.
@@ -231,8 +241,10 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
-        // Make sure there is an instance of chrome on the hotseat
-        mLauncher.useTaplWorkspaceLayoutOnReload();
+        // Set workspace  that includes the chrome Activity app icon on the hotseat.
+        LauncherLayoutBuilder builder = new LauncherLayoutBuilder()
+                .atHotseat(0).putApp("com.android.chrome", "com.google.android.apps.chrome.Main");
+        mLauncherLayout = TestUtil.setLauncherDefaultLayout(mTargetContext, builder);
         clearLauncherData();
 
         final Workspace workspace = mLauncher.getWorkspace();
@@ -391,23 +403,14 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 .switchToAllApps();
         allApps.freeze();
         try {
-            final HomeAppIconMenu menu = allApps
+            final HomeAppIconMenuItem menuItem = allApps
                     .getAppIcon(APP_NAME)
-                    .openDeepShortcutMenu();
-            final HomeAppIconMenuItem menuItem0 = menu.getMenuItem(0);
-            final HomeAppIconMenuItem menuItem2 = menu.getMenuItem(2);
+                    .openDeepShortcutMenu()
+                    .getMenuItem(0);
+            final String actualShortcutName = menuItem.getText();
+            final String expectedShortcutName = "Shortcut 1";
 
-            final HomeAppIconMenuItem menuItem;
-
-            final String expectedShortcutName = "Shortcut 3";
-            if (menuItem0.getText().equals(expectedShortcutName)) {
-                menuItem = menuItem0;
-            } else {
-                final String shortcutName2 = menuItem2.getText();
-                assertEquals("Wrong menu item", expectedShortcutName, shortcutName2);
-                menuItem = menuItem2;
-            }
-
+            assertEquals(expectedShortcutName, actualShortcutName);
             menuItem.dragToWorkspace(false, false);
             mLauncher.getWorkspace().getWorkspaceAppIcon(expectedShortcutName)
                     .launch(getAppPackageName());
@@ -519,6 +522,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     }
 
     @Test
+    @ScreenRecord // b/258071914
     @PortraitLandscape
     public void testUninstallFromAllApps() throws Exception {
         installDummyAppAndWaitForUIUpdate();

@@ -81,20 +81,22 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
     @Override
     protected int getGestureLottieAnimationId() {
         return mTutorialFragment.isLargeScreen()
-                ? R.raw.overview_gesture_tutorial_tablet_animation
+                ? mTutorialFragment.isFoldable()
+                    ? R.raw.overview_gesture_tutorial_open_foldable_animation
+                    : R.raw.overview_gesture_tutorial_tablet_animation
                 : R.raw.overview_gesture_tutorial_animation;
     }
 
     @Override
     protected int getSwipeActionColorResId() {
-        return ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
-                ? R.color.gesture_overview_background
-                : R.color.gesture_overview_tutorial_swipe_rect;
+        return R.color.gesture_overview_background;
     }
 
     @Override
     protected int getMockPreviousAppTaskThumbnailColorResId() {
-        return R.color.gesture_overview_tutorial_swipe_rect;
+        return ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
+            ? R.color.gesture_overview_tutorial_swipe_rect
+            : R.color.gesture_tutorial_fake_previous_task_view_color;
     }
 
     @Override

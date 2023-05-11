@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.taskbar
 
-import android.graphics.PorterDuff.Mode.SRC_ATOP
-import android.graphics.PorterDuffColorFilter
 import android.os.Bundle
 import android.view.View
 import android.view.View.GONE
@@ -27,15 +25,13 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.annotation.IntDef
 import androidx.annotation.LayoutRes
 import com.airbnb.lottie.LottieAnimationView
-import com.airbnb.lottie.LottieProperty.COLOR_FILTER
-import com.airbnb.lottie.model.KeyPath
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_EDU_TOOLTIP
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_EDU_OPEN
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP
+import com.android.quickstep.util.LottieAnimationColorUtils
 import java.io.PrintWriter
 
 /** First EDU step for swiping up to show transient Taskbar. */
@@ -59,7 +55,7 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
     LoggableTaskbarController {
 
     private val isTooltipEnabled: Boolean
-        get() = !Utilities.isRunningInTestHarness() && ENABLE_TASKBAR_EDU_TOOLTIP.get()
+        get() = !Utilities.isRunningInTestHarness()
     private val isOpen: Boolean
         get() = tooltip?.isOpen ?: false
     val isBeforeTooltipFeaturesStep: Boolean
@@ -240,11 +236,5 @@ private fun LottieAnimationView.supportLightTheme() {
         return
     }
 
-    addLottieOnCompositionLoadedListener {
-        DARK_TO_LIGHT_COLORS.forEach { (key, color) ->
-            addValueCallback(KeyPath("**", key, "**"), COLOR_FILTER) {
-                PorterDuffColorFilter(context.getColor(color), SRC_ATOP)
-            }
-        }
-    }
+    LottieAnimationColorUtils.updateColors(this, DARK_TO_LIGHT_COLORS, context.theme)
 }

@@ -118,7 +118,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     private final AlertDialog mSkipTutorialDialog;
 
     private boolean mGestureCompleted = false;
-    private LottieAnimationView mAnimatedGestureDemonstration;
+    protected LottieAnimationView mAnimatedGestureDemonstration;
     private LottieAnimationView mCheckmarkAnimation;
     private RelativeLayout mFullGestureDemonstration;
 
@@ -233,13 +233,19 @@ abstract class TutorialController implements BackGestureAttemptCallback,
 
     @LayoutRes
     protected int getMockHotseatResId() {
-        return mTutorialFragment.isLargeScreen()
-                ? (mTutorialFragment.isFoldable()
+        if (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
+            return mTutorialFragment.isLargeScreen()
+                    ? mTutorialFragment.isFoldable()
+                        ? R.layout.redesigned_gesture_tutorial_foldable_mock_hotseat
+                        : R.layout.redesigned_gesture_tutorial_tablet_mock_hotseat
+                    : R.layout.redesigned_gesture_tutorial_mock_hotseat;
+        } else {
+            return mTutorialFragment.isLargeScreen()
+                    ? mTutorialFragment.isFoldable()
                         ? R.layout.gesture_tutorial_foldable_mock_hotseat
-                        : R.layout.gesture_tutorial_tablet_mock_hotseat)
-                : (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
-                        ? R.layout.redesigned_gesture_tutorial_mock_hotseat
-                        : R.layout.gesture_tutorial_mock_hotseat);
+                        : R.layout.gesture_tutorial_tablet_mock_hotseat
+                    : R.layout.gesture_tutorial_mock_hotseat;
+        }
     }
 
     @LayoutRes
@@ -547,7 +553,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     protected void resetViewsForBackGesture() {
         mFakeTaskView.setVisibility(View.VISIBLE);
         mFakeTaskView.setBackgroundColor(
-                mContext.getColor(R.color.gesture_back_tutorial_background));
+                mContext.getColor(R.color.gesture_tutorial_workspace_background));
         mExitingAppView.setVisibility(View.VISIBLE);
 
         // reset the exiting app's dimensions

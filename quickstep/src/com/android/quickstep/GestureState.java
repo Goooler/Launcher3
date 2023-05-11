@@ -15,11 +15,16 @@
  */
 package com.android.quickstep;
 
+import static com.android.launcher3.MotionEventsUtils.isTrackpadFourFingerSwipe;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadThreeFingerSwipe;
+import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAPPS;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_ALL_APPS;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_HOME;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_NEW_TASK;
 
@@ -27,6 +32,7 @@ import android.annotation.Nullable;
 import android.annotation.TargetApi;
 import android.content.Intent;
 import android.os.Build;
+import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 
 import com.android.launcher3.statemanager.BaseState;
@@ -64,7 +70,9 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
                 GestureStateProto.GestureEndTarget.NEW_TASK),
 
         LAST_TASK(false, LAUNCHER_STATE_BACKGROUND, true,
-                GestureStateProto.GestureEndTarget.LAST_TASK);
+                GestureStateProto.GestureEndTarget.LAST_TASK),
+
+        ALL_APPS(true, LAUNCHER_STATE_ALLAPPS, false, GestureStateProto.GestureEndTarget.ALL_APPS);
 
         GestureEndTarget(boolean isLauncher, int containerType, boolean recentsAttachedToAppWindow,
                 GestureStateProto.GestureEndTarget protoEndTarget) {
@@ -139,8 +147,30 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     private final BaseActivityInterface mActivityInterface;
     private final MultiStateCallback mStateCallback;
     private final int mGestureId;
-    private boolean mIsTrackpadGesture;
 
+    public enum TrackpadGestureType {
+        NONE,
+        // Assigned before we know whether it's a 3-finger or 4-finger gesture.
+        MULTI_FINGER,
+        THREE_FINGER,
+        FOUR_FINGER;
+
+        public static TrackpadGestureType getTrackpadGestureType(MotionEvent event) {
+            if (!isTrackpadMultiFingerSwipe(event)) {
+                return TrackpadGestureType.NONE;
+            }
+            if (isTrackpadThreeFingerSwipe(event)) {
+                return TrackpadGestureType.THREE_FINGER;
+            }
+            if (isTrackpadFourFingerSwipe(event)) {
+                return TrackpadGestureType.FOUR_FINGER;
+            }
+
+            return TrackpadGestureType.MULTI_FINGER;
+        }
+    }
+
+    private TrackpadGestureType mTrackpadGestureType = TrackpadGestureType.NONE;
     private CachedTaskInfo mRunningTask;
     private GestureEndTarget mEndTarget;
     private RemoteAnimationTarget mLastAppearedTaskTarget;
@@ -249,17 +279,22 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     }
 
     /**
-     * Sets if the gesture is is from the trackpad.
+     * Sets if the gesture is is from the trackpad, if so, whether 3-finger, or 4-finger
      */
-    public void setIsTrackpadGesture(boolean isTrackpadGesture) {
-        mIsTrackpadGesture = isTrackpadGesture;
+    public void setTrackpadGestureType(TrackpadGestureType trackpadGestureType) {
+        mTrackpadGestureType = trackpadGestureType;
     }
 
-    /**
-     * @return if the gesture is from the trackpad.
-     */
     public boolean isTrackpadGesture() {
-        return mIsTrackpadGesture;
+        return mTrackpadGestureType != TrackpadGestureType.NONE;
+    }
+
+    public boolean isThreeFingerTrackpadGesture() {
+        return mTrackpadGestureType == TrackpadGestureType.THREE_FINGER;
+    }
+
+    public boolean isFourFingerTrackpadGesture() {
+        return mTrackpadGestureType == TrackpadGestureType.FOUR_FINGER;
     }
 
     /**
@@ -353,6 +388,9 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
                 break;
             case NEW_TASK:
                 ActiveGestureLog.INSTANCE.trackEvent(SET_END_TARGET_NEW_TASK);
+                break;
+            case ALL_APPS:
+                ActiveGestureLog.INSTANCE.trackEvent(SET_END_TARGET_ALL_APPS);
                 break;
             case LAST_TASK:
             case RECENTS:

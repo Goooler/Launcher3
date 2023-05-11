@@ -241,10 +241,6 @@
     <!-- ******* Taskbar Edu ******* -->
     <!-- Accessibility title for the Taskbar education window. [CHAR_LIMIT=NONE] -->
     <string name="taskbar_edu_a11y_title">Taskbar education</string>
-    <!-- Accessibility text spoken when the Taskbar education panel appears [CHAR_LIMIT=NONE] -->
-    <string name="taskbar_edu_opened">Taskbar education appeared</string>
-    <!-- Accessibility text spoken when the Taskbar education panel disappears [CHAR_LIMIT=NONE] -->
-    <string name="taskbar_edu_closed">Taskbar education closed</string>
     <!-- Text in dialog that lets a user know how they can use the Taskbar to use multiple apps at once on their device. [CHAR_LIMIT=60] -->
     <string name="taskbar_edu_splitscreen">Drag an app to the side to use 2 apps at once</string>
     <!-- Text in dialog that lets a user know how they can show the Taskbar on their device. [CHAR_LIMIT=60] -->
@@ -255,10 +251,6 @@
     <string name="taskbar_edu_settings_persistent">Turn on gesture navigation in Settings to auto-hide the Taskbar</string>
     <!-- Title in dialog that shows a user what they can do with the Taskbar. [CHAR_LIMIT=60] -->
     <string name="taskbar_edu_features">Do more with the Taskbar</string>
-    <!-- Text on button to go to the next screen of a tutorial [CHAR_LIMIT=16] -->
-    <string name="taskbar_edu_next">Next</string>
-    <!-- Text on button to go to the previous screen of a tutorial [CHAR_LIMIT=16] -->
-    <string name="taskbar_edu_previous">Back</string>
     <!-- Text on button to exit a tutorial [CHAR_LIMIT=16] -->
     <string name="taskbar_edu_close">Close</string>
     <!-- Text on button to finish a tutorial [CHAR_LIMIT=16] -->
@@ -285,6 +277,13 @@
     <string name="taskbar_a11y_hidden_title">Taskbar hidden</string>
     <!-- Accessibility title for the Taskbar window on phones. [CHAR_LIMIT=NONE] -->
     <string name="taskbar_phone_a11y_title">Navigation bar</string>
+    <!-- Text in popup dialog for user to switch between always showing Taskbar or not. [CHAR LIMIT=30] -->
+    <string name="always_show_taskbar">Always show Taskbar</string>
+    <!-- Text in popup dialog for user to switch between system navigation modes. [CHAR LIMIT=30] -->
+    <string name="change_navigation_mode">Change navigation mode</string>
+    <!-- Accessibility title for the Taskbar vertical divider icon. [CHAR_LIMIT=NONE] -->
+    <string name="taskbar_divider_a11y_title">Taskbar Divider</string>
+
 
     <!-- Label for moving drop target to the top or left side of the screen, depending on orientation (from the Taskbar only). -->
     <string name="move_drop_target_top_or_left">Move to top&#47;left</string>

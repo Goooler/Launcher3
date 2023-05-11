@@ -70,7 +70,9 @@ final class BackGestureTutorialController extends TutorialController {
     @Override
     protected int getGestureLottieAnimationId() {
         return mTutorialFragment.isLargeScreen()
-                ? R.raw.back_gesture_tutorial_tablet_animation
+                ? mTutorialFragment.isFoldable()
+                    ? R.raw.back_gesture_tutorial_open_foldable_animation
+                    : R.raw.back_gesture_tutorial_tablet_animation
                 : R.raw.back_gesture_tutorial_animation;
     }
 
@@ -94,7 +96,7 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     protected int getSwipeActionColorResId() {
-        return R.color.gesture_back_tutorial_background;
+        return R.color.gesture_tutorial_workspace_background;
     }
 
     @Override

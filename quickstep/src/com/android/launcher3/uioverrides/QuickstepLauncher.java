@@ -74,6 +74,7 @@ import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.display.DisplayManager;
 import android.media.permission.SafeCloseable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.IBinder;
@@ -91,6 +92,7 @@ import android.window.SplashScreen;
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.android.app.viewcapture.SettingsAwareViewCapture;
 import com.android.launcher3.AbstractFloatingView;
@@ -764,6 +766,7 @@ public class QuickstepLauncher extends Launcher {
                         mActiveOnBackAnimationCallback.onBackStarted(backEvent);
                     }
 
+                    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                     @Override
                     public void onBackInvoked() {
                         // Recreate mActiveOnBackAnimationCallback if necessary to avoid NPE
@@ -970,8 +973,8 @@ public class QuickstepLauncher extends Launcher {
         return mTaskbarUIController;
     }
 
-    public SplitSelectStateController getSplitSelectStateController() {
-        return mSplitSelectStateController;
+    public SplitToWorkspaceController getSplitToWorkspaceController() {
+        return mSplitToWorkspaceController;
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -1060,7 +1063,8 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks) {
+    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks,
+            int workspaceItemCount, boolean isBindSync) {
         pendingTasks.add(() -> {
             // This is added in pending task as we need to wait for views to be positioned
             // correctly before registering them for the animation.
@@ -1070,7 +1074,7 @@ public class QuickstepLauncher extends Launcher {
                 mLauncherUnfoldAnimationController.updateRegisteredViewsIfNeeded();
             }
         });
-        super.onInitialBindComplete(boundPages, pendingTasks);
+        super.onInitialBindComplete(boundPages, pendingTasks, workspaceItemCount, isBindSync);
     }
 
     @Override
@@ -1176,6 +1180,11 @@ public class QuickstepLauncher extends Launcher {
                 mActionsView.updateVerticalMargin(info.navigationMode);
             }
         }
+    }
+
+    @Override
+    public void tryClearAccessibilityFocus(View view) {
+        view.clearAccessibilityFocus();
     }
 
     @Override
@@ -1309,5 +1318,8 @@ public class QuickstepLauncher extends Launcher {
         writer.println("\nQuickstepLauncher:");
         writer.println(prefix + "\tmOrientationState: " + (recentsView == null ? "recentsNull" :
                 recentsView.getPagedViewOrientedState()));
+        if (recentsView != null) {
+            recentsView.getSplitSelectController().dump(prefix, writer);
+        }
     }
 }

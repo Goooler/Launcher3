@@ -48,7 +48,6 @@ public class TaskbarControllers {
     public final TaskbarKeyguardController taskbarKeyguardController;
     public final StashedHandleViewController stashedHandleViewController;
     public final TaskbarStashController taskbarStashController;
-    public final TaskbarEduController taskbarEduController;
     public final TaskbarAutohideSuspendController taskbarAutohideSuspendController;
     public final TaskbarPopupController taskbarPopupController;
     public final TaskbarForceVisibleImmersiveController taskbarForceVisibleImmersiveController;
@@ -61,6 +60,7 @@ public class TaskbarControllers {
     public final TaskbarOverlayController taskbarOverlayController;
     public final TaskbarEduTooltipController taskbarEduTooltipController;
     public final KeyboardQuickSwitchController keyboardQuickSwitchController;
+    public final TaskbarDividerPopupController taskbarPinningController;
 
     @Nullable private LoggableTaskbarController[] mControllersToLog = null;
     @Nullable private BackgroundRendererController[] mBackgroundRendererControllers = null;
@@ -95,7 +95,6 @@ public class TaskbarControllers {
             TaskbarKeyguardController taskbarKeyguardController,
             StashedHandleViewController stashedHandleViewController,
             TaskbarStashController taskbarStashController,
-            TaskbarEduController taskbarEduController,
             TaskbarAutohideSuspendController taskbarAutoHideSuspendController,
             TaskbarPopupController taskbarPopupController,
             TaskbarForceVisibleImmersiveController taskbarForceVisibleImmersiveController,
@@ -107,7 +106,8 @@ public class TaskbarControllers {
             TaskbarSpringOnStashController taskbarSpringOnStashController,
             TaskbarRecentAppsController taskbarRecentAppsController,
             TaskbarEduTooltipController taskbarEduTooltipController,
-            KeyboardQuickSwitchController keyboardQuickSwitchController) {
+            KeyboardQuickSwitchController keyboardQuickSwitchController,
+            TaskbarDividerPopupController taskbarPinningController) {
         this.taskbarActivityContext = taskbarActivityContext;
         this.taskbarDragController = taskbarDragController;
         this.navButtonController = navButtonController;
@@ -120,7 +120,6 @@ public class TaskbarControllers {
         this.taskbarKeyguardController = taskbarKeyguardController;
         this.stashedHandleViewController = stashedHandleViewController;
         this.taskbarStashController = taskbarStashController;
-        this.taskbarEduController = taskbarEduController;
         this.taskbarAutohideSuspendController = taskbarAutoHideSuspendController;
         this.taskbarPopupController = taskbarPopupController;
         this.taskbarForceVisibleImmersiveController = taskbarForceVisibleImmersiveController;
@@ -133,6 +132,7 @@ public class TaskbarControllers {
         this.taskbarRecentAppsController = taskbarRecentAppsController;
         this.taskbarEduTooltipController = taskbarEduTooltipController;
         this.keyboardQuickSwitchController = keyboardQuickSwitchController;
+        this.taskbarPinningController = taskbarPinningController;
     }
 
     /**
@@ -155,7 +155,6 @@ public class TaskbarControllers {
         taskbarSpringOnStashController.init(this);
         stashedHandleViewController.init(this);
         taskbarStashController.init(this, sharedState.setupUIVisible, mSharedState);
-        taskbarEduController.init(this);
         taskbarPopupController.init(this);
         taskbarForceVisibleImmersiveController.init(this);
         taskbarOverlayController.init(this);
@@ -167,15 +166,16 @@ public class TaskbarControllers {
         taskbarTranslationController.init(this);
         taskbarEduTooltipController.init(this);
         keyboardQuickSwitchController.init(this);
+        taskbarPinningController.init(this);
 
         mControllersToLog = new LoggableTaskbarController[] {
                 taskbarDragController, navButtonController, navbarButtonsViewController,
                 taskbarDragLayerController, taskbarScrimViewController, taskbarViewController,
                 taskbarUnfoldAnimationController, taskbarKeyguardController,
-                stashedHandleViewController, taskbarStashController, taskbarEduController,
+                stashedHandleViewController, taskbarStashController,
                 taskbarAutohideSuspendController, taskbarPopupController, taskbarInsetsController,
                 voiceInteractionWindowController, taskbarTranslationController,
-                taskbarEduTooltipController, keyboardQuickSwitchController
+                taskbarEduTooltipController, keyboardQuickSwitchController, taskbarPinningController
         };
         mBackgroundRendererControllers = new BackgroundRendererController[] {
                 taskbarDragLayerController, taskbarScrimViewController,

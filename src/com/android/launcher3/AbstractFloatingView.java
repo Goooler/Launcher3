@@ -74,7 +74,8 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             TYPE_TASKBAR_EDUCATION_DIALOG,
             TYPE_TASKBAR_ALL_APPS,
             TYPE_ADD_TO_HOME_CONFIRMATION,
-            TYPE_TASKBAR_OVERLAY_PROXY
+            TYPE_TASKBAR_OVERLAY_PROXY,
+            TYPE_TASKBAR_PINNING_POPUP
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FloatingViewType {}
@@ -102,6 +103,7 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public static final int TYPE_TASKBAR_ALL_APPS = 1 << 18;
     public static final int TYPE_ADD_TO_HOME_CONFIRMATION = 1 << 19;
     public static final int TYPE_TASKBAR_OVERLAY_PROXY = 1 << 20;
+    public static final int TYPE_TASKBAR_PINNING_POPUP = 1 << 21;
 
     public static final int TYPE_ALL = TYPE_FOLDER | TYPE_ACTION_POPUP
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_WIDGETS_FULL_SHEET
@@ -110,7 +112,7 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             | TYPE_ICON_SURFACE | TYPE_DRAG_DROP_POPUP | TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP
             | TYPE_WIDGETS_EDUCATION_DIALOG | TYPE_TASKBAR_EDUCATION_DIALOG | TYPE_TASKBAR_ALL_APPS
             | TYPE_OPTIONS_POPUP_DIALOG | TYPE_ADD_TO_HOME_CONFIRMATION
-            | TYPE_TASKBAR_OVERLAY_PROXY;
+            | TYPE_TASKBAR_OVERLAY_PROXY | TYPE_TASKBAR_PINNING_POPUP;
 
     // Type of popups which should be kept open during launcher rebind
     public static final int TYPE_REBIND_SAFE = TYPE_WIDGETS_FULL_SHEET
@@ -126,6 +128,10 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public static final int TYPE_STATUS_BAR_SWIPE_DOWN_DISALLOW = TYPE_WIDGETS_BOTTOM_SHEET |
             TYPE_WIDGETS_FULL_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_ON_BOARD_POPUP |
             TYPE_DISCOVERY_BOUNCE | TYPE_TASK_MENU | TYPE_DRAG_DROP_POPUP;
+
+    // Floating views that are exclusive to the taskbar overlay window.
+    public static final int TYPE_TASKBAR_OVERLAYS =
+            TYPE_TASKBAR_ALL_APPS | TYPE_TASKBAR_EDUCATION_DIALOG;
 
     protected boolean mIsOpen;
 

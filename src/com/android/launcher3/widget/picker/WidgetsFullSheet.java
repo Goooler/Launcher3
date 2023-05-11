@@ -25,7 +25,6 @@ import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORD
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.PropertyValuesHolder;
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.LauncherApps;
 import android.content.res.Configuration;
@@ -52,6 +51,7 @@ import android.window.BackEvent;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
+import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.RecyclerView;
@@ -183,7 +183,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         super(context, attrs, defStyleAttr);
         mDeviceProfile = Launcher.getLauncher(context).getDeviceProfile();
         mHasWorkProfile = context.getSystemService(LauncherApps.class).getProfiles().size() > 1;
-        mOrientation = Launcher.getLauncher(context).getOrientation();
+        mOrientation = context.getResources().getConfiguration().orientation;
         mAdapters.put(AdapterHolder.PRIMARY, new AdapterHolder(AdapterHolder.PRIMARY));
         mAdapters.put(AdapterHolder.WORK, new AdapterHolder(AdapterHolder.WORK));
         mAdapters.put(AdapterHolder.SEARCH, new AdapterHolder(AdapterHolder.SEARCH));
@@ -286,7 +286,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     }
 
     @Override
-    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void onBackProgressed(@NonNull BackEvent backEvent) {
         super.onBackProgressed(backEvent);
         mFastScroller.setVisibility(backEvent.getProgress() > 0 ? View.INVISIBLE : View.VISIBLE);
@@ -799,7 +799,8 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         // Checks the orientation of the screen
         if (LARGE_SCREEN_WIDGET_PICKER.get()
                 && mOrientation != newConfig.orientation
-                && mDeviceProfile.isTablet) {
+                && mDeviceProfile.isTablet
+                && !mDeviceProfile.isTwoPanels) {
             mOrientation = newConfig.orientation;
             handleClose(false);
             show(Launcher.getLauncher(getContext()), false);

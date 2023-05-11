@@ -15,13 +15,13 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
-import static com.android.systemui.animation.Interpolators.EMPHASIZED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK;
@@ -210,7 +210,9 @@ public class TaskbarLauncherStateController {
                 }
             };
 
-    public void init(TaskbarControllers controllers, QuickstepLauncher launcher) {
+    /** Initializes the controller instance, and applies the initial state immediately. */
+    public void init(TaskbarControllers controllers, QuickstepLauncher launcher,
+            int sysuiStateFlags) {
         mCanSyncViews = false;
 
         mControllers = controllers;
@@ -229,6 +231,8 @@ public class TaskbarLauncherStateController {
 
         mLauncher.getStateManager().addStateListener(mStateListener);
         mLauncherState = launcher.getStateManager().getState();
+        updateStateForSysuiFlags(sysuiStateFlags, /*applyState*/ false);
+
         applyState(0);
 
         mCanSyncViews = true;
@@ -298,7 +302,11 @@ public class TaskbarLauncherStateController {
     }
 
     /** SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values. */
-    public void updateStateForSysuiFlags(int systemUiStateFlags, boolean skipAnim) {
+    public void updateStateForSysuiFlags(int systemUiStateFlags) {
+        updateStateForSysuiFlags(systemUiStateFlags, /* applyState */ true);
+    }
+
+    private  void updateStateForSysuiFlags(int systemUiStateFlags, boolean applyState) {
         final boolean prevIsAwake = hasAnyFlag(FLAG_AWAKE);
         final boolean currIsAwake = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_AWAKE);
 
@@ -322,9 +330,7 @@ public class TaskbarLauncherStateController {
                 || (systemUiStateFlags & SYSUI_STATE_WAKEFULNESS_MASK) != WAKEFULNESS_AWAKE;
         updateStateForFlag(FLAG_TASKBAR_HIDDEN, isTaskbarHidden);
 
-        if (skipAnim) {
-            applyState(0);
-        } else {
+        if (applyState) {
             applyState();
         }
     }
@@ -359,10 +365,6 @@ public class TaskbarLauncherStateController {
 
     public void applyState(long duration) {
         applyState(duration, true);
-    }
-
-    public Animator applyState(boolean start) {
-        return applyState(mControllers.taskbarStashController.getStashDuration(), start);
     }
 
     public Animator applyState(long duration, boolean start) {
@@ -420,7 +422,7 @@ public class TaskbarLauncherStateController {
             }
         }
 
-        if (hasAnyFlag(changedFlags, FLAGS_LAUNCHER_ACTIVE | FLAG_AWAKE)) {
+        if (hasAnyFlag(changedFlags, FLAGS_LAUNCHER_ACTIVE)) {
             animatorSet.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationStart(Animator animation) {
@@ -642,7 +644,7 @@ public class TaskbarLauncherStateController {
         long resetDuration = mControllers.taskbarStashController.isInApp()
                 ? duration
                 : duration / 2;
-        if (mControllers.taskbarTranslationController.shouldResetBackToZero(resetDuration)
+        if (!mControllers.taskbarTranslationController.willAnimateToZeroBefore(resetDuration)
                 && (isAnimatingToLauncher() || mLauncherState == LauncherState.NORMAL)) {
             animatorSet.play(mControllers.taskbarTranslationController
                     .createAnimToResetTranslation(resetDuration));

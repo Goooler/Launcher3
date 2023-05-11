@@ -42,6 +42,7 @@
     <attr name="popupNotificationDotColor" format="color" />
 
     <attr name="folderDotColor" format="color" />
+    <attr name="folderPaginationColor" format="color" />
     <attr name="folderPreviewColor" format="color" />
     <attr name="folderBackgroundColor" format="color" />
     <attr name="folderIconRadius" format="float" />
@@ -53,8 +54,20 @@
     <attr name="dropTargetHoverTextColor" format="color" />
     <attr name="preloadIconAccentColor" format="color" />
     <attr name="preloadIconBackgroundColor" format="color" />
+    <attr name="widgetPickerTitleColor" format="color"/>
+    <attr name="widgetPickerPrimarySurfaceColor" format="color"/>
+    <attr name="widgetPickerSecondarySurfaceColor" format="color"/>
     <attr name="widgetPickerHeaderAppTitleColor" format="color"/>
     <attr name="widgetPickerHeaderAppSubtitleColor" format="color"/>
+    <attr name="widgetPickerHeaderBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconColor" format="color"/>
+    <attr name="widgetPickerTabBackgroundSelected" format="color"/>
+    <attr name="widgetPickerTabBackgroundUnselected" format="color"/>
+    <attr name="widgetPickerSearchTextColor" format="color"/>
+    <attr name="widgetPickerSelectedTabTextColor" format="color"/>
+    <attr name="widgetPickerUnselectedTabTextColor" format="color"/>
+    <attr name="widgetPickerCollapseHandleColor" format="color"/>
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
@@ -499,11 +512,5 @@
         <attr name="sectionTitle" format="reference" />
         <!-- The icon drawable of a widget category. -->
         <attr name="sectionDrawable" format="reference" />
-    </declare-styleable>
-
-    <!-- Attributes for PagedIndicator -->
-    <declare-styleable name="PagedIndicator">
-        <!-- Color used to draw dots -->
-        <attr name="indicatorDotColor" format="color" />
     </declare-styleable>
 </resources>
