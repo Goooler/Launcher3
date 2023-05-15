@@ -51,6 +51,7 @@ import android.window.RemoteTransition;
 import android.window.TaskSnapshot;
 import android.window.TransitionFilter;
 
+import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
@@ -58,6 +59,7 @@ import com.android.internal.logging.InstanceId;
 import com.android.internal.util.ScreenshotRequest;
 import com.android.internal.view.AppearanceRegion;
 import com.android.launcher3.util.MainThreadInitializedObject;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -69,6 +71,8 @@ import com.android.systemui.shared.system.smartspace.SmartspaceState;
 import com.android.systemui.unfold.progress.IUnfoldAnimation;
 import com.android.systemui.unfold.progress.IUnfoldTransitionListener;
 import com.android.wm.shell.back.IBackAnimation;
+import com.android.wm.shell.bubbles.IBubbles;
+import com.android.wm.shell.bubbles.IBubblesListener;
 import com.android.wm.shell.desktopmode.IDesktopMode;
 import com.android.wm.shell.draganddrop.IDragAndDrop;
 import com.android.wm.shell.onehanded.IOneHanded;
@@ -101,6 +105,7 @@ public class SystemUiProxy implements ISystemUiProxy {
 
     private ISystemUiProxy mSystemUiProxy;
     private IPip mPip;
+    private IBubbles mBubbles;
     private ISysuiUnlockAnimationController mSysuiUnlockAnimationController;
     private ISplitScreen mSplitScreen;
     private IOneHanded mOneHanded;
@@ -119,6 +124,7 @@ public class SystemUiProxy implements ISystemUiProxy {
     // up to the caller to clear the listeners to prevent leaks as these can be held indefinitely
     // in case SysUI needs to rebind.
     private IPipAnimationListener mPipAnimationListener;
+    private IBubblesListener mBubblesListener;
     private ISplitScreenListener mSplitScreenListener;
     private IStartingWindowListener mStartingWindowListener;
     private ILauncherUnlockAnimationController mLauncherUnlockAnimationController;
@@ -200,15 +206,21 @@ public class SystemUiProxy implements ISystemUiProxy {
         return null;
     }
 
-    public void setProxy(ISystemUiProxy proxy, IPip pip, ISplitScreen splitScreen,
+    /**
+     * Sets proxy state, including death linkage, various listeners, and other configuration objects
+     */
+    @MainThread
+    public void setProxy(ISystemUiProxy proxy, IPip pip, IBubbles bubbles, ISplitScreen splitScreen,
             IOneHanded oneHanded, IShellTransitions shellTransitions,
             IStartingWindow startingWindow, IRecentTasks recentTasks,
             ISysuiUnlockAnimationController sysuiUnlockAnimationController,
             IBackAnimation backAnimation, IDesktopMode desktopMode,
             IUnfoldAnimation unfoldAnimation, IDragAndDrop dragAndDrop) {
+        Preconditions.assertUIThread();
         unlinkToDeath();
         mSystemUiProxy = proxy;
         mPip = pip;
+        mBubbles = bubbles;
         mSplitScreen = splitScreen;
         mOneHanded = oneHanded;
         mShellTransitions = shellTransitions;
@@ -222,6 +234,7 @@ public class SystemUiProxy implements ISystemUiProxy {
         linkToDeath();
         // re-attach the listeners once missing due to setProxy has not been initialized yet.
         setPipAnimationListener(mPipAnimationListener);
+        setBubblesListener(mBubblesListener);
         registerSplitScreenListener(mSplitScreenListener);
         setStartingWindowListener(mStartingWindowListener);
         setLauncherUnlockAnimationController(mLauncherUnlockAnimationController);
@@ -232,8 +245,12 @@ public class SystemUiProxy implements ISystemUiProxy {
         setUnfoldAnimationListener(mUnfoldAnimationListener);
     }
 
+    /**
+     * Clear the proxy to release held resources and turn the majority of its operations into no-ops
+     */
+    @MainThread
     public void clearProxy() {
-        setProxy(null, null, null, null, null, null, null, null, null, null, null, null);
+        setProxy(null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     // TODO(141886704): Find a way to remove this
@@ -292,8 +309,10 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
+    @MainThread
     @Override
     public void onStatusBarMotionEvent(MotionEvent event) {
+        Preconditions.assertUIThread();
         if (mSystemUiProxy != null) {
             try {
                 mSystemUiProxy.onStatusBarMotionEvent(event);
@@ -567,6 +586,59 @@ public class SystemUiProxy implements ISystemUiProxy {
                 mPip.setLauncherAppIconSize(iconSizePx);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call setLauncherAppIconSize", e);
+            }
+        }
+    }
+
+    //
+    // Bubbles
+    //
+
+    /**
+     * Sets the listener to be notified of bubble state changes.
+     */
+    public void setBubblesListener(IBubblesListener listener) {
+        if (mBubbles != null) {
+            try {
+                if (mBubblesListener != null) {
+                    // Clear out any previous listener
+                    mBubbles.unregisterBubbleListener(mBubblesListener);
+                }
+                if (listener != null) {
+                    mBubbles.registerBubbleListener(listener);
+                }
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call registerBubblesListener");
+            }
+        }
+        mBubblesListener = listener;
+    }
+
+    /**
+     * Tells SysUI to show the bubble with the provided key.
+     * @param key the key of the bubble to show.
+     * @param onLauncherHome whether the bubble is showing on launcher home or not (modifies where
+     *                       the expanded bubble view is placed).
+     */
+    public void showBubble(String key, boolean onLauncherHome) {
+        if (mBubbles != null) {
+            try {
+                mBubbles.showBubble(key, onLauncherHome);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call showBubble");
+            }
+        }
+    }
+
+    /**
+     * Tells SysUI to collapse the bubbles.
+     */
+    public void collapseBubbles() {
+        if (mBubbles != null) {
+            try {
+                mBubbles.collapseBubbles();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call collapseBubbles");
             }
         }
     }

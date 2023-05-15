@@ -253,7 +253,7 @@ public final class FeatureFlags {
             "COLLECT_SEARCH_HISTORY", DISABLED, "Allow launcher to collect search history for log");
 
     public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(270390937,
-            "ENABLE_TWOLINE_ALLAPPS", DISABLED, "Enables two line label inside all apps.");
+            "ENABLE_TWOLINE_ALLAPPS", TEAMFOOD, "Enables two line label inside all apps.");
 
     public static final BooleanFlag IME_STICKY_SNACKBAR_EDU = getDebugFlag(270391693,
             "IME_STICKY_SNACKBAR_EDU", ENABLED, "Show sticky IME edu in AllApps");
@@ -314,6 +314,12 @@ public final class FeatureFlags {
             "Enables receiving unfold animation events from sysui instead of calculating "
                     + "them in launcher process using hinge sensor values.");
 
+    public static final BooleanFlag PREEMPTIVE_UNFOLD_ANIMATION_START = getDebugFlag(270397209,
+            "PREEMPTIVE_UNFOLD_ANIMATION_START", ENABLED,
+            "Enables starting the unfold animation preemptively when unfolding, without"
+                    + "waiting for SystemUI and then merging the SystemUI progress whenever we "
+                    + "start receiving the events");
+
     // TODO(Block 23): Clean up flags
     public static final BooleanFlag ENABLE_GRID_ONLY_OVERVIEW = getDebugFlag(270397206,
             "ENABLE_GRID_ONLY_OVERVIEW", DISABLED,
@@ -366,10 +372,6 @@ public final class FeatureFlags {
             "ENABLE_ENFORCED_ROUNDED_CORNERS", ENABLED,
             "Enforce rounded corners on all App Widgets");
 
-    public static final BooleanFlag ENABLE_WALLPAPER_SCRIM = getDebugFlag(270393604,
-            "ENABLE_WALLPAPER_SCRIM", DISABLED,
-            "Enables scrim over wallpaper for text protection.");
-
     public static final BooleanFlag ENABLE_ICON_LABEL_AUTO_SCALING = getDebugFlag(270393294,
             "ENABLE_ICON_LABEL_AUTO_SCALING", ENABLED,
             "Enables scaling/spacing for icon labels to make more characters visible");
@@ -409,10 +411,14 @@ public final class FeatureFlags {
 
     // TODO(Block 31)
     public static final BooleanFlag ENABLE_SPLIT_LAUNCH_DATA_REFACTOR = getDebugFlag(279494325,
-            "ENABLE_SPLIT_LAUNCH_DATA_REFACTOR", DISABLED,
+            "ENABLE_SPLIT_LAUNCH_DATA_REFACTOR", ENABLED,
             "Use refactored split launching code path");
 
     // TODO(Block 32): Empty block
+
+    public static final BooleanFlag ENABLE_RESPONSIVE_WORKSPACE = getDebugFlag(241386436,
+            "ENABLE_RESPONSIVE_WORKSPACE", DISABLED,
+            "Enables new workspace grid calculations method.");
 
     public static class BooleanFlag {
 

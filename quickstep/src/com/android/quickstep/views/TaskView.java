@@ -92,6 +92,7 @@ import com.android.launcher3.util.ViewPool.Reusable;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RemoteAnimationTargets;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
@@ -102,6 +103,7 @@ import com.android.quickstep.util.CancellableTask;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TaskCornerRadius;
+import com.android.quickstep.util.TaskRemovedDuringLaunchListener;
 import com.android.quickstep.util.TransformParams;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -651,7 +653,7 @@ public class TaskView extends FrameLayout implements Reusable {
      *         index 0 will contain the taskId, index 1 will be -1 indicating a null taskID value
      */
     public int[] getTaskIds() {
-        return mTaskIdContainer;
+        return Arrays.copyOf(mTaskIdContainer, mTaskIdContainer.length);
     }
 
     public boolean containsMultipleTasks() {
@@ -801,6 +803,14 @@ public class TaskView extends FrameLayout implements Reusable {
                     recentsView.addSideTaskLaunchCallback(callbackList);
                     return callbackList;
                 }
+                if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+                    // If the recents transition is running (ie. in live tile mode), then the start
+                    // of a new task will merge into the existing transition and it currently will
+                    // not be run independently, so we need to rely on the onTaskAppeared() call
+                    // for the new task to trigger the side launch callback to flush this runnable
+                    // list (which is usually flushed when the app launch animation finishes)
+                    recentsView.addSideTaskLaunchCallback(opts.onEndCallback);
+                }
                 return opts.onEndCallback;
             } else {
                 notifyTaskLaunchFailed(TAG);
@@ -815,23 +825,44 @@ public class TaskView extends FrameLayout implements Reusable {
      * Starts the task associated with this view without any animation
      */
     public void launchTask(@NonNull Consumer<Boolean> callback) {
-        launchTask(callback, false /* freezeTaskList */);
+        launchTask(callback, false /* isQuickswitch */);
     }
 
     /**
      * Starts the task associated with this view without any animation
      */
-    public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
+    public void launchTask(@NonNull Consumer<Boolean> callback, boolean isQuickswitch) {
         if (mTask != null) {
             TestLogging.recordEvent(
                     TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
 
+            final TaskRemovedDuringLaunchListener
+                    failureListener = new TaskRemovedDuringLaunchListener();
+            if (isQuickswitch) {
+                // We only listen for failures to launch in quickswitch because the during this
+                // gesture launcher is in the background state, vs other launches which are in
+                // the actual overview state
+                failureListener.register(mActivity, mTask.key.id, () -> {
+                    notifyTaskLaunchFailed(TAG);
+                    // Disable animations for now, as it is an edge case and the app usually covers
+                    // launcher and also any state transition animation also gets clobbered by
+                    // QuickstepTransitionManager.createWallpaperOpenAnimations when launcher
+                    // shows again
+                    getRecentsView().startHome(false /* animated */);
+                });
+            }
             // Indicate success once the system has indicated that the transition has started
-            ActivityOptions opts = makeCustomAnimation(getContext(), 0, 0,
-                    () -> callback.accept(true), MAIN_EXECUTOR.getHandler());
+            ActivityOptions opts = ActivityOptions.makeCustomTaskAnimation(getContext(), 0, 0,
+                    MAIN_EXECUTOR.getHandler(),
+                    elapsedRealTime -> {
+                        callback.accept(true);
+                    },
+                    elapsedRealTime -> {
+                        failureListener.onTransitionFinished();
+                    });
             opts.setLaunchDisplayId(
                     getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
-            if (freezeTaskList) {
+            if (isQuickswitch) {
                 opts.setFreezeRecentTasksReordering();
             }
             opts.setDisableStartingWindow(mSnapshotView.shouldShowSplashView());

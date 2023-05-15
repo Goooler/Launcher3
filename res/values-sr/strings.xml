@@ -50,6 +50,7 @@
     <string name="widgets_full_sheet_personal_tab" msgid="2743540105607120182">"Лично"</string>
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Посао"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Конверзације"</string>
+    <string name="widget_category_note_taking" msgid="3469689394504266039">"Прављење бележака"</string>
     <string name="widget_education_header" msgid="4874760613775913787">"Корисне информације надохват руке"</string>
     <string name="widget_education_content" msgid="1731667670753497052">"Да бисте пронашли информације без отварања апликација, можете да додате виџете на почетни екран"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"Додирните да бисте променили подешавања виџета"</string>
@@ -168,7 +169,7 @@
     <string name="work_apps_paused_edu_banner" msgid="8872412121608402058">"Пословне апликације су означене значком и ИТ администратор може да их види"</string>
     <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"Важи"</string>
     <string name="work_apps_pause_btn_text" msgid="4669288269140620646">"Паузирај пословне апликације"</string>
-    <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Опозови паузу"</string>
+    <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Поново активирај"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Филтер"</string>
     <string name="search_pref_screen_title" msgid="3258959643336315962">"Претражите телефон"</string>
     <string name="search_pref_screen_title_tablet" msgid="5220319680451343959">"Претражите таблет"</string>

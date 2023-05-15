@@ -25,7 +25,7 @@ import com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_NEGATIVE
 import com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.TouchController
-import com.android.quickstep.inputconsumers.TaskbarStashInputConsumer
+import com.android.quickstep.inputconsumers.TaskbarUnstashInputConsumer
 
 /**
  * A helper [TouchController] for [TaskbarDragLayerController], specifically to handle touch events
@@ -34,7 +34,7 @@ import com.android.quickstep.inputconsumers.TaskbarStashInputConsumer
  *   or [MotionEvent.ACTION_OUTSIDE].
  * - Touches inside Transient Taskbar bounds will stash if it is detected as a swipe down gesture.
  *
- * Note: touches to *unstash* Taskbar are handled by [TaskbarStashInputConsumer].
+ * Note: touches to *unstash* Taskbar are handled by [TaskbarUnstashInputConsumer].
  */
 class TaskbarStashViaTouchController(val controllers: TaskbarControllers) : TouchController {
 
@@ -108,7 +108,18 @@ class TaskbarStashViaTouchController(val controllers: TaskbarControllers) : Touc
         }
 
     override fun onControllerInterceptTouchEvent(ev: MotionEvent): Boolean {
-        if (!enabled || controllers.taskbarStashController.isStashed) {
+        val bubbleControllers = controllers.bubbleControllers.orElse(null)
+        if (!enabled || bubbleControllers == null) {
+            return false
+        }
+        if (bubbleControllers.bubbleBarViewController.isExpanded) {
+            // WMShell / bubbles will handle collapsing
+            return false
+        }
+        if (
+            controllers.taskbarStashController.isStashed &&
+                bubbleControllers.bubbleStashController.isStashed
+        ) {
             return false
         }
 
@@ -122,7 +133,12 @@ class TaskbarStashViaTouchController(val controllers: TaskbarControllers) : Touc
                 return true
             }
         } else if (ev.action == MotionEvent.ACTION_DOWN) {
-            if (screenCoordinatesEv.y < gestureHeightYThreshold) {
+            val isDownOnBubbleBar =
+                (bubbleControllers != null &&
+                    bubbleControllers.bubbleBarViewController.isEventOverAnyItem(
+                        screenCoordinatesEv
+                    ))
+            if (!isDownOnBubbleBar && screenCoordinatesEv.y < gestureHeightYThreshold) {
                 controllers.taskbarStashController.updateAndAnimateTransientTaskbar(true)
             }
         }

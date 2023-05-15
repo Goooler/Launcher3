@@ -214,6 +214,7 @@ import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.ComposeInitializer;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.FloatingSurfaceView;
 import com.android.launcher3.views.OptionsPopupView;
@@ -553,6 +554,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
 
         setContentView(getRootView());
+        ComposeInitializer.initCompose(this);
+
         if (mOnInitialBindListener != null) {
             getRootView().getViewTreeObserver().addOnPreDrawListener(mOnInitialBindListener);
         }
@@ -1621,6 +1624,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         return mModel;
     }
 
+    /**
+     * Returns the ModelWriter writer, make sure to call the function every time you want to use it.
+     */
     public ModelWriter getModelWriter() {
         return mModelWriter;
     }
@@ -3157,6 +3163,16 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
         }
         return super.onKeyShortcut(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            // Close any open floating views.
+            closeOpenViews();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
