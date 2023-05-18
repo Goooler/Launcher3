@@ -24,7 +24,6 @@ import static android.view.MotionEvent.ACTION_POINTER_UP;
 import static android.view.MotionEvent.ACTION_UP;
 
 import static com.android.launcher3.Launcher.INTENT_ACTION_ALL_APPS_TOGGLE;
-import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TRACKPAD_GESTURE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
@@ -85,6 +84,7 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -207,7 +207,15 @@ public class TouchInteractionService extends Service
         @BinderThread
         @Override
         public void onTaskbarToggled() {
-            // To be implemented.
+            if (!FeatureFlags.ENABLE_KEYBOARD_TASKBAR_TOGGLE.get()) return;
+            MAIN_EXECUTOR.execute(() -> {
+                TaskbarActivityContext activityContext =
+                        mTaskbarManager.getCurrentActivityContext();
+
+                if (activityContext != null) {
+                    activityContext.toggleTaskbarStash();
+                }
+            });
         }
 
         @BinderThread
@@ -862,7 +870,8 @@ public class TouchInteractionService extends Service
             if (tac != null) {
                 // Present always on large screen or on small screen w/ flag
                 DeviceProfile dp = tac.getDeviceProfile();
-                boolean useTaskbarConsumer = dp.isTaskbarPresent && !TaskbarManager.isPhoneMode(dp);
+                boolean useTaskbarConsumer = dp.isTaskbarPresent && !TaskbarManager.isPhoneMode(dp)
+                        && !tac.isInStashedLauncherState();
                 if (canStartSystemGesture && useTaskbarConsumer) {
                     reasonString.append(NEWLINE_PREFIX)
                             .append(reasonPrefix)
@@ -1088,22 +1097,17 @@ public class TouchInteractionService extends Service
         boolean hasWindowFocus = activity.getRootView().hasWindowFocus();
         boolean isPreviousGestureAnimatingToLauncher =
                 previousGestureState.isRunningAnimationToLauncher();
-        boolean forcingOverviewInputConsumer =
-                ASSISTANT_GIVES_LAUNCHER_FOCUS.get() && forceOverviewInputConsumer;
         boolean isInLiveTileMode = gestureState.getActivityInterface().isInLiveTileMode();
         reasonString.append(SUBSTRING_PREFIX)
                 .append(hasWindowFocus
                         ? "activity has window focus"
                         : (isPreviousGestureAnimatingToLauncher
                                 ? "previous gesture is still animating to launcher"
-                                : (forcingOverviewInputConsumer
-                                        ? "assistant gives launcher focus and forcing focus"
-                                        : (isInLiveTileMode
-                                                ? "device is in live mode"
-                                                : "all overview focus conditions failed"))));
+                                : isInLiveTileMode
+                                        ? "device is in live mode"
+                                        : "all overview focus conditions failed"));
         if (hasWindowFocus
                 || isPreviousGestureAnimatingToLauncher
-                || forcingOverviewInputConsumer
                 || isInLiveTileMode) {
             reasonString.append(SUBSTRING_PREFIX)
                     .append("overview should have focus, using OverviewInputConsumer");

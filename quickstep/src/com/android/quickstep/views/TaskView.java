@@ -45,6 +45,7 @@ import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -438,6 +439,9 @@ public class TaskView extends FrameLayout implements Reusable {
 
         setWillNotDraw(!keyboardFocusHighlightEnabled);
 
+        TypedArray ta = context.obtainStyledAttributes(
+                attrs, R.styleable.TaskView, defStyleAttr, defStyleRes);
+
         mBorderAnimator = !keyboardFocusHighlightEnabled
                 ? null
                 : new BorderAnimator(
@@ -445,18 +449,10 @@ public class TaskView extends FrameLayout implements Reusable {
                         /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
                                 R.dimen.keyboard_quick_switch_border_width),
                         /* borderRadiusPx= */ (int) mCurrentFullscreenParams.mCornerRadius,
-                        /* borderColor= */ attrs == null
-                        ? DEFAULT_BORDER_COLOR
-                        : context.getTheme()
-                                .obtainStyledAttributes(
-                                        attrs,
-                                        R.styleable.TaskView,
-                                        defStyleAttr,
-                                        defStyleRes)
-                                .getColor(
-                                        R.styleable.TaskView_borderColor,
-                                        DEFAULT_BORDER_COLOR),
+                        /* borderColor= */ ta.getColor(
+                                R.styleable.TaskView_borderColor, DEFAULT_BORDER_COLOR),
                         /* invalidateViewCallback= */ TaskView.this::invalidate);
+        ta.recycle();
     }
 
     protected void updateBorderBounds(Rect bounds) {
@@ -849,6 +845,13 @@ public class TaskView extends FrameLayout implements Reusable {
                     // QuickstepTransitionManager.createWallpaperOpenAnimations when launcher
                     // shows again
                     getRecentsView().startHome(false /* animated */);
+                    RecentsView rv = getRecentsView();
+                    if (rv != null && rv.mSizeStrategy.getTaskbarController() != null) {
+                        // LauncherTaskbarUIController depends on the launcher state when checking
+                        // whether to handle resume, but that can come in before startHome() changes
+                        // the state, so force-refresh here to ensure the taskbar is updated
+                        rv.mSizeStrategy.getTaskbarController().refreshResumedState();
+                    }
                 });
             }
             // Indicate success once the system has indicated that the transition has started
