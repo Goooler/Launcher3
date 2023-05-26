@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Surface.ROTATION_0;
 
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
@@ -25,8 +26,6 @@ import static com.android.launcher3.util.DisplayController.CHANGE_ROTATION;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.THREE_BUTTONS;
-import static com.android.quickstep.MotionEventsUtils.isTrackpadMotionEvent;
-import static com.android.quickstep.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -243,8 +242,8 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
      */
     public boolean isInSwipeUpTouchRegion(MotionEvent event, int pointerIndex,
             BaseActivityInterface activity) {
-        if (isTrackpadMotionEvent(event)) {
-            return isTrackpadMultiFingerSwipe(event) && !activity.isResumed();
+        if (isTrackpadMultiFingerSwipe(event)) {
+            return true;
         }
         return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(pointerIndex),
                 event.getY(pointerIndex));
@@ -351,7 +350,8 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
                 enableMultipleRegions(true);
             }
             activityInterface.onExitOverview(this, mExitOverviewRunnable);
-        } else if (endTarget == GestureState.GestureEndTarget.HOME) {
+        } else if (endTarget == GestureState.GestureEndTarget.HOME
+                || endTarget == GestureState.GestureEndTarget.ALL_APPS) {
             enableMultipleRegions(false);
         } else if (endTarget == GestureState.GestureEndTarget.NEW_TASK) {
             if (mOrientationTouchTransformer.getQuickStepStartingRotation() == -1) {

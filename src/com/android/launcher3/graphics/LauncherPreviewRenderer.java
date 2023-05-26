@@ -105,7 +105,6 @@ import com.android.launcher3.widget.BaseLauncherAppWidgetHostView;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.LauncherWidgetHolder;
 import com.android.launcher3.widget.LocalColorExtractor;
-import com.android.launcher3.widget.NavigableAppWidgetHostView;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 import com.android.launcher3.widget.util.WidgetSizes;
 
@@ -281,9 +280,7 @@ public class LauncherPreviewRenderer extends ContextWrapper
         } else {
             mWallpaperColorResources = null;
         }
-        mAppWidgetHost = FeatureFlags.WIDGETS_IN_LAUNCHER_PREVIEW.get()
-                ? new LauncherPreviewAppWidgetHost(context)
-                : null;
+        mAppWidgetHost = new LauncherPreviewAppWidgetHost(context);
     }
 
     /** Populate preview and render it. */
@@ -344,6 +341,25 @@ public class LauncherPreviewRenderer extends ContextWrapper
         return mHotseat;
     }
 
+    /**
+     * Hides the components in the bottom row.
+     *
+     * @param hide True to hide and false to show.
+     */
+    public void hideBottomRow(boolean hide) {
+        mUiHandler.post(() -> {
+            if (mDp.isTaskbarPresent) {
+                // hotseat icons on bottom
+                mHotseat.setIconsAlpha(hide ? 0 : 1);
+                if (mDp.isQsbInline) {
+                    mHotseat.setQsbAlpha(hide ? 0 : 1);
+                }
+            } else {
+                mHotseat.setQsbAlpha(hide ? 0 : 1);
+            }
+        });
+    }
+
     @Override
     public CellLayout getScreenWithId(int screenId) {
         return mWorkspaceScreens.get(screenId);
@@ -397,19 +413,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
     private void inflateAndAddWidgets(
             LauncherAppWidgetInfo info, LauncherAppWidgetProviderInfo providerInfo) {
-        AppWidgetHostView view;
-        if (FeatureFlags.WIDGETS_IN_LAUNCHER_PREVIEW.get()) {
-            view = mAppWidgetHost.createView(mContext, info.appWidgetId, providerInfo);
-        } else {
-            view = new NavigableAppWidgetHostView(this) {
-                @Override
-                protected boolean shouldAllowDirectClick() {
-                    return false;
-                }
-            };
-            view.setAppWidget(-1, providerInfo);
-            view.updateAppWidget(null);
-        }
+        AppWidgetHostView view = mAppWidgetHost.createView(
+                mContext, info.appWidgetId, providerInfo);
 
         if (mWallpaperColorResources != null) {
             view.setColorResources(mWallpaperColorResources);
@@ -432,26 +437,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
         final Size origSize = WidgetSizes.getWidgetSizePx(mDpOrig,
                 launcherWidgetSize.getWidth(), launcherWidgetSize.getHeight());
         final Size newSize = WidgetSizes.getWidgetSizePx(mDp, info.spanX, info.spanY);
-        final Rect previewInset = new Rect();
-        final Rect origInset = new Rect();
-        // When the setup() is called for the LayoutParams, insets are added to the width
-        // and height of the view. This is not accounted for in WidgetSizes and is handled
-        // here.
-        if (mDp.shouldInsetWidgets()) {
-            previewInset.set(mDp.inv.defaultWidgetPadding);
-        } else {
-            previewInset.setEmpty();
-        }
-        if (mDpOrig.shouldInsetWidgets()) {
-            origInset.set(mDpOrig.inv.defaultWidgetPadding);
-        } else {
-            origInset.setEmpty();
-        }
-
-        return new PointF((float) newSize.getWidth() / (origSize.getWidth()
-                + origInset.left + origInset.right),
-                (float) newSize.getHeight() / (origSize.getHeight()
-                + origInset.top + origInset.bottom));
+        return new PointF((float) newSize.getWidth() / origSize.getWidth(),
+                (float) newSize.getHeight() / origSize.getHeight());
     }
 
     private void inflateAndAddPredictedIcon(WorkspaceItemInfo info) {

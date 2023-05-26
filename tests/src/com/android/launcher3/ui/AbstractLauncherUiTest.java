@@ -72,6 +72,7 @@ import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.util.rule.TestStabilityRule;
+import com.android.launcher3.util.rule.ViewCaptureRule;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -106,6 +107,8 @@ public abstract class AbstractLauncherUiTest {
 
     private static boolean sDumpWasGenerated = false;
     private static boolean sActivityLeakReported = false;
+    private static boolean sSeenKeygard = false;
+
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
 
     protected LooperExecutor mMainThreadExecutor = MAIN_EXECUTOR;
@@ -215,12 +218,12 @@ public abstract class AbstractLauncherUiTest {
     protected TestRule getRulesInsideActivityMonitor() {
         final RuleChain inner = RuleChain
                 .outerRule(new PortraitLandscapeRunner(this))
+                .around(new ViewCaptureRule())
                 .around(new FailureWatcher(mDevice, mLauncher));
 
         return TestHelpers.isInLauncherProcess()
-                ? RuleChain.outerRule(ShellCommandRule.setDefaultLauncher())
-                .around(inner) :
-                inner;
+                ? RuleChain.outerRule(ShellCommandRule.setDefaultLauncher()).around(inner)
+                : inner;
     }
 
     @Rule
@@ -237,9 +240,18 @@ public abstract class AbstractLauncherUiTest {
     @Before
     public void setUp() throws Exception {
         mLauncher.onTestStart();
-        Assert.assertTrue("Keyguard is visible, which is likely caused by a crash in SysUI",
-                TestHelpers.wait(
-                        Until.gone(By.res(SYSTEMUI_PACKAGE, "keyguard_status_view")), 60000));
+
+        final boolean keyguardAlreadyVisible = sSeenKeygard;
+
+        sSeenKeygard = sSeenKeygard
+                || !TestHelpers.wait(
+                Until.gone(By.res(SYSTEMUI_PACKAGE, "keyguard_status_view")), 60000);
+
+        Assert.assertFalse(
+                "Keyguard is visible, which is likely caused by a crash in SysUI, seeing keyguard"
+                        + " for the first time = "
+                        + !keyguardAlreadyVisible,
+                sSeenKeygard);
 
         final String launcherPackageName = mDevice.getLauncherPackageName();
         try {

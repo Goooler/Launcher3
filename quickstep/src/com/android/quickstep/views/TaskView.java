@@ -16,6 +16,7 @@
 
 package com.android.quickstep.views;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
@@ -41,8 +42,10 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.IdRes;
 import android.app.ActivityOptions;
+import android.app.ActivityTaskManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -82,7 +85,6 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ComponentKey;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
@@ -91,6 +93,7 @@ import com.android.launcher3.util.ViewPool.Reusable;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RemoteAnimationTargets;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
@@ -101,6 +104,7 @@ import com.android.quickstep.util.CancellableTask;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TaskCornerRadius;
+import com.android.quickstep.util.TaskRemovedDuringLaunchListener;
 import com.android.quickstep.util.TransformParams;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -435,25 +439,21 @@ public class TaskView extends FrameLayout implements Reusable {
 
         setWillNotDraw(!keyboardFocusHighlightEnabled);
 
+        TypedArray ta = context.obtainStyledAttributes(
+                attrs, R.styleable.TaskView, defStyleAttr, defStyleRes);
+
         mBorderAnimator = !keyboardFocusHighlightEnabled
                 ? null
                 : new BorderAnimator(
-                        /* borderBoundsBuilder= */ this::updateBorderBounds,
-                        /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
-                                R.dimen.keyboard_quick_switch_border_width),
                         /* borderRadiusPx= */ (int) mCurrentFullscreenParams.mCornerRadius,
-                        /* borderColor= */ attrs == null
-                        ? DEFAULT_BORDER_COLOR
-                        : context.getTheme()
-                                .obtainStyledAttributes(
-                                        attrs,
-                                        R.styleable.TaskView,
-                                        defStyleAttr,
-                                        defStyleRes)
-                                .getColor(
-                                        R.styleable.TaskView_borderColor,
-                                        DEFAULT_BORDER_COLOR),
-                        /* invalidateViewCallback= */ TaskView.this::invalidate);
+                        /* borderColor= */ ta.getColor(
+                                R.styleable.TaskView_borderColor, DEFAULT_BORDER_COLOR),
+                        /* borderAnimationParams= */ new BorderAnimator.SimpleParams(
+                                /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
+                                        R.dimen.keyboard_quick_switch_border_width),
+                                /* boundsBuilder= */ this::updateBorderBounds,
+                                /* targetView= */ this));
+        ta.recycle();
     }
 
     protected void updateBorderBounds(Rect bounds) {
@@ -559,9 +559,7 @@ public class TaskView extends FrameLayout implements Reusable {
         }
         mModalness = modalness;
         mIconView.setAlpha(1 - modalness);
-        mDigitalWellBeingToast.updateBannerOffset(modalness,
-                mCurrentFullscreenParams.mCurrentDrawnInsets.top
-                        + mCurrentFullscreenParams.mCurrentDrawnInsets.bottom);
+        mDigitalWellBeingToast.updateBannerOffset(modalness);
     }
 
     public DigitalWellBeingToast getDigitalWellBeingToast() {
@@ -582,6 +580,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 mIconView, STAGE_POSITION_UNDEFINED);
         mSnapshotView.bind(task);
         setOrientationState(orientedState);
+        mDigitalWellBeingToast.initialize(mTask);
     }
 
     /**
@@ -651,7 +650,7 @@ public class TaskView extends FrameLayout implements Reusable {
      *         index 0 will contain the taskId, index 1 will be -1 indicating a null taskID value
      */
     public int[] getTaskIds() {
-        return mTaskIdContainer;
+        return Arrays.copyOf(mTaskIdContainer, mTaskIdContainer.length);
     }
 
     public boolean containsMultipleTasks() {
@@ -706,9 +705,12 @@ public class TaskView extends FrameLayout implements Reusable {
         }
         SplitSelectStateController splitSelectStateController =
                 recentsView.getSplitSelectController();
-        if (splitSelectStateController.isSplitSelectActive() &&
-                splitSelectStateController.getInitialTaskId() == getTask().key.id) {
-            // Prevent taps on the this taskview if it's being animated into split select state
+        // Disable taps for split selection animation unless we have multiple tasks
+        boolean disableTapsForSplitSelect =
+                splitSelectStateController.isSplitSelectActive()
+                        && splitSelectStateController.getInitialTaskId() == getTask().key.id
+                        && !containsMultipleTasks();
+        if (disableTapsForSplitSelect) {
             return false;
         }
 
@@ -716,6 +718,25 @@ public class TaskView extends FrameLayout implements Reusable {
             mLastTouchDownPosition.set(ev.getX(), ev.getY());
         }
         return super.dispatchTouchEvent(ev);
+    }
+
+    /**
+     * @return taskId that split selection was initiated with,
+     *         {@link ActivityTaskManager#INVALID_TASK_ID} if no tasks in this TaskView are part of
+     *         split selection
+     */
+    protected int getThisTaskCurrentlyInSplitSelection() {
+        SplitSelectStateController splitSelectController =
+                getRecentsView().getSplitSelectController();
+        int initSplitTaskId = INVALID_TASK_ID;
+        for (TaskIdAttributeContainer container : getTaskIdAttributeContainers()) {
+            int taskId = container.getTask().key.id;
+            if (taskId == splitSelectController.getInitialTaskId()) {
+                initSplitTaskId = taskId;
+                break;
+            }
+        }
+        return initSplitTaskId;
     }
 
     private void onClick(View view) {
@@ -740,13 +761,16 @@ public class TaskView extends FrameLayout implements Reusable {
         if (container != null) {
             return getRecentsView().confirmSplitSelect(this, container.getTask(),
                     container.getIconView().getDrawable(), container.getThumbnailView(),
-                    container.getThumbnailView().getThumbnail(), /* intent */ null);
+                    container.getThumbnailView().getThumbnail(), /* intent */ null,
+                    /* user */ null);
         }
         return false;
     }
 
     /**
      * Returns the task index of the last selected child task (0 or 1).
+     * If we contain multiple tasks and this TaskView is used as part of split selection, the
+     * selected child task index will be that of the remaining task.
      */
     protected int getLastSelectedChildTaskIndex() {
         return 0;
@@ -776,6 +800,14 @@ public class TaskView extends FrameLayout implements Reusable {
                     recentsView.addSideTaskLaunchCallback(callbackList);
                     return callbackList;
                 }
+                if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+                    // If the recents transition is running (ie. in live tile mode), then the start
+                    // of a new task will merge into the existing transition and it currently will
+                    // not be run independently, so we need to rely on the onTaskAppeared() call
+                    // for the new task to trigger the side launch callback to flush this runnable
+                    // list (which is usually flushed when the app launch animation finishes)
+                    recentsView.addSideTaskLaunchCallback(opts.onEndCallback);
+                }
                 return opts.onEndCallback;
             } else {
                 notifyTaskLaunchFailed(TAG);
@@ -790,23 +822,51 @@ public class TaskView extends FrameLayout implements Reusable {
      * Starts the task associated with this view without any animation
      */
     public void launchTask(@NonNull Consumer<Boolean> callback) {
-        launchTask(callback, false /* freezeTaskList */);
+        launchTask(callback, false /* isQuickswitch */);
     }
 
     /**
      * Starts the task associated with this view without any animation
      */
-    public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
+    public void launchTask(@NonNull Consumer<Boolean> callback, boolean isQuickswitch) {
         if (mTask != null) {
             TestLogging.recordEvent(
                     TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
 
+            final TaskRemovedDuringLaunchListener
+                    failureListener = new TaskRemovedDuringLaunchListener();
+            if (isQuickswitch) {
+                // We only listen for failures to launch in quickswitch because the during this
+                // gesture launcher is in the background state, vs other launches which are in
+                // the actual overview state
+                failureListener.register(mActivity, mTask.key.id, () -> {
+                    notifyTaskLaunchFailed(TAG);
+                    // Disable animations for now, as it is an edge case and the app usually covers
+                    // launcher and also any state transition animation also gets clobbered by
+                    // QuickstepTransitionManager.createWallpaperOpenAnimations when launcher
+                    // shows again
+                    getRecentsView().startHome(false /* animated */);
+                    RecentsView rv = getRecentsView();
+                    if (rv != null && rv.mSizeStrategy.getTaskbarController() != null) {
+                        // LauncherTaskbarUIController depends on the launcher state when checking
+                        // whether to handle resume, but that can come in before startHome() changes
+                        // the state, so force-refresh here to ensure the taskbar is updated
+                        rv.mSizeStrategy.getTaskbarController().refreshResumedState();
+                    }
+                });
+            }
             // Indicate success once the system has indicated that the transition has started
-            ActivityOptions opts = makeCustomAnimation(getContext(), 0, 0,
-                    () -> callback.accept(true), MAIN_EXECUTOR.getHandler());
+            ActivityOptions opts = ActivityOptions.makeCustomTaskAnimation(getContext(), 0, 0,
+                    MAIN_EXECUTOR.getHandler(),
+                    elapsedRealTime -> {
+                        callback.accept(true);
+                    },
+                    elapsedRealTime -> {
+                        failureListener.onTransitionFinished();
+                    });
             opts.setLaunchDisplayId(
                     getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
-            if (freezeTaskList) {
+            if (isQuickswitch) {
                 opts.setFreezeRecentTasksReordering();
             }
             opts.setDisableStartingWindow(mSnapshotView.shouldShowSplashView());
@@ -960,10 +1020,7 @@ public class TaskView extends FrameLayout implements Reusable {
             }
             if (needsUpdate(changes, FLAG_UPDATE_ICON)) {
                 mIconLoadRequest = iconCache.updateIconInBackground(mTask,
-                        (task) -> {
-                            setIcon(mIconView, task.icon);
-                            mDigitalWellBeingToast.initialize(mTask);
-                        });
+                        (task) -> setIcon(mIconView, task.icon));
             }
         } else {
             if (needsUpdate(changes, FLAG_UPDATE_THUMBNAIL)) {
@@ -1084,6 +1141,8 @@ public class TaskView extends FrameLayout implements Reusable {
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         int thumbnailTopMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
 
+        // TODO(b/271468547), we should default to setting trasnlations only on the snapshot instead
+        //  of a hybrid of both margins and translations
         LayoutParams snapshotParams = (LayoutParams) mSnapshotView.getLayoutParams();
         snapshotParams.topMargin = thumbnailTopMargin;
         mSnapshotView.setLayoutParams(snapshotParams);
@@ -1120,9 +1179,7 @@ public class TaskView extends FrameLayout implements Reusable {
         float scale = Interpolators.clampToProgress(FAST_OUT_SLOW_IN, lowerClamp, upperClamp)
                 .getInterpolation(progress);
         mIconView.setAlpha(scale);
-        mDigitalWellBeingToast.updateBannerOffset(1f - scale,
-                mCurrentFullscreenParams.mCurrentDrawnInsets.top
-                        + mCurrentFullscreenParams.mCurrentDrawnInsets.bottom);
+        mDigitalWellBeingToast.updateBannerOffset(1f - scale);
     }
 
     public void setIconScaleAnimStartProgress(float startProgress) {
@@ -1179,6 +1236,7 @@ public class TaskView extends FrameLayout implements Reusable {
         setAlpha(mStableAlpha);
         setIconScaleAndDim(1);
         setColorTint(0, 0);
+        mSnapshotView.resetViewTransforms();
     }
 
     public void setStableAlpha(float parentAlpha) {
@@ -1619,7 +1677,12 @@ public class TaskView extends FrameLayout implements Reusable {
             int boxWidth;
             int boxHeight;
             boolean isFocusedTask = isFocusedTask();
-            if (isFocusedTask || isDesktopTask()) {
+            if (isDesktopTask()) {
+                Rect lastComputedDesktopTaskSize =
+                        getRecentsView().getLastComputedDesktopTaskSize();
+                boxWidth = lastComputedDesktopTaskSize.width();
+                boxHeight = lastComputedDesktopTaskSize.height();
+            } else if (isFocusedTask) {
                 // Task will be focused and should use focused task size. Use focusTaskRatio
                 // that is associated with the original orientation of the focused task.
                 boxWidth = taskWidth;
@@ -1715,10 +1778,12 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     /**
-     *     Sets visibility for the thumbnail and associated elements (DWB banners and action chips).
-     *     IconView is unaffected.
+     *  Sets visibility for the thumbnail and associated elements (DWB banners and action chips).
+     *  IconView is unaffected.
+     *
+     * @param taskId is only used when setting visibility to a non-{@link View#VISIBLE} value
      */
-    void setThumbnailVisibility(int visibility) {
+    void setThumbnailVisibility(int visibility, int taskId) {
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             if (child != mIconView) {
@@ -1735,17 +1800,11 @@ public class TaskView extends FrameLayout implements Reusable {
         private final float mCornerRadius;
         private final float mWindowCornerRadius;
 
-        public RectF mCurrentDrawnInsets = new RectF();
         public float mCurrentDrawnCornerRadius;
-        /** The current scale we apply to the thumbnail to adjust for new left/right insets. */
-        public float mScale = 1;
-
-        private boolean mIsTaskbarTransient;
 
         public FullscreenDrawParams(Context context) {
             mCornerRadius = TaskCornerRadius.get(context);
             mWindowCornerRadius = QuickStepContract.getWindowCornerRadius(context);
-            mIsTaskbarTransient = DisplayController.isTransientTaskbar(context);
 
             mCurrentDrawnCornerRadius = mCornerRadius;
         }
@@ -1755,36 +1814,9 @@ public class TaskView extends FrameLayout implements Reusable {
          */
         public void setProgress(float fullscreenProgress, float parentScale, float taskViewScale,
                 int previewWidth, DeviceProfile dp, PreviewPositionHelper pph) {
-            RectF insets = getInsetsToDrawInFullscreen(pph, dp, mIsTaskbarTransient);
-
-            float currentInsetsLeft = insets.left * fullscreenProgress;
-            float currentInsetsTop = insets.top * fullscreenProgress;
-            float currentInsetsRight = insets.right * fullscreenProgress;
-            float currentInsetsBottom = insets.bottom * fullscreenProgress;
-            mCurrentDrawnInsets.set(
-                    currentInsetsLeft, currentInsetsTop, currentInsetsRight, currentInsetsBottom);
-
             mCurrentDrawnCornerRadius =
                     Utilities.mapRange(fullscreenProgress, mCornerRadius, mWindowCornerRadius)
                             / parentScale / taskViewScale;
-
-            // We scaled the thumbnail to fit the content (excluding insets) within task view width.
-            // Now that we are drawing left/right insets again, we need to scale down to fit them.
-            if (previewWidth > 0) {
-                mScale = previewWidth / (previewWidth + currentInsetsLeft + currentInsetsRight);
-            }
-        }
-
-        /**
-         * Insets to used for clipping the thumbnail (in case it is drawing outside its own space)
-         */
-        private static RectF getInsetsToDrawInFullscreen(PreviewPositionHelper pph,
-                DeviceProfile dp, boolean isTaskbarTransient) {
-            if (dp.isTaskbarPresent && isTaskbarTransient) {
-                return pph.getClippedInsets();
-            }
-            return dp.isTaskbarPresent && !dp.isTaskbarPresentInApps
-                    ? pph.getClippedInsets() : EMPTY_RECT_F;
         }
     }
 

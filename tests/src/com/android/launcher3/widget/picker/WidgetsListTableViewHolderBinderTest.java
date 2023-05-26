@@ -94,6 +94,7 @@ public final class WidgetsListTableViewHolderBinderTest {
         }).when(mIconCache).getTitleNoCache(any());
 
         mViewHolderBinder = new WidgetsListTableViewHolderBinder(
+                mContext,
                 LayoutInflater.from(mContext),
                 mOnIconClickListener,
                 mOnLongClickListener);
@@ -143,7 +144,7 @@ public final class WidgetsListTableViewHolderBinderTest {
 
             widgetItems.add(new WidgetItem(
                     LauncherAppWidgetProviderInfo.fromProviderInfo(mContext, widgetInfo),
-                    mTestProfile, mIconCache));
+                    mTestProfile, mIconCache, mContext));
         }
         return widgetItems;
     }

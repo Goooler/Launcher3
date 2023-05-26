@@ -13,7 +13,7 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<resources xmlns:android="http://schemas.android.com/apk/res/android">
+<resources xmlns:androidprv="http://schemas.android.com/apk/prv/res/android">
 
     <color name="chip_hint_foreground_color">#fff</color>
     <color name="chip_scrim_start_color">#39000000</color>
@@ -25,10 +25,6 @@
 
     <!-- Taskbar -->
     <color name="taskbar_nav_icon_selection_ripple">#E0E0E0</color>
-    <color name="taskbar_nav_icon_light_color">#ffffff</color>
-    <!-- The dark navigation button color is only used in the rare cases that taskbar isn't drawing
-    its background and the underlying app has requested dark buttons. -->
-    <color name="taskbar_nav_icon_dark_color">#99000000</color>
     <color name="taskbar_stashed_handle_light_color">#EBffffff</color>
     <color name="taskbar_stashed_handle_dark_color">#99000000</color>
 
@@ -41,13 +37,6 @@
     <!-- Must contrast gesture_tutorial_fake_wallpaper_color -->
     <color name="gesture_tutorial_fake_previous_task_view_color">#3C4043</color> <!-- Gray -->
     <color name="gesture_tutorial_taskbar_color">#E8EAED</color>
-
-    <!-- Redesigned gesture navigation tutorial -->
-    <color name="gesture_home_tutorial_background">#FFB399</color>
-    <color name="gesture_home_tutorial_swipe_up_rect">#3857C7</color>
-    <color name="gesture_back_tutorial_background">#F3A5B9</color>
-    <color name="gesture_back_tutorial_swipe_rect">#217500</color>
-    <color name="gesture_overview_tutorial_swipe_rect">#7E44AD</color>
 
     <!-- Mock hotseat -->
     <color name="mock_app_icon">#BDC1C6</color>
@@ -95,4 +84,8 @@
     <color name="lottie_yellow400">#fcc934</color>
     <color name="lottie_yellow600">#f9ab00</color>
 
+    <!-- Turn on work apps button -->
+    <color name="work_turn_on_stroke">?androidprv:attr/colorAccentPrimaryVariant</color>
+    <color name="work_fab_bg_color">?androidprv:attr/materialColorPrimaryFixedDim</color>
+    <color name="work_fab_icon_color">?androidprv:attr/materialColorOnPrimaryFixed</color>
 </resources>

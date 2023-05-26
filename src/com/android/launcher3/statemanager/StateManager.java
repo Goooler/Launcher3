@@ -184,6 +184,13 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
     public void reapplyState(boolean cancelCurrentAnimation) {
         boolean wasInAnimation = mConfig.currentAnimation != null;
         if (cancelCurrentAnimation) {
+            // Animation canceling can trigger a cleanup routine, causing problems when we are in a
+            // launcher state that relies on member variable data. So if we are in one of those
+            // states, accelerate the current animation to its end point rather than canceling it
+            // outright.
+            if (mState.shouldPreserveDataStateOnReapply() && mConfig.currentAnimation != null) {
+                mConfig.currentAnimation.end();
+            }
             mAtomicAnimationFactory.cancelAllStateElementAnimation();
             cancelAnimation();
         }
@@ -222,8 +229,10 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
                     listener.onAnimationEnd(null);
                 }
                 return;
-            } else if (!mConfig.userControlled && animated && mConfig.targetState == state) {
-                // We are running the same animation as requested
+            } else if ((!mConfig.userControlled && animated && mConfig.targetState == state)
+                    || mState.shouldPreserveDataStateOnReapply()) {
+                // We are running the same animation as requested, and/or target state should not be
+                // reset -- allow the current animation to complete instead of canceling it.
                 if (listener != null) {
                     mConfig.currentAnimation.addListener(listener);
                 }
