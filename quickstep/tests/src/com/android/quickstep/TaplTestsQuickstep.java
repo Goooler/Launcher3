@@ -26,6 +26,7 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import android.content.Intent;
+import android.platform.test.annotations.PlatinumTest;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -99,6 +100,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testWorkspaceSwitchToAllApps() {
         assertNotNull("switchToAllApps() returned null",
                 mLauncher.getWorkspace().switchToAllApps());
@@ -108,6 +110,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testOverview() throws Exception {
         startTestAppsWithCheck();
         // mLauncher.pressHome() also tests an important case of pressing home while in background.
@@ -175,6 +178,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @NavigationModeSwitch
     @PortraitLandscape
     @ScreenRecord // b/195673272
+    @PlatinumTest(focusArea = "launcher")
     public void testOverviewActions() throws Exception {
         // Experimenting for b/165029151:
         final Overview overview = mLauncher.goHome().switchToOverview();
@@ -209,6 +213,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @NavigationModeSwitch
     @PortraitLandscape
     @ScreenRecord // b/238461765
+    @PlatinumTest(focusArea = "launcher")
     public void testSwitchToOverview() throws Exception {
         startTestAppsWithCheck();
         assertNotNull("Workspace.switchToOverview() returned null",
@@ -221,6 +226,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testBackground() throws Exception {
         startAppFast(CALCULATOR_APP_PACKAGE);
         final LaunchedAppState launchedAppState = getAndAssertLaunchedApp();
@@ -275,6 +281,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testQuickSwitchFromApp() throws Exception {
         startTestActivity(2);
         startTestActivity(3);
@@ -304,6 +311,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     @Test
     @ScreenRecord // b/242163205
+    @PlatinumTest(focusArea = "launcher")
+    @TaskbarModeSwitch(mode = PERSISTENT)
     public void testQuickSwitchToPreviousAppForTablet() throws Exception {
         assumeTrue(mLauncher.isTablet());
         startTestActivity(2);
@@ -335,6 +344,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testQuickSwitchFromHome() throws Exception {
         startTestActivity(2);
         mLauncher.goHome().quickSwitchToPreviousApp();
@@ -346,6 +356,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @PortraitLandscape
     @NavigationModeSwitch
+    @PlatinumTest(focusArea = "launcher")
     public void testPressBack() throws Exception {
         InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity(
                 READ_DEVICE_CONFIG_PERMISSION);
@@ -364,6 +375,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @PortraitLandscape
     @TaskbarModeSwitch(mode = PERSISTENT)
+    @PlatinumTest(focusArea = "launcher")
     public void testOverviewForTablet() throws Exception {
         assumeTrue(mLauncher.isTablet());
 
@@ -425,6 +437,55 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         executeOnLauncher(
                 launcher -> assertEquals("Still have tasks after dismissing all",
                         0, getTaskCount(launcher)));
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testOverviewDeadzones() throws Exception {
+        startTestAppsWithCheck();
+
+        Overview overview = mLauncher.goHome().switchToOverview();
+        assertTrue("Launcher internal state should be Overview",
+                isInState(() -> LauncherState.OVERVIEW));
+        executeOnLauncher(
+                launcher -> assertTrue("Should have at least 3 tasks",
+                        getTaskCount(launcher) >= 3));
+
+        // It should not dismiss overview when tapping between tasks
+        overview.touchBetweenTasks();
+        overview = mLauncher.getOverview();
+        assertTrue("Launcher internal state should be Overview",
+                isInState(() -> LauncherState.OVERVIEW));
+
+        // Dismiss when tapping to the right of the focused task
+        overview.touchOutsideFirstTask();
+        assertTrue("Launcher internal state should be Home",
+                isInState(() -> LauncherState.NORMAL));
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testTaskbarDeadzonesForTablet() throws Exception {
+        assumeTrue(mLauncher.isTablet());
+
+        startTestAppsWithCheck();
+
+        Overview overview = mLauncher.goHome().switchToOverview();
+        assertTrue("Launcher internal state should be Overview",
+                isInState(() -> LauncherState.OVERVIEW));
+        executeOnLauncher(
+                launcher -> assertTrue("Should have at least 3 tasks",
+                        getTaskCount(launcher) >= 3));
+
+        // On persistent taskbar, it should not dismiss when tapping the taskbar
+        overview.touchTaskbarBottomCorner(/* tapRight= */ false);
+        assertTrue("Launcher internal state should be Overview",
+                isInState(() -> LauncherState.OVERVIEW));
+
+        // On persistent taskbar, it should not dismiss when tapping the taskbar
+        overview.touchTaskbarBottomCorner(/* tapRight= */ true);
+        assertTrue("Launcher internal state should be Overview",
+                isInState(() -> LauncherState.OVERVIEW));
     }
 
     @Test

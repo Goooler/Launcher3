@@ -13,9 +13,6 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<shape
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/gesture_home_tutorial_background" />
-    <corners android:radius="@dimen/gesture_tutorial_hotseat_icon_corner_radius" />
-</shape>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@android:color/system_neutral2_700"/>
+</selector>

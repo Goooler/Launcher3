@@ -147,6 +147,7 @@ import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -662,6 +663,14 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         } else {
             runningTasks = mGestureState.getRunningTask().getPlaceholderTasks();
         }
+
+        // Safeguard against any null tasks being sent to recents view, happens when quickswitching
+        // very quickly w/ split tasks because TopTaskTracker provides stale information compared to
+        // actual running tasks in the recents animation.
+        // TODO(b/236226779), Proper fix (ag/22237143)
+        if (Arrays.stream(runningTasks).anyMatch(Objects::isNull)) {
+            return;
+        }
         mRecentsView.onGestureAnimationStart(runningTasks, mDeviceState.getRotationTouchHelper());
     }
 
@@ -915,7 +924,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         if (DesktopTaskView.DESKTOP_MODE_SUPPORTED && targets.hasDesktopTasks()) {
             mRemoteTargetHandles = mTargetGluer.assignTargetsForDesktop(targets);
         } else {
+            int untrimmedAppCount = mRemoteTargetHandles.length;
             mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(targets);
+            if (mRemoteTargetHandles.length < untrimmedAppCount && mIsSwipeForSplit) {
+                updateIsGestureForSplit(mRemoteTargetHandles.length);
+                setupRecentsViewUi();
+            }
         }
         mRecentsAnimationController = controller;
         mRecentsAnimationTargets = targets;
@@ -2041,8 +2055,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         if (!hasTargets() || mRecentsAnimationController == null) {
             // If there are no targets or the animation not started, then there is nothing to finish
             mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED);
+            maybeAbortSwipePipToHome();
         } else {
-            maybeFinishSwipeToHome();
+            maybeFinishSwipePipToHome();
             finishRecentsControllerToHome(
                     () -> mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED));
         }
@@ -2054,11 +2069,24 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     /**
+     * Notifies SysUI that transition is aborted if applicable and also pass leash transactions
+     * from Launcher to WM.
+     */
+    private void maybeAbortSwipePipToHome() {
+        if (mIsSwipingPipToHome && mSwipePipToHomeAnimators[0] != null) {
+            SystemUiProxy.INSTANCE.get(mContext).abortSwipePipToHome(
+                    mSwipePipToHomeAnimator.getTaskId(),
+                    mSwipePipToHomeAnimator.getComponentName());
+            mIsSwipingPipToHome = false;
+        }
+    }
+
+    /**
      * Notifies SysUI that transition is finished if applicable and also pass leash transactions
      * from Launcher to WM.
      * This should happen before {@link #finishRecentsControllerToHome(Runnable)}.
      */
-    private void maybeFinishSwipeToHome() {
+    private void maybeFinishSwipePipToHome() {
         if (mIsSwipingPipToHome && mSwipePipToHomeAnimators[0] != null) {
             SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
                     mSwipePipToHomeAnimator.getTaskId(),
@@ -2246,6 +2274,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                                         targetCompat.taskId == mGestureState.getLastStartedTaskId())
                                 .findFirst();
                 if (!taskTargetOptional.isPresent()) {
+                    ActiveGestureLog.INSTANCE.addLog("No appeared task matching started task id");
                     finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
                     return;
                 }
@@ -2253,6 +2282,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 TaskView taskView = mRecentsView == null
                         ? null : mRecentsView.getTaskViewByTaskId(taskTarget.taskId);
                 if (taskView == null || !taskView.getThumbnail().shouldShowSplashView()) {
+                    ActiveGestureLog.INSTANCE.addLog("Invalid task view splash state");
                     finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
                     return;
                 }

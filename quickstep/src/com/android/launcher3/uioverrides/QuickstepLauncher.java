@@ -878,7 +878,9 @@ public class QuickstepLauncher extends Launcher {
 
     private void onTISConnected(TISBinder binder) {
         mTaskbarManager = binder.getTaskbarManager();
-        mTaskbarManager.setActivity(this);
+        if (mTaskbarManager != null) {
+            mTaskbarManager.setActivity(this);
+        }
         mOverviewCommandHelper = binder.getOverviewCommandHelper();
     }
 
@@ -1282,7 +1284,8 @@ public class QuickstepLauncher extends Launcher {
                             getActivityLaunchOptions(taskView, null).options));
             return;
         }
-        mSplitSelectStateController.launchTasks(
+        mSplitSelectStateController.launchExistingSplitPair(
+                null /* launchingTaskView */,
                 groupTask.task1.key.id,
                 groupTask.task2.key.id,
                 SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT,
