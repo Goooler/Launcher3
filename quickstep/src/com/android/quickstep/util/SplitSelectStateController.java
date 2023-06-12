@@ -28,6 +28,7 @@ import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_PENDINGINTE
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_PENDINGINTENT_TASK;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_SHORTCUT_TASK;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_SINGLE_INTENT_FULLSCREEN;
+import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_SINGLE_SHORTCUT_FULLSCREEN;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_SINGLE_TASK_FULLSCREEN;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_PENDINGINTENT;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_SHORTCUT;
@@ -201,13 +202,17 @@ public class SplitSelectStateController {
      * Pulls the list of active Tasks from RecentsModel, and finds the most recently active Task
      * matching a given ComponentName. Then uses that Task (which could be null) with the given
      * callback.
-     *
+     * <p>
      * Used in various task-switching or splitscreen operations when we need to check if there is a
      * currently running Task of a certain type and use the most recent one.
      */
-    public void findLastActiveTaskAndRunCallback(ComponentKey componentKey,
-            Consumer<Task> callback) {
+    public void findLastActiveTaskAndRunCallback(
+            @Nullable ComponentKey componentKey, Consumer<Task> callback) {
         mRecentTasksModel.getTasks(taskGroups -> {
+            if (componentKey == null) {
+                callback.accept(null);
+                return;
+            }
             Task lastActiveTask = null;
             // Loop through tasks in reverse, since they are ordered with most-recent tasks last.
             for (int i = taskGroups.size() - 1; i >= 0; i--) {
@@ -232,7 +237,7 @@ public class SplitSelectStateController {
      * Checks if a given Task is the most recently-active Task of type componentName. Used for
      * selecting already-running Tasks for splitscreen.
      */
-    public boolean isInstanceOfComponent(@Nullable Task task, ComponentKey componentKey) {
+    public boolean isInstanceOfComponent(@Nullable Task task, @NonNull ComponentKey componentKey) {
         // Exclude the task that is already staged
         if (task == null || task.key.id == mInitialTaskId) {
             return false;
@@ -524,6 +529,7 @@ public class SplitSelectStateController {
         PendingIntent firstPI = launchData.getInitialPendingIntent();
         int firstUserId = launchData.getInitialUserId();
         int initialStagePosition = launchData.getInitialStagePosition();
+        ShortcutInfo initialShortcut = launchData.getInitialShortcut();
         Bundle optionsBundle = options1.toBundle();
 
         final RemoteSplitLaunchTransitionRunner animationRunner =
@@ -531,17 +537,19 @@ public class SplitSelectStateController {
         final RemoteTransition remoteTransition = new RemoteTransition(animationRunner,
                 ActivityThread.currentActivityThread().getApplicationThread(),
                 "LaunchSplitPair");
-        Pair<InstanceId, com.android.launcher3.logging.InstanceId> instanceIds =
-                LogUtils.getShellShareableInstanceId();
+        InstanceId instanceId = LogUtils.getShellShareableInstanceId().first;
         if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
             switch (launchData.getSplitLaunchType()) {
                 case SPLIT_SINGLE_TASK_FULLSCREEN -> mSystemUiProxy.startTasks(firstTaskId,
                         optionsBundle, secondTaskId, null /* options2 */, initialStagePosition,
-                        DEFAULT_SPLIT_RATIO, remoteTransition, instanceIds.first);
+                        DEFAULT_SPLIT_RATIO, remoteTransition, instanceId);
                 case SPLIT_SINGLE_INTENT_FULLSCREEN -> mSystemUiProxy.startIntentAndTask(firstPI,
                         firstUserId, optionsBundle, secondTaskId, null /*options2*/,
                         initialStagePosition, DEFAULT_SPLIT_RATIO, remoteTransition,
-                        instanceIds.first);
+                        instanceId);
+                case SPLIT_SINGLE_SHORTCUT_FULLSCREEN -> mSystemUiProxy.startShortcutAndTask(
+                        initialShortcut, optionsBundle, firstTaskId, null /* options2 */,
+                        initialStagePosition, DEFAULT_SPLIT_RATIO, remoteTransition, instanceId);
             }
         } else {
             final RemoteAnimationAdapter adapter = getLegacyRemoteAdapter(firstTaskId,
@@ -549,12 +557,16 @@ public class SplitSelectStateController {
             switch (launchData.getSplitLaunchType()) {
                 case SPLIT_SINGLE_TASK_FULLSCREEN -> mSystemUiProxy.startTasksWithLegacyTransition(
                         firstTaskId, optionsBundle, secondTaskId, null /* options2 */,
-                        initialStagePosition, DEFAULT_SPLIT_RATIO, adapter, instanceIds.first);
+                        initialStagePosition, DEFAULT_SPLIT_RATIO, adapter, instanceId);
                 case SPLIT_SINGLE_INTENT_FULLSCREEN ->
                         mSystemUiProxy.startIntentAndTaskWithLegacyTransition(firstPI, firstUserId,
                                 optionsBundle, secondTaskId, null /*options2*/,
                                 initialStagePosition, DEFAULT_SPLIT_RATIO, adapter,
-                                instanceIds.first);
+                                instanceId);
+                case SPLIT_SINGLE_SHORTCUT_FULLSCREEN ->
+                        mSystemUiProxy.startShortcutAndTaskWithLegacyTransition(
+                                initialShortcut, optionsBundle, firstTaskId, null /* options2 */,
+                                initialStagePosition, DEFAULT_SPLIT_RATIO, adapter, instanceId);
             }
         }
     }
