@@ -28,9 +28,6 @@
     <string name="shortcut_not_available" msgid="2536503539825726397">"Acceso directo no disponible"</string>
     <string name="home_screen" msgid="5629429142036709174">"Inicio"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Pantalla dividida"</string>
-    <string name="split_screen_position_top" msgid="1504965011158689649">"Dividir parte superior"</string>
-    <string name="split_screen_position_left" msgid="7537793098851830883">"Dividir parte izquierda"</string>
-    <string name="split_screen_position_right" msgid="1569377524925193369">"Dividir parte derecha"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Información de la aplicación %1$s"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Mantén pulsado un widget para moverlo"</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Toca dos veces y mantén pulsado un widget para moverlo o usar acciones personalizadas."</string>
@@ -40,6 +37,7 @@
     <string name="add_item_request_drag_hint" msgid="8730547755622776606">"Mantén pulsado el widget para moverlo por la pantalla de inicio"</string>
     <string name="add_to_home_screen" msgid="9168649446635919791">"Añadir a pantalla de inicio"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g> añadido a la pantalla de inicio"</string>
+    <string name="suggested_widgets_header_title" msgid="1844314680798145222">"Sugerencias"</string>
     <string name="widgets_count" msgid="6467746476364652096">"{count,plural, =1{# widget}other{# widgets}}"</string>
     <string name="shortcuts_count" msgid="8471715556199592381">"{count,plural, =1{# acceso directo}other{# accesos directos}}"</string>
     <string name="widgets_and_shortcuts_count" msgid="7209136747878365116">"<xliff:g id="WIDGETS_COUNT">%1$s</xliff:g>, <xliff:g id="SHORTCUTS_COUNT">%2$s</xliff:g>"</string>
@@ -106,7 +104,7 @@
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Inhabilitado por el administrador"</string>
     <string name="allow_rotation_title" msgid="7222049633713050106">"Permitir rotación de la pantalla de inicio"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Al girar el teléfono"</string>
-    <string name="notification_dots_title" msgid="9062440428204120317">"Puntos de notificación"</string>
+    <string name="notification_dots_title" msgid="9062440428204120317">"Burbujas de notificación"</string>
     <string name="notification_dots_desc_on" msgid="1679848116452218908">"Activado"</string>
     <string name="notification_dots_desc_off" msgid="1760796511504341095">"Desactivadas"</string>
     <string name="title_missing_notification_access" msgid="7503287056163941064">"Se necesita acceso a las notificaciones"</string>
@@ -171,6 +169,6 @@
     <string name="work_apps_enable_btn_text" msgid="1156432622148413741">"Activar aplicaciones de trabajo"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtro"</string>
     <string name="search_pref_screen_title" msgid="3258959643336315962">"Busca en tu teléfono"</string>
-    <string name="search_pref_screen_title_tablet" msgid="5220319680451343959">"Busca en tu tablet"</string>
+    <string name="search_pref_screen_title_tablet" msgid="5220319680451343959">"Buscar en tu tablet"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Se ha producido un error: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
 </resources>
