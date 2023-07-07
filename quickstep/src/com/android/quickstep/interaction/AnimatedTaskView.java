@@ -15,6 +15,8 @@
  */
 package com.android.quickstep.interaction;
 
+import static com.android.launcher3.config.FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -53,17 +55,16 @@ public class AnimatedTaskView extends ConstraintLayout {
     private float mTaskViewAnimatedRadius;
 
     public AnimatedTaskView(@NonNull Context context) {
-        super(context);
+        this(context, null);
     }
 
-    public AnimatedTaskView(@NonNull Context context,
-            @Nullable AttributeSet attrs) {
-        super(context, attrs);
+    public AnimatedTaskView(@NonNull Context context, @Nullable AttributeSet attrs) {
+        this(context, attrs, 0);
     }
 
     public AnimatedTaskView(
             @NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+        this(context, attrs, defStyleAttr, 0);
     }
 
     public AnimatedTaskView(
@@ -112,17 +113,7 @@ public class AnimatedTaskView extends ConstraintLayout {
             @Override
             public void onAnimationStart(Animator animation) {
                 super.onAnimationStart(animation);
-
-                mTaskViewAnimatedRect.set(outlineStartRect);
-                mTaskViewAnimatedRadius = outlineStartRadius;
-
-                mFullTaskView.setClipToOutline(true);
-                mFullTaskView.setOutlineProvider(new ViewOutlineProvider() {
-                    @Override
-                    public void getOutline(View view, Outline outline) {
-                        outline.setRoundRect(mTaskViewAnimatedRect, mTaskViewAnimatedRadius);
-                    }
-                });
+                addAnimatedOutlineProvider(mFullTaskView, outlineStartRect, outlineStartRadius);
             }
 
             @Override
@@ -184,6 +175,11 @@ public class AnimatedTaskView extends ConstraintLayout {
 
     void setFakeTaskViewFillColor(@ColorInt int colorResId) {
         mFullTaskView.setBackgroundColor(colorResId);
+
+        if (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()){
+            mTopTaskView.getBackground().setTint(colorResId);
+            mBottomTaskView.getBackground().setTint(colorResId);
+        }
     }
 
     @Override
@@ -195,5 +191,18 @@ public class AnimatedTaskView extends ConstraintLayout {
     public void setOutlineProvider(ViewOutlineProvider provider) {
         mTaskViewOutlineProvider = provider;
         mFullTaskView.setOutlineProvider(mTaskViewOutlineProvider);
+    }
+
+    private void addAnimatedOutlineProvider(View view,
+            Rect outlineStartRect, float outlineStartRadius){
+        mTaskViewAnimatedRect.set(outlineStartRect);
+        mTaskViewAnimatedRadius = outlineStartRadius;
+        view.setClipToOutline(true);
+        view.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(mTaskViewAnimatedRect, mTaskViewAnimatedRadius);
+            }
+        });
     }
 }

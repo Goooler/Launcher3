@@ -27,7 +27,6 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
-import static com.android.launcher3.util.NavigationMode.THREE_BUTTONS;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
@@ -51,8 +50,6 @@ import android.widget.LinearLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
@@ -517,57 +514,29 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public void setSplitInstructionsParams(View out, DeviceProfile dp, int splitInstructionsHeight,
-            int splitInstructionsWidth, int threeButtonNavShift) {
+            int splitInstructionsWidth) {
         out.setPivotX(0);
         out.setPivotY(splitInstructionsHeight);
         out.setRotation(getDegreesRotated());
         int distanceToEdge;
-        if ((DisplayController.getNavigationMode(out.getContext()) == THREE_BUTTONS)
-                && (dp.isTwoPanels || dp.isTablet)
-                // If taskbar is in overview, overview action has dedicated space above nav buttons
-                && !FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
-            // If 3-button nav is active, align the splitInstructionsView with it.
-            distanceToEdge = dp.getTaskbarOffsetY()
-                    + ((dp.taskbarSize - splitInstructionsHeight) / 2);
-        } else {
-            // If 3-button nav is not active, set bottom margin according to spec.
-            if (dp.isPhone) {
-                if (dp.isLandscape) {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_phone_landscape);
-                } else {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_phone_portrait);
-                }
-            } else if (dp.isTwoPanels) {
-                if (dp.isLandscape) {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_twopanels_landscape);
-                } else {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_twopanels_portrait);
-                }
+        if (dp.isPhone) {
+            if (dp.isLandscape) {
+                distanceToEdge = out.getResources().getDimensionPixelSize(
+                        R.dimen.split_instructions_bottom_margin_phone_landscape);
             } else {
-                if (dp.isLandscape) {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_tablet_landscape);
-                } else {
-                    distanceToEdge = out.getResources().getDimensionPixelSize(
-                            R.dimen.split_instructions_bottom_margin_tablet_portrait);
-                }
+                distanceToEdge = out.getResources().getDimensionPixelSize(
+                        R.dimen.split_instructions_bottom_margin_phone_portrait);
             }
+        } else {
+            distanceToEdge = dp.getOverviewActionsClaimedSpaceBelow();
         }
 
         // Center the view in case of unbalanced insets on left or right of screen
         int insetCorrectionX = (dp.getInsets().right - dp.getInsets().left) / 2;
         // Adjust for any insets on the bottom edge
         int insetCorrectionY = dp.getInsets().bottom;
-        // Adjust for taskbar in overview
-        int taskbarCorrectionY =
-                dp.isTaskbarPresent && FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()
-                        ? dp.taskbarSize : 0;
-        out.setTranslationX(insetCorrectionX + threeButtonNavShift);
-        out.setTranslationY(-distanceToEdge + insetCorrectionY - taskbarCorrectionY);
+        out.setTranslationX(insetCorrectionX);
+        out.setTranslationY(-distanceToEdge + insetCorrectionY);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) out.getLayoutParams();
         lp.gravity = CENTER_HORIZONTAL | BOTTOM;
         out.setLayoutParams(lp);
@@ -613,25 +582,24 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
                 ? splitInfo.dividerHeightPercent
                 : splitInfo.dividerWidthPercent;
 
-        int deviceHeightWithoutTaskbar = dp.availableHeightPx - dp.taskbarSize;
-        float scale = (float) outRect.height() / deviceHeightWithoutTaskbar;
+        float scale = (float) outRect.height() / dp.availableHeightPx;
         float topTaskHeight = dp.availableHeightPx * topLeftTaskPercent;
         float scaledTopTaskHeight = topTaskHeight * scale;
         float dividerHeight = dp.availableHeightPx * dividerBarPercent;
         float scaledDividerHeight = dividerHeight * scale;
 
         if (desiredStagePosition == SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT) {
-            if (splitInfo.appsStackedVertically) {
-                outRect.bottom = Math.round(outRect.top + scaledTopTaskHeight);
-            } else {
+            if (dp.isLandscape) {
                 outRect.right = outRect.left + Math.round(outRect.width() * topLeftTaskPercent);
+            } else {
+                outRect.bottom = Math.round(outRect.top + scaledTopTaskHeight);
             }
         } else {
-            if (splitInfo.appsStackedVertically) {
-                outRect.top += Math.round(scaledTopTaskHeight + scaledDividerHeight);
-            } else {
+            if (dp.isLandscape) {
                 outRect.left += Math.round(outRect.width()
                         * (topLeftTaskPercent + dividerBarPercent));
+            } else {
+                outRect.top += Math.round(scaledTopTaskHeight + scaledDividerHeight);
             }
         }
     }
@@ -642,9 +610,9 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
             DeviceProfile dp, boolean isRtl) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
-        int dividerBar = Math.round(splitBoundsConfig.appsStackedVertically
-                ? splitBoundsConfig.dividerHeightPercent * dp.availableHeightPx
-                : splitBoundsConfig.dividerWidthPercent * parentWidth);
+        float dividerScale = splitBoundsConfig.appsStackedVertically
+                ? splitBoundsConfig.dividerHeightPercent
+                : splitBoundsConfig.dividerWidthPercent;
         int primarySnapshotHeight;
         int primarySnapshotWidth;
         int secondarySnapshotHeight;
@@ -652,12 +620,13 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
         float taskPercent = splitBoundsConfig.appsStackedVertically ?
                 splitBoundsConfig.topTaskPercent : splitBoundsConfig.leftTaskPercent;
         if (dp.isLandscape) {
+            int scaledDividerBar = Math.round(parentWidth * dividerScale);
             primarySnapshotHeight = totalThumbnailHeight;
             primarySnapshotWidth = Math.round(parentWidth * taskPercent);
 
             secondarySnapshotHeight = totalThumbnailHeight;
-            secondarySnapshotWidth = parentWidth - primarySnapshotWidth - dividerBar;
-            int translationX = primarySnapshotWidth + dividerBar;
+            secondarySnapshotWidth = parentWidth - primarySnapshotWidth - scaledDividerBar;
+            int translationX = primarySnapshotWidth + scaledDividerBar;
             if (isRtl) {
                 primarySnapshot.setTranslationX(-translationX);
                 secondarySnapshot.setTranslationX(0);
@@ -666,11 +635,13 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
                 primarySnapshot.setTranslationX(0);
             }
             secondarySnapshot.setTranslationY(spaceAboveSnapshot);
+
+            // Reset unused translations
+            primarySnapshot.setTranslationY(0);
         } else {
-            int deviceHeightWithoutTaskbar = dp.availableHeightPx - dp.taskbarSize;
-            float scale = (float) totalThumbnailHeight / deviceHeightWithoutTaskbar;
+            float scale = (float) totalThumbnailHeight / dp.availableHeightPx;
             float topTaskHeight = dp.availableHeightPx * taskPercent;
-            float finalDividerHeight = dividerBar * scale;
+            float finalDividerHeight = Math.round(totalThumbnailHeight * dividerScale);
             float scaledTopTaskHeight = topTaskHeight * scale;
             primarySnapshotWidth = parentWidth;
             primarySnapshotHeight = Math.round(scaledTopTaskHeight);
@@ -700,6 +671,10 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
                 View.MeasureSpec.makeMeasureSpec(secondarySnapshotWidth, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(secondarySnapshotHeight,
                         View.MeasureSpec.EXACTLY));
+        primarySnapshot.setScaleX(1);
+        secondarySnapshot.setScaleX(1);
+        primarySnapshot.setScaleY(1);
+        secondarySnapshot.setScaleY(1);
     }
 
     @Override
@@ -730,13 +705,13 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
                     : deviceProfile.getInsets().left;
             int fullscreenMidpointFromBottom = ((deviceProfile.widthPx
                     - fullscreenInsetThickness) / 2);
-            float midpointFromBottomPct = (float) fullscreenMidpointFromBottom
+            float midpointFromEndPct = (float) fullscreenMidpointFromBottom
                     / deviceProfile.widthPx;
             float insetPct = (float) fullscreenInsetThickness / deviceProfile.widthPx;
             int spaceAboveSnapshots = 0;
             int overviewThumbnailAreaThickness = groupedTaskViewWidth - spaceAboveSnapshots;
             int bottomToMidpointOffset = (int) (overviewThumbnailAreaThickness
-                    * midpointFromBottomPct);
+                    * midpointFromEndPct);
             int insetOffset = (int) (overviewThumbnailAreaThickness * insetPct);
 
             if (deviceProfile.isSeascape()) {

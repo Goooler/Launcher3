@@ -65,7 +65,6 @@ public class PredictionRowView<T extends Context & ActivityContext>
     private FloatingHeaderView mParent;
 
     private boolean mPredictionsEnabled = false;
-    private @Nullable List<ItemInfo> mPendingPredictedItems;
     private OnLongClickListener mOnIconLongClickListener = ItemLongClickListener.INSTANCE_ALL_APPS;
 
     public PredictionRowView(@NonNull Context context) {
@@ -78,7 +77,6 @@ public class PredictionRowView<T extends Context & ActivityContext>
 
         mFocusHelper = new SimpleFocusIndicatorHelper(this);
         mActivityContext = ActivityContext.lookupContext(context);
-        mActivityContext.addOnDeviceProfileChangeListener(this);
         mNumPredictedAppsPerRow = mActivityContext.getDeviceProfile().numShownAllAppsColumns;
         updateVisibility();
     }
@@ -86,6 +84,13 @@ public class PredictionRowView<T extends Context & ActivityContext>
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        mActivityContext.addOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mActivityContext.removeOnDeviceProfileChangeListener(this);
     }
 
     public void setup(FloatingHeaderView parent, FloatingHeaderRow[] rows, boolean tabsHidden) {
@@ -101,12 +106,22 @@ public class PredictionRowView<T extends Context & ActivityContext>
                 mActivityContext.getAppsView().getAppsStore().unregisterIconContainer(this);
             }
         }
+
+        // Set the predicted row in All Apps' text line to 1.
+        if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get()
+                || FeatureFlags.ENABLE_TWOLINE_DEVICESEARCH.get()) {
+            for (int i = 0; i < getChildCount(); i++) {
+                BubbleTextView icon = (BubbleTextView) getChildAt(i);
+                icon.setMaxLines(1);
+            }
+        }
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(getExpectedHeight(),
                 MeasureSpec.EXACTLY));
+        updateVisibility();
     }
 
     @Override
@@ -159,18 +174,10 @@ public class PredictionRowView<T extends Context & ActivityContext>
      * we can optimize by swapping them in place.
      */
     public void setPredictedApps(List<ItemInfo> items) {
-        if (!FeatureFlags.ENABLE_APP_PREDICTIONS_WHILE_VISIBLE.get()
-                && !mActivityContext.isBindingItems()
-                && isShown()
-                && getWindowVisibility() == View.VISIBLE) {
-            mPendingPredictedItems = items;
-            return;
-        }
         applyPredictedApps(items);
     }
 
     private void applyPredictedApps(List<ItemInfo> items) {
-        mPendingPredictedItems = null;
         mPredictedApps.clear();
         mPredictedApps.addAll(items.stream()
                 .filter(itemInfo -> itemInfo instanceof WorkspaceItemInfo)
@@ -265,13 +272,4 @@ public class PredictionRowView<T extends Context & ActivityContext>
         return getChildAt(0);
     }
 
-
-    @Override
-    public void onVisibilityAggregated(boolean isVisible) {
-        super.onVisibilityAggregated(isVisible);
-
-        if (mPendingPredictedItems != null && !isVisible) {
-            applyPredictedApps(mPendingPredictedItems);
-        }
-    }
 }

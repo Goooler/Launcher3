@@ -52,6 +52,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.states.RotationHelper;
+import com.android.launcher3.uioverrides.flags.DeveloperOptionsFragment;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.DisplayController;
 
@@ -248,6 +249,8 @@ public class SettingsActivity extends FragmentActivity
                         bottomPadding + insets.getSystemWindowInsetBottom());
                 return insets.consumeSystemWindowInsets();
             });
+            // Overriding Text Direction in the Androidx preference library to support RTL
+            view.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         }
 
         @Override

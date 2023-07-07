@@ -75,11 +75,12 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
         clipToOutline = true
 
         shouldScaleArrow = true
+        mIsArrowRotated = true
         // This synchronizes the arrow and menu to open at the same time
-        OPEN_CHILD_FADE_START_DELAY = OPEN_FADE_START_DELAY
-        OPEN_CHILD_FADE_DURATION = OPEN_FADE_DURATION
-        CLOSE_FADE_START_DELAY = CLOSE_CHILD_FADE_START_DELAY
-        CLOSE_FADE_DURATION = CLOSE_CHILD_FADE_DURATION
+        mOpenChildFadeStartDelay = mOpenFadeStartDelay
+        mOpenChildFadeDuration = mOpenFadeDuration
+        mCloseFadeStartDelay = mCloseChildFadeStartDelay
+        mCloseFadeDuration = mCloseChildFadeDuration
     }
 
     private var alignedOptionIndex: Int = 0
@@ -212,7 +213,7 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
         scrim?.let {
             anim.play(
                 ObjectAnimator.ofFloat(it, View.ALPHA, 0f, scrimAlpha)
-                    .setDuration(OPEN_DURATION.toLong())
+                    .setDuration(mOpenDuration.toLong())
             )
         }
     }
@@ -221,7 +222,7 @@ class TaskMenuViewWithArrow<T : BaseDraggingActivity> : ArrowPopup<T> {
         scrim?.let {
             anim.play(
                 ObjectAnimator.ofFloat(it, View.ALPHA, scrimAlpha, 0f)
-                    .setDuration(CLOSE_DURATION.toLong())
+                    .setDuration(mCloseDuration.toLong())
             )
         }
     }

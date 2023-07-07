@@ -47,9 +47,7 @@ public class DesktopNavbarButtonsViewController extends NavbarButtonsViewControl
         mStartContextualContainer = mNavButtonsView.findViewById(R.id.start_contextual_buttons);
         mAllAppsButton = LayoutInflater.from(context)
                 .inflate(R.layout.taskbar_all_apps_button, mStartContextualContainer, false);
-        mAllAppsButton.setOnClickListener((View v) -> {
-            mControllers.taskbarAllAppsController.show();
-        });
+        mAllAppsButton.setOnClickListener(v -> mControllers.taskbarAllAppsController.toggle());
     }
 
     /**
@@ -58,7 +56,7 @@ public class DesktopNavbarButtonsViewController extends NavbarButtonsViewControl
     @Override
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
-        mNavButtonsView.getLayoutParams().height = mContext.getDeviceProfile().taskbarSize;
+        mNavButtonsView.getLayoutParams().height = mContext.getDeviceProfile().taskbarHeight;
 
         // Quick settings and notifications buttons
         addButton(R.drawable.ic_sysbar_quick_settings, BUTTON_QUICK_SETTINGS,

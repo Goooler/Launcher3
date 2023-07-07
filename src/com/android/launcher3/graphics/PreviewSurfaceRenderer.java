@@ -16,6 +16,7 @@
 
 package com.android.launcher3.graphics;
 
+import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -50,8 +51,12 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.graphics.LauncherPreviewRenderer.PreviewContext;
 import com.android.launcher3.model.BgDataModel;
+import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.GridSizeMigrationUtil;
+import com.android.launcher3.model.LauncherBinder;
 import com.android.launcher3.model.LoaderTask;
+import com.android.launcher3.model.ModelDbController;
+import com.android.launcher3.provider.LauncherDbUtils;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Themes;
@@ -87,6 +92,8 @@ public class PreviewSurfaceRenderer {
     private final SurfaceControlViewHost mSurfaceControlViewHost;
 
     private boolean mDestroyed = false;
+    private LauncherPreviewRenderer mRenderer;
+    private boolean mHideQsb;
 
     public PreviewSurfaceRenderer(Context context, Bundle bundle) throws Exception {
         mContext = context;
@@ -97,6 +104,7 @@ public class PreviewSurfaceRenderer {
             gridName = InvariantDeviceProfile.getCurrentGridName(context);
         }
         mWallpaperColors = bundle.getParcelable(KEY_COLORS);
+        mHideQsb = bundle.getBoolean(GridCustomizationsProvider.KEY_HIDE_BOTTOM_ROW);
         mIdp = new InvariantDeviceProfile(context, gridName);
 
         mHostToken = bundle.getBinder(KEY_HOST_TOKEN);
@@ -142,7 +150,9 @@ public class PreviewSurfaceRenderer {
         final String query = LauncherSettings.Favorites.ITEM_TYPE + " = "
                 + LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
 
-        try (Cursor c = context.getContentResolver().query(LauncherSettings.Favorites.CONTENT_URI,
+        ModelDbController mainController =
+                LauncherAppState.getInstance(mContext).getModel().getModelDbController();
+        try (Cursor c = mainController.query(TABLE_NAME,
                 new String[] {
                         LauncherSettings.Favorites.APPWIDGET_ID,
                         LauncherSettings.Favorites.SPANX,
@@ -174,10 +184,19 @@ public class PreviewSurfaceRenderer {
         MODEL_EXECUTOR.execute(this::loadModelData);
     }
 
+    /**
+     * Hides the components in the bottom row.
+     *
+     * @param hide True to hide and false to show.
+     */
+    public void hideBottomRow(boolean hide) {
+        if (mRenderer != null) {
+            mRenderer.hideBottomRow(hide);
+        }
+    }
+
     @WorkerThread
     private void loadModelData() {
-        final boolean migrated = doGridMigrationIfNecessary();
-
         final Context inflationContext;
         if (mWallpaperColors != null) {
             // Create a themed context, without affecting the main application context
@@ -195,28 +214,41 @@ public class PreviewSurfaceRenderer {
                     Themes.getActivityThemeRes(mContext));
         }
 
-        if (migrated) {
+        if (GridSizeMigrationUtil.needsToMigrate(inflationContext, mIdp)) {
+            // Start the migration
             PreviewContext previewContext = new PreviewContext(inflationContext, mIdp);
+            // Copy existing data to preview DB
+            LauncherDbUtils.copyTable(LauncherAppState.getInstance(mContext)
+                    .getModel().getModelDbController().getDb(),
+                    TABLE_NAME,
+                    LauncherAppState.getInstance(previewContext)
+                            .getModel().getModelDbController().getDb(),
+                    TABLE_NAME,
+                    mContext);
+            LauncherAppState.getInstance(previewContext)
+                    .getModel().getModelDbController().clearEmptyDbFlag();
+
+            BgDataModel bgModel = new BgDataModel();
             new LoaderTask(
                     LauncherAppState.getInstance(previewContext),
                     /* bgAllAppsList= */ null,
-                    new BgDataModel(),
+                    bgModel,
                     LauncherAppState.getInstance(previewContext).getModel().getModelDelegate(),
-                    /* results= */ null) {
+                    new LauncherBinder(LauncherAppState.getInstance(previewContext), bgModel,
+                            /* bgAllAppsList= */ null, new Callbacks[0])) {
 
                 @Override
                 public void run() {
                     DeviceProfile deviceProfile = mIdp.getDeviceProfile(previewContext);
                     String query =
                             LauncherSettings.Favorites.SCREEN + " = " + Workspace.FIRST_SCREEN_ID
-                            + " or " + LauncherSettings.Favorites.CONTAINER + " = "
-                            + LauncherSettings.Favorites.CONTAINER_HOTSEAT;
+                                    + " or " + LauncherSettings.Favorites.CONTAINER + " = "
+                                    + LauncherSettings.Favorites.CONTAINER_HOTSEAT;
                     if (deviceProfile.isTwoPanels) {
                         query += " or " + LauncherSettings.Favorites.SCREEN + " = "
                                 + Workspace.SECOND_SCREEN_ID;
                     }
-                    loadWorkspace(new ArrayList<>(), LauncherSettings.Favorites.PREVIEW_CONTENT_URI,
-                            query);
+                    loadWorkspace(new ArrayList<>(), query, null);
 
                     final SparseArray<Size> spanInfo =
                             getLoadedLauncherWidgetInfo(previewContext.getBaseContext());
@@ -239,14 +271,6 @@ public class PreviewSurfaceRenderer {
         }
     }
 
-    @WorkerThread
-    private boolean doGridMigrationIfNecessary() {
-        if (!GridSizeMigrationUtil.needsToMigrate(mContext, mIdp)) {
-            return false;
-        }
-        return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, mIdp);
-    }
-
     @UiThread
     private void renderView(Context inflationContext, BgDataModel dataModel,
             Map<ComponentKey, AppWidgetProviderInfo> widgetProviderInfoMap,
@@ -254,8 +278,10 @@ public class PreviewSurfaceRenderer {
         if (mDestroyed) {
             return;
         }
-        View view = new LauncherPreviewRenderer(inflationContext, mIdp, mWallpaperColors,
-                launcherWidgetSpanInfo).getRenderedView(dataModel, widgetProviderInfoMap);
+        mRenderer = new LauncherPreviewRenderer(inflationContext, mIdp,
+                mWallpaperColors, launcherWidgetSpanInfo);
+        mRenderer.hideBottomRow(mHideQsb);
+        View view = mRenderer.getRenderedView(dataModel, widgetProviderInfoMap);
         // This aspect scales the view to fit in the surface and centers it
         final float scale = Math.min(mWidth / (float) view.getMeasuredWidth(),
                 mHeight / (float) view.getMeasuredHeight());

@@ -119,10 +119,11 @@ public final class Workspace extends Home {
      *
      * The qsb must already be visible when calling this method.
      */
-    public HomeQsb getQsb() {
+    @NonNull
+    public Qsb getQsb() {
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                 "want to get the home qsb")) {
-            return new HomeQsb(mLauncher);
+            return new HomeQsb(mLauncher, mHotseat);
         }
     }
 
@@ -432,7 +433,7 @@ public final class Workspace extends Home {
     }
 
     /** Returns the index of the current page */
-    static int geCurrentPage(LauncherInstrumentation launcher) {
+    private static int geCurrentPage(LauncherInstrumentation launcher) {
         return launcher.getTestInfo(TestProtocol.REQUEST_WORKSPACE_CURRENT_PAGE_INDEX).getInt(
                 TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
@@ -601,8 +602,8 @@ public final class Workspace extends Home {
      * @param y
      * @return the finishing position of the drag.
      */
-    static Point dragToGivenWorkspace(LauncherInstrumentation launcher, Point currentPosition,
-            int destinationWorkspaceIndex, int y) {
+    private static Point dragToGivenWorkspace(LauncherInstrumentation launcher,
+            Point currentPosition, int destinationWorkspaceIndex, int y) {
         final long downTime = SystemClock.uptimeMillis();
         int displayX = launcher.getRealDisplaySize().x;
         int currentPage = Workspace.geCurrentPage(launcher);

@@ -21,7 +21,6 @@ import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_UP;
 import static android.view.WindowManager.LayoutParams.FLAG_SLIPPERY;
 
-import static com.android.launcher3.Utilities.isTrackpadMotionEvent;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPE_DOWN_WORKSPACE_NOTISHADE_OPEN;
 
 import android.graphics.PointF;
@@ -91,10 +90,11 @@ public class StatusBarTouchController implements TouchController {
             if (!mCanIntercept) {
                 return false;
             }
+            mDownEvents.clear();
             mDownEvents.put(pid, new PointF(ev.getX(), ev.getY()));
         } else if (ev.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN) {
-           // Check!! should only set it only when threshold is not entered.
-           mDownEvents.put(pid, new PointF(ev.getX(idx), ev.getY(idx)));
+            // Check!! should only set it only when threshold is not entered.
+            mDownEvents.put(pid, new PointF(ev.getX(idx), ev.getY(idx)));
         }
         if (!mCanIntercept) {
             return false;
@@ -105,8 +105,7 @@ public class StatusBarTouchController implements TouchController {
             // Currently input dispatcher will not do touch transfer if there are more than
             // one touch pointer. Hence, even if slope passed, only set the slippery flag
             // when there is single touch event. (context: InputDispatcher.cpp line 1445)
-            if (dy > mTouchSlop && dy > Math.abs(dx) && (isTrackpadMotionEvent(ev)
-                    || ev.getPointerCount() == 1)) {
+            if (dy > mTouchSlop && dy > Math.abs(dx) && ev.getPointerCount() == 1) {
                 ev.setAction(ACTION_DOWN);
                 dispatchTouchEvent(ev);
                 setWindowSlippery(true);
@@ -160,8 +159,7 @@ public class StatusBarTouchController implements TouchController {
         } else {
             // For NORMAL state, only listen if the event originated above the navbar height
             DeviceProfile dp = mLauncher.getDeviceProfile();
-            if (!isTrackpadMotionEvent(ev) && ev.getY() > (mLauncher.getDragLayer().getHeight()
-                    - dp.getInsets().bottom)) {
+            if (ev.getY() > (mLauncher.getDragLayer().getHeight() - dp.getInsets().bottom)) {
                 return false;
             }
         }

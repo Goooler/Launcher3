@@ -76,12 +76,11 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     /**
      * Called to cancel any existing animations.
      */
-    public void cancelAnimationIfExists() {
+    public void cancelSpringIfExists() {
         if (mSpringBounce != null) {
             mSpringBounce.cancel();
             mSpringBounce = null;
         }
-        reset();
     }
 
     private void updateTranslationYForSwipe() {
@@ -135,16 +134,32 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     }
 
     /**
-     * Returns an animation to reset the taskbar translation for animation back to launcher.
+     * Returns true if we will animate to zero before the input duration.
      */
-    public ObjectAnimator createAnimToLauncher(long duration) {
-        ObjectAnimator animator = ObjectAnimator.ofFloat(mTranslationYForSwipe, VALUE, 0);
+    public boolean willAnimateToZeroBefore(long duration) {
+        if (mSpringBounce != null && mSpringBounce.isRunning()) {
+            long springDuration = mSpringBounce.getDuration();
+            long current = mSpringBounce.getCurrentPlayTime();
+            return (springDuration - current < duration);
+        }
+        if (mTranslationYForSwipe.isAnimatingToValue(0)) {
+            return mTranslationYForSwipe.getRemainingTime() < duration;
+        }
+        return false;
+    }
+
+    /**
+     * Returns an animation to reset the taskbar translation to {@code 0}.
+     */
+    public ObjectAnimator createAnimToResetTranslation(long duration) {
+        ObjectAnimator animator = mTranslationYForSwipe.animateToValue(0);
         animator.setInterpolator(Interpolators.LINEAR);
         animator.setDuration(duration);
         animator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
-                cancelAnimationIfExists();
+                cancelSpringIfExists();
+                reset();
                 mAnimationToHomeRunning = true;
             }
 
@@ -162,6 +177,18 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
      */
     public class TransitionCallback {
 
+        /**
+         * Clears any existing animations so that user
+         * can take control over the movement of the taskbaer.
+         */
+        public void onActionDown() {
+            if (mAnimationToHomeRunning) {
+                mTranslationYForSwipe.cancelAnimation();
+            }
+            mAnimationToHomeRunning = false;
+            cancelSpringIfExists();
+            reset();
+        }
         /**
          * Called when there is movement to move the taskbar.
          */

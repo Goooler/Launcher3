@@ -32,7 +32,6 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.dot.FolderDotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
@@ -65,6 +64,7 @@ import java.util.stream.Stream;
 
 /**
  * Implements interfaces required to show and allow interacting with a PopupContainerWithArrow.
+ * Controls the long-press menu on Taskbar and AllApps icons.
  */
 public class TaskbarPopupController implements TaskbarControllers.LoggableTaskbarController {
 
@@ -136,6 +136,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
         if (folder != null) {
             folder.iterateOverItems(op);
         }
+        mControllers.taskbarAllAppsController.updateNotificationDots(updatedDots);
     }
 
     /**
@@ -190,9 +191,8 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
         // Make focusable to receive back events
         context.onPopupVisibilityChanged(true);
-        container.setOnCloseCallback(() -> {
+        container.addOnCloseCallback(() -> {
             context.getDragLayer().post(() -> context.onPopupVisibilityChanged(false));
-            container.setOnCloseCallback(null);
         });
 
         return container;
@@ -200,14 +200,10 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     // Create a Stream of all applicable system shortcuts
     private Stream<SystemShortcut.Factory> getSystemShortcuts() {
-        // concat a Stream of split options with a Stream of APP_INFO
-        Stream<SystemShortcut.Factory> appInfo = Stream.of(APP_INFO);
-
+        // append split options to APP_INFO shortcut, the order here will reflect in the popup
         return Stream.concat(
-                Utilities.getSplitPositionOptions(mContext.getDeviceProfile())
-                        .stream()
-                        .map(this::createSplitShortcutFactory),
-                appInfo
+                Stream.of(APP_INFO),
+                mControllers.uiController.getSplitMenuOptions()
         );
     }
 
@@ -249,7 +245,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
             // Move the icon to align with the center-top of the touch point
             Point iconShift = new Point();
             iconShift.x = mIconLastTouchPos.x - sv.getIconCenter().x;
-            iconShift.y = mIconLastTouchPos.y - mContext.getDeviceProfile().iconSizePx;
+            iconShift.y = mIconLastTouchPos.y - mContext.getDeviceProfile().taskbarIconSize;
 
             ((TaskbarDragController) ActivityContext.lookupContext(
                     v.getContext()).getDragController()).startDragOnLongClick(sv, iconShift);
@@ -265,7 +261,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
      *                 right.
      * @return A factory function to be used in populating the long-press menu.
      */
-    private SystemShortcut.Factory<BaseTaskbarContext> createSplitShortcutFactory(
+    SystemShortcut.Factory<BaseTaskbarContext> createSplitShortcutFactory(
             SplitPositionOption position) {
         return (context, itemInfo, originalView) -> new TaskbarSplitShortcut(context, itemInfo,
                 originalView, position, mAllowInitialSplitSelection);
@@ -293,13 +289,19 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
         @Override
         public void onClick(View view) {
+            // Add callbacks depending on what type of Taskbar context we're in (Taskbar or AllApps)
+            mTarget.onSplitScreenMenuButtonClicked();
             AbstractFloatingView.closeAllOpenViews(mTarget);
+
+            // Depending on what app state we're in, we either want to initiate the split screen
+            // staging process or immediately launch a split with an existing app.
+            // - Initiate the split screen staging process
              if (mAllowInitialSplitSelection) {
                  super.onClick(view);
                  return;
              }
 
-            // Initiate splitscreen from the in-app Taskbar or Taskbar All Apps
+            // - Immediately launch split with the running app
             Pair<InstanceId, com.android.launcher3.logging.InstanceId> instanceIds =
                     LogUtils.getShellShareableInstanceId();
             mTarget.getStatsLogManager().logger()
@@ -322,6 +324,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
                                 mItemInfo.getIntent().getComponent(),
                                 null,
                                 mItemInfo.user),
+                        mItemInfo.user.getIdentifier(),
                         new Intent(),
                         getPosition().stagePosition,
                         null,

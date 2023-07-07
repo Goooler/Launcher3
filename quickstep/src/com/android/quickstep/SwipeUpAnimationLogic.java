@@ -39,6 +39,8 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.RectFSpringAnim;
+import com.android.quickstep.util.RectFSpringAnim.DefaultSpringConfig;
+import com.android.quickstep.util.RectFSpringAnim.TaskbarHotseatSpringConfig;
 import com.android.quickstep.util.SurfaceTransaction.SurfaceProperties;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
@@ -65,7 +67,7 @@ public abstract class SwipeUpAnimationLogic implements
     // 0 => preview snapShot is completely visible, and hotseat is completely translated down
     // 1 => preview snapShot is completely aligned with the recents view and hotseat is completely
     // visible.
-    protected final AnimatedFloat mCurrentShift = new AnimatedFloat(this::updateFinalShift);
+    protected final AnimatedFloat mCurrentShift = new AnimatedFloat(this::onCurrentShiftUpdated);
     protected float mCurrentDisplacement;
 
     // The distance needed to drag to reach the task size in recents.
@@ -80,7 +82,8 @@ public abstract class SwipeUpAnimationLogic implements
         mContext = context;
         mDeviceState = deviceState;
         mGestureState = gestureState;
-        mIsSwipeForSplit = TopTaskTracker.INSTANCE.get(context).getRunningSplitTaskIds().length > 1;
+        updateIsGestureForSplit(TopTaskTracker.INSTANCE.get(context)
+                .getRunningSplitTaskIds().length);
 
         mTargetGluer = new RemoteTargetGluer(mContext, mGestureState.getActivityInterface());
         mRemoteTargetHandles = mTargetGluer.getRemoteTargetHandles();
@@ -146,7 +149,7 @@ public abstract class SwipeUpAnimationLogic implements
      * Called when the value of {@link #mCurrentShift} changes
      */
     @UiThread
-    public abstract void updateFinalShift();
+    public abstract void onCurrentShiftUpdated();
 
     protected PagedOrientationHandler getOrientationHandler() {
         // OrientationHandler should be independent of remote target, can directly take one
@@ -156,6 +159,13 @@ public abstract class SwipeUpAnimationLogic implements
 
     protected abstract class HomeAnimationFactory {
         protected float mSwipeVelocity;
+
+        /**
+         * Returns true if we know the home animation involves an item in the hotseat.
+         */
+        public boolean isInHotseat() {
+            return false;
+        }
 
         public @NonNull RectF getWindowTargetRect() {
             PagedOrientationHandler orientationHandler = getOrientationHandler();
@@ -271,6 +281,10 @@ public abstract class SwipeUpAnimationLogic implements
         return out;
     }
 
+    protected void updateIsGestureForSplit(int targetCount) {
+        mIsSwipeForSplit = targetCount > 1;
+    }
+
     private RectFSpringAnim getWindowAnimationToHomeInternal(
             HomeAnimationFactory homeAnimationFactory, RectF targetRect,
             TransformParams transformParams, TaskViewSimulator taskViewSimulator,
@@ -288,7 +302,11 @@ public abstract class SwipeUpAnimationLogic implements
         homeToWindowPositionMap.invert(windowToHomePositionMap);
         windowToHomePositionMap.mapRect(startRect);
 
-        RectFSpringAnim anim = new RectFSpringAnim(startRect, targetRect, mContext, mDp);
+        boolean useTaskbarHotseatParams = mDp.isTaskbarPresent
+                && homeAnimationFactory.isInHotseat();
+        RectFSpringAnim anim = new RectFSpringAnim(useTaskbarHotseatParams
+                ? new TaskbarHotseatSpringConfig(mContext, startRect, targetRect)
+                : new DefaultSpringConfig(mContext, mDp, startRect, targetRect));
         homeAnimationFactory.setAnimation(anim);
 
         SpringAnimationRunner runner = new SpringAnimationRunner(

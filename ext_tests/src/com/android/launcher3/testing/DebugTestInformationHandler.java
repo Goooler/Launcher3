@@ -25,7 +25,7 @@ import android.content.Context;
 import android.os.Binder;
 import android.os.Bundle;
 import android.system.Os;
-import android.view.View;
+import android.util.Log;
 
 import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
@@ -39,7 +39,6 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -49,7 +48,6 @@ import java.util.concurrent.TimeUnit;
  * Class to handle requests from tests, including debug ones.
  */
 public class DebugTestInformationHandler extends TestInformationHandler {
-    private static LinkedList sLeaks;
     private static Collection<String> sEvents;
     private static Application.ActivityLifecycleCallbacks sActivityLifecycleCallbacks;
     private static final Map<Activity, Boolean> sActivities =
@@ -64,6 +62,7 @@ public class DebugTestInformationHandler extends TestInformationHandler {
                 public void onActivityCreated(Activity activity, Bundle bundle) {
                     sActivities.put(activity, true);
                     ++sActivitiesCreatedCount;
+                    Log.d(TestProtocol.FLAKY_ACTIVITY_COUNT, "onActivityCreated", new Exception());
                 }
 
                 @Override
@@ -155,13 +154,6 @@ public class DebugTestInformationHandler extends TestInformationHandler {
                 return response;
             }
 
-            case TestProtocol.REQUEST_VIEW_LEAK: {
-                if (sLeaks == null) sLeaks = new LinkedList();
-                sLeaks.add(new View(mContext));
-                sLeaks.add(new View(mContext));
-                return response;
-            }
-
             case TestProtocol.REQUEST_START_EVENT_LOGGING: {
                 sEvents = new ArrayList<>();
                 TestLogging.setEventConsumer(
@@ -209,23 +201,6 @@ public class DebugTestInformationHandler extends TestInformationHandler {
                 }
             }
 
-            case TestProtocol.REQUEST_USE_TEST_WORKSPACE_LAYOUT: {
-                useTestWorkspaceLayout(
-                        LauncherSettings.Settings.ARG_DEFAULT_WORKSPACE_LAYOUT_TEST);
-                return response;
-            }
-
-            case TestProtocol.REQUEST_USE_TEST2_WORKSPACE_LAYOUT: {
-                useTestWorkspaceLayout(
-                        LauncherSettings.Settings.ARG_DEFAULT_WORKSPACE_LAYOUT_TEST2);
-                return response;
-            }
-
-            case TestProtocol.REQUEST_USE_DEFAULT_WORKSPACE_LAYOUT: {
-                useTestWorkspaceLayout(null);
-                return response;
-            }
-
             case TestProtocol.REQUEST_HOTSEAT_ICON_NAMES: {
                 return getLauncherUIProperty(Bundle::putStringArrayList, l -> {
                     ShortcutAndWidgetContainer hotseatIconsContainer =
@@ -261,22 +236,6 @@ public class DebugTestInformationHandler extends TestInformationHandler {
 
             default:
                 return super.call(method, arg, extras);
-        }
-    }
-
-    private void useTestWorkspaceLayout(String layout) {
-        final long identity = Binder.clearCallingIdentity();
-        try {
-            if (layout != null) {
-                LauncherSettings.Settings.call(mContext.getContentResolver(),
-                        LauncherSettings.Settings.METHOD_SET_USE_TEST_WORKSPACE_LAYOUT_FLAG,
-                        layout);
-            } else {
-                LauncherSettings.Settings.call(mContext.getContentResolver(),
-                        LauncherSettings.Settings.METHOD_CLEAR_USE_TEST_WORKSPACE_LAYOUT_FLAG);
-            }
-        } finally {
-            Binder.restoreCallingIdentity(identity);
         }
     }
 }

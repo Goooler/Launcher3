@@ -64,7 +64,7 @@ public class QuickstepOnboardingPrefs extends OnboardingPrefs<QuickstepLauncher>
             });
         }
 
-        if (!Utilities.IS_RUNNING_IN_TEST_HARNESS
+        if (!Utilities.isRunningInTestHarness()
                 && !hasReachedMaxCount(HOTSEAT_DISCOVERY_TIP_COUNT)) {
             stateManager.addStateListener(new StateListener<LauncherState>() {
                 boolean mFromAllApps = false;
@@ -78,7 +78,8 @@ public class QuickstepOnboardingPrefs extends OnboardingPrefs<QuickstepLauncher>
                 public void onStateTransitionComplete(LauncherState finalState) {
                     HotseatPredictionController client = mLauncher.getHotseatPredictionController();
                     if (mFromAllApps && finalState == NORMAL && client.hasPredictions()) {
-                        if (incrementEventCount(HOTSEAT_DISCOVERY_TIP_COUNT)) {
+                        if (!mLauncher.getDeviceProfile().isTablet
+                                && incrementEventCount(HOTSEAT_DISCOVERY_TIP_COUNT)) {
                             client.showEdu();
                             stateManager.removeStateListener(this);
                         }

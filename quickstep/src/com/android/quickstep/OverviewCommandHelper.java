@@ -249,7 +249,7 @@ public class OverviewCommandHelper {
         }
 
         GestureState gestureState = mService.createGestureState(GestureState.DEFAULT_STATE,
-                false /* isTrackpadGesture */);
+                GestureState.TrackpadGestureType.NONE);
         gestureState.setHandlingAtomicEvent(true);
         AbsSwipeUpHandler interactionHandler = mService.getSwipeUpHandlerFactory()
                 .newHandler(gestureState, cmd.createTime);
@@ -284,7 +284,7 @@ public class OverviewCommandHelper {
 
         RecentsView<?, ?> visibleRecentsView = activityInterface.getVisibleRecentsView();
         if (visibleRecentsView != null) {
-            visibleRecentsView.moveFocusedTaskToFront();
+            visibleRecentsView.moveRunningTaskToFront();
         }
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
             cmd.mActiveCallbacks = mTaskAnimationManager.continueRecentsAnimation(gestureState);

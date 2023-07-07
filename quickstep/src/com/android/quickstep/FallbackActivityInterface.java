@@ -61,7 +61,7 @@ public final class FallbackActivityInterface extends
     @Override
     public int getSwipeUpDestinationAndLength(DeviceProfile dp, Context context, Rect outRect,
             PagedOrientationHandler orientationHandler) {
-        calculateTaskSize(context, dp, outRect);
+        calculateTaskSize(context, dp, outRect, orientationHandler);
         if (dp.isVerticalBarLayout() && DisplayController.getNavigationMode(context) != NO_BUTTON) {
             return dp.isSeascape() ? outRect.left : (dp.widthPx - outRect.right);
         } else {
@@ -139,6 +139,11 @@ public final class FallbackActivityInterface extends
     }
 
     @Override
+    public boolean allowAllAppsFromOverview() {
+        return false;
+    }
+
+    @Override
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
         // In non-gesture mode, user might be clicking on the home button which would directly
         // start the home activity instead of going through recents. In that case, defer starting
@@ -196,6 +201,7 @@ public final class FallbackActivityInterface extends
             case LAST_TASK:
                 return BACKGROUND_APP;
             case HOME:
+            case ALL_APPS:
             default:
                 return HOME;
         }

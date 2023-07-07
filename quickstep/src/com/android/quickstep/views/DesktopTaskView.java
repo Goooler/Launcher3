@@ -309,7 +309,7 @@ public class DesktopTaskView extends TaskView {
 
     @Override
     public RunnableList launchTasks() {
-        SystemUiProxy.INSTANCE.get(getContext()).showDesktopApps();
+        SystemUiProxy.INSTANCE.get(getContext()).showDesktopApps(mActivity.getDisplayId());
         Launcher.getLauncher(mActivity).getStateManager().goToState(NORMAL, false /* animated */);
         return null;
     }
@@ -321,7 +321,7 @@ public class DesktopTaskView extends TaskView {
     }
 
     @Override
-    public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
+    public void launchTask(@NonNull Consumer<Boolean> callback, boolean isQuickswitch) {
         launchTasks();
         callback.accept(true);
     }
@@ -377,6 +377,7 @@ public class DesktopTaskView extends TaskView {
         }
         setOverlayEnabled(false);
         onTaskListVisibilityChanged(false);
+        setVisibility(VISIBLE);
     }
 
     @Override
@@ -495,7 +496,7 @@ public class DesktopTaskView extends TaskView {
     }
 
     @Override
-    void setThumbnailVisibility(int visibility) {
+    void setThumbnailVisibility(int visibility, int taskId) {
         for (int i = 0; i < mSnapshotViewMap.size(); i++) {
             mSnapshotViewMap.valueAt(i).setVisibility(visibility);
         }

@@ -16,6 +16,7 @@
 package com.android.quickstep;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_BACKGROUND_COLOR;
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -186,8 +187,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public abstract boolean allowMinimizeSplitScreen();
 
+    /** @return whether to allow going to All Apps from Overview. */
+    public abstract boolean allowAllAppsFromOverview();
+
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
-        return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons();
+        return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons()
+                || isTrackpadMultiFingerSwipe(ev);
     }
 
     /**
@@ -231,17 +236,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     /**
      * Calculates the taskView size for the provided device configuration.
      */
-    public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect) {
-        Resources res = context.getResources();
-        float maxScale = res.getFloat(R.dimen.overview_max_scale);
+    public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect,
+            PagedOrientationHandler orientedState) {
         if (dp.isTablet) {
-            Rect gridRect = new Rect();
-            calculateGridSize(dp, gridRect);
-
-            calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
+            if (FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()) {
+                calculateGridTaskSize(context, dp, outRect, orientedState);
+            } else {
+                calculateFocusTaskSize(context, dp, outRect);
+            }
         } else {
+            Resources res = context.getResources();
+            float maxScale = res.getFloat(R.dimen.overview_max_scale);
             int taskMargin = dp.overviewTaskMarginPx;
-            calculateTaskSizeInternal(context, dp,
+            calculateTaskSizeInternal(
+                    context,
+                    dp,
                     dp.overviewTaskThumbnailTopMarginPx,
                     dp.getOverviewActionsClaimedSpace(),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
@@ -249,6 +258,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                     Gravity.CENTER,
                     outRect);
         }
+    }
+
+    private void calculateFocusTaskSize(Context context, DeviceProfile dp, Rect outRect) {
+        Resources res = context.getResources();
+        float maxScale = res.getFloat(R.dimen.overview_max_scale);
+        Rect gridRect = new Rect();
+        calculateGridSize(dp, gridRect);
+        calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
     }
 
     private void calculateTaskSizeInternal(Context context, DeviceProfile dp, int claimedSpaceAbove,
@@ -269,7 +286,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
             Rect potentialTaskRect, float maxScale, int gravity, Rect outRect) {
-        PointF taskDimension = getTaskDimension(dp);
+        PointF taskDimension = getTaskDimension(context, dp);
 
         float scale = Math.min(
                 potentialTaskRect.width() / taskDimension.x,
@@ -281,20 +298,20 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         Gravity.apply(gravity, outWidth, outHeight, potentialTaskRect, outRect);
     }
 
-    private static PointF getTaskDimension(DeviceProfile dp) {
+    private static PointF getTaskDimension(Context context, DeviceProfile dp) {
         PointF dimension = new PointF();
-        getTaskDimension(dp, dimension);
+        getTaskDimension(context, dp, dimension);
         return dimension;
     }
 
     /**
      * Gets the dimension of the task in the current system state.
      */
-    public static void getTaskDimension(DeviceProfile dp, PointF out) {
+    public static void getTaskDimension(Context context, DeviceProfile dp, PointF out) {
         out.x = dp.widthPx;
         out.y = dp.heightPx;
-        if (dp.isTablet) {
-            out.y -= dp.taskbarSize;
+        if (dp.isTablet && !DisplayController.isTransientTaskbar(context)) {
+            out.y -= dp.taskbarHeight;
         }
     }
 
@@ -318,31 +335,42 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateGridTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         Resources res = context.getResources();
-        Rect taskRect = new Rect();
-        calculateTaskSize(context, dp, taskRect);
+        Rect potentialTaskRect = new Rect();
+        if (FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()) {
+            calculateGridSize(dp, potentialTaskRect);
+        } else {
+            calculateFocusTaskSize(context, dp, potentialTaskRect);
+        }
 
-        float rowHeight =
-                (taskRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
-                        / 2f;
+        float rowHeight = (potentialTaskRect.height() + dp.overviewTaskThumbnailTopMarginPx
+                - dp.overviewRowSpacing) / 2f;
 
-        PointF taskDimension = getTaskDimension(dp);
+        PointF taskDimension = getTaskDimension(context, dp);
         float scale = (rowHeight - dp.overviewTaskThumbnailTopMarginPx) / taskDimension.y;
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
         int gravity = Gravity.TOP;
         gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
-        Gravity.apply(gravity, outWidth, outHeight, taskRect, outRect);
+        Gravity.apply(gravity, outWidth, outHeight, potentialTaskRect, outRect);
+    }
+
+    /**
+     * Calculates the task size for the desktop task
+     */
+    public final void calculateDesktopTaskSize(Context context, DeviceProfile dp, Rect outRect) {
+        calculateFocusTaskSize(context, dp, outRect);
     }
 
     /**
      * Calculates the modal taskView size for the provided device configuration
      */
-    public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect) {
-        calculateTaskSize(context, dp, outRect);
+    public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect,
+            PagedOrientationHandler orientedState) {
+        calculateTaskSize(context, dp, outRect, orientedState);
         boolean isGridOnlyOverview = dp.isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get();
         int claimedSpaceBelow = isGridOnlyOverview
-                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarSize
+                ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarHeight
                 : (dp.heightPx - outRect.bottom - dp.getInsets().bottom);
         int minimumHorizontalPadding = 0;
         if (!isGridOnlyOverview) {
@@ -351,7 +379,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                     Math.round((dp.availableWidthPx - outRect.width() * maxScale) / 2);
         }
         calculateTaskSizeInternal(
-                context, dp,
+                context,
+                dp,
                 dp.overviewTaskMarginPx,
                 claimedSpaceBelow,
                 minimumHorizontalPadding,
