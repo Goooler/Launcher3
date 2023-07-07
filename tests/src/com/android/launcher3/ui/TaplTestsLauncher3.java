@@ -31,7 +31,7 @@ import static org.junit.Assume.assumeTrue;
 import android.content.Intent;
 import android.graphics.Point;
 import android.os.SystemClock;
-import android.platform.test.annotations.IwTest;
+import android.platform.test.annotations.PlatinumTest;
 import android.util.Log;
 
 import androidx.test.filters.FlakyTest;
@@ -237,7 +237,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 false /* tapRight */);
     }
 
-    @IwTest(focusArea = "launcher")
+    @PlatinumTest(focusArea = "launcher")
     @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
@@ -350,6 +350,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testLaunchMenuItem() throws Exception {
         final AllApps allApps = mLauncher.getWorkspace().switchToAllApps();
         allApps.freeze();
@@ -370,7 +371,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         }
     }
 
-    @IwTest(focusArea = "launcher")
+    @PlatinumTest(focusArea = "launcher")
     @Test
     @PortraitLandscape
     @ScreenRecord // b/256898879
@@ -394,6 +395,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testDragShortcut() throws Throwable {
         // 1. Open all apps and wait for load complete.
         // 2. Find the app and long press it to show shortcuts.
@@ -423,6 +425,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @PortraitLandscape
     @ScreenRecord
     @Ignore // b/233075289
+    @PlatinumTest(focusArea = "launcher")
     public void testDragToFolder() {
         // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
         // on tablets or phones due to difference in resolution.
@@ -469,6 +472,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testDragAndCancelAppIcon() {
         final HomeAppIcon homeAppIcon = createShortcutInCenterIfNotExist(GMAIL_APP_NAME);
         Point positionBeforeDrag =
@@ -511,6 +515,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Ignore("b/256615483")
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testUninstallFromWorkspace() throws Exception {
         installDummyAppAndWaitForUIUpdate();
         try {
@@ -524,6 +529,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Test
     @ScreenRecord // b/258071914
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testUninstallFromAllApps() throws Exception {
         installDummyAppAndWaitForUIUpdate();
         try {
@@ -539,6 +545,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testDragAppIconToWorkspaceCell() throws Exception {
         long startTime, endTime, elapsedTime;
         Point[] targets = getCornersAndCenterPositions();
@@ -574,6 +581,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @ScreenRecord // b/241821721
+    @PlatinumTest(focusArea = "launcher")
     public void getIconsPosition_afterIconRemoved_notContained() throws IOException {
         Point[] gridPositions = getCornersAndCenterPositions();
         createShortcutIfNotExist(STORE_APP_NAME, gridPositions[0]);
@@ -600,6 +608,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @PlatinumTest(focusArea = "launcher")
     public void testDragShortcutToWorkspaceCell() throws Exception {
         Point[] targets = getCornersAndCenterPositions();
 

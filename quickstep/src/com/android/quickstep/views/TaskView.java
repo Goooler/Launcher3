@@ -45,6 +45,7 @@ import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -438,25 +439,21 @@ public class TaskView extends FrameLayout implements Reusable {
 
         setWillNotDraw(!keyboardFocusHighlightEnabled);
 
+        TypedArray ta = context.obtainStyledAttributes(
+                attrs, R.styleable.TaskView, defStyleAttr, defStyleRes);
+
         mBorderAnimator = !keyboardFocusHighlightEnabled
                 ? null
                 : new BorderAnimator(
-                        /* borderBoundsBuilder= */ this::updateBorderBounds,
-                        /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
-                                R.dimen.keyboard_quick_switch_border_width),
                         /* borderRadiusPx= */ (int) mCurrentFullscreenParams.mCornerRadius,
-                        /* borderColor= */ attrs == null
-                        ? DEFAULT_BORDER_COLOR
-                        : context.getTheme()
-                                .obtainStyledAttributes(
-                                        attrs,
-                                        R.styleable.TaskView,
-                                        defStyleAttr,
-                                        defStyleRes)
-                                .getColor(
-                                        R.styleable.TaskView_borderColor,
-                                        DEFAULT_BORDER_COLOR),
-                        /* invalidateViewCallback= */ TaskView.this::invalidate);
+                        /* borderColor= */ ta.getColor(
+                                R.styleable.TaskView_borderColor, DEFAULT_BORDER_COLOR),
+                        /* borderAnimationParams= */ new BorderAnimator.SimpleParams(
+                                /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
+                                        R.dimen.keyboard_quick_switch_border_width),
+                                /* boundsBuilder= */ this::updateBorderBounds,
+                                /* targetView= */ this));
+        ta.recycle();
     }
 
     protected void updateBorderBounds(Rect bounds) {
@@ -844,11 +841,21 @@ public class TaskView extends FrameLayout implements Reusable {
                 // the actual overview state
                 failureListener.register(mActivity, mTask.key.id, () -> {
                     notifyTaskLaunchFailed(TAG);
-                    // Disable animations for now, as it is an edge case and the app usually covers
-                    // launcher and also any state transition animation also gets clobbered by
-                    // QuickstepTransitionManager.createWallpaperOpenAnimations when launcher
-                    // shows again
-                    getRecentsView().startHome(false /* animated */);
+                    RecentsView rv = getRecentsView();
+                    if (rv != null) {
+                        // Disable animations for now, as it is an edge case and the app usually
+                        // covers launcher and also any state transition animation also gets
+                        // clobbered by QuickstepTransitionManager.createWallpaperOpenAnimations
+                        // when launcher shows again
+                        rv.startHome(false /* animated */);
+                        if (rv.mSizeStrategy.getTaskbarController() != null) {
+                            // LauncherTaskbarUIController depends on the launcher state when
+                            // checking whether to handle resume, but that can come in before
+                            // startHome() changes the state, so force-refresh here to ensure the
+                            // taskbar is updated
+                            rv.mSizeStrategy.getTaskbarController().refreshResumedState();
+                        }
+                    }
                 });
             }
             // Indicate success once the system has indicated that the transition has started
@@ -1016,7 +1023,10 @@ public class TaskView extends FrameLayout implements Reusable {
             }
             if (needsUpdate(changes, FLAG_UPDATE_ICON)) {
                 mIconLoadRequest = iconCache.updateIconInBackground(mTask,
-                        (task) -> setIcon(mIconView, task.icon));
+                        (task) -> {
+                            setIcon(mIconView, task.icon);
+                            mDigitalWellBeingToast.initialize(task);
+                        });
             }
         } else {
             if (needsUpdate(changes, FLAG_UPDATE_THUMBNAIL)) {

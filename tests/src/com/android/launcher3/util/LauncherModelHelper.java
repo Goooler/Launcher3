@@ -113,7 +113,7 @@ public class LauncherModelHelper {
     private final HashMap<Class, HashMap<String, Field>> mFieldCache = new HashMap<>();
     private final MockContentResolver mMockResolver = new MockContentResolver();
     public final TestLauncherProvider provider;
-    public final SanboxModelContext sandboxContext;
+    public final SandboxModelContext sandboxContext;
 
     public final long defaultProfileId;
 
@@ -128,7 +128,7 @@ public class LauncherModelHelper {
         Settings.Global.getString(context.getContentResolver(), "test");
 
         provider = new TestLauncherProvider();
-        sandboxContext = new SanboxModelContext();
+        sandboxContext = new SandboxModelContext();
         defaultProfileId = UserCache.INSTANCE.get(sandboxContext)
                 .getSerialNumberForUser(Process.myUserHandle());
         setupProvider(LauncherProvider.AUTHORITY, provider);
@@ -363,12 +363,6 @@ public class LauncherModelHelper {
         sandboxContext.getContentResolver().insert(contentUri, values);
     }
 
-    public void deleteItem(int itemId, @NonNull final String tableName) {
-        final Uri uri = Uri.parse("content://"
-                + LauncherProvider.AUTHORITY + "/" + tableName + "/" + itemId);
-        sandboxContext.getContentResolver().delete(uri, null, null);
-    }
-
     /**
      * Sets up a mock provider to load the provided layout by default, next time the layout loads
      */
@@ -426,7 +420,7 @@ public class LauncherModelHelper {
         }
 
         public SQLiteDatabase getDb() {
-            return getModelDbController().getDatabaseHelper().getWritableDatabase();
+            return getModelDbController().getDb();
         }
     }
 
@@ -446,13 +440,13 @@ public class LauncherModelHelper {
         return success;
     }
 
-    public class SanboxModelContext extends SandboxContext {
+    public class SandboxModelContext extends SandboxContext {
 
         private final ArrayMap<String, Object> mSpiedServices = new ArrayMap<>();
         private final PackageManager mPm;
         private final File mDbDir;
 
-        SanboxModelContext() {
+        SandboxModelContext() {
             super(ApplicationProvider.getApplicationContext(),
                     UserCache.INSTANCE, InstallSessionHelper.INSTANCE, LauncherPrefs.INSTANCE,
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
@@ -463,7 +457,7 @@ public class LauncherModelHelper {
             mDbDir = new File(getCacheDir(), UUID.randomUUID().toString());
         }
 
-        public SanboxModelContext allow(MainThreadInitializedObject object) {
+        public SandboxModelContext allow(MainThreadInitializedObject object) {
             mAllowedObjects.add(object);
             return this;
         }

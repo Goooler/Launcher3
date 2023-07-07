@@ -18,6 +18,7 @@ package com.android.launcher3;
 
 import static android.animation.ValueAnimator.areAnimatorsEnabled;
 
+import static com.android.launcher3.LauncherState.EDIT_MODE;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_5;
 import static com.android.launcher3.dragndrop.DraggableView.DRAGGABLE_ICON;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
@@ -571,7 +572,9 @@ public class CellLayout extends ViewGroup {
     }
 
     protected void updateBgAlpha() {
-        mBackground.setAlpha((int) (mSpringLoadedProgress * 255));
+        if (!getWorkspace().mLauncher.isInState(EDIT_MODE)) {
+            mBackground.setAlpha((int) (mSpringLoadedProgress * 255));
+        }
     }
 
     /**
@@ -1269,7 +1272,7 @@ public class CellLayout extends ViewGroup {
      * @return The X, Y cell of a vacant area that can contain this object,
      *         nearest the requested location.
      */
-    private int[] findNearestArea(int relativeXPos, int relativeYPos, int minSpanX, int minSpanY,
+    protected int[] findNearestArea(int relativeXPos, int relativeYPos, int minSpanX, int minSpanY,
             int spanX, int spanY, boolean ignoreOccupied, int[] result, int[] resultSpan) {
         // For items with a spanX / spanY > 1, the passed in point (relativeXPos, relativeYPos)
         // corresponds to the center of the item, but we are searching based on the top-left cell,

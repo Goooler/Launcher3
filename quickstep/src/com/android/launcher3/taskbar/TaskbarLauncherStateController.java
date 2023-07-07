@@ -202,15 +202,16 @@ public class TaskbarLauncherStateController {
                 public void onStateTransitionComplete(LauncherState finalState) {
                     mLauncherState = finalState;
                     updateStateForFlag(FLAG_LAUNCHER_IN_STATE_TRANSITION, false);
+                    // TODO(b/279514548) Cleans up bad state that can occur when user interacts with
+                    // taskbar on top of transparent activity.
+                    if (finalState == LauncherState.NORMAL && mLauncher.isResumed()) {
+                        updateStateForFlag(FLAG_RESUMED, true);
+                    }
                     applyState();
                     boolean disallowLongClick = finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
                     com.android.launcher3.taskbar.Utilities.setOverviewDragState(
                             mControllers, finalState.disallowTaskbarGlobalDrag(),
                             disallowLongClick, finalState.allowTaskbarInitialSplitSelection());
-                    // LauncherTaskbarUIController depends on the state when checking whether
-                    // to handle resume, so it should also be poked if current state changes
-                    mLauncher.getTaskbarUIController().onLauncherResumedOrPaused(
-                            mLauncher.hasBeenResumed());
                 }
             };
 
@@ -408,14 +409,6 @@ public class TaskbarLauncherStateController {
                     + ", mLauncherState: " + mLauncherState
                     + ", toAlignment: " + toAlignment);
         }
-        mControllers.bubbleControllers.ifPresent(controllers -> {
-            // Show the bubble bar when on launcher home or in overview.
-            boolean onHome = isInLauncher && mLauncherState == LauncherState.NORMAL;
-            boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
-            controllers.bubbleStashController.setBubblesShowingOnHome(onHome);
-            controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
-        });
-
         AnimatorSet animatorSet = new AnimatorSet();
 
         if (hasAnyFlag(changedFlags, FLAG_LAUNCHER_IN_STATE_TRANSITION)) {
@@ -431,6 +424,10 @@ public class TaskbarLauncherStateController {
             if (mLauncherState == LauncherState.NORMAL) {
                 // We're changing state to home, should close open popups e.g. Taskbar AllApps
                 handleOpenFloatingViews = true;
+            }
+            if (mLauncherState == LauncherState.OVERVIEW) {
+                // Calling to update the insets in TaskbarInsetController#updateInsetsTouchability
+                mControllers.taskbarActivityContext.notifyUpdateLayoutParams();
             }
         }
 
@@ -482,8 +479,7 @@ public class TaskbarLauncherStateController {
                     public void onAnimationEnd(Animator animation) {
                         TaskbarStashController stashController =
                                 mControllers.taskbarStashController;
-                        stashController.updateAndAnimateTransientTaskbar(
-                                /* stash */ true, /* duration */ 0, true /* bubblesShouldFollow */);
+                        stashController.updateAndAnimateTransientTaskbar(/* stash */ true);
                     }
                 });
             } else {
@@ -560,6 +556,12 @@ public class TaskbarLauncherStateController {
             // updateValue ensures onIconAlignmentRatioChanged will be called if there is an actual
             // change in value
             mIconAlignment.updateValue(toAlignment);
+
+            // Make sure FLAG_IN_APP is set when launching applications from keyguard.
+            if (!isInLauncher) {
+                mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_APP, true);
+                mControllers.taskbarStashController.applyState(0);
+            }
         } else if (mIconAlignment.isAnimatingToValue(toAlignment)
                 || mIconAlignment.isSettledOnValue(toAlignment)) {
             // Already at desired value, but make sure we run the callback at the end.

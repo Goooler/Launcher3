@@ -549,9 +549,9 @@ public class SystemUiProxy implements ISystemUiProxy {
     }
 
     /**
-     * Notifies WM Shell that launcher has finished all the animation for swipe to home. WM Shell
-     * can choose to fade out the overlay when entering PIP is finished, and WM Shell should be
-     * responsible for cleaning up the overlay.
+     * Notifies WM Shell that launcher has finished the preparation of the animation for swipe to
+     * home. WM Shell can choose to fade out the overlay when entering PIP is finished, and WM Shell
+     * should be responsible for cleaning up the overlay.
      */
     public void stopSwipePipToHome(int taskId, ComponentName componentName, Rect destinationBounds,
             SurfaceControl overlay) {
@@ -560,6 +560,20 @@ public class SystemUiProxy implements ISystemUiProxy {
                 mPip.stopSwipePipToHome(taskId, componentName, destinationBounds, overlay);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call stopSwipePipToHome");
+            }
+        }
+    }
+
+    /**
+     * Notifies WM Shell that launcher has aborted all the animation for swipe to home. WM Shell
+     * can use this callback to clean up its internal states.
+     */
+    public void abortSwipePipToHome(int taskId, ComponentName componentName) {
+        if (mPip != null) {
+            try {
+                mPip.abortSwipePipToHome(taskId, componentName);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call abortSwipePipToHome");
             }
         }
     }
@@ -683,12 +697,12 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
-    public void startIntentAndTask(PendingIntent pendingIntent, Bundle options1, int taskId,
-            Bundle options2, @SplitConfigurationOptions.StagePosition int splitPosition,
+    public void startIntentAndTask(PendingIntent pendingIntent, int userId1, Bundle options1,
+            int taskId, Bundle options2, @SplitConfigurationOptions.StagePosition int splitPosition,
             float splitRatio, RemoteTransition remoteTransition, InstanceId instanceId) {
         if (mSystemUiProxy != null) {
             try {
-                mSplitScreen.startIntentAndTask(pendingIntent, options1, taskId, options2,
+                mSplitScreen.startIntentAndTask(pendingIntent, userId1, options1, taskId, options2,
                         splitPosition, splitRatio, remoteTransition, instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntentAndTask");
@@ -696,15 +710,16 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
-    public void startIntents(PendingIntent pendingIntent1, @Nullable ShortcutInfo shortcutInfo1,
-            Bundle options1, PendingIntent pendingIntent2, @Nullable ShortcutInfo shortcutInfo2,
-            Bundle options2, @SplitConfigurationOptions.StagePosition int splitPosition,
-            float splitRatio, RemoteTransition remoteTransition, InstanceId instanceId) {
+    public void startIntents(PendingIntent pendingIntent1, int userId1,
+            @Nullable ShortcutInfo shortcutInfo1, Bundle options1, PendingIntent pendingIntent2,
+            int userId2, @Nullable ShortcutInfo shortcutInfo2, Bundle options2,
+            @SplitConfigurationOptions.StagePosition int splitPosition, float splitRatio,
+            RemoteTransition remoteTransition, InstanceId instanceId) {
         if (mSystemUiProxy != null) {
             try {
-                mSplitScreen.startIntents(pendingIntent1, shortcutInfo1, options1, pendingIntent2,
-                        shortcutInfo2, options2, splitPosition, splitRatio, remoteTransition,
-                        instanceId);
+                mSplitScreen.startIntents(pendingIntent1, userId1, shortcutInfo1, options1,
+                        pendingIntent2, userId2, shortcutInfo2, options2, splitPosition, splitRatio,
+                        remoteTransition, instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntents");
             }
@@ -740,14 +755,14 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
-    public void startIntentAndTaskWithLegacyTransition(PendingIntent pendingIntent,
+    public void startIntentAndTaskWithLegacyTransition(PendingIntent pendingIntent, int userId1,
             Bundle options1, int taskId, Bundle options2,
             @SplitConfigurationOptions.StagePosition int splitPosition, float splitRatio,
             RemoteAnimationAdapter adapter, InstanceId instanceId) {
         if (mSystemUiProxy != null) {
             try {
-                mSplitScreen.startIntentAndTaskWithLegacyTransition(pendingIntent, options1, taskId,
-                        options2, splitPosition, splitRatio, adapter, instanceId);
+                mSplitScreen.startIntentAndTaskWithLegacyTransition(pendingIntent, userId1,
+                        options1, taskId, options2, splitPosition, splitRatio, adapter, instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntentAndTaskWithLegacyTransition");
             }
@@ -771,16 +786,16 @@ public class SystemUiProxy implements ISystemUiProxy {
      * Starts a pair of intents or shortcuts in split-screen using legacy transition. Passing a
      * non-null shortcut info means to start the app as a shortcut.
      */
-    public void startIntentsWithLegacyTransition(PendingIntent pendingIntent1,
+    public void startIntentsWithLegacyTransition(PendingIntent pendingIntent1, int userId1,
             @Nullable ShortcutInfo shortcutInfo1, @Nullable Bundle options1,
-            PendingIntent pendingIntent2, @Nullable ShortcutInfo shortcutInfo2,
+            PendingIntent pendingIntent2, int userId2, @Nullable ShortcutInfo shortcutInfo2,
             @Nullable Bundle options2, @SplitConfigurationOptions.StagePosition int sidePosition,
             float splitRatio, RemoteAnimationAdapter adapter, InstanceId instanceId) {
         if (mSystemUiProxy != null) {
             try {
-                mSplitScreen.startIntentsWithLegacyTransition(pendingIntent1, shortcutInfo1,
-                        options1, pendingIntent2, shortcutInfo2, options2, sidePosition, splitRatio,
-                        adapter, instanceId);
+                mSplitScreen.startIntentsWithLegacyTransition(pendingIntent1, userId1,
+                        shortcutInfo1, options1, pendingIntent2, userId2, shortcutInfo2, options2,
+                        sidePosition, splitRatio, adapter, instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntentsWithLegacyTransition");
             }
@@ -799,11 +814,12 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
     }
 
-    public void startIntent(PendingIntent intent, Intent fillInIntent, int position,
+    public void startIntent(PendingIntent intent, int userId, Intent fillInIntent, int position,
             Bundle options, InstanceId instanceId) {
         if (mSplitScreen != null) {
             try {
-                mSplitScreen.startIntent(intent, fillInIntent, position, options, instanceId);
+                mSplitScreen.startIntent(intent, userId, fillInIntent, position, options,
+                        instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call startIntent");
             }

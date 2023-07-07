@@ -34,6 +34,7 @@ import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_F
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherState.ALL_APPS;
+import static com.android.launcher3.LauncherState.EDIT_MODE;
 import static com.android.launcher3.LauncherState.FLAG_MULTI_PAGE;
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -44,6 +45,7 @@ import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
 import static com.android.launcher3.anim.Interpolators.EMPHASIZED;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
+import static com.android.launcher3.config.FeatureFlags.MULTI_SELECT_EDIT_MODE;
 import static com.android.launcher3.config.FeatureFlags.SHOW_DOT_PAGINATION;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
@@ -131,6 +133,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
+import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DropTarget.DragObject;
@@ -203,6 +206,7 @@ import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
@@ -244,6 +248,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -516,11 +521,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         // TODO: move the SearchConfig to SearchState when new LauncherState is created.
         mBaseSearchConfig = new BaseSearchConfig();
 
+        setupViews();
+
         mAppWidgetManager = new WidgetManagerHelper(this);
         mAppWidgetHolder = createAppWidgetHolder();
         mAppWidgetHolder.startListening();
 
-        setupViews();
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
@@ -901,12 +907,8 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         final int pendingAddWidgetId = requestArgs.getWidgetId();
 
-        Runnable exitSpringLoaded = new Runnable() {
-            @Override
-            public void run() {
-                mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
-            }
-        };
+        Runnable exitSpringLoaded = MULTI_SELECT_EDIT_MODE.get() ? null
+                : () -> mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
 
         if (requestCode == REQUEST_BIND_APPWIDGET) {
             // This is called only if the user did not previously have permissions to bind widgets
@@ -1040,10 +1042,9 @@ public class Launcher extends StatefulActivity<LauncherState>
             final AppWidgetHostView layout = mAppWidgetHolder.createView(this, appWidgetId,
                     requestArgs.getWidgetHandler().getProviderInfo(this));
             boundWidget = layout;
-            onCompleteRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    completeAddAppWidget(appWidgetId, requestArgs, layout, null);
+            onCompleteRunnable = () -> {
+                completeAddAppWidget(appWidgetId, requestArgs, layout, null);
+                if (!isInState(EDIT_MODE)) {
                     mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
                 }
             };
@@ -1073,6 +1074,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         logStopAndResume(false /* isResume */);
         mAppWidgetHolder.setActivityStarted(false);
         NotificationListener.removeNotificationsChangedListener(getPopupDataProvider());
+        FloatingIconView.resetIconLoadResult();
     }
 
     @Override
@@ -1178,7 +1180,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
         addActivityFlags(ACTIVITY_STATE_TRANSITION_ACTIVE);
 
-        if (state == SPRING_LOADED) {
+        if (state == SPRING_LOADED || state == EDIT_MODE) {
             // Prevent any Un/InstallShortcutReceivers from updating the db while we are
             // not on homescreen
             ItemInstallQueue.INSTANCE.get(this).pauseModelPush(FLAG_DRAG_AND_DROP);
@@ -1532,7 +1534,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                 mStateManager.addStateListener(new StateManager.StateListener<LauncherState>() {
                     @Override
                     public void onStateTransitionComplete(LauncherState finalState) {
-                        if (mPrevLauncherState == SPRING_LOADED && finalState == NORMAL) {
+                        if ((mPrevLauncherState == SPRING_LOADED || mPrevLauncherState == EDIT_MODE)
+                                && finalState == NORMAL) {
                             AppWidgetResizeFrame.showForWidget(launcherHostView, cellLayout);
                             mStateManager.removeStateListener(this);
                         }
@@ -1900,13 +1903,9 @@ public class Launcher extends StatefulActivity<LauncherState>
                 REQUEST_CREATE_APPWIDGET)) {
             // If the configuration flow was not started, add the widget
 
-            Runnable onComplete = new Runnable() {
-                @Override
-                public void run() {
-                    // Exit spring loaded mode if necessary after adding the widget
-                    mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
-                }
-            };
+            // Exit spring loaded mode if necessary after adding the widget
+            Runnable onComplete = MULTI_SELECT_EDIT_MODE.get() ? null
+                    : () -> mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
             completeAddAppWidget(appWidgetId, info, boundWidget,
                     addFlowHandler.getProviderInfo(this));
             mWorkspace.removeExtraEmptyScreenDelayed(delay, false, onComplete);
@@ -2154,30 +2153,38 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
+    public RunnableList startActivitySafely(View v, Intent intent, ItemInfo item) {
         if (!hasBeenResumed()) {
+            RunnableList result = new RunnableList();
             // Workaround an issue where the WM launch animation is clobbered when finishing the
             // recents animation into launcher. Defer launching the activity until Launcher is
             // next resumed.
-            addOnResumeCallback(() -> startActivitySafely(v, intent, item));
+            addOnResumeCallback(() -> {
+                RunnableList actualResult = startActivitySafely(v, intent, item);
+                if (actualResult != null) {
+                    actualResult.add(result::executeAllAndDestroy);
+                } else {
+                    result.executeAllAndDestroy();
+                }
+            });
             if (mOnDeferredActivityLaunchCallback != null) {
                 mOnDeferredActivityLaunchCallback.run();
                 mOnDeferredActivityLaunchCallback = null;
             }
-            return true;
+            return result;
         }
 
-        boolean success = super.startActivitySafely(v, intent, item);
-        if (success && v instanceof BubbleTextView) {
+        RunnableList result = super.startActivitySafely(v, intent, item);
+        if (result != null && v instanceof BubbleTextView) {
             // This is set to the view that launched the activity that navigated the user away
             // from launcher. Since there is no callback for when the activity has finished
             // launching, enable the press state and keep this reference to reset the press
             // state when we return to launcher.
             BubbleTextView btv = (BubbleTextView) v;
             btv.setStayPressed(true);
-            addOnResumeCallback(() -> btv.setStayPressed(false));
+            result.add(() -> btv.setStayPressed(false));
         }
-        return success;
+        return result;
     }
 
     boolean isHotseatLayout(View layout) {
@@ -2968,8 +2975,12 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     @Override
     @TargetApi(Build.VERSION_CODES.S)
-    public void bindAllApplications(AppInfo[] apps, int flags) {
-        mAppsView.getAppsStore().setApps(apps, flags);
+    @UiThread
+    public void bindAllApplications(AppInfo[] apps, int flags,
+            Map<PackageUserKey, Integer> packageUserKeytoUidMap) {
+        Preconditions.assertUIThread();
+        AllAppsStore appsStore = mAppsView.getAppsStore();
+        appsStore.setApps(apps, flags, packageUserKeytoUidMap);
         PopupContainerWithArrow.dismissInvalidPopup(this);
         if (Utilities.ATLEAST_S) {
             Trace.endAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,

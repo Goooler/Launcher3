@@ -26,6 +26,7 @@ import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
+import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.testing.shared.ResourceUtils.pxFromDp;
 import static com.android.launcher3.testing.shared.ResourceUtils.roundPxValueFromFloat;
@@ -55,7 +56,10 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
+import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.workspace.CalculatedWorkspaceSpec;
+import com.android.launcher3.workspace.WorkspaceSpecs;
 
 import java.io.PrintWriter;
 import java.util.Locale;
@@ -101,8 +105,13 @@ public class DeviceProfile {
     public final float aspectRatio;
 
     public final boolean isScalableGrid;
-    public final boolean isResponsiveGrid;
     private final int mTypeIndex;
+
+    // Responsive grid
+    private final boolean mIsResponsiveGrid;
+    private WorkspaceSpecs mWorkspaceSpecs;
+    private CalculatedWorkspaceSpec mResponsiveWidthSpec;
+    private CalculatedWorkspaceSpec mResponsiveHeightSpec;
 
     /**
      * The maximum amount of left/right workspace padding as a percentage of the screen width.
@@ -294,9 +303,8 @@ public class DeviceProfile {
         this.rotationHint = windowBounds.rotationHint;
         mInsets.set(windowBounds.insets);
 
-        // TODO(b/241386436):
-        //  for testing that the flag works only, shouldn't change any launcher behaviour
-        isResponsiveGrid = inv.workspaceSpecsId != INVALID_RESOURCE_HANDLE;
+        // TODO(b/241386436): shouldn't change any launcher behaviour
+        mIsResponsiveGrid = inv.workspaceSpecsId != INVALID_RESOURCE_HANDLE;
 
         isScalableGrid = inv.isScalable && !isVerticalBarLayout() && !isMultiWindowMode;
         // Determine device posture.
@@ -335,11 +343,19 @@ public class DeviceProfile {
             }
         }
 
+        if (mIsResponsiveGrid) {
+            mWorkspaceSpecs = new WorkspaceSpecs(new ResourceHelper(context, inv.workspaceSpecsId));
+            mResponsiveWidthSpec = mWorkspaceSpecs.getCalculatedWidthSpec(inv.numColumns,
+                    availableWidthPx);
+            mResponsiveHeightSpec = mWorkspaceSpecs.getCalculatedHeightSpec(inv.numRows,
+                    availableHeightPx);
+        }
+
         if (DisplayController.isTransientTaskbar(context)) {
             float invTransientIconSizeDp = inv.transientTaskbarIconSize[mTypeIndex];
             taskbarIconSize = pxFromDp(invTransientIconSizeDp, mMetrics);
-            taskbarHeight = taskbarIconSize
-                    + (2 * res.getDimensionPixelSize(R.dimen.transient_taskbar_padding));
+            taskbarHeight = Math.round((taskbarIconSize * ICON_VISIBLE_AREA_FACTOR)
+                    + (2 * res.getDimensionPixelSize(R.dimen.transient_taskbar_padding)));
             stashedTaskbarHeight =
                     res.getDimensionPixelSize(R.dimen.transient_taskbar_stashed_height);
             taskbarBottomMargin =
@@ -1582,7 +1598,7 @@ public class DeviceProfile {
 
         writer.println(prefix + "\taspectRatio:" + aspectRatio);
 
-        writer.println(prefix + "\tisResponsiveGrid:" + isResponsiveGrid);
+        writer.println(prefix + "\tisResponsiveGrid:" + mIsResponsiveGrid);
         writer.println(prefix + "\tisScalableGrid:" + isScalableGrid);
 
         writer.println(prefix + "\tinv.numRows: " + inv.numRows);

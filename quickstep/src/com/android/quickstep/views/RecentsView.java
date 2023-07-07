@@ -2345,7 +2345,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false);
         });
         resetFromSplitSelectionState();
-        mSplitSelectStateController.resetState();
 
         // These are relatively expensive and don't need to be done this frame (RecentsView isn't
         // visible anyway), so defer by a frame to get off the critical path, e.g. app to home.
@@ -3261,7 +3260,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 true /* isStagedTask */);
 
         pendingAnimation.addEndListener(animationSuccess ->
-                mSplitSelectStateController.launchSplitTasks(launchSuccess ->
+                mSplitSelectStateController.launchInitialAppFullscreen(launchSuccess ->
                         resetFromSplitSelectionState()));
 
         pendingAnimation.buildAnim().start();
@@ -3743,19 +3742,33 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                                         taskViewIdArray.removeValue(
                                                 finalNextFocusedTaskView.getTaskViewId());
                                     }
-                                    if (snappedIndex < taskViewIdArray.size()) {
-                                        taskViewIdToSnapTo = taskViewIdArray.get(snappedIndex);
-                                    } else if (snappedIndex == taskViewIdArray.size()) {
-                                        // If the snapped task is the last item from the
-                                        // dismissed row,
-                                        // snap to the same column in the other grid row
-                                        IntArray inverseRowTaskViewIdArray =
-                                                isSnappedTaskInTopRow ? getBottomRowIdArray()
-                                                        : getTopRowIdArray();
-                                        if (snappedIndex < inverseRowTaskViewIdArray.size()) {
-                                            taskViewIdToSnapTo = inverseRowTaskViewIdArray.get(
-                                                    snappedIndex);
+                                    try {
+                                        if (snappedIndex < taskViewIdArray.size()) {
+                                            taskViewIdToSnapTo = taskViewIdArray.get(snappedIndex);
+                                        } else if (snappedIndex == taskViewIdArray.size()) {
+                                            // If the snapped task is the last item from the
+                                            // dismissed row,
+                                            // snap to the same column in the other grid row
+                                            IntArray inverseRowTaskViewIdArray =
+                                                    isSnappedTaskInTopRow ? getBottomRowIdArray()
+                                                            : getTopRowIdArray();
+                                            if (snappedIndex < inverseRowTaskViewIdArray.size()) {
+                                                taskViewIdToSnapTo = inverseRowTaskViewIdArray.get(
+                                                        snappedIndex);
+                                            }
                                         }
+                                    } catch (ArrayIndexOutOfBoundsException e) {
+                                        throw new IllegalStateException(
+                                                "b/269956477 invalid snappedIndex"
+                                                        + "\nsnappedTaskViewId: "
+                                                        + snappedTaskViewId
+                                                        + "\nfocusedTaskViewId: "
+                                                        + mFocusedTaskViewId
+                                                        + "\ntopRowIdArray: "
+                                                        + getTopRowIdArray().toConcatString()
+                                                        + "\nbottomRowIdArray: "
+                                                        + getBottomRowIdArray().toConcatString(),
+                                                e);
                                     }
                                 }
                             }
@@ -4100,6 +4113,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
         alpha = Utilities.boundToRange(alpha, 0, 1);
         mContentAlpha = alpha;
+
         int runningTaskId = getTaskIdsForRunningTaskView()[0];
         for (int i = getTaskViewCount() - 1; i >= 0; i--) {
             TaskView child = requireTaskViewAt(i);
@@ -4740,6 +4754,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         setTaskViewsPrimarySplitTranslation(0);
         setTaskViewsSecondarySplitTranslation(0);
 
+        mSplitSelectStateController.resetState();
         if (mSplitHiddenTaskViewIndex == -1) {
             return;
         }

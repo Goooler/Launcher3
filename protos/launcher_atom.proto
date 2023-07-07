@@ -135,7 +135,7 @@ message TaskBarContainer {
   }
 }
 
-// Next value 48
+// Next value 51
 enum Attribute {
   option allow_alias = true;
 
@@ -186,10 +186,13 @@ enum Attribute {
   ALL_APPS_SEARCH_RESULT_VIDEO = 41;
   ALL_APPS_SEARCH_RESULT_SYSTEM_POINTER = 42;
   ALL_APPS_SEARCH_RESULT_EDUCARD = 43;
+  ALL_APPS_SEARCH_RESULT_LOCATION = 50;
 
   // Result sources
   DATA_SOURCE_APPSEARCH_APP_PREVIEW = 45;
   DATA_SOURCE_APPSEARCH_APP_SRP_PREVIEW = 46;
+  DATA_SOURCE_APPSEARCH_CATEGORY_SRP_PREVIEW = 48;
+  DATA_SOURCE_APPSEARCH_ENTITY_SRP_PREVIEW = 49;
   DATA_SOURCE_AIAI_SEARCH_ROOT = 47;
 
   // Web suggestions provided by AGA

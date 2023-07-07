@@ -38,15 +38,19 @@ import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.util.LooperIdleLock;
+import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.RunnableList;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 /**
  * Binds the results of {@link com.android.launcher3.model.LoaderTask} to the Callbacks objects.
@@ -146,7 +150,12 @@ public abstract class BaseLauncherBinder {
         // shallow copy
         AppInfo[] apps = mBgAllAppsList.copyData();
         int flags = mBgAllAppsList.getFlags();
-        executeCallbacksTask(c -> c.bindAllApplications(apps, flags), mUiExecutor);
+        Map<PackageUserKey, Integer> packageUserKeytoUidMap = Arrays.stream(apps).collect(
+                Collectors.toMap(
+                        appInfo -> new PackageUserKey(appInfo.componentName.getPackageName(),
+                                appInfo.user), appInfo -> appInfo.uid, (a, b) -> a));
+        executeCallbacksTask(c -> c.bindAllApplications(apps, flags, packageUserKeytoUidMap),
+                mUiExecutor);
     }
 
     /**

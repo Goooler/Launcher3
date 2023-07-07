@@ -36,6 +36,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.UserHandle;
+import android.util.Log;
 import android.util.Pair;
 import android.view.DragEvent;
 import android.view.MotionEvent;
@@ -87,6 +88,7 @@ import java.util.function.Predicate;
  */
 public class TaskbarDragController extends DragController<BaseTaskbarContext> implements
         TaskbarControllers.LoggableTaskbarController {
+    private static final String TAG = "TaskbarDragController";
 
     private static final boolean DEBUG_DRAG_SHADOW_SURFACE = false;
     private static final int ANIM_DURATION_RETURN_ICON_TO_TASKBAR = 300;
@@ -151,6 +153,11 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             return false;
         }
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onTaskbarItemLongClick");
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.TWO_TASKBAR_LONG_CLICKS,
+                    "TaskbarDragController.startDragOnLongClick",
+                    new Throwable());
+        }
         BubbleTextView btv = (BubbleTextView) view;
         mActivity.onDragStart();
         btv.post(() -> {
@@ -198,7 +205,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
                 @Override
                 public boolean shouldStartDrag(double distanceDragged) {
-                    return mDragView != null && mDragView.isAnimationFinished();
+                    return mDragView != null && mDragView.isScaleAnimationFinished();
                 }
 
                 @Override
@@ -231,7 +238,6 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 dragLayerY,
                 (View target, DropTarget.DragObject d, boolean success) -> {} /* DragSource */,
                 (ItemInfo) btv.getTag(),
-                /* dragVisualizeOffset = */ null,
                 dragRect,
                 scale * iconScale,
                 scale,
@@ -241,7 +247,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
     @Override
     protected DragView startDrag(@Nullable Drawable drawable, @Nullable View view,
             DraggableView originalView, int dragLayerX, int dragLayerY, DragSource source,
-            ItemInfo dragInfo, Point dragOffset, Rect dragRegion, float initialDragViewScale,
+            ItemInfo dragInfo, Rect dragRegion, float initialDragViewScale,
             float dragViewScaleOnDrop, DragOptions options) {
         mOptions = options;
 
@@ -319,12 +325,26 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             @Override
             public void onProvideShadowMetrics(Point shadowSize, Point shadowTouchPoint) {
                 int iconSize = Math.max(mDragIconSize, btv.getWidth());
-                shadowSize.set(iconSize, iconSize);
+                if (iconSize > 0) {
+                    shadowSize.set(iconSize, iconSize);
+                } else {
+                    Log.d(TAG, "Invalid icon size, dragSize=" + mDragIconSize
+                            + " viewWidth=" + btv.getWidth());
+                }
+
                 // The registration point was taken before the icon scaled to mDragIconSize, so
                 // offset the registration to where the touch is on the new size.
                 int offsetX = (mDragIconSize - mDragObject.dragView.getDragRegionWidth()) / 2;
                 int offsetY = (mDragIconSize - mDragObject.dragView.getDragRegionHeight()) / 2;
-                shadowTouchPoint.set(mRegistrationX + offsetX, mRegistrationY + offsetY);
+                int touchX = mRegistrationX + offsetX;
+                int touchY = mRegistrationY + offsetY;
+                if (touchX >= 0 && touchY >= 0) {
+                    shadowTouchPoint.set(touchX, touchY);
+                } else {
+                    Log.d(TAG, "Invalid touch point, "
+                            + "registrationXY=(" + mRegistrationX + ", " + mRegistrationY + ") "
+                            + "offsetXY=(" + offsetX + ", " + offsetY + ")");
+                }
             }
 
             @Override

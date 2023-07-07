@@ -61,6 +61,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.util.Executors;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.TouchInteractionService.TISBinder;
@@ -94,16 +95,13 @@ public class AllSetActivity extends Activity {
 
     private static final float ANIMATION_PAUSE_ALPHA_THRESHOLD = 0.1f;
 
-    private final Rect mTempSettingsBounds = new Rect();
-    private final Rect mTempInclusionBounds = new Rect();
-    private final Rect mTempExclusionBounds = new Rect();
-
     private TISBindHelper mTISBindHelper;
     private TISBinder mBinder;
+    @Nullable private TaskbarManager mTaskbarManager = null;
 
     private final AnimatedFloat mSwipeProgress = new AnimatedFloat(this::onSwipeProgressUpdate);
     private BgDrawable mBackground;
-    private View mContentView;
+    private View mRootView;
     private float mSwipeUpShift;
 
     @Nullable private Vibrator mVibrator;
@@ -116,7 +114,8 @@ public class AllSetActivity extends Activity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_allset);
-        findViewById(R.id.root_view).setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        mRootView = findViewById(R.id.root_view);
+        mRootView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 
@@ -131,8 +130,7 @@ public class AllSetActivity extends Activity {
         ((ImageView) findViewById(R.id.icon)).getDrawable().mutate().setTint(accentColor);
 
         mBackground = new BgDrawable(this);
-        findViewById(R.id.root_view).setBackground(mBackground);
-        mContentView = findViewById(R.id.content_view);
+        mRootView.setBackground(mBackground);
         mSwipeUpShift = resources.getDimension(R.dimen.allset_swipe_up_shift);
 
         TextView subtitle = findViewById(R.id.subtitle);
@@ -159,34 +157,6 @@ public class AllSetActivity extends Activity {
             hint.setText(R.string.allset_button_hint);
         }
         hint.setAccessibilityDelegate(new SkipButtonAccessibilityDelegate());
-
-        View textContent = findViewById(R.id.text_content_view);
-        textContent.addOnLayoutChangeListener(
-                (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-                    mTempSettingsBounds.set(
-                            settings.getLeft(),
-                            settings.getTop(),
-                            settings.getRight(),
-                            settings.getBottom());
-                    mTempInclusionBounds.set(
-                            0,
-                            // Do not allow overlapping with the subtitle text
-                            subtitle.getBottom(),
-                            textContent.getWidth(),
-                            textContent.getHeight());
-                    mTempExclusionBounds.set(
-                            hint.getLeft(),
-                            hint.getTop(),
-                            hint.getRight(),
-                            hint.getBottom());
-
-                    Utilities.translateOverlappingView(
-                            settings,
-                            mTempSettingsBounds,
-                            mTempInclusionBounds,
-                            mTempExclusionBounds,
-                            Utilities.TRANSLATE_UP);
-                });
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
 
@@ -262,19 +232,25 @@ public class AllSetActivity extends Activity {
         mAnimatedBackground.playAnimation();
     }
 
+    private void setSetupUIVisible(boolean visible) {
+        if (mBinder == null || mTaskbarManager == null) return;
+        mTaskbarManager.setSetupUIVisible(visible);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         maybeResumeOrPauseBackgroundAnimation();
         if (mBinder != null) {
-            mBinder.getTaskbarManager().setSetupUIVisible(true);
+            setSetupUIVisible(true);
             mBinder.setSwipeUpProxy(this::createSwipeUpProxy);
         }
     }
 
     private void onTISConnected(TISBinder binder) {
         mBinder = binder;
-        mBinder.getTaskbarManager().setSetupUIVisible(isResumed());
+        mTaskbarManager = mBinder.getTaskbarManager();
+        setSetupUIVisible(isResumed());
         mBinder.setSwipeUpProxy(isResumed() ? this::createSwipeUpProxy : null);
         mBinder.setOverviewTargetChangeListener(mBinder::preloadOverviewForSUWAllSet);
         mBinder.preloadOverviewForSUWAllSet();
@@ -293,7 +269,7 @@ public class AllSetActivity extends Activity {
 
     private void clearBinderOverride() {
         if (mBinder != null) {
-            mBinder.getTaskbarManager().setSetupUIVisible(false);
+            setSetupUIVisible(false);
             mBinder.setSwipeUpProxy(null);
             mBinder.setOverviewTargetChangeListener(null);
         }
@@ -349,12 +325,11 @@ public class AllSetActivity extends Activity {
     private void onSwipeProgressUpdate() {
         mBackground.setProgress(mSwipeProgress.value);
         float alpha = getContentViewAlphaForSwipeProgress();
-        mContentView.setAlpha(alpha);
-        mContentView.setTranslationY((alpha - 1) * mSwipeUpShift);
+        mRootView.setAlpha(alpha);
+        mRootView.setTranslationY((alpha - 1) * mSwipeUpShift);
 
-        if (mLauncherStartAnim == null) {
-            mLauncherStartAnim = mBinder.getTaskbarManager().createLauncherStartFromSuwAnim(
-                    MAX_SWIPE_DURATION);
+        if (mLauncherStartAnim == null && mTaskbarManager != null) {
+            mLauncherStartAnim = mTaskbarManager.createLauncherStartFromSuwAnim(MAX_SWIPE_DURATION);
         }
         if (mLauncherStartAnim != null) {
             mLauncherStartAnim.setPlayFraction(Utilities.mapBoundToRange(

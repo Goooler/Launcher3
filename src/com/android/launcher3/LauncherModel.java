@@ -20,6 +20,9 @@ import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURC
 
 import static com.android.launcher3.LauncherAppState.ACTION_FORCE_ROLOAD;
 import static com.android.launcher3.config.FeatureFlags.IS_STUDIO_BUILD;
+import static com.android.launcher3.testing.shared.TestProtocol.WORK_TAB_MISSING;
+import static com.android.launcher3.testing.shared.TestProtocol.sDebugTracing;
+import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -91,6 +94,15 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     private static final boolean DEBUG_RECEIVER = false;
 
     static final String TAG = "Launcher.Model";
+
+    // Broadcast intent to track when the profile gets locked:
+    // ACTION_MANAGED_PROFILE_UNAVAILABLE can be used until Android U where profile no longer gets
+    // locked when paused.
+    // ACTION_PROFILE_INACCESSIBLE always means that the profile is getting locked but it only
+    // appeared in Android S.
+    private static final String ACTION_PROFILE_LOCKED = Utilities.ATLEAST_U
+            ? Intent.ACTION_PROFILE_INACCESSIBLE
+            : Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE;
 
     @NonNull
     private final LauncherAppState mApp;
@@ -284,14 +296,15 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     }
 
     public void onBroadcastIntent(@NonNull final Intent intent) {
-        if (DEBUG_RECEIVER) Log.d(TAG, "onReceive intent=" + intent);
+        if (DEBUG_RECEIVER || sDebugTracing) Log.d(TAG, "onReceive intent=" + intent);
         final String action = intent.getAction();
         if (Intent.ACTION_LOCALE_CHANGED.equals(action)) {
             // If we have changed locale we need to clear out the labels in all apps/workspace.
             forceReload();
-        } else if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE.equals(action) ||
-                Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action) ||
-                Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
+        } else if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE.equals(action)
+                || Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action)
+                || Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)
+                || Intent.ACTION_PROFILE_INACCESSIBLE.equals(action)) {
             UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
             if (TestProtocol.sDebugTracing) {
                 Log.d(TestProtocol.WORK_TAB_MISSING, "onBroadcastIntent intentAction: " + action +
@@ -304,10 +317,8 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                             PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user));
                 }
 
-                // ACTION_MANAGED_PROFILE_UNAVAILABLE sends the profile back to locked mode, so
-                // we need to run the state change task again.
-                if (Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE.equals(action) ||
-                        Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
+                if (ACTION_PROFILE_LOCKED.equals(action)
+                        || Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)) {
                     enqueueModelUpdateTask(new UserLockStateChangedTask(
                             user, Intent.ACTION_MANAGED_PROFILE_UNLOCKED.equals(action)));
                 }
@@ -552,6 +563,7 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
             synchronized (mLock) {
                 // Everything loaded bind the data.
                 mModelLoaded = true;
+                testLogD(WORK_TAB_MISSING, "launcher model loaded");
             }
         }
 

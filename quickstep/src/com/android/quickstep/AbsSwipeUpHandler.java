@@ -147,6 +147,7 @@ import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -334,6 +335,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     private boolean mCanSlowSwipeGoHome = true;
     // Indicates whether the divider is shown, only used when split screen is activated.
     private boolean mIsDividerShown = true;
+    private boolean mStartMovingTasks;
 
     @Nullable
     private RemoteAnimationTargets.ReleaseCheck mSwipePipToHomeReleaseCheck = null;
@@ -661,6 +663,14 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         } else {
             runningTasks = mGestureState.getRunningTask().getPlaceholderTasks();
         }
+
+        // Safeguard against any null tasks being sent to recents view, happens when quickswitching
+        // very quickly w/ split tasks because TopTaskTracker provides stale information compared to
+        // actual running tasks in the recents animation.
+        // TODO(b/236226779), Proper fix (ag/22237143)
+        if (Arrays.stream(runningTasks).anyMatch(Objects::isNull)) {
+            return;
+        }
         mRecentsView.onGestureAnimationStart(runningTasks, mDeviceState.getRotationTouchHelper());
     }
 
@@ -820,7 +830,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
      * @return Whether we can create the launcher controller or update its progress.
      */
     private boolean canCreateNewOrUpdateExistingLauncherTransitionController() {
-        return mGestureState.getEndTarget() != HOME && !mHasEndedLauncherTransition;
+        return mGestureState.getEndTarget() != HOME
+                && !mHasEndedLauncherTransition && mActivity != null;
     }
 
     @Override
@@ -914,7 +925,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         if (DesktopTaskView.DESKTOP_MODE_SUPPORTED && targets.hasDesktopTasks()) {
             mRemoteTargetHandles = mTargetGluer.assignTargetsForDesktop(targets);
         } else {
+            int untrimmedAppCount = mRemoteTargetHandles.length;
             mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(targets);
+            if (mRemoteTargetHandles.length < untrimmedAppCount && mIsSwipeForSplit) {
+                updateIsGestureForSplit(mRemoteTargetHandles.length);
+                setupRecentsViewUi();
+            }
         }
         mRecentsAnimationController = controller;
         mRecentsAnimationTargets = targets;
@@ -1499,6 +1515,20 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 if (mSwipePipToHomeReleaseCheck != null) {
                     mSwipePipToHomeReleaseCheck.setCanRelease(false);
                 }
+
+                // grab a screenshot before the PipContentOverlay gets parented on top of the task
+                UI_HELPER_EXECUTOR.execute(() -> {
+                    mTaskSnapshot = mRecentsAnimationController.screenshotTask(
+                            mGestureState.getRunningTaskId());
+                });
+
+                // let SystemUi reparent the overlay leash as soon as possible
+                SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
+                        mSwipePipToHomeAnimator.getTaskId(),
+                        mSwipePipToHomeAnimator.getComponentName(),
+                        mSwipePipToHomeAnimator.getDestinationBounds(),
+                        mSwipePipToHomeAnimator.getContentOverlay());
+
                 windowAnim = mSwipePipToHomeAnimators;
             } else {
                 mSwipePipToHomeAnimator = null;
@@ -1722,12 +1752,19 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         return keepClearArea;
     }
 
+    /**
+     * Notifies to start intercepting touches in the app window and hide the divider bar if needed.
+     * @see RecentsAnimationController#enableInputConsumer()
+     */
     private void startInterceptingTouchesForGesture() {
-        if (mRecentsAnimationController == null) {
+        if (mRecentsAnimationController == null || !mStartMovingTasks) {
             return;
         }
 
         mRecentsAnimationController.enableInputConsumer();
+
+        // Hide the divider as it starts intercepting touches in the app window.
+        setDividerShown(false);
     }
 
     private void computeRecentsScrollIfInvisible() {
@@ -2033,8 +2070,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         if (!hasTargets() || mRecentsAnimationController == null) {
             // If there are no targets or the animation not started, then there is nothing to finish
             mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED);
+            maybeAbortSwipePipToHome();
         } else {
-            maybeFinishSwipeToHome();
+            maybeFinishSwipePipToHome();
             finishRecentsControllerToHome(
                     () -> mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED));
         }
@@ -2046,17 +2084,25 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     /**
+     * Notifies SysUI that transition is aborted if applicable and also pass leash transactions
+     * from Launcher to WM.
+     */
+    private void maybeAbortSwipePipToHome() {
+        if (mIsSwipingPipToHome && mSwipePipToHomeAnimators[0] != null) {
+            SystemUiProxy.INSTANCE.get(mContext).abortSwipePipToHome(
+                    mSwipePipToHomeAnimator.getTaskId(),
+                    mSwipePipToHomeAnimator.getComponentName());
+            mIsSwipingPipToHome = false;
+        }
+    }
+
+    /**
      * Notifies SysUI that transition is finished if applicable and also pass leash transactions
      * from Launcher to WM.
      * This should happen before {@link #finishRecentsControllerToHome(Runnable)}.
      */
-    private void maybeFinishSwipeToHome() {
+    private void maybeFinishSwipePipToHome() {
         if (mIsSwipingPipToHome && mSwipePipToHomeAnimators[0] != null) {
-            SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
-                    mSwipePipToHomeAnimator.getTaskId(),
-                    mSwipePipToHomeAnimator.getComponentName(),
-                    mSwipePipToHomeAnimator.getDestinationBounds(),
-                    mSwipePipToHomeAnimator.getContentOverlay());
             mRecentsAnimationController.setFinishTaskTransaction(
                     mSwipePipToHomeAnimator.getTaskId(),
                     mSwipePipToHomeAnimator.getFinishTransaction(),
@@ -2238,6 +2284,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                                         targetCompat.taskId == mGestureState.getLastStartedTaskId())
                                 .findFirst();
                 if (!taskTargetOptional.isPresent()) {
+                    ActiveGestureLog.INSTANCE.addLog("No appeared task matching started task id");
                     finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
                     return;
                 }
@@ -2245,6 +2292,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 TaskView taskView = mRecentsView == null
                         ? null : mRecentsView.getTaskViewByTaskId(taskTarget.taskId);
                 if (taskView == null || !taskView.getThumbnail().shouldShowSplashView()) {
+                    ActiveGestureLog.INSTANCE.addLog("Invalid task view splash state");
                     finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
                     return;
                 }
@@ -2339,9 +2387,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         boolean setRecentsScroll = mRecentsViewScrollLinked && mRecentsView != null;
         float progress = Math.max(mCurrentShift.value, getScaleProgressDueToScroll());
         int scrollOffset = setRecentsScroll ? mRecentsView.getScrollOffset() : 0;
-        if (progress > 0 || scrollOffset != 0) {
-            // Hide the divider as the tasks start moving.
-            setDividerShown(false);
+        if (!mStartMovingTasks && (progress > 0 || scrollOffset != 0)) {
+            mStartMovingTasks = true;
+            startInterceptingTouchesForGesture();
         }
         for (RemoteTargetHandle remoteHandle : mRemoteTargetHandles) {
             AnimatorControllerWithResistance playbackController =

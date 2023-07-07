@@ -68,6 +68,7 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.hardware.SensorManager;
@@ -141,8 +142,8 @@ import com.android.launcher3.uioverrides.touchcontrollers.TaskViewTouchControlle
 import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
 import com.android.launcher3.util.ActivityOptionsWrapper;
-import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ObjectWrapper;
@@ -343,14 +344,18 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
-        // Only pause is taskbar controller is not present
+    public RunnableList startActivitySafely(View v, Intent intent, ItemInfo item) {
+        // Only pause is taskbar controller is not present until the transition (if it exists) ends
         mHotseatPredictionController.setPauseUIUpdate(getTaskbarUIController() == null);
-        boolean started = super.startActivitySafely(v, intent, item);
-        if (getTaskbarUIController() == null && !started) {
-            mHotseatPredictionController.setPauseUIUpdate(false);
+        RunnableList result = super.startActivitySafely(v, intent, item);
+        if (result == null) {
+            if (getTaskbarUIController() == null) {
+                mHotseatPredictionController.setPauseUIUpdate(false);
+            }
+        } else {
+            result.add(() -> mHotseatPredictionController.setPauseUIUpdate(false));
         }
-        return started;
+        return result;
     }
 
     @Override
@@ -369,11 +374,6 @@ public class QuickstepLauncher extends Launcher {
         if ((changeBits & (ACTIVITY_STATE_DEFERRED_RESUMED | ACTIVITY_STATE_STARTED
                 | ACTIVITY_STATE_USER_ACTIVE | ACTIVITY_STATE_TRANSITION_ACTIVE)) != 0) {
             onStateOrResumeChanging((getActivityFlags() & ACTIVITY_STATE_TRANSITION_ACTIVE) == 0);
-        }
-
-        if (((changeBits & ACTIVITY_STATE_STARTED) != 0
-                || (changeBits & getActivityFlags() & ACTIVITY_STATE_DEFERRED_RESUMED) != 0)) {
-            mHotseatPredictionController.setPauseUIUpdate(false);
         }
     }
 
@@ -602,13 +602,10 @@ public class QuickstepLauncher extends Launcher {
     @Override
     public void startSplitSelection(SplitSelectSource splitSelectSource) {
         RecentsView recentsView = getOverviewPanel();
-        ComponentKey componentToBeStaged = new ComponentKey(
-                splitSelectSource.itemInfo.getTargetComponent(),
-                splitSelectSource.itemInfo.user);
         // Check if there is already an instance of this app running, if so, initiate the split
         // using that.
         mSplitSelectStateController.findLastActiveTaskAndRunCallback(
-                componentToBeStaged,
+                splitSelectSource.itemInfo.getComponentKey(),
                 foundTask -> {
                     splitSelectSource.alreadyRunningTaskId = foundTask == null
                             ? INVALID_TASK_ID
@@ -879,7 +876,9 @@ public class QuickstepLauncher extends Launcher {
 
     private void onTISConnected(TISBinder binder) {
         mTaskbarManager = binder.getTaskbarManager();
-        mTaskbarManager.setActivity(this);
+        if (mTaskbarManager != null) {
+            mTaskbarManager.setActivity(this);
+        }
         mOverviewCommandHelper = binder.getOverviewCommandHelper();
     }
 
@@ -1102,6 +1101,17 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
+    public ActivityOptionsWrapper makeDefaultActivityOptions(int splashScreenStyle) {
+        RunnableList callbacks = new RunnableList();
+        ActivityOptions options = ActivityOptions.makeCustomAnimation(
+                this, 0, 0, Color.TRANSPARENT,
+                Executors.MAIN_EXECUTOR.getHandler(), null,
+                elapsedRealTime -> callbacks.executeAllAndDestroy());
+        options.setSplashScreenStyle(splashScreenStyle);
+        return new ActivityOptionsWrapper(options, callbacks);
+    }
+
+    @Override
     @BinderThread
     public void enterStageSplitFromRunningApp(boolean leftOrTop) {
         mSplitWithKeyboardShortcutController.enterStageSplit(leftOrTop);
@@ -1272,7 +1282,8 @@ public class QuickstepLauncher extends Launcher {
                             getActivityLaunchOptions(taskView, null).options));
             return;
         }
-        mSplitSelectStateController.launchTasks(
+        mSplitSelectStateController.launchExistingSplitPair(
+                null /* launchingTaskView */,
                 groupTask.task1.key.id,
                 groupTask.task2.key.id,
                 SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT,
