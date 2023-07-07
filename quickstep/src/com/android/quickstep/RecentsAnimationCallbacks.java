@@ -15,8 +15,11 @@
  */
 package com.android.quickstep;
 
+import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
+
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.ACTIVITY_TYPE_HOME;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.START_RECENTS_ANIMATION;
 
 import android.graphics.Rect;
 import android.util.ArraySet;
@@ -28,11 +31,12 @@ import androidx.annotation.UiThread;
 
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.Preconditions;
+import com.android.quickstep.util.ActiveGestureErrorDetector;
+import com.android.quickstep.util.ActiveGestureLog;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
 
@@ -85,30 +89,18 @@ public class RecentsAnimationCallbacks implements
     @BinderThread
     @Deprecated
     public final void onAnimationStart(RecentsAnimationControllerCompat controller,
-            RemoteAnimationTargetCompat[] appTargets, Rect homeContentInsets,
+            RemoteAnimationTarget[] appTargets, Rect homeContentInsets,
             Rect minimizedHomeBounds) {
-        onAnimationStart(controller, appTargets, new RemoteAnimationTargetCompat[0],
+        onAnimationStart(controller, appTargets, new RemoteAnimationTarget[0],
                 homeContentInsets, minimizedHomeBounds);
     }
 
     // Called only in R+ platform
     @BinderThread
     public final void onAnimationStart(RecentsAnimationControllerCompat animationController,
-            RemoteAnimationTargetCompat[] appTargets,
-            RemoteAnimationTargetCompat[] wallpaperTargets,
+            RemoteAnimationTarget[] appTargets,
+            RemoteAnimationTarget[] wallpaperTargets,
             Rect homeContentInsets, Rect minimizedHomeBounds) {
-        // Convert appTargets to type RemoteAnimationTarget for all apps except Home app
-        RemoteAnimationTarget[] nonHomeApps = Arrays.stream(appTargets)
-                .filter(remoteAnimationTarget ->
-                        remoteAnimationTarget.activityType != ACTIVITY_TYPE_HOME)
-                .map(RemoteAnimationTargetCompat::unwrap)
-                .toArray(RemoteAnimationTarget[]::new);
-
-        RemoteAnimationTarget[] nonAppTargets = mSystemUiProxy.onGoingToRecentsLegacy(nonHomeApps);
-
-        RecentsAnimationTargets targets = new RecentsAnimationTargets(appTargets,
-                wallpaperTargets, RemoteAnimationTargetCompat.wrap(nonAppTargets),
-                homeContentInsets, minimizedHomeBounds);
         mController = new RecentsAnimationController(animationController,
                 mAllowMinimizeSplitScreen, this::onAnimationFinished);
 
@@ -116,7 +108,27 @@ public class RecentsAnimationCallbacks implements
             Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(),
                     mController::finishAnimationToApp);
         } else {
+            RemoteAnimationTarget[] nonAppTargets;
+            if (!TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+                nonAppTargets = mSystemUiProxy.onGoingToRecentsLegacy(appTargets);
+            } else {
+                final ArrayList<RemoteAnimationTarget> apps = new ArrayList<>();
+                final ArrayList<RemoteAnimationTarget> nonApps = new ArrayList<>();
+                classifyTargets(appTargets, apps, nonApps);
+                appTargets = apps.toArray(new RemoteAnimationTarget[apps.size()]);
+                nonAppTargets = nonApps.toArray(new RemoteAnimationTarget[nonApps.size()]);
+            }
+            if (nonAppTargets == null) {
+                nonAppTargets = new RemoteAnimationTarget[0];
+            }
+            final RecentsAnimationTargets targets = new RecentsAnimationTargets(appTargets,
+                    wallpaperTargets, nonAppTargets, homeContentInsets, minimizedHomeBounds);
+
             Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
+                ActiveGestureLog.INSTANCE.addLog(
+                        /* event= */ "RecentsAnimationCallbacks.onAnimationStart",
+                        /* extras= */ targets.apps.length,
+                        /* gestureEvent= */ START_RECENTS_ANIMATION);
                 for (RecentsAnimationListener listener : getListeners()) {
                     listener.onRecentsAnimationStart(mController, targets);
                 }
@@ -128,6 +140,9 @@ public class RecentsAnimationCallbacks implements
     @Override
     public final void onAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
+            ActiveGestureLog.INSTANCE.addLog(
+                    /* event= */ "RecentsAnimationCallbacks.onAnimationCanceled",
+                    /* gestureEvent= */ CANCEL_RECENTS_ANIMATION);
             for (RecentsAnimationListener listener : getListeners()) {
                 listener.onRecentsAnimationCanceled(thumbnailDatas);
             }
@@ -136,8 +151,10 @@ public class RecentsAnimationCallbacks implements
 
     @BinderThread
     @Override
-    public void onTasksAppeared(RemoteAnimationTargetCompat[] apps) {
+    public void onTasksAppeared(RemoteAnimationTarget[] apps) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
+            ActiveGestureLog.INSTANCE.addLog("RecentsAnimationCallbacks.onTasksAppeared",
+                    ActiveGestureErrorDetector.GestureEvent.TASK_APPEARED);
             for (RecentsAnimationListener listener : getListeners()) {
                 listener.onTasksAppeared(apps);
             }
@@ -158,6 +175,8 @@ public class RecentsAnimationCallbacks implements
 
     private final void onAnimationFinished(RecentsAnimationController controller) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
+            ActiveGestureLog.INSTANCE.addLog(
+                    /* event= */ "RecentsAnimationCallbacks.onAnimationFinished");
             for (RecentsAnimationListener listener : getListeners()) {
                 listener.onRecentsAnimationFinished(controller);
             }
@@ -166,6 +185,18 @@ public class RecentsAnimationCallbacks implements
 
     private RecentsAnimationListener[] getListeners() {
         return mListeners.toArray(new RecentsAnimationListener[mListeners.size()]);
+    }
+
+    private void classifyTargets(RemoteAnimationTarget[] appTargets,
+            ArrayList<RemoteAnimationTarget> apps, ArrayList<RemoteAnimationTarget> nonApps) {
+        for (int i = 0; i < appTargets.length; i++) {
+            RemoteAnimationTarget target = appTargets[i];
+            if (target.windowType == TYPE_DOCK_DIVIDER) {
+                nonApps.add(target);
+            } else {
+                apps.add(target);
+            }
+        }
     }
 
     /**
@@ -190,7 +221,7 @@ public class RecentsAnimationCallbacks implements
         /**
          * Callback made when a task started from the recents is ready for an app transition.
          */
-        default void onTasksAppeared(@NonNull RemoteAnimationTargetCompat[] appearedTaskTarget) {}
+        default void onTasksAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTarget) {}
 
         /**
          * @return whether this will call onFinished or not (onFinished should only be called once).
