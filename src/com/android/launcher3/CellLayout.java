@@ -18,6 +18,7 @@ package com.android.launcher3;
 
 import static android.animation.ValueAnimator.areAnimatorsEnabled;
 
+import static com.android.launcher3.LauncherState.EDIT_MODE;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_5;
 import static com.android.launcher3.dragndrop.DraggableView.DRAGGABLE_ICON;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
@@ -85,6 +86,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Stack;
 
 public class CellLayout extends ViewGroup {
@@ -570,7 +572,9 @@ public class CellLayout extends ViewGroup {
     }
 
     protected void updateBgAlpha() {
-        mBackground.setAlpha((int) (mSpringLoadedProgress * 255));
+        if (!getWorkspace().mLauncher.isInState(EDIT_MODE)) {
+            mBackground.setAlpha((int) (mSpringLoadedProgress * 255));
+        }
     }
 
     /**
@@ -891,7 +895,7 @@ public class CellLayout extends ViewGroup {
      *
      * @param result Array of 2 ints to hold the x and y coordinate of the point
      */
-    void regionToCenterPoint(int cellX, int cellY, int spanX, int spanY, int[] result) {
+    public void regionToCenterPoint(int cellX, int cellY, int spanX, int spanY, int[] result) {
         cellToRect(cellX, cellY, spanX, spanY, mTempRect);
         result[0] = mTempRect.centerX();
         result[1] = mTempRect.centerY();
@@ -1268,7 +1272,7 @@ public class CellLayout extends ViewGroup {
      * @return The X, Y cell of a vacant area that can contain this object,
      *         nearest the requested location.
      */
-    private int[] findNearestArea(int relativeXPos, int relativeYPos, int minSpanX, int minSpanY,
+    protected int[] findNearestArea(int relativeXPos, int relativeYPos, int minSpanX, int minSpanY,
             int spanX, int spanY, boolean ignoreOccupied, int[] result, int[] resultSpan) {
         // For items with a spanX / spanY > 1, the passed in point (relativeXPos, relativeYPos)
         // corresponds to the center of the item, but we are searching based on the top-left cell,
@@ -2340,7 +2344,16 @@ public class CellLayout extends ViewGroup {
         }
         Rect r0 = new Rect(cellX, cellY, cellX + spanX, cellY + spanY);
         Rect r1 = new Rect();
-        for (View child: solution.map.keySet()) {
+        // The views need to be sorted so that the results are deterministic on the views positions
+        // and not by the views hash which is "random".
+        // The views are sorted twice, once for the X position and a second time for the Y position
+        // to ensure same order everytime.
+        Comparator comparator = Comparator.comparing(view ->
+                        ((CellLayoutLayoutParams) ((View) view).getLayoutParams()).getCellX())
+                .thenComparing(view ->
+                        ((CellLayoutLayoutParams) ((View) view).getLayoutParams()).getCellY());
+        List<View> views = solution.map.keySet().stream().sorted(comparator).toList();
+        for (View child : views) {
             if (child == ignoreView) continue;
             CellAndSpan c = solution.map.get(child);
             CellLayoutLayoutParams lp = (CellLayoutLayoutParams) child.getLayoutParams();

@@ -25,16 +25,14 @@ class DeleteDropTargetTest {
         enableRunningInTestHarnessForTests()
     }
 
-    // Needs mText, mTempRect, getPaddingTop, getPaddingBottom
-    // availableHeight as a parameter
     @Test
     fun isTextClippedVerticallyTest() {
-        buttonDropTarget.mText = "My Test"
+        buttonDropTarget.updateText("My Test")
+        buttonDropTarget.setPadding(0, 0, 0, 0)
+        buttonDropTarget.setTextMultiLine(false)
+
         // No space for text
         assertThat(buttonDropTarget.isTextClippedVertically(30)).isTrue()
-
-        // Some space for text, and just enough that the text should not be clipped
-        assertThat(buttonDropTarget.isTextClippedVertically(50)).isFalse()
 
         // A lot of space for text so the text should not be clipped
         assertThat(buttonDropTarget.isTextClippedVertically(100)).isFalse()

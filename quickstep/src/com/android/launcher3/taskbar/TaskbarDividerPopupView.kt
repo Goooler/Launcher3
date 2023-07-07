@@ -17,7 +17,9 @@ package com.android.launcher3.taskbar
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.MotionEvent
@@ -42,6 +44,9 @@ constructor(
     companion object {
         private const val TAG = "TaskbarDividerPopupView"
         private const val DIVIDER_POPUP_CLOSING_DELAY = 500L
+        private const val SETTINGS_PACKAGE_NAME = "com.android.settings"
+        private const val CHANGE_NAVIGATION_MODE_ACTION =
+            "com.android.settings.NAVIGATION_MODE_SETTINGS"
 
         @JvmStatic
         fun createAndPopulate(
@@ -71,7 +76,7 @@ constructor(
     private var didPreferenceChange = false
 
     /** Callback invoked when the pinning popup view is closing. */
-    var onCloseCallback: () -> Unit = {}
+    var onCloseCallback: (preferenceChanged: Boolean) -> Unit = {}
 
     /**
      * Callback invoked when the user preference changes in popup view. Preference change will be
@@ -98,11 +103,20 @@ constructor(
         super.onFinishInflate()
         val taskbarSwitchOption = findViewById<LinearLayout>(R.id.taskbar_switch_option)
         val alwaysShowTaskbarSwitch = findViewById<Switch>(R.id.taskbar_pinning_switch)
+        val navigationModeChangeOption =
+            findViewById<LinearLayout>(R.id.navigation_mode_switch_option)
         alwaysShowTaskbarSwitch.isChecked = alwaysShowTaskbarOn
         taskbarSwitchOption.setOnClickListener {
             alwaysShowTaskbarSwitch.isClickable = true
             alwaysShowTaskbarSwitch.isChecked = !alwaysShowTaskbarOn
             onClickAlwaysShowTaskbarSwitchOption()
+        }
+        navigationModeChangeOption.setOnClickListener {
+            context.startActivity(
+                Intent(CHANGE_NAVIGATION_MODE_ACTION)
+                    .setPackage(SETTINGS_PACKAGE_NAME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         }
     }
 
@@ -125,7 +139,27 @@ constructor(
 
     private fun populateForView(view: View): TaskbarDividerPopupView<*> {
         dividerView = view
+        tryUpdateBackground()
         return this
+    }
+
+    /** Updates the text background to match the shape of this background (when applicable). */
+    private fun tryUpdateBackground() {
+        if (background !is GradientDrawable) {
+            return
+        }
+        val background = background as GradientDrawable
+        val color = context.getColor(R.color.popup_shade_first)
+        val backgroundMask = GradientDrawable()
+        backgroundMask.setColor(color)
+        backgroundMask.shape = GradientDrawable.RECTANGLE
+        if (background.cornerRadii != null) {
+            backgroundMask.cornerRadii = background.cornerRadii
+        } else {
+            backgroundMask.cornerRadius = background.cornerRadius
+        }
+
+        setBackground(backgroundMask)
     }
 
     override fun addArrow() {
@@ -148,7 +182,7 @@ constructor(
                     0f, // arrowOffsetY
                     false, // isPointingUp
                     true, // leftAligned
-                    Themes.getAttrColor(context, R.attr.popupColorPrimary),
+                    context.getColor(R.color.popup_shade_first),
                 )
             elevation = mElevation
             mArrow.elevation = mElevation
@@ -156,9 +190,7 @@ constructor(
     }
 
     override fun closeComplete() {
-        if (didPreferenceChange) {
-            onCloseCallback()
-        }
+        onCloseCallback(didPreferenceChange)
         super.closeComplete()
     }
 

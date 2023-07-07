@@ -75,7 +75,7 @@ public class BaseDepthController {
     // marking the launcher surface as opaque.  Only used in certain Launcher states.
     private boolean mHasContentBehindLauncher;
 
-    /** Pause applying depth and blur, can be used when something behind the Launcher. */
+    /** Pause blur but allow transparent, can be used when launch something behind the Launcher. */
     protected boolean mPauseBlurs;
 
     /**
@@ -87,6 +87,8 @@ public class BaseDepthController {
      * If we requested early wake-up offsets to SurfaceFlinger.
      */
     protected boolean mInEarlyWakeUp;
+
+    private boolean mWaitingOnSurfaceValidity;
 
     public BaseDepthController(Launcher activity) {
         mLauncher = activity;
@@ -115,6 +117,8 @@ public class BaseDepthController {
         }
     }
 
+    protected void onInvalidSurface() { }
+
     protected void applyDepthAndBlur() {
         float depth = mDepth;
         IBinder windowToken = mLauncher.getRootView().getWindowToken();
@@ -128,11 +132,17 @@ public class BaseDepthController {
         if (!BlurUtils.supportsBlursOnWindows()) {
             return;
         }
-        if (mSurface == null || !mSurface.isValid()) {
+        if (mSurface == null) {
             return;
         }
+        if (!mSurface.isValid()) {
+            mWaitingOnSurfaceValidity = true;
+            onInvalidSurface();
+            return;
+        }
+        mWaitingOnSurfaceValidity = false;
         boolean hasOpaqueBg = mLauncher.getScrimView().isFullyOpaque();
-        boolean isSurfaceOpaque = mPauseBlurs || (!mHasContentBehindLauncher && hasOpaqueBg);
+        boolean isSurfaceOpaque = !mHasContentBehindLauncher && hasOpaqueBg && !mPauseBlurs;
 
         mCurrentBlur = !mCrossWindowBlursEnabled || hasOpaqueBg || mPauseBlurs
                 ? 0 : (int) (depth * mMaxBlurRadius);
@@ -174,7 +184,7 @@ public class BaseDepthController {
      * Sets the specified app target surface to apply the blur to.
      */
     protected void setSurface(SurfaceControl surface) {
-        if (mSurface != surface) {
+        if (mSurface != surface || mWaitingOnSurfaceValidity) {
             mSurface = surface;
             applyDepthAndBlur();
         }

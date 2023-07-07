@@ -107,6 +107,8 @@ public final class LauncherInstrumentation {
     static final Pattern EVENT_TOUCH_DOWN_TIS = getTouchEventPatternTIS("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP_TIS = getTouchEventPatternTIS("ACTION_UP");
     static final Pattern EVENT_TOUCH_CANCEL_TIS = getTouchEventPatternTIS("ACTION_CANCEL");
+    static final Pattern EVENT_HOVER_ENTER_TIS = getTouchEventPatternTIS("ACTION_HOVER_ENTER");
+    static final Pattern EVENT_HOVER_EXIT_TIS = getTouchEventPatternTIS("ACTION_HOVER_EXIT");
 
     private static final Pattern EVENT_KEY_BACK_DOWN =
             getKeyEventPattern("ACTION_DOWN", "KEYCODE_BACK");
@@ -140,7 +142,9 @@ public final class LauncherInstrumentation {
      * Represents a point in the code at which a callback can run.
      */
     public enum CALLBACK_RUN_POINT {
-        CALLBACK_HOLD_BEFORE_DROP
+        CALLBACK_HOLD_BEFORE_DROP,
+        CALLBACK_HOVER_ENTER,
+        CALLBACK_HOVER_EXIT,
     }
 
     private Consumer<CALLBACK_RUN_POINT> mCallbackAtRunPoint = null;
@@ -1682,6 +1686,12 @@ public final class LauncherInstrumentation {
                                     ? EVENT_TOUCH_CANCEL_TIS : EVENT_TOUCH_UP_TIS);
                 }
                 break;
+            case MotionEvent.ACTION_HOVER_ENTER:
+                expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_HOVER_ENTER_TIS);
+                break;
+            case MotionEvent.ACTION_HOVER_EXIT:
+                expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_HOVER_EXIT_TIS);
+                break;
         }
 
         final MotionEvent event = getMotionEvent(downTime, currentTime, action, point.x, point.y);
@@ -1829,14 +1839,6 @@ public final class LauncherInstrumentation {
     public Integer getPid() {
         final Bundle testInfo = getTestInfo(TestProtocol.REQUEST_PID);
         return testInfo != null ? testInfo.getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD) : null;
-    }
-
-    public void produceViewLeak() {
-        getTestInfo(TestProtocol.REQUEST_VIEW_LEAK);
-    }
-
-    public void printViewLeak() {
-        getTestInfo(TestProtocol.PRINT_VIEW_LEAK);
     }
 
     public ArrayList<ComponentName> getRecentTasks() {
@@ -2004,21 +2006,41 @@ public final class LauncherInstrumentation {
     }
 
     /**
-     * Taps outside container to dismiss.
+     * Taps outside container to dismiss, centered vertically and halfway to the edge of the screen.
      *
      * @param container container to be dismissed
      * @param tapRight  tap on the right of the container if true, or left otherwise
      */
     void touchOutsideContainer(UiObject2 container, boolean tapRight) {
+        touchOutsideContainer(container, tapRight, true);
+    }
+
+    /**
+     * Taps outside the container, to the right or left, and centered vertically.
+     *
+     * @param tapRight      if true touches to the right of the container, otherwise touches on left
+     * @param halfwayToEdge if true touches halfway to the screen edge, if false touches 1 px from
+     *                      container
+     */
+    void touchOutsideContainer(UiObject2 container, boolean tapRight, boolean halfwayToEdge) {
         try (LauncherInstrumentation.Closable c = addContextLayer(
                 "want to tap outside container on the " + (tapRight ? "right" : "left"))) {
             Rect containerBounds = getVisibleBounds(container);
+
+            int x;
+            if (halfwayToEdge) {
+                x = tapRight
+                        ? (containerBounds.right + getRealDisplaySize().x) / 2
+                        : containerBounds.left / 2;
+            } else {
+                x = tapRight
+                        ? containerBounds.right + 1
+                        : containerBounds.left - 1;
+            }
+            int y = containerBounds.top + containerBounds.height() / 2;
+
             final long downTime = SystemClock.uptimeMillis();
-            final Point tapTarget = new Point(
-                    tapRight
-                            ? (containerBounds.right + getRealDisplaySize().x) / 2
-                            : containerBounds.left / 2,
-                    containerBounds.top + 1);
+            final Point tapTarget = new Point(x, y);
             sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, tapTarget,
                     LauncherInstrumentation.GestureScope.INSIDE);
             sendPointer(downTime, downTime, MotionEvent.ACTION_UP, tapTarget,

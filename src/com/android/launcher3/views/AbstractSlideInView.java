@@ -28,7 +28,6 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Outline;
@@ -46,6 +45,7 @@ import android.window.BackEvent;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
+import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Utilities;
@@ -99,7 +99,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     protected @Nullable OnCloseListener mOnCloseBeginListener;
     protected List<OnCloseListener> mOnCloseListeners = new ArrayList<>();
 
-    private final AnimatedFloat mSlideInViewScale =
+    protected final AnimatedFloat mSlideInViewScale =
             new AnimatedFloat(this::onScaleProgressChanged, VIEW_NO_SCALE);
     protected boolean mIsBackProgressing;
     @Nullable private Drawable mContentBackground;
@@ -195,7 +195,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     }
 
     @Override
-    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void onBackProgressed(BackEvent backEvent) {
         final float progress = backEvent.getProgress();
         float deceleratedProgress =
