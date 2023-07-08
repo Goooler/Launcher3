@@ -208,7 +208,7 @@ public final class FeatureFlags {
 
     // TODO(Block 14): Cleanup flags
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag(270393108, "NOTIFY_CRASHES",
-            DISABLED, "Sends a notification whenever launcher encounters an uncaught exception.");
+            TEAMFOOD, "Sends a notification whenever launcher encounters an uncaught exception.");
 
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(270395798,
             "ENABLE_TRANSIENT_TASKBAR", ENABLED, "Enables transient taskbar.");
@@ -302,7 +302,7 @@ public final class FeatureFlags {
             "Enable widget transition animation when resizing the widgets");
 
     public static final BooleanFlag PREEMPTIVE_UNFOLD_ANIMATION_START = getDebugFlag(270397209,
-            "PREEMPTIVE_UNFOLD_ANIMATION_START", ENABLED,
+            "PREEMPTIVE_UNFOLD_ANIMATION_START", DISABLED,
             "Enables starting the unfold animation preemptively when unfolding, without"
                     + "waiting for SystemUI and then merging the SystemUI progress whenever we "
                     + "start receiving the events");

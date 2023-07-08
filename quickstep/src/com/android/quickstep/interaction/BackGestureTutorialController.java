@@ -66,12 +66,19 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public int getIntroductionSubtitle() {
-        return R.string.back_gesture_intro_subtitle;
+        return ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
+                ? R.string.back_gesture_tutorial_subtitle
+                : R.string.back_gesture_intro_subtitle;
     }
 
     @Override
     public int getSpokenIntroductionSubtitle() {
         return R.string.back_gesture_spoken_intro_subtitle;
+    }
+
+    @Override
+    public int getSuccessFeedbackTitle() {
+        return R.string.gesture_tutorial_nice;
     }
 
     @Override
@@ -136,7 +143,7 @@ final class BackGestureTutorialController extends TutorialController {
     }
 
     @Override
-    protected int getSwipeActionColor() {
+    protected int getFakeLauncherColor() {
         return mTutorialFragment.mRootView.mColorSurfaceContainer;
     }
 
@@ -147,7 +154,7 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (isGestureCompleted()) {
+        if (skipGestureAttempt()) {
             return;
         }
         switch (mTutorialType) {
@@ -165,7 +172,7 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public void onBackGestureProgress(float diffx, float diffy, boolean isLeftGesture) {
-        if (isGestureCompleted()) {
+        if (skipGestureAttempt()) {
             return;
         }
 
@@ -234,7 +241,7 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (isGestureCompleted()) {
+        if (skipGestureAttempt()) {
             return;
         }
         if (mTutorialType == BACK_NAVIGATION_COMPLETE) {

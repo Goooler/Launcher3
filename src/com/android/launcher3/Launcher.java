@@ -133,6 +133,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
+import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DropTarget.DragObject;
@@ -205,6 +206,7 @@ import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
@@ -246,6 +248,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -518,11 +521,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         // TODO: move the SearchConfig to SearchState when new LauncherState is created.
         mBaseSearchConfig = new BaseSearchConfig();
 
+        setupViews();
+
         mAppWidgetManager = new WidgetManagerHelper(this);
         mAppWidgetHolder = createAppWidgetHolder();
         mAppWidgetHolder.startListening();
 
-        setupViews();
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
@@ -1070,6 +1074,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         logStopAndResume(false /* isResume */);
         mAppWidgetHolder.setActivityStarted(false);
         NotificationListener.removeNotificationsChangedListener(getPopupDataProvider());
+        FloatingIconView.resetIconLoadResult();
     }
 
     @Override
@@ -2970,8 +2975,12 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     @Override
     @TargetApi(Build.VERSION_CODES.S)
-    public void bindAllApplications(AppInfo[] apps, int flags) {
-        mAppsView.getAppsStore().setApps(apps, flags);
+    @UiThread
+    public void bindAllApplications(AppInfo[] apps, int flags,
+            Map<PackageUserKey, Integer> packageUserKeytoUidMap) {
+        Preconditions.assertUIThread();
+        AllAppsStore appsStore = mAppsView.getAppsStore();
+        appsStore.setApps(apps, flags, packageUserKeytoUidMap);
         PopupContainerWithArrow.dismissInvalidPopup(this);
         if (Utilities.ATLEAST_S) {
             Trace.endAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,

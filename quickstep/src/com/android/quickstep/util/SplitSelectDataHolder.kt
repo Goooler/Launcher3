@@ -61,7 +61,9 @@ class SplitSelectDataHolder(
      */
     companion object {
         @IntDef(SPLIT_TASK_TASK, SPLIT_TASK_PENDINGINTENT, SPLIT_TASK_SHORTCUT,
-                SPLIT_PENDINGINTENT_TASK, SPLIT_PENDINGINTENT_PENDINGINTENT, SPLIT_SHORTCUT_TASK)
+                SPLIT_PENDINGINTENT_TASK, SPLIT_PENDINGINTENT_PENDINGINTENT, SPLIT_SHORTCUT_TASK,
+                SPLIT_SINGLE_TASK_FULLSCREEN, SPLIT_SINGLE_INTENT_FULLSCREEN,
+                SPLIT_SINGLE_SHORTCUT_FULLSCREEN)
         @Retention(AnnotationRetention.SOURCE)
         annotation class SplitLaunchType
 
@@ -71,6 +73,11 @@ class SplitSelectDataHolder(
         const val SPLIT_PENDINGINTENT_TASK = 3
         const val SPLIT_SHORTCUT_TASK = 4
         const val SPLIT_PENDINGINTENT_PENDINGINTENT = 5
+
+        // Non-split edge case of launching the initial selected task as a fullscreen task
+        const val SPLIT_SINGLE_TASK_FULLSCREEN = 6
+        const val SPLIT_SINGLE_INTENT_FULLSCREEN = 7
+        const val SPLIT_SINGLE_SHORTCUT_FULLSCREEN = 8
     }
 
 
@@ -190,7 +197,7 @@ class SplitSelectDataHolder(
 
     /**
      * @return [SplitLaunchData] with the necessary fields populated as determined by
-     *   [SplitLaunchData.splitLaunchType]
+     *   [SplitLaunchData.splitLaunchType]. This is to be used for launching splitscreen
      */
     fun getSplitLaunchData() : SplitLaunchData {
         // Convert all intents to shortcut infos to see if determine if we launch shortcut or intent
@@ -201,6 +208,23 @@ class SplitSelectDataHolder(
             initialStagePosition = getOppositeStagePosition(initialStagePosition)
         }
 
+        return generateSplitLaunchData(splitLaunchType)
+    }
+
+    /**
+     * @return [SplitLaunchData] with the necessary fields populated as determined by
+     *   [SplitLaunchData.splitLaunchType]. This is to be used for launching an initially selected
+     *   split task in fullscreen
+     */
+    fun getFullscreenLaunchData() : SplitLaunchData {
+        // Convert all intents to shortcut infos to see if determine if we launch shortcut or intent
+        convertIntentsToFinalTypes()
+        val splitLaunchType = getFullscreenLaunchType()
+
+        return generateSplitLaunchData(splitLaunchType)
+    }
+
+    private fun generateSplitLaunchData(@SplitLaunchType splitLaunchType: Int) : SplitLaunchData {
         return SplitLaunchData(
                 splitLaunchType,
                 initialTaskId,
@@ -284,6 +308,22 @@ class SplitSelectDataHolder(
             return SPLIT_PENDINGINTENT_PENDINGINTENT
         }
         throw IllegalStateException("Unidentified split launch type")
+    }
+
+    @SplitLaunchType
+    private fun getFullscreenLaunchType(): Int {
+        if (initialTaskId != INVALID_TASK_ID) {
+            return SPLIT_SINGLE_TASK_FULLSCREEN
+        }
+
+        if (initialShortcut != null) {
+            return SPLIT_SINGLE_SHORTCUT_FULLSCREEN
+        }
+
+        if (initialPendingIntent != null) {
+            return SPLIT_SINGLE_INTENT_FULLSCREEN
+        }
+        throw IllegalStateException("Unidentified fullscreen launch type")
     }
 
     data class SplitLaunchData(

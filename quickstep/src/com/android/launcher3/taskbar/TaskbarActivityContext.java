@@ -98,7 +98,6 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemClickHandler.ItemClickProxy;
 import com.android.launcher3.util.ActivityOptionsWrapper;
-import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.NavigationMode;
@@ -233,8 +232,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         ? new DesktopNavbarButtonsViewController(this, navButtonsView)
                         : new NavbarButtonsViewController(this, navButtonsView),
                 new RotationButtonController(this,
-                        c.getColor(R.color.taskbar_nav_icon_light_color),
-                        c.getColor(R.color.taskbar_nav_icon_dark_color),
+                        c.getColor(R.color.floating_rotation_button_light_color),
+                        c.getColor(R.color.floating_rotation_button_dark_color),
                         R.drawable.ic_sysbar_rotate_button_ccw_start_0,
                         R.drawable.ic_sysbar_rotate_button_ccw_start_90,
                         R.drawable.ic_sysbar_rotate_button_cw_start_0,
@@ -592,9 +591,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * Sets a new data-source for this taskbar instance
      */
     public void setUIController(@NonNull TaskbarUIController uiController) {
-        mControllers.uiController.onDestroy();
-        mControllers.uiController = uiController;
-        mControllers.uiController.init(mControllers);
+        mControllers.setUiController(uiController);
     }
 
     /**
@@ -939,9 +936,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         if (recents == null) {
             return;
         }
-        ComponentKey componentToBeLaunched = new ComponentKey(info.getTargetComponent(), info.user);
         recents.getSplitSelectController().findLastActiveTaskAndRunCallback(
-                componentToBeLaunched,
+                info.getComponentKey(),
                 foundTask -> {
                     if (foundTask != null) {
                         TaskView foundTaskView =

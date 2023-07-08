@@ -216,10 +216,11 @@ public abstract class AbstractLauncherUiTest {
     }
 
     protected TestRule getRulesInsideActivityMonitor() {
+        final ViewCaptureRule viewCaptureRule = new ViewCaptureRule();
         final RuleChain inner = RuleChain
                 .outerRule(new PortraitLandscapeRunner(this))
-                .around(new ViewCaptureRule())
-                .around(new FailureWatcher(mDevice, mLauncher));
+                .around(viewCaptureRule)
+                .around(new FailureWatcher(mDevice, mLauncher, viewCaptureRule.getViewCapture()));
 
         return TestHelpers.isInLauncherProcess()
                 ? RuleChain.outerRule(ShellCommandRule.setDefaultLauncher()).around(inner)
@@ -241,17 +242,7 @@ public abstract class AbstractLauncherUiTest {
     public void setUp() throws Exception {
         mLauncher.onTestStart();
 
-        final boolean keyguardAlreadyVisible = sSeenKeygard;
-
-        sSeenKeygard = sSeenKeygard
-                || !TestHelpers.wait(
-                Until.gone(By.res(SYSTEMUI_PACKAGE, "keyguard_status_view")), 60000);
-
-        Assert.assertFalse(
-                "Keyguard is visible, which is likely caused by a crash in SysUI, seeing keyguard"
-                        + " for the first time = "
-                        + !keyguardAlreadyVisible,
-                sSeenKeygard);
+        verifyKeyguardInvisible();
 
         final String launcherPackageName = mDevice.getLauncherPackageName();
         try {
@@ -282,6 +273,20 @@ public abstract class AbstractLauncherUiTest {
                 }
             }
         }
+    }
+
+    private static void verifyKeyguardInvisible() {
+        final boolean keyguardAlreadyVisible = sSeenKeygard;
+
+        sSeenKeygard = sSeenKeygard
+                || !TestHelpers.wait(
+                Until.gone(By.res(SYSTEMUI_PACKAGE, "keyguard_status_view")), 60000);
+
+        Assert.assertFalse(
+                "Keyguard is visible, which is likely caused by a crash in SysUI, seeing keyguard"
+                        + " for the first time = "
+                        + !keyguardAlreadyVisible,
+                sSeenKeygard);
     }
 
     @After
@@ -401,6 +406,7 @@ public abstract class AbstractLauncherUiTest {
     // flakiness.
     protected void waitForLauncherCondition(
             String message, Function<Launcher, Boolean> condition, long timeout) {
+        verifyKeyguardInvisible();
         if (!TestHelpers.isInLauncherProcess()) return;
         Wait.atMost(message, () -> getFromLauncher(condition), timeout, mLauncher);
     }

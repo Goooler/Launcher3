@@ -642,6 +642,9 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User has swiped upwards from the gesture handle to show transient taskbar.")
         LAUNCHER_TRANSIENT_TASKBAR_SHOW(1331),
+
+        @UiEvent(doc = "App launched through pending intent")
+        LAUNCHER_APP_LAUNCH_PENDING_INTENT(1394),
         ;
 
         // ADD MORE
@@ -972,6 +975,14 @@ public class StatsLogManager implements ResourceBasedOverride {
          * if this result is above keyboard or not for the impression event.
          */
         default StatsImpressionLogger withAboveKeyboard(List<Boolean> aboveKeyboard) {
+            return this;
+        }
+
+        /**
+         * Sets list of uid for each of {@link com.android.app.search.ResultType} that indicates
+         * package name for the impression event.
+         */
+        default StatsImpressionLogger withUids(IntArray uid) {
             return this;
         }
 

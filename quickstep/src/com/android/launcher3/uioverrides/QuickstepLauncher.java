@@ -142,7 +142,6 @@ import com.android.launcher3.uioverrides.touchcontrollers.TaskViewTouchControlle
 import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
 import com.android.launcher3.util.ActivityOptionsWrapper;
-import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSet;
@@ -346,11 +345,13 @@ public class QuickstepLauncher extends Launcher {
 
     @Override
     public RunnableList startActivitySafely(View v, Intent intent, ItemInfo item) {
-        // Only pause is taskbar controller is not present
+        // Only pause is taskbar controller is not present until the transition (if it exists) ends
         mHotseatPredictionController.setPauseUIUpdate(getTaskbarUIController() == null);
         RunnableList result = super.startActivitySafely(v, intent, item);
-        if (getTaskbarUIController() == null && result == null) {
-            mHotseatPredictionController.setPauseUIUpdate(false);
+        if (result == null) {
+            if (getTaskbarUIController() == null) {
+                mHotseatPredictionController.setPauseUIUpdate(false);
+            }
         } else {
             result.add(() -> mHotseatPredictionController.setPauseUIUpdate(false));
         }
@@ -601,13 +602,10 @@ public class QuickstepLauncher extends Launcher {
     @Override
     public void startSplitSelection(SplitSelectSource splitSelectSource) {
         RecentsView recentsView = getOverviewPanel();
-        ComponentKey componentToBeStaged = new ComponentKey(
-                splitSelectSource.itemInfo.getTargetComponent(),
-                splitSelectSource.itemInfo.user);
         // Check if there is already an instance of this app running, if so, initiate the split
         // using that.
         mSplitSelectStateController.findLastActiveTaskAndRunCallback(
-                componentToBeStaged,
+                splitSelectSource.itemInfo.getComponentKey(),
                 foundTask -> {
                     splitSelectSource.alreadyRunningTaskId = foundTask == null
                             ? INVALID_TASK_ID
@@ -878,7 +876,9 @@ public class QuickstepLauncher extends Launcher {
 
     private void onTISConnected(TISBinder binder) {
         mTaskbarManager = binder.getTaskbarManager();
-        mTaskbarManager.setActivity(this);
+        if (mTaskbarManager != null) {
+            mTaskbarManager.setActivity(this);
+        }
         mOverviewCommandHelper = binder.getOverviewCommandHelper();
     }
 
