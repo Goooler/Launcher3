@@ -335,7 +335,7 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
 
     @Override
     public View.OnLongClickListener getAllAppsItemLongClickListener() {
-        return mDragLayer::onIconLongClicked;
+        return v -> mDragLayer.onIconLongClicked(v);
     }
 
     private void onIconClicked(View v) {
