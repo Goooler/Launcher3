@@ -33,7 +33,6 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_FROM_WORKSPACE;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE;
 import static com.android.launcher3.config.FeatureFlags.RECEIVE_UNFOLD_EVENTS_FROM_SYSUI;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
@@ -406,9 +405,7 @@ public class QuickstepLauncher extends Launcher {
     }
 
     private List<SystemShortcut.Factory<QuickstepLauncher>> getSplitShortcuts() {
-
-        if (!ENABLE_SPLIT_FROM_WORKSPACE.get() || !mDeviceProfile.isTablet ||
-                mSplitSelectStateController.isSplitSelectActive()) {
+        if (!mDeviceProfile.isTablet || mSplitSelectStateController.isSplitSelectActive()) {
             return Collections.emptyList();
         }
         RecentsView recentsView = getOverviewPanel();
@@ -549,7 +546,7 @@ public class QuickstepLauncher extends Launcher {
         list.add(getDragController());
         Consumer<AnimatorSet> splitAnimator = animatorSet -> {
             AnimatorSet anim = mSplitSelectStateController.getSplitAnimationController()
-                    .animateAwayPlaceholder(QuickstepLauncher.this);
+                    .createPlaceholderDismissAnim(QuickstepLauncher.this);
             anim.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
@@ -1000,6 +997,13 @@ public class QuickstepLauncher extends Launcher {
         return mSplitToWorkspaceController;
     }
 
+    @Override
+    protected void handleSplitAnimationGoingToHome() {
+        super.handleSplitAnimationGoingToHome();
+        mSplitSelectStateController.getSplitAnimationController()
+                .playPlaceholderDismissAnim(this);
+    }
+
     public <T extends OverviewActionsView> T getActionsView() {
         return (T) mActionsView;
     }
@@ -1324,9 +1328,9 @@ public class QuickstepLauncher extends Launcher {
                                 : groupTask.mSplitBounds.leftTaskPercent);
     }
 
-    public boolean isCommandQueueEmpty() {
+    public boolean canStartHomeSafely() {
         OverviewCommandHelper overviewCommandHelper = mTISBindHelper.getOverviewCommandHelper();
-        return overviewCommandHelper == null || overviewCommandHelper.isCommandQueueEmpty();
+        return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely();
     }
 
     private static final class LauncherTaskViewController extends
