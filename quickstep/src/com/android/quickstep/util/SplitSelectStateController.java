@@ -73,11 +73,13 @@ import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.views.FloatingTaskView;
 import com.android.quickstep.views.GroupedTaskView;
+import com.android.quickstep.views.SplitInstructionsView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.RemoteAnimationRunnerCompat;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -112,6 +114,7 @@ public class SplitSelectStateController {
     private GroupedTaskView mLaunchingTaskView;
 
     private FloatingTaskView mFirstFloatingTaskView;
+    private SplitInstructionsView mSplitInstructionsView;
 
     private final List<SplitSelectionListener> mSplitSelectionListeners = new ArrayList<>();
 
@@ -126,7 +129,7 @@ public class SplitSelectStateController {
         mDepthController = depthController;
         mRecentTasksModel = recentsModel;
         mSplitAnimationController = new SplitAnimationController(this);
-        mAppPairsController = new AppPairsController(context, this);
+        mAppPairsController = new AppPairsController(context, this, statsLogManager);
         mSplitSelectDataHolder = new SplitSelectDataHolder(mContext);
     }
 
@@ -153,37 +156,46 @@ public class SplitSelectStateController {
     }
 
     /**
-     * Pulls the list of active Tasks from RecentsModel, and finds the most recently active Task
-     * matching a given ComponentName. Then uses that Task (which could be null) with the given
-     * callback.
+     * Maps a List<ComponentKey> to List<@Nullable Task>, searching through active Tasks in
+     * RecentsModel. If found, the Task will be the most recently-interacted-with instance of that
+     * Task. Then runs the given callback on that List.
      * <p>
      * Used in various task-switching or splitscreen operations when we need to check if there is a
      * currently running Task of a certain type and use the most recent one.
      */
-    public void findLastActiveTaskAndRunCallback(
-            @Nullable ComponentKey componentKey, Consumer<Task> callback) {
+    public void findLastActiveTasksAndRunCallback(
+            @Nullable List<ComponentKey> componentKeys, Consumer<List<Task>> callback) {
         mRecentTasksModel.getTasks(taskGroups -> {
-            if (componentKey == null) {
-                callback.accept(null);
+            if (componentKeys == null || componentKeys.isEmpty()) {
+                callback.accept(Collections.emptyList());
                 return;
             }
-            Task lastActiveTask = null;
-            // Loop through tasks in reverse, since they are ordered with most-recent tasks last.
-            for (int i = taskGroups.size() - 1; i >= 0; i--) {
-                GroupTask groupTask = taskGroups.get(i);
-                Task task1 = groupTask.task1;
-                if (isInstanceOfComponent(task1, componentKey)) {
-                    lastActiveTask = task1;
-                    break;
+
+            List<Task> lastActiveTasks = new ArrayList<>();
+            // For each key we are looking for, add to lastActiveTasks with the corresponding Task
+            // (or null if not found).
+            for (ComponentKey key : componentKeys) {
+                Task lastActiveTask = null;
+                // Loop through tasks in reverse, since they are ordered with most-recent tasks last
+                for (int i = taskGroups.size() - 1; i >= 0; i--) {
+                    GroupTask groupTask = taskGroups.get(i);
+                    Task task1 = groupTask.task1;
+                    // Don't add duplicate Tasks
+                    if (isInstanceOfComponent(task1, key) && !lastActiveTasks.contains(task1)) {
+                        lastActiveTask = task1;
+                        break;
+                    }
+                    Task task2 = groupTask.task2;
+                    if (isInstanceOfComponent(task2, key) && !lastActiveTasks.contains(task2)) {
+                        lastActiveTask = task2;
+                        break;
+                    }
                 }
-                Task task2 = groupTask.task2;
-                if (isInstanceOfComponent(task2, componentKey)) {
-                    lastActiveTask = task2;
-                    break;
-                }
+
+                lastActiveTasks.add(lastActiveTask);
             }
 
-            callback.accept(lastActiveTask);
+            callback.accept(lastActiveTasks);
         });
     }
 
@@ -226,7 +238,7 @@ public class SplitSelectStateController {
      * To be called when the both split tasks are ready to be launched. Call after launcher side
      * animations are complete.
      */
-    public void launchSplitTasks(Consumer<Boolean> callback) {
+    public void launchSplitTasks(@Nullable Consumer<Boolean> callback) {
         Pair<InstanceId, com.android.launcher3.logging.InstanceId> instanceIds =
                 LogUtils.getShellShareableInstanceId();
         launchTasks(callback, false /* freezeTaskList */, DEFAULT_SPLIT_RATIO,
@@ -236,6 +248,14 @@ public class SplitSelectStateController {
                 .withItemInfo(mSplitSelectDataHolder.getItemInfo())
                 .withInstanceId(instanceIds.second)
                 .log(mSplitSelectDataHolder.getSplitEvent());
+    }
+
+    /**
+     * A version of {@link #launchTasks(Consumer, boolean, float, InstanceId)} with no success
+     * callback.
+     */
+    public void launchSplitTasks() {
+        launchSplitTasks(null);
     }
 
     /**
@@ -271,8 +291,8 @@ public class SplitSelectStateController {
      *                   create a split instance, null for cases that bring existing instaces to the
      *                   foreground (quickswitch, launching previous pairs from overview)
      */
-    public void launchTasks(Consumer<Boolean> callback, boolean freezeTaskList, float splitRatio,
-            @Nullable InstanceId shellInstanceId) {
+    public void launchTasks(@Nullable Consumer<Boolean> callback, boolean freezeTaskList,
+            float splitRatio, @Nullable InstanceId shellInstanceId) {
         TestLogging.recordEvent(
                 TestProtocol.SEQUENCE_MAIN, "launchSplitTasks");
         final ActivityOptions options1 = ActivityOptions.makeBasic();
@@ -457,7 +477,7 @@ public class SplitSelectStateController {
     }
 
     private RemoteTransition getShellRemoteTransition(int firstTaskId, int secondTaskId,
-            Consumer<Boolean> callback, String transitionName) {
+            @Nullable Consumer<Boolean> callback, String transitionName) {
         final RemoteSplitLaunchTransitionRunner animationRunner =
                 new RemoteSplitLaunchTransitionRunner(firstTaskId, secondTaskId, callback);
         return new RemoteTransition(animationRunner,
@@ -465,7 +485,7 @@ public class SplitSelectStateController {
     }
 
     private RemoteAnimationAdapter getLegacyRemoteAdapter(int firstTaskId, int secondTaskId,
-            Consumer<Boolean> callback) {
+            @Nullable Consumer<Boolean> callback) {
         final RemoteSplitLaunchAnimationRunner animationRunner =
                 new RemoteSplitLaunchAnimationRunner(firstTaskId, secondTaskId, callback);
         return new RemoteAnimationAdapter(animationRunner, 300, 150,
@@ -514,7 +534,7 @@ public class SplitSelectStateController {
         private final Consumer<Boolean> mSuccessCallback;
 
         RemoteSplitLaunchTransitionRunner(int initialTaskId, int secondTaskId,
-                Consumer<Boolean> callback) {
+                @Nullable Consumer<Boolean> callback) {
             mInitialTaskId = initialTaskId;
             mSecondTaskId = secondTaskId;
             mSuccessCallback = callback;
@@ -563,7 +583,7 @@ public class SplitSelectStateController {
         private final Consumer<Boolean> mSuccessCallback;
 
         RemoteSplitLaunchAnimationRunner(int initialTaskId, int secondTaskId,
-                Consumer<Boolean> successCallback) {
+                @Nullable Consumer<Boolean> successCallback) {
             mInitialTaskId = initialTaskId;
             mSecondTaskId = secondTaskId;
             mSuccessCallback = successCallback;
@@ -612,6 +632,7 @@ public class SplitSelectStateController {
         mAnimateCurrentTaskDismissal = false;
         mDismissingFromSplitPair = false;
         mFirstFloatingTaskView = null;
+        mSplitInstructionsView = null;
     }
 
     /**
@@ -642,9 +663,18 @@ public class SplitSelectStateController {
         mFirstFloatingTaskView = floatingTaskView;
     }
 
+    public void setSplitInstructionsView(SplitInstructionsView splitInstructionsView) {
+        mSplitInstructionsView = splitInstructionsView;
+    }
+
     @Nullable
     public FloatingTaskView getFirstFloatingTaskView() {
         return mFirstFloatingTaskView;
+    }
+
+    @Nullable
+    public SplitInstructionsView getSplitInstructionsView() {
+        return mSplitInstructionsView;
     }
 
     public AppPairsController getAppPairsController() {
