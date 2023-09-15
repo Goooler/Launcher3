@@ -1,3 +1,5 @@
+import com.android.build.gradle.api.AndroidBasePlugin
+
 buildscript {
     repositories {
         mavenCentral()
@@ -16,32 +18,14 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.google.protobuf'
 
 android {
-    compileSdkVersion COMPILE_SDK
-    buildToolsVersion BUILD_TOOLS_VERSION
-
     defaultConfig {
-        minSdkVersion 26
-        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables.useSupportLibrary = true
-    }
-    buildTypes {
-        debug {
-            minifyEnabled false
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     // The flavor dimensions for build variants (e.g. aospWithQuickstep, aospWithoutQuickstep)
     // See: https://developer.android.com/studio/build/build-variants#flavor-dimensions
-    flavorDimensions "app", "recents"
+    flavorDimensions += ["app", "recents"]
 
     productFlavors {
         aosp {
@@ -134,11 +118,27 @@ android {
 
 allprojects {
     repositories {
-        maven { url "../../../prebuilts/sdk/current/androidx/m2repository" }
-        maven { url "../../../prebuilts/fullsdk-darwin/extras/android/m2repository" }
-        maven { url "../../../prebuilts/fullsdk-linux/extras/android/m2repository" }
-        mavenCentral()
         google()
+        mavenCentral()
+    }
+
+    plugins.withType(AndroidBasePlugin).configureEach {
+        android {
+            compileSdk 33
+            defaultConfig {
+                minSdk 26
+                targetSdk 30
+                vectorDrawables.useSupportLibrary = true
+            }
+            lint {
+                abortOnError true
+                checkReleaseBuilds false
+            }
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+        }
     }
 }
 
