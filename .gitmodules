@@ -1,0 +1,3 @@
+[submodule "systemui"]
+	path = systemui
+	url = https://android.googlesource.com/platform/frameworks/libs/systemui
