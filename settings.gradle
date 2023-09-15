@@ -1,3 +1,12 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    includeBuild("gradle/build-logic")
+}
+
 include ':IconLoader'
 project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 
