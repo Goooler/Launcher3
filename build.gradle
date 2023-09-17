@@ -1,4 +1,5 @@
 import com.android.build.gradle.api.AndroidBasePlugin
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
     repositories {
@@ -8,6 +9,7 @@ buildscript {
     dependencies {
         classpath GRADLE_CLASS_PATH
         classpath PROTOBUF_CLASS_PATH
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
     }
 }
 
@@ -16,6 +18,21 @@ final String FRAMEWORK_PREBUILTS_DIR = "$rootDir/prebuilts"
 
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.protobuf'
+
+ext.addFrameworkJar = { String name ->
+    def frameworkJar = new File("$FRAMEWORK_PREBUILTS_DIR/libs", name)
+    if (!frameworkJar.exists()) {
+        throw new IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
+    }
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile).configureEach {
+            classpath = files(frameworkJar, classpath)
+        }
+        tasks.withType(KotlinCompile).configureEach {
+            libraries.from(files(frameworkJar))
+        }
+    }
+}
 
 android {
     defaultConfig {
@@ -114,6 +131,8 @@ android {
             manifest.srcFile "quickstep/AndroidManifest.xml"
         }
     }
+
+    addFrameworkJar("framework.jar")
 }
 
 allprojects {
