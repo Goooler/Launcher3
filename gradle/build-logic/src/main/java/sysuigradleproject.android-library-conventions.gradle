@@ -10,3 +10,5 @@ configurations.configureEach {
         }
     }
 }
+
+addFrameworkJar("framework.jar")
