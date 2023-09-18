@@ -11,4 +11,14 @@ configurations.configureEach {
     }
 }
 
+android {
+    sourceSets {
+        main {
+            java.exclude {
+                it.file.path.contains("src_full_lib")
+            }
+        }
+    }
+}
+
 addFrameworkJar("framework.jar")
