@@ -74,6 +74,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:text="@string/taskbar_edu_next"
             style="@style/TaskbarEdu.Button.Next"
-            android:textColor="?androidprv:attr/textColorOnAccent"/>
+            android:textColor="?android:attr/textColorOnAccent"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.android.launcher3.taskbar.TaskbarEduView>
