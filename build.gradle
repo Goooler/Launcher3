@@ -130,6 +130,13 @@ allprojects {
                 targetSdk 30
                 vectorDrawables.useSupportLibrary = true
             }
+            sourceSets {
+                main {
+                    java.exclude {
+                        it.file.path.contains("src_full_lib")
+                    }
+                }
+            }
             lint {
                 abortOnError true
                 checkReleaseBuilds false
@@ -137,6 +144,14 @@ allprojects {
             compileOptions {
                 sourceCompatibility JavaVersion.VERSION_1_8
                 targetCompatibility JavaVersion.VERSION_1_8
+            }
+        }
+    }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if ("${requested.group}:${requested.name}" == "androidx.core:core") {
+                useVersion("1.9.0")
             }
         }
     }
