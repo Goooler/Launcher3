@@ -67,16 +67,16 @@
     <style name="GestureTutorialActivity" parent="@style/AppTheme">
         <item name="background">@android:color/transparent</item>
         <item name="tutorialSubtitle">@android:color/white</item>
-        <item name="surfaceContainer">?androidprv:attr/materialColorSurfaceContainer</item>
-        <item name="onSurfaceHome">?androidprv:attr/materialColorPrimaryFixedDim</item>
-        <item name="surfaceHome">?androidprv:attr/materialColorOnPrimaryFixedVariant</item>
-        <item name="secondaryHome">?androidprv:attr/materialColorOnPrimaryFixed</item>
-        <item name="onSurfaceBack">?androidprv:attr/materialColorTertiaryFixedDim</item>
-        <item name="surfaceBack">?androidprv:attr/materialColorOnTertiaryFixedVariant</item>
-        <item name="secondaryBack">?androidprv:attr/materialColorOnTertiaryFixed</item>
-        <item name="onSurfaceOverview">?androidprv:attr/materialColorPrimaryFixed</item>
-        <item name="surfaceOverview">?androidprv:attr/materialColorOnSecondaryFixedVariant</item>
-        <item name="secondaryOverview">?androidprv:attr/materialColorOnSecondaryFixed</item>
+        <item name="surfaceContainer">?android:attr/materialColorSurfaceContainer</item>
+        <item name="onSurfaceHome">?android:attr/materialColorPrimaryFixedDim</item>
+        <item name="surfaceHome">?android:attr/materialColorOnPrimaryFixedVariant</item>
+        <item name="secondaryHome">?android:attr/materialColorOnPrimaryFixed</item>
+        <item name="onSurfaceBack">?android:attr/materialColorTertiaryFixedDim</item>
+        <item name="surfaceBack">?android:attr/materialColorOnTertiaryFixedVariant</item>
+        <item name="secondaryBack">?android:attr/materialColorOnTertiaryFixed</item>
+        <item name="onSurfaceOverview">?android:attr/materialColorPrimaryFixed</item>
+        <item name="surfaceOverview">?android:attr/materialColorOnSecondaryFixedVariant</item>
+        <item name="secondaryOverview">?android:attr/materialColorOnSecondaryFixed</item>
     </style>
 
 </resources>
