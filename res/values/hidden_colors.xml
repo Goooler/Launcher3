@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <color name="AccentPrimaryVariant">#ffffff</color>
+    <color name="colorAccentPrimary">#ffffff</color>
+    <color name="colorAccentPrimaryVariant">#ffffff</color>
+    <color name="colorAccentSecondaryVariant">#ffffff</color>
+    <color name="colorSurface">#ffffff</color>
+    <color name="colorSurfaceVariant">#ffffff</color>
+    <color name="materialColorOnPrimary">#ffffff</color>
+    <color name="materialColorOnPrimaryFixed">#ffffff</color>
+    <color name="materialColorOnPrimaryFixedVariant">#ffffff</color>
+    <color name="materialColorOnSecondaryFixed">#ffffff</color>
+    <color name="materialColorOnSecondaryFixedVariant">#ffffff</color>
+    <color name="materialColorOnSurface">#ffffff</color>
+    <color name="materialColorOnSurfaceInverse">#ffffff</color>
+    <color name="materialColorOnSurfaceVariant">#ffffff</color>
+    <color name="materialColorOnTertiaryFixed">#ffffff</color>
+    <color name="materialColorOnTertiaryFixedVariant">#ffffff</color>
+    <color name="materialColorOutline">#ffffff</color>
+    <color name="materialColorPrimary">#ffffff</color>
+    <color name="materialColorPrimaryContainer">#ffffff</color>
+    <color name="materialColorPrimaryFixed">#ffffff</color>
+    <color name="materialColorPrimaryFixedDim">#ffffff</color>
+    <color name="materialColorSecondaryFixed">#ffffff</color>
+    <color name="materialColorSurfaceBright">#ffffff</color>
+    <color name="materialColorSurfaceContainer">#ffffff</color>
+    <color name="materialColorSurfaceVariant">#ffffff</color>
+    <color name="materialColorTertiary">#ffffff</color>
+    <color name="materialColorTertiaryFixed">#ffffff</color>
+    <color name="materialColorTertiaryFixedDim">#ffffff</color>
+    <color name="textColorOnAccent">#ffffff</color>
+
+</resources>

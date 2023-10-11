@@ -22,7 +22,7 @@
     android:layout_height="@dimen/keyboard_quick_switch_taskview_height"
     android:clipToOutline="true"
     android:importantForAccessibility="yes"
-    launcher:borderColor="?android:attr/materialColorOutline">
+    launcher:borderColor="@color/materialColorOutline">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/content"
@@ -41,7 +41,7 @@
             android:layout_height="@dimen/keyboard_quick_switch_recents_icon_size"
             android:layout_marginBottom="8dp"
             android:src="@drawable/ic_empty_recents"
-            android:tint="?android:attr/materialColorOnSurface"
+            android:tint="@color/materialColorOnSurface"
 
             app:layout_constraintVertical_chainStyle="packed"
             app:layout_constraintTop_toTopOf="parent"

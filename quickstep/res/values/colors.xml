@@ -89,7 +89,7 @@
     <color name="lottie_yellow600">#f9ab00</color>
 
     <!-- Turn on work apps button -->
-    <color name="work_turn_on_stroke">?android:attr/colorAccentPrimaryVariant</color>
-    <color name="work_fab_bg_color">?android:attr/materialColorPrimaryFixedDim</color>
-    <color name="work_fab_icon_color">?android:attr/materialColorOnPrimaryFixed</color>
+    <color name="work_turn_on_stroke">@color/AccentPrimaryVariant</color>
+    <color name="work_fab_bg_color">@color/materialColorPrimaryFixedDim</color>
+    <color name="work_fab_icon_color">@color/materialColorOnPrimaryFixed</color>
 </resources>
