@@ -3,8 +3,6 @@ pluginManagement {
         google()
         mavenCentral()
     }
-
-    includeBuild("gradle/build-logic")
 }
 
 include ':IconLoader'
