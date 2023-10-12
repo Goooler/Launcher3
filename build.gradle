@@ -1,5 +1,6 @@
 import com.android.build.gradle.api.AndroidBasePlugin
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 buildscript {
     repositories {
@@ -170,7 +171,7 @@ allprojects {
     }
 
     tasks.withType(KotlinCompile).configureEach {
-        compilerOptions.jvmTarget = JavaVersion.VERSION_17
+        compilerOptions.jvmTarget = JvmTarget.JVM_17
     }
 
     configurations.configureEach {
