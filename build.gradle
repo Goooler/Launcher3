@@ -104,6 +104,7 @@ android {
         }
 
         aospWithQuickstep {
+            java.srcDirs = ['tests/shared']
             manifest.srcFile "quickstep/AndroidManifest-launcher.xml"
         }
 
