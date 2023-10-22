@@ -1,4 +1,6 @@
 import com.android.build.gradle.api.AndroidBasePlugin
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 buildscript {
     repositories {
@@ -8,14 +10,34 @@ buildscript {
     dependencies {
         classpath GRADLE_CLASS_PATH
         classpath PROTOBUF_CLASS_PATH
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
     }
 }
 
 final String ANDROID_TOP = "${rootDir}/../../.."
-final String FRAMEWORK_PREBUILTS_DIR = "${ANDROID_TOP}/prebuilts/framework_intermediates/"
+final String FRAMEWORK_PREBUILTS_DIR = "$rootDir/prebuilts"
 
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'com.google.protobuf'
+
+ext.addFrameworkJar = { String name ->
+    def frameworkJar = new File("$FRAMEWORK_PREBUILTS_DIR/libs", name)
+    if (!frameworkJar.exists()) {
+        throw new IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
+    }
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile).configureEach {
+            classpath = files(frameworkJar, classpath)
+        }
+        tasks.withType(KotlinCompile).configureEach {
+            libraries.from(files(frameworkJar))
+        }
+        dependencies {
+            compileOnly files(frameworkJar)
+        }
+    }
+}
 
 android {
     defaultConfig {
@@ -79,7 +101,7 @@ android {
         }
 
         aosp {
-            java.srcDirs = ['src_flags', 'src_shortcuts_overrides']
+            java.srcDirs = ['src_flags', 'src_shortcuts_overrides', 'systemui/animationlib/src']
         }
 
         aospWithoutQuickstep {
@@ -87,6 +109,7 @@ android {
         }
 
         aospWithQuickstep {
+            java.srcDirs = ['tests/shared']
             manifest.srcFile "quickstep/AndroidManifest-launcher.xml"
         }
 
@@ -114,6 +137,8 @@ android {
             manifest.srcFile "quickstep/AndroidManifest.xml"
         }
     }
+
+    addFrameworkJar("framework.jar")
 }
 
 allprojects {
@@ -124,7 +149,7 @@ allprojects {
 
     plugins.withType(AndroidBasePlugin).configureEach {
         android {
-            compileSdk 33
+            compileSdk 34
             defaultConfig {
                 minSdk 26
                 targetSdk 30
@@ -142,10 +167,14 @@ allprojects {
                 checkReleaseBuilds false
             }
             compileOptions {
-                sourceCompatibility JavaVersion.VERSION_1_8
-                targetCompatibility JavaVersion.VERSION_1_8
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
         }
+    }
+
+    tasks.withType(KotlinCompile).configureEach {
+        compilerOptions.jvmTarget = JvmTarget.JVM_17
     }
 
     configurations.configureEach {
@@ -163,10 +192,10 @@ dependencies {
     implementation "androidx.preference:preference:${ANDROID_X_VERSION}"
     implementation project(':IconLoader')
 //    implementation project(':UiTestsLibLauncher')
-    withQuickstepImplementation project(':SharedLibWrapper')
+    withQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/libs", include: 'SystemUI-statsd.jar')
 
     // Recents lib dependency
-    withQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/quickstep/libs", include: 'sysui_shared.jar')
+    withQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/libs", include: 'SystemUISharedLib.jar')
 
     // Required for AOSP to compile. This is already included in the sysui_shared.jar
     withoutQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/libs", include: 'plugin_core.jar')
@@ -181,6 +210,10 @@ dependencies {
     androidTestImplementation "androidx.annotation:annotation:${ANDROID_X_VERSION}"
 
     api 'com.airbnb.android:lottie:3.3.0'
+
+    implementation "com.google.android.material:material:1.9.0"
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.slice:slice-core:1.1.0-alpha02'
 }
 
 protobuf {
