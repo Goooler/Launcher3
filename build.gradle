@@ -98,7 +98,7 @@ android {
         }
 
         aosp {
-            java.srcDirs = ['src_flags', 'src_shortcuts_overrides']
+            java.srcDirs = ['src_flags', 'src_shortcuts_overrides', 'systemui/animationlib/src']
         }
 
         aospWithoutQuickstep {
