@@ -136,6 +136,11 @@ public class PackageManagerHelper {
      * any permissions
      */
     public boolean hasPermissionForActivity(Intent intent, String srcPackage) {
+        // b/270152142
+        if (Intent.ACTION_CHOOSER.equals(intent.getAction())) {
+            // Chooser shortcuts is not a valid target
+            return false;
+        }
         ResolveInfo target = mPm.resolveActivity(intent, 0);
         if (target == null) {
             // Not a valid target
