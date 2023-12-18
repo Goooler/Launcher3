@@ -158,6 +158,7 @@ import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.RemoteAnimationRunnerCompat;
 import com.android.wm.shell.startingsurface.IStartingWindowListener;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -476,6 +477,9 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             }
         });
     }
+
+    /** Dump debug logs to bug report. */
+    public void dump(@NonNull String prefix, @NonNull PrintWriter printWriter) {}
 
     /**
      * Content is everything on screen except the background and the floating view (if any).
@@ -1046,7 +1050,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         boolean allowBlurringLauncher = mLauncher.getStateManager().getState() != OVERVIEW
                 && BlurUtils.supportsBlursOnWindows();
 
-        MyDepthController depthController = new MyDepthController(mLauncher);
+        LaunchDepthController depthController = new LaunchDepthController(mLauncher);
         ObjectAnimator backgroundRadiusAnim = ObjectAnimator.ofFloat(depthController.stateDepth,
                         MULTI_PROPERTY_VALUE, BACKGROUND_APP.getDepth(mLauncher))
                 .setDuration(APP_LAUNCH_DURATION);
@@ -2047,11 +2051,14 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         }
     }
 
-    private static class MyDepthController extends DepthController {
-        MyDepthController(Launcher l) {
-            super(l);
+    private static class LaunchDepthController extends DepthController {
+        LaunchDepthController(QuickstepLauncher launcher) {
+            super(launcher);
             setCrossWindowBlursEnabled(
                     CrossWindowBlurListeners.getInstance().isCrossWindowBlurEnabled());
+            // Make sure that the starting value matches the current depth set by the main
+            // controller.
+            stateDepth.setValue(launcher.getDepthController().stateDepth.getValue());
         }
     }
 }
