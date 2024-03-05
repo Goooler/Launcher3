@@ -27,6 +27,14 @@ public interface PageIndicator {
     void setMarkersCount(int numMarkers);
 
     /**
+     * Sets flag to indicate when the screens are in the process of binding so that we don't animate
+     * during that period.
+     */
+    default void setAreScreensBinding(boolean areScreensBinding, boolean isTwoPanels) {
+        // No-op by default
+    }
+
+    /**
      * Sets the flag if the Page Indicator should autohide.
      */
     default void setShouldAutoHide(boolean shouldAutoHide) {

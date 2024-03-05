@@ -16,8 +16,11 @@
 
 package com.android.quickstep;
 
+import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
+
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.quickstep.views.DesktopTaskView.DESKTOP_IS_PROTO2_ENABLED;
+import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 import static com.android.wm.shell.util.GroupedRecentTaskInfo.TYPE_FREEFORM;
 
 import android.annotation.TargetApi;
@@ -39,7 +42,6 @@ import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.recents.IRecentTasksListener;
 import com.android.wm.shell.util.GroupedRecentTaskInfo;
-import com.android.wm.shell.util.SplitBounds;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -269,8 +271,9 @@ public class RecentTasksList {
 
         TaskLoadResult allTasks = new TaskLoadResult(requestId, loadKeysOnly, rawTasks.size());
 
+        int numVisibleTasks = 0;
         for (GroupedRecentTaskInfo rawTask : rawTasks) {
-            if (DESKTOP_IS_PROTO2_ENABLED && rawTask.getType() == TYPE_FREEFORM) {
+            if (isDesktopModeSupported() && rawTask.getType() == TYPE_FREEFORM) {
                 GroupTask desktopTask = createDesktopTask(rawTask);
                 allTasks.add(desktopTask);
                 continue;
@@ -285,15 +288,30 @@ public class RecentTasksList {
             task1.setLastSnapshotData(taskInfo1);
             Task task2 = null;
             if (taskInfo2 != null) {
+                // Is split task
                 Task.TaskKey task2Key = new Task.TaskKey(taskInfo2);
                 task2 = loadKeysOnly
                         ? new Task(task2Key)
                         : Task.from(task2Key, taskInfo2,
                                 tmpLockedUsers.get(task2Key.userId) /* isLocked */);
                 task2.setLastSnapshotData(taskInfo2);
+            } else {
+                // Is fullscreen task
+                if (numVisibleTasks > 0) {
+                    boolean isExcluded = (taskInfo1.baseIntent.getFlags()
+                            & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
+                    if (taskInfo1.isTopActivityTransparent && isExcluded) {
+                        // If there are already visible tasks, then ignore the excluded tasks and
+                        // don't add them to the returned list
+                        continue;
+                    }
+                }
+            }
+            if (taskInfo1.isVisible) {
+                numVisibleTasks++;
             }
             final SplitConfigurationOptions.SplitBounds launcherSplitBounds =
-                    convertSplitBounds(rawTask.getSplitBounds());
+                    convertShellSplitBoundsToLauncher(rawTask.getSplitBounds());
             allTasks.add(new GroupTask(task1, task2, launcherSplitBounds));
         }
 
@@ -308,19 +326,9 @@ public class RecentTasksList {
             task.setLastSnapshotData(taskInfo);
             task.positionInParent = taskInfo.positionInParent;
             task.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
-            // TODO(b/244348395): tasks should be sorted from oldest to most recently used
             tasks.add(task);
         }
         return new DesktopTask(tasks);
-    }
-
-    private SplitConfigurationOptions.SplitBounds convertSplitBounds(
-            SplitBounds shellSplitBounds) {
-        return shellSplitBounds == null ?
-                null :
-                new SplitConfigurationOptions.SplitBounds(
-                        shellSplitBounds.leftTopBounds, shellSplitBounds.rightBottomBounds,
-                        shellSplitBounds.leftTopTaskId, shellSplitBounds.rightBottomTaskId);
     }
 
     private ArrayList<GroupTask> copyOf(ArrayList<GroupTask> tasks) {
@@ -363,7 +371,8 @@ public class RecentTasksList {
         writer.println(prefix + "  ]");
     }
 
-    private static class TaskLoadResult extends ArrayList<GroupTask> {
+    @VisibleForTesting
+    static class TaskLoadResult extends ArrayList<GroupTask> {
 
         final int mRequestId;
 

@@ -15,8 +15,7 @@
  */
 package com.android.launcher3.uioverrides.touchcontrollers;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_ACCESSIBLE;
-import static com.android.launcher3.AbstractFloatingView.TYPE_ALL_APPS_EDU;
+import static com.android.launcher3.AbstractFloatingView.TYPE_TOUCH_CONTROLLER_NO_INTERCEPT;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -24,11 +23,12 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 
 import android.view.MotionEvent;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.allapps.AllAppsTransitionController;
-import com.android.launcher3.anim.Interpolators;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.AbstractStateChangeTouchController;
 import com.android.launcher3.touch.AllAppsSwipeController;
@@ -83,7 +83,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                 return false;
             }
         }
-        if (getTopOpenViewWithType(mLauncher, TYPE_ACCESSIBLE | TYPE_ALL_APPS_EDU) != null) {
+        if (getTopOpenViewWithType(mLauncher, TYPE_TOUCH_CONTROLLER_NO_INTERCEPT) != null) {
             return false;
         }
         return true;
@@ -92,10 +92,10 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
     @Override
     protected LauncherState getTargetState(LauncherState fromState, boolean isDragTowardPositive) {
         if (fromState == ALL_APPS && !isDragTowardPositive) {
-            return NORMAL;
-        } else if (fromState == OVERVIEW) {
-            return isDragTowardPositive ? OVERVIEW : NORMAL;
-        } else if (fromState == NORMAL && isDragTowardPositive) {
+            return FeatureFlags.ENABLE_ALL_APPS_FROM_OVERVIEW.get()
+                    ? mLauncher.getStateManager().getLastState()
+                    : NORMAL;
+        } else if (fromState == NORMAL && shouldOpenAllApps(isDragTowardPositive)) {
             return ALL_APPS;
         }
         return fromState;
@@ -105,7 +105,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
     protected StateAnimationConfig getConfigForStates(
             LauncherState fromState, LauncherState toState) {
         final StateAnimationConfig config = new StateAnimationConfig();
-        config.userControlled = true;
+        config.animProps |= StateAnimationConfig.USER_CONTROLLED;
         if (fromState == NORMAL && toState == ALL_APPS) {
             AllAppsSwipeController.applyNormalToAllAppsAnimConfig(mLauncher, config);
         } else if (fromState == ALL_APPS && toState == NORMAL) {

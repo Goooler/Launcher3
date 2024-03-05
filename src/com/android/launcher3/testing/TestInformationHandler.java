@@ -16,6 +16,7 @@
 package com.android.launcher3.testing;
 
 import static com.android.launcher3.allapps.AllAppsStore.DEFER_UPDATES_TEST;
+import static com.android.launcher3.Flags.enableGridOnlyOverview;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
@@ -31,6 +32,7 @@ import android.os.Bundle;
 import android.view.WindowInsets;
 
 import androidx.annotation.Nullable;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.android.launcher3.CellLayout;
 import com.android.launcher3.DeviceProfile;
@@ -45,6 +47,7 @@ import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.testing.shared.HotseatCellCenterRequest;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.testing.shared.WorkspaceCellCenterRequest;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.ResourceBasedOverride;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
@@ -102,6 +105,15 @@ public class TestInformationHandler implements ResourceBasedOverride {
                 return getUIProperty(Bundle::putBoolean, t -> isLauncherInitialized(), () -> true);
             }
 
+            case TestProtocol.REQUEST_IS_LAUNCHER_LAUNCHER_ACTIVITY_STARTED: {
+                final Bundle bundle = getLauncherUIProperty(Bundle::putBoolean, l -> l.isStarted());
+                if (bundle != null) return bundle;
+
+                // If Launcher activity wasn't created, it's not started.
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, false);
+                return response;
+            }
+
             case TestProtocol.REQUEST_FREEZE_APP_LIST:
                 return getLauncherUIProperty(Bundle::putBoolean, l -> {
                     l.getAppsView().getAppsStore().enableDeferUpdates(DEFER_UPDATES_TEST);
@@ -141,6 +153,14 @@ public class TestInformationHandler implements ResourceBasedOverride {
                 }, this::getCurrentActivity);
             }
 
+            case TestProtocol.REQUEST_IME_INSETS: {
+                return getUIProperty(Bundle::putParcelable, activity -> {
+                    WindowInsetsCompat insets = WindowInsetsCompat.toWindowInsetsCompat(
+                            activity.getWindow().getDecorView().getRootWindowInsets());
+                    return insets.getInsets(WindowInsetsCompat.Type.ime()).toPlatformInsets();
+                }, this::getCurrentActivity);
+            }
+
             case TestProtocol.REQUEST_ICON_HEIGHT: {
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
                         mDeviceProfile.allAppsCellHeightPx);
@@ -153,6 +173,16 @@ public class TestInformationHandler implements ResourceBasedOverride {
 
             case TestProtocol.REQUEST_IS_TABLET:
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, mDeviceProfile.isTablet);
+                return response;
+
+            case TestProtocol.REQUEST_NUM_ALL_APPS_COLUMNS:
+                response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        mDeviceProfile.numShownAllAppsColumns);
+                return response;
+
+            case TestProtocol.REQUEST_IS_TRANSIENT_TASKBAR:
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        DisplayController.isTransientTaskbar(mContext));
                 return response;
 
             case TestProtocol.REQUEST_IS_TWO_PANELS:
@@ -203,10 +233,11 @@ public class TestInformationHandler implements ResourceBasedOverride {
             }
 
             case TestProtocol.REQUEST_WORKSPACE_COLUMNS_ROWS: {
+                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(mContext);
                 return getLauncherUIProperty(Bundle::putParcelable, launcher -> new Point(
-                        InvariantDeviceProfile.INSTANCE.get(mContext).numColumns,
-                        InvariantDeviceProfile.INSTANCE.get(mContext).numRows)
-                );
+                        idp.getDeviceProfile(mContext).getPanelCount() * idp.numColumns,
+                        idp.numRows
+                ));
             }
 
             case TestProtocol.REQUEST_WORKSPACE_CURRENT_PAGE_INDEX: {
@@ -229,7 +260,7 @@ public class TestInformationHandler implements ResourceBasedOverride {
             }
 
             case TestProtocol.REQUEST_HAS_TIS: {
-                response.putBoolean(TestProtocol.REQUEST_HAS_TIS, false);
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, false);
                 return response;
             }
 
@@ -243,6 +274,12 @@ public class TestInformationHandler implements ResourceBasedOverride {
                         l -> l.getAppsView().getBottom()
                                 - l.getAppsView().getActiveRecyclerView().getBottom()
                                 + l.getAppsView().getActiveRecyclerView().getPaddingBottom());
+            }
+
+            case TestProtocol.REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW: {
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        enableGridOnlyOverview());
+                return response;
             }
 
             default:

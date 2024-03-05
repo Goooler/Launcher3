@@ -15,8 +15,8 @@
  */
 package com.android.launcher3.touch;
 
-import static com.android.launcher3.Launcher.REQUEST_BIND_PENDING_APPWIDGET;
-import static com.android.launcher3.Launcher.REQUEST_RECONFIGURE_APPWIDGET;
+import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_BIND_PENDING_APPWIDGET;
+import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_DISABLED_BY_PUBLISHER;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_DISABLED_LOCKED_USER;
@@ -42,6 +42,7 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logging.InstanceId;
@@ -60,7 +61,10 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.views.FloatingIconView;
+import com.android.launcher3.views.Snackbar;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
+import com.android.launcher3.widget.PendingAddShortcutInfo;
+import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.PendingAppWidgetHostView;
 import com.android.launcher3.widget.WidgetAddFlowHandler;
 import com.android.launcher3.widget.WidgetManagerHelper;
@@ -95,6 +99,8 @@ public class ItemClickHandler {
         } else if (tag instanceof FolderInfo) {
             if (v instanceof FolderIcon) {
                 onClickFolderIcon(v);
+            } else if (v instanceof AppPairIcon) {
+                onClickAppPairIcon(v);
             }
         } else if (tag instanceof AppInfo) {
             startAppShortcutOrInfoActivity(v, (AppInfo) tag, launcher);
@@ -104,6 +110,16 @@ public class ItemClickHandler {
             }
         } else if (tag instanceof ItemClickProxy) {
             ((ItemClickProxy) tag).onItemClicked(v);
+        } else if (tag instanceof PendingAddShortcutInfo) {
+            CharSequence msg = Utilities.wrapForTts(
+                    launcher.getText(R.string.long_press_shortcut_to_add),
+                    launcher.getString(R.string.long_accessible_way_to_add_shortcut));
+            Snackbar.show(launcher, msg, null);
+        } else if (tag instanceof PendingAddWidgetInfo) {
+            CharSequence msg = Utilities.wrapForTts(
+                    launcher.getText(R.string.long_press_widget_to_add),
+                    launcher.getString(R.string.long_accessible_way_to_add));
+            Snackbar.show(launcher, msg, null);
         }
     }
 
@@ -120,6 +136,17 @@ public class ItemClickHandler {
             StatsLogManager.newInstance(v.getContext()).logger().withItemInfo(folder.mInfo)
                     .log(LAUNCHER_FOLDER_OPEN);
         }
+    }
+
+    /**
+     * Event handler for an app pair icon click.
+     *
+     * @param v The view that was clicked. Must be an instance of {@link AppPairIcon}.
+     */
+    private static void onClickAppPairIcon(View v) {
+        Launcher launcher = Launcher.getLauncher(v.getContext());
+        AppPairIcon appPairIcon = (AppPairIcon) v;
+        launcher.launchAppPair(appPairIcon);
     }
 
     /**

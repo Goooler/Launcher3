@@ -17,7 +17,6 @@ package com.android.launcher3.allapps;
 
 import static com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.getTabWidth;
 
-import android.animation.LayoutTransition;
 import android.content.Context;
 import android.graphics.Rect;
 import android.util.AttributeSet;
@@ -36,7 +35,6 @@ import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.KeyboardInsetAnimationCallback;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.views.ActivityContext;
@@ -93,8 +91,6 @@ public class WorkModeSwitch extends LinearLayout implements Insettable,
 
         setInsets(mActivityContext.getDeviceProfile().getInsets());
         updateStringFromCache();
-
-        getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
     }
 
     @Override
@@ -105,7 +101,7 @@ public class WorkModeSwitch extends LinearLayout implements Insettable,
         if (lp != null) {
             int bottomMargin = getResources().getDimensionPixelSize(R.dimen.work_fab_margin_bottom);
             DeviceProfile dp = ActivityContext.lookupContext(getContext()).getDeviceProfile();
-            if (FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get()) {
+            if (mActivityContext.getAppsView().isSearchBarFloating()) {
                 bottomMargin += dp.hotseatQsbHeight;
             }
 
@@ -121,12 +117,13 @@ public class WorkModeSwitch extends LinearLayout implements Insettable,
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         View parent = (View) getParent();
-        int allAppsLeftRightPadding = mActivityContext.getDeviceProfile().allAppsLeftRightPadding;
+        boolean isRtl = Utilities.isRtl(getResources());
+        Rect allAppsPadding = mActivityContext.getDeviceProfile().allAppsPadding;
         int size = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight()
-                - 2 * allAppsLeftRightPadding;
+                - (allAppsPadding.left + allAppsPadding.right);
         int tabWidth = getTabWidth(getContext(), size);
-        int shift = (size - tabWidth) / 2 + allAppsLeftRightPadding;
-        setTranslationX(Utilities.isRtl(getResources()) ? shift : -shift);
+        int shift = (size - tabWidth) / 2 + (isRtl ? allAppsPadding.left : allAppsPadding.right);
+        setTranslationX(isRtl ? shift : -shift);
     }
 
     @Override

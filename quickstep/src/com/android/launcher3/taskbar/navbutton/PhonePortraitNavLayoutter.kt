@@ -20,48 +20,60 @@ import android.content.res.Resources
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.R
 import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.util.DimensionUtils
+import com.android.systemui.shared.rotation.RotationButton
 
 class PhonePortraitNavLayoutter(
-    resources: Resources,
-    navBarContainer: LinearLayout,
-    endContextualContainer: ViewGroup,
-    startContextualContainer: ViewGroup
+        resources: Resources,
+        navBarContainer: LinearLayout,
+        endContextualContainer: ViewGroup,
+        startContextualContainer: ViewGroup,
+        imeSwitcher: ImageView?,
+        rotationButton: RotationButton?,
+        a11yButton: ImageView?,
 ) :
     AbstractNavButtonLayoutter(
-        resources,
-        navBarContainer,
-        endContextualContainer,
-        startContextualContainer
+            resources,
+            navBarContainer,
+            endContextualContainer,
+            startContextualContainer,
+            imeSwitcher,
+            rotationButton,
+            a11yButton
     ) {
 
-    override fun layoutButtons(dp: DeviceProfile, isContextualButtonShowing: Boolean) {
+    override fun layoutButtons(dp: DeviceProfile, isA11yButtonPersistent: Boolean) {
         // TODO(b/230395757): Polish pending, this is just to make it usable
-        val navContainerParams = navButtonContainer.layoutParams as FrameLayout.LayoutParams
         val taskbarDimensions =
-            DimensionUtils.getTaskbarPhoneDimensions(dp, resources, TaskbarManager.isPhoneMode(dp))
+            DimensionUtils.getTaskbarPhoneDimensions(dp, resources,
+                    TaskbarManager.isPhoneMode(dp))
         val endStartMargins = resources.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_size)
-        navContainerParams.width = taskbarDimensions.x
-        navContainerParams.height = ViewGroup.LayoutParams.MATCH_PARENT
-        navContainerParams.gravity = Gravity.CENTER_VERTICAL
 
         // Ensure order of buttons is correct
         navButtonContainer.removeAllViews()
         navButtonContainer.orientation = LinearLayout.HORIZONTAL
-        navContainerParams.topMargin = 0
-        navContainerParams.bottomMargin = 0
-        navContainerParams.marginEnd = endStartMargins
-        navContainerParams.marginStart = endStartMargins
+
+        val navContainerParams = FrameLayout.LayoutParams(
+                taskbarDimensions.x, ViewGroup.LayoutParams.MATCH_PARENT)
+        navContainerParams.apply {
+            topMargin = 0
+            bottomMargin = 0
+            marginEnd = endStartMargins
+            marginStart = endStartMargins
+        }
+
         // Swap recents and back button in case we were landscape prior to this
         navButtonContainer.addView(backButton)
         navButtonContainer.addView(homeButton)
         navButtonContainer.addView(recentsButton)
 
         navButtonContainer.layoutParams = navContainerParams
+        navButtonContainer.gravity = Gravity.CENTER
 
         // Add the spaces in between the nav buttons
         val spaceInBetween =
@@ -85,6 +97,25 @@ class PhonePortraitNavLayoutter(
                     buttonLayoutParams.marginEnd = spaceInBetween / 2
                 }
             }
+        }
+
+        endContextualContainer.removeAllViews()
+        startContextualContainer.removeAllViews()
+
+        val contextualMargin = resources.getDimensionPixelSize(
+                R.dimen.taskbar_contextual_button_padding)
+        repositionContextualContainer(endContextualContainer, contextualMargin, Gravity.END)
+
+        if (imeSwitcher != null) {
+            endContextualContainer.addView(imeSwitcher)
+            imeSwitcher.layoutParams = getParamsToCenterView()
+        }
+        if (a11yButton != null) {
+            endContextualContainer.addView(a11yButton)
+        }
+        if (rotationButton != null) {
+            endContextualContainer.addView(rotationButton.currentView)
+            rotationButton.currentView.layoutParams = getParamsToCenterView()
         }
     }
 }

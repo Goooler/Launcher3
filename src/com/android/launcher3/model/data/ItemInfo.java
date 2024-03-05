@@ -30,7 +30,6 @@ import static com.android.launcher3.LauncherSettings.Favorites.EXTENDED_CONTAINE
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_TASK;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.CONTAINER_NOT_SET;
 import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
@@ -50,7 +49,6 @@ import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Animation;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Workspace;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logger.LauncherAtom.AllAppsContainer;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
@@ -62,9 +60,12 @@ import com.android.launcher3.logger.LauncherAtom.TaskSwitcherContainer;
 import com.android.launcher3.logger.LauncherAtom.WallpapersContainer;
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.model.ModelWriter;
+import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.ContentWriter;
 import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.UserIconInfo;
+import com.android.systemui.shared.system.SysUiStatsLog;
 
 import java.util.Optional;
 
@@ -88,7 +89,6 @@ public class ItemInfo {
 
     /**
      * One of {@link Favorites#ITEM_TYPE_APPLICATION},
-     * {@link Favorites#ITEM_TYPE_SHORTCUT},
      * {@link Favorites#ITEM_TYPE_DEEP_SHORTCUT}
      * {@link Favorites#ITEM_TYPE_FOLDER},
      * {@link Favorites#ITEM_TYPE_APP_PAIR},
@@ -325,9 +325,7 @@ public class ItemInfo {
      * Returns whether this item should use the background animation.
      */
     public boolean shouldUseBackgroundAnimation() {
-        return animationType == LauncherSettings.Animation.VIEW_BACKGROUND
-                && FeatureFlags.ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES.get()
-                && FeatureFlags.ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION.get();
+        return animationType == LauncherSettings.Animation.VIEW_BACKGROUND;
     }
 
     /**
@@ -366,13 +364,6 @@ public class ItemInfo {
                                             .ifPresent(lsb::setShortcutId);
                                     return lsb;
                                 })
-                                .orElse(LauncherAtom.Shortcut.newBuilder()));
-                break;
-            case ITEM_TYPE_SHORTCUT:
-                itemBuilder
-                        .setShortcut(nullableComponent
-                                .map(component -> LauncherAtom.Shortcut.newBuilder()
-                                        .setShortcutName(component.flattenToShortString()))
                                 .orElse(LauncherAtom.Shortcut.newBuilder()));
                 break;
             case ITEM_TYPE_APPWIDGET:
@@ -426,7 +417,9 @@ public class ItemInfo {
     @NonNull
     protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder() {
         LauncherAtom.ItemInfo.Builder itemBuilder = LauncherAtom.ItemInfo.newBuilder();
-        itemBuilder.setIsWork(!Process.myUserHandle().equals(user));
+        UserIconInfo info = getUserInfo();
+        itemBuilder.setIsWork(info != null && info.isWork());
+        itemBuilder.setUserType(getUserType(info));
         SettingsCache settingsCache = SettingsCache.INSTANCE.getNoCreate();
         boolean isKidsMode = settingsCache != null && settingsCache.getValue(NAV_BAR_KIDS_MODE, 0);
         itemBuilder.setIsKidsMode(isKidsMode);
@@ -521,5 +514,30 @@ public class ItemInfo {
     public void setTitle(@Nullable final CharSequence title,
             @Nullable final ModelWriter modelWriter) {
         this.title = title;
+    }
+
+    private UserIconInfo getUserInfo() {
+        UserCache userCache = UserCache.INSTANCE.getNoCreate();
+        if (userCache == null) {
+            return null;
+        }
+
+        return userCache.getUserInfo(user);
+    }
+
+    private int getUserType(UserIconInfo info) {
+        if (info == null) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_UNKNOWN;
+        } else if (info.isMain()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_MAIN;
+        } else if (info.isPrivate()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_PRIVATE;
+        } else if (info.isWork()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_WORK;
+        } else if (info.isCloned()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_CLONED;
+        } else {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_UNKNOWN;
+        }
     }
 }

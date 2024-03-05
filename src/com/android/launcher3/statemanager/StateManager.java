@@ -19,6 +19,7 @@ package com.android.launcher3.statemanager;
 import static android.animation.ValueAnimator.areAnimatorsEnabled;
 
 import static com.android.launcher3.anim.AnimatorPlaybackController.callListenerCommandRecursively;
+import static com.android.launcher3.states.StateAnimationConfig.HANDLE_STATE_APPLY;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_ALL_ANIMATIONS;
 
 import android.animation.Animator;
@@ -27,6 +28,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.FloatRange;
 
@@ -35,6 +37,8 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.states.StateAnimationConfig.AnimationFlags;
+import com.android.launcher3.states.StateAnimationConfig.AnimationPropertyFlags;
+import com.android.launcher3.testing.shared.TestProtocol;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -74,6 +78,10 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
     public STATE_TYPE getState() {
         return mState;
+    }
+
+    public STATE_TYPE getTargetState() {
+        return (STATE_TYPE) mConfig.targetState;
     }
 
     public STATE_TYPE getCurrentStableState() {
@@ -183,7 +191,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
     public void reapplyState(boolean cancelCurrentAnimation) {
         boolean wasInAnimation = mConfig.currentAnimation != null;
-        if (cancelCurrentAnimation) {
+        if (cancelCurrentAnimation && (mConfig.animProps & HANDLE_STATE_APPLY) == 0) {
             // Animation canceling can trigger a cleanup routine, causing problems when we are in a
             // launcher state that relies on member variable data. So if we are in one of those
             // states, accelerate the current animation to its end point rather than canceling it
@@ -221,6 +229,8 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
     private void goToState(
             STATE_TYPE state, boolean animated, long delay, AnimatorListener listener) {
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "go to state " + state);
+
         animated &= areAnimatorsEnabled();
         if (mActivity.isInState(state)) {
             if (mConfig.currentAnimation == null) {
@@ -229,7 +239,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
                     listener.onAnimationEnd(null);
                 }
                 return;
-            } else if ((!mConfig.userControlled && animated && mConfig.targetState == state)
+            } else if ((!mConfig.isUserControlled() && animated && mConfig.targetState == state)
                     || mState.shouldPreserveDataStateOnReapply()) {
                 // We are running the same animation as requested, and/or target state should not be
                 // reset -- allow the current animation to complete instead of canceling it.
@@ -335,7 +345,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
     public AnimatorPlaybackController createAnimationToNewWorkspace(STATE_TYPE state,
             StateAnimationConfig config) {
-        config.userControlled = true;
+        config.animProps |= StateAnimationConfig.USER_CONTROLLED;
         cancelAnimation();
         config.copyTo(mConfig);
         mConfig.playbackController = createAnimationToNewWorkspaceInternal(state)
@@ -375,6 +385,8 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
         mState = state;
         mActivity.onStateSetStart(mState);
 
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "Notifying listeners for state transition start"
+                + " to state: " + state.toString());
         for (int i = mListeners.size() - 1; i >= 0; i--) {
             mListeners.get(i).onStateTransitionStart(state);
         }
@@ -392,6 +404,8 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
             setRestState(null);
         }
 
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "Notifying " + mListeners.size() + " listeners "
+                + "for end transition for state: " + state.toString());
         for (int i = mListeners.size() - 1; i >= 0; i--) {
             mListeners.get(i).onStateTransitionComplete(state);
         }
@@ -406,7 +420,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
     }
 
     public void moveToRestState(boolean isAnimated) {
-        if (mConfig.currentAnimation != null && mConfig.userControlled) {
+        if (mConfig.currentAnimation != null && mConfig.isUserControlled()) {
             // The user is doing something. Lets not mess it up
             return;
         }
@@ -429,6 +443,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
      * Cancels the current animation.
      */
     public void cancelAnimation() {
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "current animation cancelled");
         mConfig.reset();
         // It could happen that a new animation is set as a result of an endListener on the
         // existing animation.
@@ -437,10 +452,18 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
         }
     }
 
+    /**
+     * Sets the provided controller as the current user controlled state animation
+     */
     public void setCurrentUserControlledAnimation(AnimatorPlaybackController controller) {
+        setCurrentAnimation(controller, StateAnimationConfig.USER_CONTROLLED);
+    }
+
+    public void setCurrentAnimation(AnimatorPlaybackController controller,
+            @AnimationPropertyFlags int animationProps) {
         clearCurrentAnimation();
         setCurrentAnimation(controller.getTarget());
-        mConfig.userControlled = true;
+        mConfig.animProps = animationProps;
         mConfig.playbackController = controller;
     }
 
@@ -452,6 +475,7 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
      * @param toState The state we are animating towards.
      */
     public void setCurrentAnimation(AnimatorSet anim, STATE_TYPE toState) {
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "setting animation to " + toState.toString());
         cancelAnimation();
         setCurrentAnimation(anim);
         anim.addListener(createStateAnimationListener(toState));

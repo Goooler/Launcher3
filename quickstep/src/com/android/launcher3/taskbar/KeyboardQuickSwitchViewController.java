@@ -24,9 +24,10 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
+import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -52,6 +53,8 @@ public class KeyboardQuickSwitchViewController {
 
     private int mCurrentFocusIndex = -1;
 
+    private boolean mOnDesktop;
+
     protected KeyboardQuickSwitchViewController(
             @NonNull TaskbarControllers controllers,
             @NonNull TaskbarOverlayContext overlayContext,
@@ -71,10 +74,12 @@ public class KeyboardQuickSwitchViewController {
             @NonNull List<GroupTask> tasks,
             int numHiddenTasks,
             boolean updateTasks,
-            int currentFocusIndexOverride) {
+            int currentFocusIndexOverride,
+            boolean onDesktop) {
         TaskbarOverlayDragLayer dragLayer = mOverlayContext.getDragLayer();
         dragLayer.addView(mKeyboardQuickSwitchView);
         dragLayer.runOnClickOnce(v -> closeQuickSwitchView(true));
+        mOnDesktop = onDesktop;
 
         mKeyboardQuickSwitchView.applyLoadPlan(
                 mOverlayContext,
@@ -87,27 +92,19 @@ public class KeyboardQuickSwitchViewController {
 
     protected void closeQuickSwitchView(boolean animate) {
         if (mCloseAnimation != null) {
-            if (animate) {
-                // Let currently-running animation finish.
-                return;
-            } else {
-                mCloseAnimation.cancel();
+            // Let currently-running animation finish.
+            if (!animate) {
+                mCloseAnimation.end();
             }
+            return;
         }
         if (!animate) {
-            mCloseAnimation = null;
             onCloseComplete();
             return;
         }
         mCloseAnimation = mKeyboardQuickSwitchView.getCloseAnimation();
 
-        mCloseAnimation.addListener(new AnimationSuccessListener() {
-            @Override
-            public void onAnimationSuccess(Animator animator) {
-                mCloseAnimation = null;
-                onCloseComplete();
-            }
-        });
+        mCloseAnimation.addListener(AnimatorListeners.forEndCallback(this::onCloseComplete));
         mCloseAnimation.start();
     }
 
@@ -136,7 +133,20 @@ public class KeyboardQuickSwitchViewController {
         GroupTask task = mControllerCallbacks.getTaskAt(index);
         if (task == null) {
             return Math.max(0, index);
-        } else if (task.task2 == null) {
+        }
+        Task task2 = task.task2;
+        int runningTaskId = ActivityManagerWrapper.getInstance().getRunningTask().taskId;
+        if (runningTaskId == task.task1.key.id
+                || (task2 != null && runningTaskId == task2.key.id)) {
+            // Ignore attempts to run the selected task if it is already running.
+            return -1;
+        }
+
+        if (mOnDesktop) {
+            UI_HELPER_EXECUTOR.execute(() ->
+                    SystemUiProxy.INSTANCE.get(mKeyboardQuickSwitchView.getContext())
+                            .showDesktopApp(task.task1.key.id));
+        } else if (task2 == null) {
             UI_HELPER_EXECUTOR.execute(() ->
                     ActivityManagerWrapper.getInstance().startActivityFromRecents(
                             task.task1.key,
@@ -144,13 +154,13 @@ public class KeyboardQuickSwitchViewController {
                                     taskView == null ? mKeyboardQuickSwitchView : taskView, null)
                                     .options));
         } else {
-            mControllers.uiController.launchSplitTasks(
-                    taskView == null ? mKeyboardQuickSwitchView : taskView, task);
+            mControllers.uiController.launchSplitTasks(task);
         }
         return -1;
     }
 
     private void onCloseComplete() {
+        mCloseAnimation = null;
         mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
         mControllerCallbacks.onCloseComplete();
     }

@@ -19,6 +19,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -26,6 +27,7 @@ import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -41,6 +43,7 @@ import com.android.quickstep.TouchInteractionService.TISBinder;
 import com.android.quickstep.interaction.TutorialController.TutorialType;
 import com.android.quickstep.util.TISBindHelper;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /** Shows the gesture interactive sandbox in full screen mode. */
@@ -53,18 +56,15 @@ public class GestureSandboxActivity extends FragmentActivity {
     static final String KEY_USE_TUTORIAL_MENU = "use_tutorial_menu";
 
     @Nullable private TutorialType[] mTutorialSteps;
-    private GestureSandboxFragment mFragment;
+    private GestureSandboxFragment mCurrentFragment;
+    private GestureSandboxFragment mPendingFragment;
 
     private int mCurrentStep;
     private int mNumSteps;
-    private boolean mShowRotationPrompt;
 
     private SharedPreferences mSharedPrefs;
     private StatsLogManager mStatsLogManager;
-
-    private View mRotationPrompt;
     private TISBindHelper mTISBindHelper;
-    private TISBinder mBinder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,7 +83,7 @@ public class GestureSandboxActivity extends FragmentActivity {
                 && args.getBoolean(KEY_USE_TUTORIAL_MENU, false)) {
             mTutorialSteps = null;
             TutorialType tutorialTypeOverride = (TutorialType) args.get(KEY_TUTORIAL_TYPE);
-            mFragment = tutorialTypeOverride == null
+            mCurrentFragment = tutorialTypeOverride == null
                     ? new MenuFragment()
                     : makeTutorialFragment(
                             tutorialTypeOverride,
@@ -91,21 +91,23 @@ public class GestureSandboxActivity extends FragmentActivity {
                             /* fromMenu= */ true);
         } else {
             mTutorialSteps = getTutorialSteps(args);
-            mFragment = makeTutorialFragment(
+            mCurrentFragment = makeTutorialFragment(
                     mTutorialSteps[mCurrentStep - 1],
                     gestureComplete,
                     /* fromMenu= */ false);
         }
         getSupportFragmentManager().beginTransaction()
-                .add(R.id.gesture_tutorial_fragment_container, mFragment)
+                .add(R.id.gesture_tutorial_fragment_container, mCurrentFragment)
                 .commit();
 
-        mRotationPrompt = findViewById(R.id.rotation_prompt);
         if (FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
             correctUserOrientation();
         }
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
+
+        initWindowInsets();
     }
+
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
@@ -115,6 +117,42 @@ public class GestureSandboxActivity extends FragmentActivity {
         if (FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
             correctUserOrientation();
         }
+    }
+
+    private void initWindowInsets() {
+        View root = findViewById(android.R.id.content);
+        root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                updateExclusionRects(root);
+            }
+        });
+
+        // Return CONSUMED if you don't want want the window insets to keep being
+        // passed down to descendant views.
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                return WindowInsets.CONSUMED;
+            }
+        });
+    }
+
+    private void updateExclusionRects(View rootView) {
+        Insets gestureInsets = rootView.getRootWindowInsets()
+                .getInsets(WindowInsets.Type.systemGestures());
+        ArrayList<Rect> exclusionRects = new ArrayList<>();
+        // Add rect for left
+        exclusionRects.add(new Rect(0, 0, gestureInsets.left, rootView.getHeight()));
+        // Add rect for right
+        exclusionRects.add(new Rect(
+                rootView.getWidth() - gestureInsets.right,
+                0,
+                rootView.getWidth(),
+                rootView.getHeight()
+        ));
+        rootView.setSystemGestureExclusionRects(exclusionRects);
     }
 
     /**
@@ -128,34 +166,45 @@ public class GestureSandboxActivity extends FragmentActivity {
         DeviceProfile deviceProfile = InvariantDeviceProfile.INSTANCE.get(
                 getApplicationContext()).getDeviceProfile(this);
         if (deviceProfile.isTablet) {
-            mShowRotationPrompt = getResources().getConfiguration().orientation
+            boolean showRotationPrompt = getResources().getConfiguration().orientation
                     == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-            updateVisibility(mRotationPrompt, mShowRotationPrompt ? View.VISIBLE : View.GONE);
+
+            GestureSandboxFragment recreatedFragment =
+                    showRotationPrompt || mPendingFragment == null
+                            ? null : mPendingFragment.recreateFragment();
+            showFragment(showRotationPrompt
+                    ? new RotationPromptFragment()
+                    : recreatedFragment == null
+                            ? mCurrentFragment : recreatedFragment);
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         }
     }
 
-    void updateVisibility(View view, int visibility) {
-        if (view == null || view.getVisibility() == visibility) {
-            return;
+    private void showFragment(@NonNull GestureSandboxFragment fragment) {
+        if (mCurrentFragment.recreateFragment() != null) {
+            mPendingFragment = mCurrentFragment;
         }
-        view.setVisibility(visibility);
+        mCurrentFragment = fragment;
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.gesture_tutorial_fragment_container, mCurrentFragment)
+                .runOnCommit(() -> mCurrentFragment.onAttachedToWindow())
+                .commit();
     }
 
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (mFragment.shouldDisableSystemGestures()) {
+        if (mCurrentFragment.shouldDisableSystemGestures()) {
             disableSystemGestures();
         }
-        mFragment.onAttachedToWindow();
+        mCurrentFragment.onAttachedToWindow();
     }
 
     @Override
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mFragment.onDetachedFromWindow();
+        mCurrentFragment.onDetachedFromWindow();
     }
 
     @Override
@@ -170,12 +219,8 @@ public class GestureSandboxActivity extends FragmentActivity {
     protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
         savedInstanceState.putStringArray(KEY_TUTORIAL_STEPS, getTutorialStepNames());
         savedInstanceState.putInt(KEY_CURRENT_STEP, mCurrentStep);
-        mFragment.onSaveInstanceState(savedInstanceState);
+        mCurrentFragment.onSaveInstanceState(savedInstanceState);
         super.onSaveInstanceState(savedInstanceState);
-    }
-
-    protected boolean isRotationPromptShowing() {
-        return mShowRotationPrompt;
     }
 
     protected SharedPreferences getSharedPrefs() {
@@ -206,7 +251,7 @@ public class GestureSandboxActivity extends FragmentActivity {
      */
     public void continueTutorial() {
         if (isTutorialComplete() || mTutorialSteps == null) {
-            mFragment.close();
+            mCurrentFragment.close();
             return;
         }
         launchTutorialStep(mTutorialSteps[mCurrentStep], false);
@@ -225,20 +270,12 @@ public class GestureSandboxActivity extends FragmentActivity {
      * the menu when complete.
      */
     public void launchTutorialStep(@NonNull TutorialType tutorialType, boolean fromMenu) {
-        mFragment = makeTutorialFragment(tutorialType, false, fromMenu);
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.gesture_tutorial_fragment_container, mFragment)
-                .runOnCommit(() -> mFragment.onAttachedToWindow())
-                .commit();
+        showFragment(makeTutorialFragment(tutorialType, false, fromMenu));
     }
 
     /** Launches the gesture nav tutorial menu page */
     public void launchTutorialMenu() {
-        mFragment = new MenuFragment();
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.gesture_tutorial_fragment_container, mFragment)
-                .runOnCommit(() -> mFragment.onAttachedToWindow())
-                .commit();
+        showFragment(new MenuFragment());
     }
 
     private String[] getTutorialStepNames() {
@@ -321,7 +358,6 @@ public class GestureSandboxActivity extends FragmentActivity {
     }
 
     private void onTISConnected(TISBinder binder) {
-        mBinder = binder;
         updateServiceState(isResumed());
     }
 
@@ -332,8 +368,9 @@ public class GestureSandboxActivity extends FragmentActivity {
     }
 
     private void updateServiceState(boolean isEnabled) {
-        if (mBinder != null) {
-            mBinder.setGestureBlockedTaskId(isEnabled ? getTaskId() : -1);
+        TISBinder binder = mTISBindHelper.getBinder();
+        if (binder != null) {
+            binder.setGestureBlockedTaskId(isEnabled ? getTaskId() : -1);
         }
     }
 

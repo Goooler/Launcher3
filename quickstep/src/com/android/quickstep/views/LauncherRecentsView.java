@@ -16,7 +16,6 @@
 package com.android.quickstep.views;
 
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
-
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.CLEAR_ALL_BUTTON;
 import static com.android.launcher3.LauncherState.EDIT_MODE;
@@ -25,23 +24,27 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
-import android.view.Surface;
 
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.PendingSplitSelectInfo;
 import com.android.launcher3.util.SplitConfigurationOptions;
@@ -75,17 +78,27 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
 
     @Override
     public void init(OverviewActionsView actionsView,
-            SplitSelectStateController splitPlaceholderView) {
-        super.init(actionsView, splitPlaceholderView);
+            SplitSelectStateController splitPlaceholderView,
+            @Nullable DesktopRecentsTransitionController desktopRecentsTransitionController) {
+        super.init(actionsView, splitPlaceholderView, desktopRecentsTransitionController);
         setContentAlpha(0);
     }
 
     @Override
-    public void startHome(boolean animated) {
+    protected void handleStartHome(boolean animated) {
         StateManager stateManager = mActivity.getStateManager();
         animated &= stateManager.shouldAnimateStateChange();
         stateManager.goToState(NORMAL, animated);
+        if (FeatureFlags.enableSplitContextually()) {
+            mSplitSelectStateController.getSplitAnimationController()
+                    .playPlaceholderDismissAnim(mActivity);
+        }
         AbstractFloatingView.closeAllOpenViews(mActivity, animated);
+    }
+
+    @Override
+    protected boolean canStartHomeSafely() {
+        return mActivity.canStartHomeSafely();
     }
 
     @Override
@@ -118,18 +131,30 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     @Override
     public void reset() {
         super.reset();
-        setLayoutRotation(Surface.ROTATION_0, Surface.ROTATION_0);
+
+        int recentsActivityRotation = getPagedViewOrientedState().getRecentsActivityRotation();
+        setLayoutRotation(recentsActivityRotation, recentsActivityRotation);
     }
 
     @Override
     public void onStateTransitionStart(LauncherState toState) {
         setOverviewStateEnabled(toState.overviewUi);
+
         setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
         setOverviewFullscreenEnabled(toState.getOverviewFullscreenProgress() == 1);
         if (toState == OVERVIEW_MODAL_TASK) {
             setOverviewSelectEnabled(true);
         }
+
+        // Set border after select mode changes to avoid showing border during state transition
+        if (!toState.overviewUi || toState == OVERVIEW_MODAL_TASK) {
+            setTaskBorderEnabled(false);
+        }
+
         setFreezeViewVisibility(true);
+        if (mActivity.getDesktopVisibilityController() != null) {
+            mActivity.getDesktopVisibilityController().onLauncherStateChanged(toState);
+        }
     }
 
     @Override
@@ -146,6 +171,10 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
             setOverviewSelectEnabled(false);
         }
 
+        if (finalState.overviewUi && finalState != OVERVIEW_MODAL_TASK) {
+            setTaskBorderEnabled(true);
+        }
+
         if (isOverlayEnabled) {
             runActionOnRemoteHandles(remoteTargetHandle ->
                     remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
@@ -155,14 +184,13 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     @Override
     public void setOverviewStateEnabled(boolean enabled) {
         super.setOverviewStateEnabled(enabled);
+        Log.d(TestProtocol.OVERVIEW_OVER_HOME, "overview state enabled state has changed: "
+                + enabled);
         if (enabled) {
             LauncherState state = mActivity.getStateManager().getState();
             boolean hasClearAllButton = (state.getVisibleElements(mActivity)
                     & CLEAR_ALL_BUTTON) != 0;
             setDisallowScrollToClearAll(!hasClearAllButton);
-        }
-        if (mActivity.getDesktopVisibilityController() != null) {
-            mActivity.getDesktopVisibilityController().setOverviewStateEnabled(enabled);
         }
     }
 
@@ -218,7 +246,11 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
 
     @Override
     protected boolean canLaunchFullscreenTask() {
-        return !mActivity.isInState(OVERVIEW_SPLIT_SELECT);
+        if (FeatureFlags.enableSplitContextually()) {
+            return !mSplitSelectStateController.isSplitSelectActive();
+        } else {
+            return !mActivity.isInState(OVERVIEW_SPLIT_SELECT);
+        }
     }
 
     @Override
@@ -228,7 +260,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         DesktopVisibilityController desktopVisibilityController =
                 mActivity.getDesktopVisibilityController();
         if (desktopVisibilityController != null) {
-            desktopVisibilityController.setGestureInProgress(true);
+            desktopVisibilityController.setRecentsGestureStart();
         }
     }
 
@@ -236,9 +268,11 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     public void onGestureAnimationEnd() {
         DesktopVisibilityController desktopVisibilityController = null;
         boolean showDesktopApps = false;
-        if (DesktopTaskView.DESKTOP_MODE_SUPPORTED) {
+        GestureState.GestureEndTarget endTarget = null;
+        if (isDesktopModeSupported()) {
             desktopVisibilityController = mActivity.getDesktopVisibilityController();
-            if (mCurrentGestureEndTarget == GestureState.GestureEndTarget.LAST_TASK
+            endTarget = mCurrentGestureEndTarget;
+            if (endTarget == GestureState.GestureEndTarget.LAST_TASK
                     && desktopVisibilityController.areFreeformTasksVisible()) {
                 // Recents gesture was cancelled and we are returning to the previous task.
                 // After super class has handled clean up, show desktop apps on top again
@@ -247,10 +281,11 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         }
         super.onGestureAnimationEnd();
         if (desktopVisibilityController != null) {
-            desktopVisibilityController.setGestureInProgress(false);
+            desktopVisibilityController.setRecentsGestureEnd(endTarget);
         }
         if (showDesktopApps) {
-            SystemUiProxy.INSTANCE.get(mActivity).showDesktopApps(mActivity.getDisplayId());
+            SystemUiProxy.INSTANCE.get(mActivity).showDesktopApps(mActivity.getDisplayId(),
+                    null /* transition */);
         }
     }
 }

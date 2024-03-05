@@ -17,6 +17,7 @@
 package com.android.launcher3.model;
 
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
+import static com.android.launcher3.config.FeatureFlags.shouldShowFirstPageWidget;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -193,9 +194,7 @@ public class LoaderCursor extends CursorWrapper {
 
     public IconRequestInfo<WorkspaceItemInfo> createIconRequestInfo(
             WorkspaceItemInfo wai, boolean useLowResIcon) {
-        byte[] iconBlob = itemType == Favorites.ITEM_TYPE_SHORTCUT
-                || itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT
-                || restoreFlag != 0
+        byte[] iconBlob = itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT || restoreFlag != 0
                 ? getIconBlob() : null;
 
         return new IconRequestInfo<>(wai, mActivityInfo, iconBlob, useLowResIcon);
@@ -347,7 +346,6 @@ public class LoaderCursor extends CursorWrapper {
         }
 
         final WorkspaceItemInfo info = new WorkspaceItemInfo();
-        info.itemType = Favorites.ITEM_TYPE_APPLICATION;
         info.user = user;
         info.intent = newIntent;
 
@@ -473,7 +471,7 @@ public class LoaderCursor extends CursorWrapper {
             // cause the item loading to get skipped
             ShortcutKey.fromItemInfo(info);
         }
-        if (checkItemPlacement(info)) {
+        if (checkItemPlacement(info, dataModel.isFirstPagePinnedItemEnabled)) {
             dataModel.addItem(mContext, info, false, logger);
         } else {
             markDeleted("Item position overlap");
@@ -483,7 +481,7 @@ public class LoaderCursor extends CursorWrapper {
     /**
      * check & update map of what's occupied; used to discard overlapping/invalid items
      */
-    protected boolean checkItemPlacement(ItemInfo item) {
+    protected boolean checkItemPlacement(ItemInfo item, boolean isFirstPagePinnedItemEnabled) {
         int containerIndex = item.screenId;
         if (item.container == Favorites.CONTAINER_HOTSEAT) {
             final GridOccupancy hotseatOccupancy =
@@ -531,7 +529,8 @@ public class LoaderCursor extends CursorWrapper {
 
         if (!mOccupied.containsKey(item.screenId)) {
             GridOccupancy screen = new GridOccupancy(countX + 1, countY + 1);
-            if (item.screenId == Workspace.FIRST_SCREEN_ID && FeatureFlags.QSB_ON_FIRST_SCREEN) {
+            if (item.screenId == Workspace.FIRST_SCREEN_ID && (FeatureFlags.QSB_ON_FIRST_SCREEN
+                    && !shouldShowFirstPageWidget() && isFirstPagePinnedItemEnabled)) {
                 // Mark the first X columns (X is width of the search container) in the first row as
                 // occupied (if the feature is enabled) in order to account for the search
                 // container.

@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.stream.IntStream;
 
-
 /**
  * Represents a folder containing shortcuts or apps.
  */
@@ -119,8 +118,8 @@ public class FolderInfo extends ItemInfo {
     public static FolderInfo createAppPair(WorkspaceItemInfo app1, WorkspaceItemInfo app2) {
         FolderInfo newAppPair = new FolderInfo();
         newAppPair.itemType = LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
-        newAppPair.contents.add(app1);
-        newAppPair.contents.add(app2);
+        newAppPair.add(app1, /* animate */ false);
+        newAppPair.add(app2, /* animate */ false);
         return newAppPair;
     }
 

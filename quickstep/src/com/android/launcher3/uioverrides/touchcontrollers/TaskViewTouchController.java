@@ -15,7 +15,7 @@
  */
 package com.android.launcher3.uioverrides.touchcontrollers;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_ACCESSIBLE;
+import static com.android.launcher3.AbstractFloatingView.TYPE_TOUCH_CONTROLLER_NO_INTERCEPT;
 import static com.android.launcher3.LauncherAnimUtils.SUCCESS_TRANSITION_PROGRESS;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_BOTH;
 
@@ -27,13 +27,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Interpolator;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
-import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.BaseSwipeDetector;
 import com.android.launcher3.touch.PagedOrientationHandler;
@@ -112,7 +112,8 @@ public abstract class TaskViewTouchController<T extends BaseDraggingActivity>
             // If we are already animating from a previous state, we can intercept.
             return true;
         }
-        if (AbstractFloatingView.getTopOpenViewWithType(mActivity, TYPE_ACCESSIBLE) != null) {
+        if (AbstractFloatingView.getTopOpenViewWithType(
+                mActivity, TYPE_TOUCH_CONTROLLER_NO_INTERCEPT) != null) {
             return false;
         }
         return isRecentsInteractive();

@@ -16,9 +16,9 @@
 
 package com.android.launcher3.tapl;
 
+import static android.view.KeyEvent.KEYCODE_META_RIGHT;
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_SCROLLED;
 
-import static com.android.launcher3.tapl.LauncherInstrumentation.CALLBACK_RUN_POINT.CALLBACK_HOLD_BEFORE_DROP;
 import static com.android.launcher3.testing.shared.TestProtocol.ALL_APPS_STATE_ORDINAL;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
@@ -105,10 +105,25 @@ public final class Workspace extends Home {
                     windowCornerRadius,
                     startY - swipeHeight - mLauncher.getTouchSlop(),
                     12,
-                    ALL_APPS_STATE_ORDINAL, LauncherInstrumentation.GestureScope.INSIDE);
+                    ALL_APPS_STATE_ORDINAL,
+                    LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER);
 
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                     "swiped to all apps")) {
+                return new HomeAllApps(mLauncher);
+            }
+        }
+    }
+
+    /** Opens the Launcher all apps page with the meta keyboard shortcut. */
+    public HomeAllApps openAllAppsFromKeyboardShortcut() {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
+             LauncherInstrumentation.Closable c =
+                     mLauncher.addContextLayer("want to open all apps search")) {
+            verifyActiveContainer();
+            mLauncher.getDevice().pressKeyCode(KEYCODE_META_RIGHT);
+            try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
+                    "pressed meta key")) {
                 return new HomeAllApps(mLauncher);
             }
         }
@@ -320,7 +335,8 @@ public final class Workspace extends Home {
                     homeAppIcon,
                     () -> new Point(0, 0),
                     () -> mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
-                    null);
+                    null,
+                    /* startsActivity = */ false);
 
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                     "dragged the app across workspace")) {
@@ -344,7 +360,8 @@ public final class Workspace extends Home {
                     homeAppIcon,
                     () -> getDropPointFromDropTargetBar(mLauncher, DELETE_TARGET_TEXT_ID),
                     () -> mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
-                    /* expectDropEvents= */ null);
+                    /* expectDropEvents= */ null,
+                    /* startsActivity = */ false);
 
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                     "dragged the app to the drop bar")) {
@@ -352,7 +369,6 @@ public final class Workspace extends Home {
             }
         }
     }
-
 
     /**
      * Uninstall the appIcon by dragging it to the 'uninstall' drop point of the drop_target_bar.
@@ -375,7 +391,8 @@ public final class Workspace extends Home {
                     homeAppIcon,
                     () -> getDropPointFromDropTargetBar(launcher, UNINSTALL_TARGET_TEXT_ID),
                     expectLongClickEvents,
-                    /* expectDropEvents= */null);
+                    /* expectDropEvents= */null,
+                    /* startsActivity = */ false);
 
             launcher.waitUntilLauncherObjectGone(DROP_BAR_RES_ID);
 
@@ -387,7 +404,7 @@ public final class Workspace extends Home {
                     Until.hasObject(installerAlert), LauncherInstrumentation.WAIT_TIME_MS));
             final UiObject2 ok = device.findObject(By.text("OK"));
             assertNotNull("OK button is not shown", ok);
-            launcher.clickObject(ok, LauncherInstrumentation.GestureScope.OUTSIDE_WITHOUT_PILFER);
+            launcher.clickObject(ok);
             assertTrue("Uninstall alert is not dismissed after clicking OK", device.wait(
                     Until.gone(installerAlert), LauncherInstrumentation.WAIT_TIME_MS));
 
@@ -449,14 +466,25 @@ public final class Workspace extends Home {
                 o -> new FolderIcon(mLauncher, o)).collect(Collectors.toList());
     }
 
+    private static void sendUp(LauncherInstrumentation launcher, Point dest,
+            long downTime) {
+        launcher.sendPointer(
+                downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, dest,
+                LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER);
+    }
+
     private static void dropDraggedIcon(LauncherInstrumentation launcher, Point dest, long downTime,
-            @Nullable Runnable expectedEvents) {
-        launcher.runToState(
-                () -> launcher.sendPointer(
-                        downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, dest,
-                        LauncherInstrumentation.GestureScope.INSIDE),
-                NORMAL_STATE_ORDINAL,
-                "sending UP event");
+            @Nullable Runnable expectedEvents, boolean startsActivity) {
+        if (startsActivity) {
+            launcher.executeAndWaitForLauncherStop(
+                    () -> sendUp(launcher, dest, downTime),
+                    "sending UP event");
+        } else {
+            launcher.runToState(
+                    () -> sendUp(launcher, dest, downTime),
+                    NORMAL_STATE_ORDINAL,
+                    "sending UP event");
+        }
         if (expectedEvents != null) {
             expectedEvents.run();
         }
@@ -473,7 +501,8 @@ public final class Workspace extends Home {
                     LauncherInstrumentation.EVENT_START);
         }
         dragIconToWorkspace(
-                launcher, launchable, dest, expectLongClickEvents, expectDropEvents);
+                launcher, launchable, dest, expectLongClickEvents, expectDropEvents,
+                startsActivity);
     }
 
     static void dragIconToWorkspaceCellPosition(LauncherInstrumentation launcher,
@@ -502,7 +531,8 @@ public final class Workspace extends Home {
                 destSupplier,
                 /* isDecelerating= */ false,
                 () -> launcher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
-                /* expectDropEvents= */ null);
+                /* expectDropEvents= */ null,
+                /* startsActivity = */ false);
     }
 
     static void dragIconToWorkspace(
@@ -510,9 +540,10 @@ public final class Workspace extends Home {
             Launchable launchable,
             Supplier<Point> dest,
             Runnable expectLongClickEvents,
-            @Nullable Runnable expectDropEvents) {
+            @Nullable Runnable expectDropEvents,
+            boolean startsActivity) {
         dragIconToWorkspace(launcher, launchable, dest, /* isDecelerating */ true,
-                expectLongClickEvents, expectDropEvents);
+                expectLongClickEvents, expectDropEvents, startsActivity);
     }
 
     static void dragIconToWorkspace(
@@ -521,7 +552,8 @@ public final class Workspace extends Home {
             Supplier<Point> dest,
             boolean isDecelerating,
             Runnable expectLongClickEvents,
-            @Nullable Runnable expectDropEvents) {
+            @Nullable Runnable expectDropEvents,
+            boolean startsActivity) {
         try (LauncherInstrumentation.Closable ignored = launcher.addContextLayer(
                 "want to drag icon to workspace")) {
             final long downTime = SystemClock.uptimeMillis();
@@ -543,7 +575,7 @@ public final class Workspace extends Home {
                 executeAndWaitForPageScroll(launcher,
                         () -> launcher.movePointer(finalDragStart, screenEdge, DEFAULT_DRAG_STEPS,
                                 true, downTime, downTime, true,
-                                LauncherInstrumentation.GestureScope.INSIDE));
+                                LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER));
                 targetDest.x += displayX * (targetDest.x > 0 ? -1 : 1);
                 dragStart = screenEdge;
             }
@@ -552,9 +584,8 @@ public final class Workspace extends Home {
             // we just have to put move the icon to the destination and drop it
             launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
-                    LauncherInstrumentation.GestureScope.INSIDE);
-            launcher.runCallbackIfActive(CALLBACK_HOLD_BEFORE_DROP);
-            dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
+                    LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER);
+            dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents, startsActivity);
         }
     }
 
@@ -586,9 +617,9 @@ public final class Workspace extends Home {
             // we just have to put move the icon to the destination and drop it
             launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
-                    LauncherInstrumentation.GestureScope.INSIDE);
-            launcher.runCallbackIfActive(CALLBACK_HOLD_BEFORE_DROP);
-            dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
+                    LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER);
+            dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents,
+                    /* startsActivity = */ false);
         }
     }
 
@@ -624,7 +655,7 @@ public final class Workspace extends Home {
             executeAndWaitForPageScroll(launcher,
                     () -> launcher.movePointer(finalDragStart, screenEdge, DEFAULT_DRAG_STEPS,
                             true, downTime, downTime, true,
-                            LauncherInstrumentation.GestureScope.INSIDE));
+                            LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER));
             currentPage = Workspace.geCurrentPage(launcher);
             currentPosition = screenEdge;
         }
@@ -653,8 +684,9 @@ public final class Workspace extends Home {
 
         launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, true,
                 downTime, SystemClock.uptimeMillis(), false,
-                LauncherInstrumentation.GestureScope.INSIDE);
-        dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
+                LauncherInstrumentation.GestureScope.DONT_EXPECT_PILFER);
+        dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents,
+                /* startsActivity = */ false);
     }
 
     /**

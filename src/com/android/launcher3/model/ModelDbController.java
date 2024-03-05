@@ -37,7 +37,6 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
@@ -55,6 +54,7 @@ import com.android.launcher3.AutoInstallsLayout;
 import com.android.launcher3.AutoInstallsLayout.SourceResources;
 import com.android.launcher3.ConstantItem;
 import com.android.launcher3.DefaultLayoutParser;
+import com.android.launcher3.EncryptionType;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherFiles;
@@ -62,6 +62,7 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.provider.LauncherDbUtils;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
@@ -85,6 +86,7 @@ public class ModelDbController {
     private static final String TAG = "LauncherProvider";
 
     private static final String EMPTY_DATABASE_CREATED = "EMPTY_DATABASE_CREATED";
+    public static final String EXTRA_DB_NAME = "db_name";
 
     protected DatabaseHelper mOpenHelper;
 
@@ -140,7 +142,7 @@ public class ModelDbController {
                 table, projection, selection, selectionArgs, null, null, sortOrder);
 
         final Bundle extra = new Bundle();
-        extra.putString(LauncherSettings.Settings.EXTRA_DB_NAME, mOpenHelper.getDatabaseName());
+        extra.putString(EXTRA_DB_NAME, mOpenHelper.getDatabaseName());
         result.setExtras(extra);
         return result;
     }
@@ -162,28 +164,6 @@ public class ModelDbController {
     }
 
     /**
-     * Similar to insert but for adding multiple values in a transaction.
-     */
-    @WorkerThread
-    public int bulkInsert(String table, ContentValues[] values) {
-        createDbIfNotExists();
-
-        SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-        try (SQLiteTransaction t = new SQLiteTransaction(db)) {
-            int numValues = values.length;
-            for (int i = 0; i < numValues; i++) {
-                addModifiedTime(values[i]);
-                if (mOpenHelper.dbInsertAndCheck(db, table, values[i]) < 0) {
-                    return 0;
-                }
-            }
-            onAddOrDeleteOp(db);
-            t.commit();
-        }
-        return values.length;
-    }
-
-    /**
      * Refer {@link SQLiteDatabase#delete(String, String, String[])}
      */
     @WorkerThread
@@ -191,10 +171,6 @@ public class ModelDbController {
         createDbIfNotExists();
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-        if (Binder.getCallingPid() != Process.myPid()
-                && Favorites.TABLE_NAME.equalsIgnoreCase(table)) {
-            mOpenHelper.removeGhostWidgets(mOpenHelper.getWritableDatabase());
-        }
         int count = db.delete(table, selection, selectionArgs);
         if (count > 0) {
             onAddOrDeleteOp(db);
@@ -250,6 +226,7 @@ public class ModelDbController {
     public void createEmptyDB() {
         createDbIfNotExists();
         mOpenHelper.createEmptyDB(mOpenHelper.getWritableDatabase());
+        LauncherPrefs.get(mContext).putSync(getEmptyDbCreatedKey().to(true));
     }
 
     /**
@@ -280,21 +257,43 @@ public class ModelDbController {
                 mOpenHelper.getReadableDatabase(), Favorites.HYBRID_HOTSEAT_BACKUP_TABLE);
     }
 
+
+    /**
+     * Migrates the DB if needed. If the migration failed, it clears the DB.
+     */
+    public void tryMigrateDB() {
+        if (!migrateGridIfNeeded()) {
+            FileLog.d(TAG, "Migration failed: resetting launcher database");
+            createEmptyDB();
+            LauncherPrefs.get(mContext).putSync(
+                    getEmptyDbCreatedKey(mOpenHelper.getDatabaseName()).to(true));
+
+            // Write the grid state to avoid another migration
+            new DeviceGridState(LauncherAppState.getIDP(mContext)).writeToPrefs(mContext);
+        }
+    }
+
     /**
      * Migrates the DB if needed, and returns false if the migration failed
      * and DB needs to be cleared.
      * @return true if migration was success or ignored, false if migration failed
      * and the DB should be reset.
      */
-    public boolean migrateGridIfNeeded() {
+    private boolean migrateGridIfNeeded() {
         createDbIfNotExists();
+        if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
+            // If we have already create a new DB, ignore migration
+            Log.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
+            return false;
+        }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
         if (!GridSizeMigrationUtil.needsToMigrate(mContext, idp)) {
+            Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
             return true;
         }
         String targetDbName = new DeviceGridState(idp).getDbFile();
         if (TextUtils.equals(targetDbName, mOpenHelper.getDatabaseName())) {
-            Log.e(TAG, "migrateGridIfNeeded - target db is same as current: " + targetDbName);
+            Log.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
             return false;
         }
         DatabaseHelper oldHelper = mOpenHelper;
@@ -303,6 +302,9 @@ public class ModelDbController {
         try {
             return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, idp, mOpenHelper,
                    oldHelper.getWritableDatabase());
+        } catch (Exception e) {
+            FileLog.e(TAG, "Failed to migrate grid", e);
+            return false;
         } finally {
             if (mOpenHelper != oldHelper) {
                 oldHelper.close();
@@ -358,7 +360,7 @@ public class ModelDbController {
     }
 
     private void clearFlagEmptyDbCreated() {
-        LauncherPrefs.get(mContext).removeSync(getEmptyDbCreatedKey(mOpenHelper.getDatabaseName()));
+        LauncherPrefs.get(mContext).removeSync(getEmptyDbCreatedKey());
     }
 
     /**
@@ -372,7 +374,7 @@ public class ModelDbController {
     public synchronized void loadDefaultFavoritesIfNecessary() {
         createDbIfNotExists();
 
-        if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey(mOpenHelper.getDatabaseName()))) {
+        if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
             Log.d(TAG, "loading default workspace");
 
             LauncherWidgetHolder widgetHolder = mOpenHelper.newLauncherWidgetHolder();
@@ -471,7 +473,7 @@ public class ModelDbController {
                 () -> parser, AutoInstallsLayout.TAG_WORKSPACE);
     }
 
-    private static Uri getLayoutUri(String authority, Context ctx) {
+    public static Uri getLayoutUri(String authority, Context ctx) {
         InvariantDeviceProfile grid = LauncherAppState.getIDP(ctx);
         return new Uri.Builder().scheme("content").authority(authority).path("launcher_layout")
                 .appendQueryParameter("version", "1")
@@ -491,6 +493,10 @@ public class ModelDbController {
                 mOpenHelper, mContext.getResources(), defaultLayout);
     }
 
+    private ConstantItem<Boolean> getEmptyDbCreatedKey() {
+        return getEmptyDbCreatedKey(mOpenHelper.getDatabaseName());
+    }
+
     /**
      * Re-composite given key in respect to database. If the current db is
      * {@link LauncherFiles#LAUNCHER_DB}, return the key as-is. Otherwise append the db name to
@@ -500,11 +506,11 @@ public class ModelDbController {
     private ConstantItem<Boolean> getEmptyDbCreatedKey(String dbName) {
         if (mContext instanceof SandboxContext) {
             return LauncherPrefs.nonRestorableItem(EMPTY_DATABASE_CREATED,
-                    false /* default value */, false /* boot aware */);
+                    false /* default value */, EncryptionType.ENCRYPTED);
         }
         String key = TextUtils.equals(dbName, LauncherFiles.LAUNCHER_DB)
                 ? EMPTY_DATABASE_CREATED : EMPTY_DATABASE_CREATED + "@" + dbName;
-        return LauncherPrefs.backedUpItem(key, false /* default value */, false /* boot aware */);
+        return LauncherPrefs.backedUpItem(key, false /* default value */, EncryptionType.ENCRYPTED);
     }
 
     /**

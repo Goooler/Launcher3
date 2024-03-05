@@ -28,7 +28,6 @@ import static com.android.launcher3.PagedView.DEBUG_FAILED_QUICKSWITCH;
 import static com.android.launcher3.Utilities.EDGE_NAV_BAR;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.TraceHelper.FLAG_CHECK_FOR_RACE_CONDITIONS;
 import static com.android.launcher3.util.VelocityUtils.PX_PER_MS;
 import static com.android.quickstep.util.ActiveGestureLog.INTENT_EXTRA_LOG_TRACE_ID;
 
@@ -41,7 +40,6 @@ import android.os.Build;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
-import android.view.ViewConfiguration;
 
 import androidx.annotation.UiThread;
 
@@ -49,7 +47,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.launcher3.tracing.InputConsumerProto;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.AbsSwipeUpHandler;
@@ -127,6 +124,9 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
     // Might be displacement in X or Y, depending on the direction we are swiping from the nav bar.
     private float mStartDisplacement;
 
+    // The callback called upon finishing the recents transition if it was force-canceled
+    private Runnable mForceFinishRecentsTransitionCallback;
+
     public OtherActivityInputConsumer(Context base, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
             boolean isDeferredDownTarget, Consumer<OtherActivityInputConsumer> onCompleteCallback,
@@ -153,7 +153,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         boolean continuingPreviousGesture = mTaskAnimationManager.isRecentsAnimationRunning();
         mIsDeferredDownTarget = !continuingPreviousGesture && isDeferredDownTarget;
 
-        mTouchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        mTouchSlop = mDeviceState.getTouchSlop();
         mSquaredTouchSlop = mDeviceState.getSquaredTouchSlop();
 
         mPassedPilferInputSlop = mPassedWindowMoveSlop = continuingPreviousGesture;
@@ -229,8 +229,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                 // Until we detect the gesture, handle events as we receive them
                 mInputEventReceiver.setBatchingEnabled(false);
 
-                Object traceToken = TraceHelper.INSTANCE.beginSection(DOWN_EVT,
-                        FLAG_CHECK_FOR_RACE_CONDITIONS);
+                TraceHelper.INSTANCE.beginSection(DOWN_EVT);
                 mActivePointerId = ev.getPointerId(0);
                 mDownPos.set(ev.getX(), ev.getY());
                 mLastPos.set(mDownPos);
@@ -241,15 +240,14 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                     startTouchTrackingForWindowAnimation(ev.getEventTime());
                 }
 
-                TraceHelper.INSTANCE.endSection(traceToken);
+                TraceHelper.INSTANCE.endSection();
                 break;
             }
             case ACTION_POINTER_DOWN: {
                 if (!mPassedPilferInputSlop) {
                     // Cancel interaction in case of multi-touch interaction
                     int ptrIdx = ev.getActionIndex();
-                    if (!mRotationTouchHelper.isInSwipeUpTouchRegion(ev, ptrIdx,
-                            mActivityInterface)) {
+                    if (!mRotationTouchHelper.isInSwipeUpTouchRegion(ev, ptrIdx)) {
                         forceCancelGesture(ev);
                     }
                 }
@@ -282,7 +280,8 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                     if (!mIsDeferredDownTarget) {
                         // Normal gesture, ensure we pass the drag slop before we start tracking
                         // the gesture
-                        if (Math.abs(displacement) > mTouchSlop) {
+                        if (mGestureState.isTrackpadGesture() || Math.abs(displacement)
+                                > mTouchSlop) {
                             mPassedWindowMoveSlop = true;
                             mStartDisplacement = Math.min(displacement, -mTouchSlop);
                         }
@@ -291,8 +290,8 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
 
                 float horizontalDist = Math.abs(displacementX);
                 float upDist = -displacement;
-                boolean passedSlop = squaredHypot(displacementX, displacementY)
-                        >= mSquaredTouchSlop;
+                boolean passedSlop = mGestureState.isTrackpadGesture() || squaredHypot(
+                        displacementX, displacementY) >= mSquaredTouchSlop;
 
                 if (!mPassedSlopOnThisGesture && passedSlop) {
                     mPassedSlopOnThisGesture = true;
@@ -352,7 +351,8 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                         mInteractionHandler.updateDisplacement(displacement - mStartDisplacement);
                     }
 
-                    if (mDeviceState.isFullyGesturalNavMode()) {
+                    if (mDeviceState.isFullyGesturalNavMode()
+                            || mGestureState.isTrackpadGesture()) {
                         boolean minSwipeMet = upDist >= Math.max(mMotionPauseMinDisplacement,
                                 mInteractionHandler.getThresholdToAllowMotionPause());
                         mInteractionHandler.setCanSlowSwipeGoHome(minSwipeMet);
@@ -413,15 +413,23 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
     }
 
     /**
+     * Returns whether this input consumer has started touch tracking (if touch tracking is not
+     * deferred).
+     */
+    public boolean hasStartedTouchTracking() {
+        return mInteractionHandler != null;
+    }
+
+    /**
      * Called when the gesture has ended. Does not correlate to the completion of the interaction as
      * the animation can still be running.
      */
     private void finishTouchTracking(MotionEvent ev) {
-        Object traceToken = TraceHelper.INSTANCE.beginSection(UP_EVT,
-                FLAG_CHECK_FOR_RACE_CONDITIONS);
+        TraceHelper.INSTANCE.beginSection(UP_EVT);
 
+        boolean isCanceled = ev.getActionMasked() == ACTION_CANCEL;
         if (mPassedWindowMoveSlop && mInteractionHandler != null) {
-            if (ev.getActionMasked() == ACTION_CANCEL) {
+            if (isCanceled) {
                 mInteractionHandler.onGestureCancelled();
             } else {
                 mVelocityTracker.computeCurrentVelocity(PX_PER_MS);
@@ -443,8 +451,10 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
             if (mActiveCallbacks != null && mInteractionHandler != null) {
                 if (mTaskAnimationManager.isRecentsAnimationRunning()) {
                     // The animation started, but with no movement, in this case, there will be no
-                    // animateToProgress so we have to manually finish here.
-                    mTaskAnimationManager.finishRunningRecentsAnimation(false /* toHome */);
+                    // animateToProgress so we have to manually finish here. In the case of
+                    // ACTION_CANCEL, someone else may be doing something so finish synchronously.
+                    mTaskAnimationManager.finishRunningRecentsAnimation(false /* toHome */,
+                            isCanceled /* forceFinish */, mForceFinishRecentsTransitionCallback);
                 } else {
                     // The animation hasn't started yet, so insert a replacement handler into the
                     // callbacks which immediately finishes the animation after it starts.
@@ -455,7 +465,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
             onInteractionGestureFinished();
         }
         cleanupAfterGesture();
-        TraceHelper.INSTANCE.endSection(traceToken);
+        TraceHelper.INSTANCE.endSection();
     }
 
     private void cleanupAfterGesture() {
@@ -512,11 +522,12 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         return !mPassedPilferInputSlop;
     }
 
-    @Override
-    public void writeToProtoInternal(InputConsumerProto.Builder inputConsumerProto) {
-        if (mInteractionHandler != null) {
-            mInteractionHandler.writeToProto(inputConsumerProto);
-        }
+    /**
+     * Sets a callback to be called when the recents transition is force-canceled by another input
+     * consumer being made active.
+     */
+    public void setForceFinishRecentsTransitionCallback(Runnable r) {
+        mForceFinishRecentsTransitionCallback = r;
     }
 
     /**

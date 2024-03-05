@@ -17,7 +17,9 @@ package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
+import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
+import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
@@ -44,6 +46,7 @@ import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
@@ -66,13 +69,13 @@ public class TaskbarLauncherStateController {
     private static final String TAG = TaskbarLauncherStateController.class.getSimpleName();
     private static final boolean DEBUG = false;
 
-    /** Launcher activity is resumed and focused. */
-    public static final int FLAG_RESUMED = 1 << 0;
+    /** Launcher activity is visible and focused. */
+    public static final int FLAG_VISIBLE = 1 << 0;
 
     /**
-     * A external transition / animation is running that will result in FLAG_RESUMED being set.
+     * A external transition / animation is running that will result in FLAG_VISIBLE being set.
      **/
-    public static final int FLAG_TRANSITION_TO_RESUMED = 1 << 1;
+    public static final int FLAG_TRANSITION_TO_VISIBLE = 1 << 1;
 
     /**
      * Set while the launcher state machine is performing a state transition, see {@link
@@ -116,7 +119,7 @@ public class TaskbarLauncherStateController {
      */
     private static final int FLAG_TASKBAR_HIDDEN = 1 << 6;
 
-    private static final int FLAGS_LAUNCHER_ACTIVE = FLAG_RESUMED | FLAG_TRANSITION_TO_RESUMED;
+    private static final int FLAGS_LAUNCHER_ACTIVE = FLAG_VISIBLE | FLAG_TRANSITION_TO_VISIBLE;
     /** Equivalent to an int with all 1s for binary operation purposes */
     private static final int FLAGS_ALL = ~0;
 
@@ -202,18 +205,31 @@ public class TaskbarLauncherStateController {
                 public void onStateTransitionComplete(LauncherState finalState) {
                     mLauncherState = finalState;
                     updateStateForFlag(FLAG_LAUNCHER_IN_STATE_TRANSITION, false);
-                    // TODO(b/279514548) Cleans up bad state that can occur when user interacts with
-                    // taskbar on top of transparent activity.
-                    if (finalState == LauncherState.NORMAL && mLauncher.isResumed()) {
-                        updateStateForFlag(FLAG_RESUMED, true);
-                    }
                     applyState();
-                    boolean disallowLongClick = finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
+                    boolean disallowLongClick =
+                            FeatureFlags.enableSplitContextually()
+                                    ? mLauncher.isSplitSelectionEnabled()
+                                    : finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
                     com.android.launcher3.taskbar.Utilities.setOverviewDragState(
                             mControllers, finalState.disallowTaskbarGlobalDrag(),
                             disallowLongClick, finalState.allowTaskbarInitialSplitSelection());
                 }
             };
+
+    /**
+     * Callback for when launcher state transition completes after user swipes to home.
+     * @param finalState The final state of the transition.
+     */
+    public void onStateTransitionCompletedAfterSwipeToHome(LauncherState finalState) {
+        // TODO(b/279514548) Cleans up bad state that can occur when user interacts with
+        // taskbar on top of transparent activity.
+        if (!FeatureFlags.enableHomeTransitionListener()
+                && (finalState == LauncherState.NORMAL)
+                && mLauncher.hasBeenResumed()) {
+            updateStateForFlag(FLAG_VISIBLE, true);
+            applyState();
+        }
+    }
 
     /** Initializes the controller instance, and applies the initial state immediately. */
     public void init(TaskbarControllers controllers, QuickstepLauncher launcher,
@@ -249,7 +265,6 @@ public class TaskbarLauncherStateController {
 
         mIconAlignment.finishAnimation();
 
-        Log.d("b/260135164", "onDestroy - updateIconAlphaForHome(1)");
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
@@ -278,7 +293,7 @@ public class TaskbarLauncherStateController {
         }
         stashController.updateStateForFlag(FLAG_IN_APP, false);
 
-        updateStateForFlag(FLAG_TRANSITION_TO_RESUMED, true);
+        updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, true);
         animatorSet.play(stashController.createApplyStateAnimator(duration));
         animatorSet.play(applyState(duration, false));
 
@@ -409,6 +424,17 @@ public class TaskbarLauncherStateController {
                     + ", mLauncherState: " + mLauncherState
                     + ", toAlignment: " + toAlignment);
         }
+        mControllers.bubbleControllers.ifPresent(controllers -> {
+            // Show the bubble bar when on launcher home or in overview.
+            boolean onHome = isInLauncher && mLauncherState == LauncherState.NORMAL;
+            boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
+            controllers.bubbleStashController.setBubblesShowingOnHome(onHome);
+            controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
+        });
+
+        mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_OVERVIEW,
+                mLauncherState == LauncherState.OVERVIEW);
+
         AnimatorSet animatorSet = new AnimatorSet();
 
         if (hasAnyFlag(changedFlags, FLAG_LAUNCHER_IN_STATE_TRANSITION)) {
@@ -418,7 +444,7 @@ public class TaskbarLauncherStateController {
             if (launcherTransitionCompleted
                     && mLauncherState == LauncherState.QUICK_SWITCH_FROM_HOME) {
                 // We're about to be paused, set immediately to ensure seamless handoff.
-                updateStateForFlag(FLAG_RESUMED, false);
+                updateStateForFlag(FLAG_VISIBLE, false);
                 applyState(0 /* duration */);
             }
             if (mLauncherState == LauncherState.NORMAL) {
@@ -479,7 +505,8 @@ public class TaskbarLauncherStateController {
                     public void onAnimationEnd(Animator animation) {
                         TaskbarStashController stashController =
                                 mControllers.taskbarStashController;
-                        stashController.updateAndAnimateTransientTaskbar(/* stash */ true);
+                        stashController.updateAndAnimateTransientTaskbar(
+                                /* stash */ true, /* bubblesShouldFollow */ true);
                     }
                 });
             } else {
@@ -636,8 +663,6 @@ public class TaskbarLauncherStateController {
                 public void onAnimationEnd(Animator animation) {
                     if (isInStashedState && committed) {
                         // Reset hotseat alpha to default
-                        Log.d("b/260135164",
-                                "playStateTransitionAnim#onAnimationEnd - setIconsAlpha(1)");
                         mLauncher.getHotseat().setIconsAlpha(1);
                     }
                 }
@@ -705,21 +730,17 @@ public class TaskbarLauncherStateController {
 
     private void updateIconAlphaForHome(float alpha) {
         if (mControllers.taskbarActivityContext.isDestroyed()) {
-            Log.e("b/260135164", "updateIconAlphaForHome is called after Taskbar is destroyed",
-                    new Exception());
             return;
         }
         mIconAlphaForHome.setValue(alpha);
         boolean hotseatVisible = alpha == 0
+                || isPhoneMode(mLauncher.getDeviceProfile())
                 || (!mControllers.uiController.isHotseatIconOnTopWhenAligned()
                 && mIconAlignment.value > 0);
         /*
          * Hide Launcher Hotseat icons when Taskbar icons have opacity. Both icon sets
          * should not be visible at the same time.
          */
-        Log.d("b/260135164",
-                "updateIconAlphaForHome - setIconsAlpha(" + (hotseatVisible ? 1 : 0)
-                        + "), isTaskbarPresent: " + mLauncher.getDeviceProfile().isTaskbarPresent);
         mLauncher.getHotseat().setIconsAlpha(hotseatVisible ? 1 : 0);
         if (mIsQsbInline) {
             mLauncher.getHotseat().setQsbAlpha(hotseatVisible ? 1 : 0);
@@ -750,10 +771,10 @@ public class TaskbarLauncherStateController {
             mTaskBarRecentsAnimationListener = null;
             ((RecentsView) mLauncher.getOverviewPanel()).setTaskLaunchListener(null);
 
-            // Update the resumed state immediately to ensure a seamless handoff
-            boolean launcherResumed = !finishedToApp;
-            updateStateForFlag(FLAG_TRANSITION_TO_RESUMED, false);
-            updateStateForFlag(FLAG_RESUMED, launcherResumed);
+            // Update the visible state immediately to ensure a seamless handoff
+            boolean launcherVisible = !finishedToApp;
+            updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, false);
+            updateStateForFlag(FLAG_VISIBLE, launcherVisible);
             applyState();
 
             TaskbarStashController controller = mControllers.taskbarStashController;
@@ -767,8 +788,8 @@ public class TaskbarLauncherStateController {
 
     private static String getStateString(int flags) {
         StringJoiner result = new StringJoiner("|");
-        appendFlag(result, flags, FLAG_RESUMED, "resumed");
-        appendFlag(result, flags, FLAG_TRANSITION_TO_RESUMED, "transition_to_resumed");
+        appendFlag(result, flags, FLAG_VISIBLE, "flag_visible");
+        appendFlag(result, flags, FLAG_TRANSITION_TO_VISIBLE, "transition_to_visible");
         appendFlag(result, flags, FLAG_LAUNCHER_IN_STATE_TRANSITION,
                 "launcher_in_state_transition");
         appendFlag(result, flags, FLAG_AWAKE, "awake");

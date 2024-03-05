@@ -16,6 +16,7 @@
 
 package com.android.launcher3.provider;
 
+import static com.android.launcher3.LauncherSettings.Favorites.getColumns;
 import static com.android.launcher3.icons.IconCache.EXTRA_SHORTCUT_BADGE_OVERRIDE_PACKAGE;
 
 import android.content.ContentValues;
@@ -28,7 +29,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
-import android.os.Binder;
 import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.UserManager;
@@ -49,6 +49,12 @@ import com.android.launcher3.util.IntSet;
  * A set of utility methods for Launcher DB used for DB updates and migration.
  */
 public class LauncherDbUtils {
+    /**
+     * Returns a string which can be used as a where clause for DB query to match the given itemId
+     */
+    public static String itemIdMatch(int itemId) {
+        return "_id=" + itemId;
+    }
 
     public static IntArray queryIntArray(boolean distinct, SQLiteDatabase db, String tableName,
             String columnName, String selection, String groupBy, String orderBy) {
@@ -84,10 +90,12 @@ public class LauncherDbUtils {
         if (fromDb != toDb) {
             toDb.execSQL("ATTACH DATABASE '" + fromDb.getPath() + "' AS from_db");
             toDb.execSQL(
-                    "INSERT INTO " + toTable + " SELECT * FROM from_db." + fromTable);
+                    "INSERT INTO " + toTable + " SELECT " + getColumns(userSerial)
+                        + " FROM from_db." + fromTable);
             toDb.execSQL("DETACH DATABASE 'from_db'");
         } else {
-            toDb.execSQL("INSERT INTO " + toTable + " SELECT * FROM " + fromTable);
+            toDb.execSQL("INSERT INTO " + toTable + " SELECT " + getColumns(userSerial) + " FROM "
+                    + fromTable);
         }
     }
 
@@ -111,6 +119,10 @@ public class LauncherDbUtils {
             }
             Intent intent = lc.parseIntent();
             if (intent == null) {
+                deletedShortcuts.add(lc.id);
+                continue;
+            }
+            if (TextUtils.isEmpty(lc.getTitle())) {
                 deletedShortcuts.add(lc.id);
                 continue;
             }
@@ -166,7 +178,7 @@ public class LauncherDbUtils {
     /**
      * Utility class to simplify managing sqlite transactions
      */
-    public static class SQLiteTransaction extends Binder implements AutoCloseable {
+    public static class SQLiteTransaction implements AutoCloseable {
         private final SQLiteDatabase mDb;
 
         public SQLiteTransaction(SQLiteDatabase db) {
