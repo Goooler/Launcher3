@@ -272,7 +272,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 R.drawable.ic_sysbar_rotate_button_cw_start_0,
                 R.drawable.ic_sysbar_rotate_button_cw_start_90,
                 () -> getDisplay().getRotation());
-        rotationButtonController.setBgExecutor(Executors.THREAD_POOL_EXECUTOR);
+        rotationButtonController.setBgExecutor(Executors.UI_HELPER_EXECUTOR);
 
         mControllers = new TaskbarControllers(this,
                 new TaskbarDragController(this),
@@ -301,7 +301,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 createTaskbarRecentAppsController(),
                 TaskbarEduTooltipController.newInstance(this),
                 new KeyboardQuickSwitchController(),
-                new TaskbarPinningController(this),
+                new TaskbarPinningController(this, () ->
+                        DisplayController.INSTANCE.get(this).getInfo().isInDesktopMode()),
                 bubbleControllersOptional);
 
         mLauncherPrefs = LauncherPrefs.get(this);
