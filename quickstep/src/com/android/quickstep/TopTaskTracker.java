@@ -16,8 +16,9 @@
 package com.android.quickstep;
 
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
-import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.content.Intent.ACTION_CHOOSER;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -28,6 +29,7 @@ import android.annotation.UserIdInt;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
@@ -126,20 +128,13 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
 
     @Override
     public void onTaskStageChanged(int taskId, @StageType int stage, boolean visible) {
-        // If task is not visible but we are tracking it, stop tracking it
-        if (!visible) {
+        // If a task is not visible anymore or has been moved to undefined, stop tracking it.
+        if (!visible || stage == SplitConfigurationOptions.STAGE_TYPE_UNDEFINED) {
             if (mMainStagePosition.taskId == taskId) {
-                resetTaskId(mMainStagePosition);
+                mMainStagePosition.taskId = INVALID_TASK_ID;
             } else if (mSideStagePosition.taskId == taskId) {
-                resetTaskId(mSideStagePosition);
+                mSideStagePosition.taskId = INVALID_TASK_ID;
             } // else it's an un-tracked child
-            return;
-        }
-
-        // If stage has moved to undefined, stop tracking the task
-        if (stage == SplitConfigurationOptions.STAGE_TYPE_UNDEFINED) {
-            resetTaskId(taskId == mMainStagePosition.taskId
-                    ? mMainStagePosition : mSideStagePosition);
             return;
         }
 
@@ -158,10 +153,6 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
     @Override
     public void onActivityUnpinned() {
         mPinnedTaskId = INVALID_TASK_ID;
-    }
-
-    private void resetTaskId(SplitStageInfo taskPosition) {
-        taskPosition.taskId = -1;
     }
 
     /**
@@ -188,6 +179,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
     /**
      * Returns the CachedTaskInfo for the top most task
      */
+    @NonNull
     @UiThread
     public CachedTaskInfo getCachedTopTask(boolean filterOnlyVisibleRecents) {
         if (filterOnlyVisibleRecents) {
@@ -219,7 +211,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
 
         @Nullable
         private final RunningTaskInfo mTopTask;
-        private final List<RunningTaskInfo> mAllCachedTasks;
+        public final List<RunningTaskInfo> mAllCachedTasks;
 
         CachedTaskInfo(List<RunningTaskInfo> allCachedTasks) {
             mAllCachedTasks = allCachedTasks;
@@ -238,12 +230,21 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
         }
 
         /**
-         * Returns true if the given task holds an Assistant activity that is excluded from recents
+         * If the given task holds an activity that is excluded from recents, and there
+         * is another running task that is not excluded from recents, returns that underlying task.
          */
-        public boolean isExcludedAssistant() {
-            return mTopTask != null && mTopTask.configuration.windowConfiguration
-                    .getActivityType() == ACTIVITY_TYPE_ASSISTANT
-                    && (mTopTask.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
+        public @Nullable CachedTaskInfo otherVisibleTaskThisIsExcludedOver() {
+            if (mTopTask == null
+                    || (mTopTask.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) == 0) {
+                // Not an excluded task.
+                return null;
+            }
+            List<RunningTaskInfo> visibleNonExcludedTasks = mAllCachedTasks.stream()
+                    .filter(t -> t.isVisible
+                            && (t.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) == 0)
+                    .toList();
+            return visibleNonExcludedTasks.isEmpty() ? null
+                    : new CachedTaskInfo(visibleNonExcludedTasks);
         }
 
         /**
@@ -252,6 +253,20 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
         public boolean isHomeTask() {
             return mTopTask != null && mTopTask.configuration.windowConfiguration
                     .getActivityType() == ACTIVITY_TYPE_HOME;
+        }
+
+        public boolean isRecentsTask() {
+            return mTopTask != null && mTopTask.configuration.windowConfiguration
+                    .getActivityType() == ACTIVITY_TYPE_RECENTS;
+        }
+
+        /**
+         * Returns {@code true} if this task windowing mode is set to {@link
+         * android.app.WindowConfiguration#WINDOWING_MODE_FREEFORM}
+         */
+        public boolean isFreeformTask() {
+            return mTopTask != null && mTopTask.configuration.windowConfiguration.getWindowingMode()
+                    == WINDOWING_MODE_FREEFORM;
         }
 
         /**
@@ -292,7 +307,10 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
 
         @Nullable
         public String getPackageName() {
-            return mTopTask == null ? null : mTopTask.baseActivity.getPackageName();
+            if (mTopTask == null || mTopTask.baseActivity == null) {
+                return null;
+            }
+            return mTopTask.baseActivity.getPackageName();
         }
     }
 }

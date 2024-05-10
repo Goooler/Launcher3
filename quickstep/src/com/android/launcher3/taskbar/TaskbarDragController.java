@@ -15,13 +15,20 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.app.animation.Interpolators.FAST_OUT_SLOW_IN;
+import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION;
+import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
+import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.annotation.NonNull;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.Intent;
@@ -30,18 +37,21 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.UserHandle;
+import android.util.Log;
 import android.util.Pair;
 import android.view.DragEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.ViewRootImpl;
-import android.window.SurfaceSyncer;
+import android.window.SurfaceSyncGroup;
 
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.internal.logging.InstanceId;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
@@ -49,16 +59,14 @@ import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.accessibility.DragViewStateAnnouncer;
-import com.android.launcher3.anim.Interpolators;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragDriver;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.graphics.DragPreviewProvider;
+import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -67,10 +75,14 @@ import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.shortcuts.ShortcutDragPreviewProvider;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
+import com.android.launcher3.views.BubbleTextHolder;
 import com.android.quickstep.util.LogUtils;
+import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.wm.shell.draganddrop.DragAndDropConstants;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -82,8 +94,10 @@ import java.util.function.Predicate;
  */
 public class TaskbarDragController extends DragController<BaseTaskbarContext> implements
         TaskbarControllers.LoggableTaskbarController {
+    private static final String TAG = "TaskbarDragController";
 
-    private static boolean DEBUG_DRAG_SHADOW_SURFACE = false;
+    private static final boolean DEBUG_DRAG_SHADOW_SURFACE = false;
+    private static final int ANIM_DURATION_RETURN_ICON_TO_TASKBAR = 300;
 
     private final int mDragIconSize;
     private final int[] mTempXY = new int[2];
@@ -99,6 +113,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     // Animation for the drag shadow back into position after an unsuccessful drag
     private ValueAnimator mReturnAnimator;
+    private boolean mDisallowGlobalDrag;
+    private boolean mDisallowLongClick;
 
     public TaskbarDragController(BaseTaskbarContext activity) {
         super(activity);
@@ -108,6 +124,14 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
+    }
+
+    public void setDisallowGlobalDrag(boolean disallowGlobalDrag) {
+        mDisallowGlobalDrag = disallowGlobalDrag;
+    }
+
+    public void setDisallowLongClick(boolean disallowLongClick) {
+        mDisallowLongClick = disallowLongClick;
     }
 
     /**
@@ -131,10 +155,18 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             View view,
             @Nullable DragPreviewProvider dragPreviewProvider,
             @Nullable Point iconShift) {
-        if (!(view instanceof BubbleTextView)) {
+        if (view instanceof BubbleTextHolder) {
+            view = ((BubbleTextHolder) view).getBubbleText();
+        }
+        if (!(view instanceof BubbleTextView) || mDisallowLongClick) {
             return false;
         }
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onTaskbarItemLongClick");
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.TWO_TASKBAR_LONG_CLICKS,
+                    "TaskbarDragController.startDragOnLongClick",
+                    new Throwable());
+        }
         BubbleTextView btv = (BubbleTextView) view;
         mActivity.onDragStart();
         btv.post(() -> {
@@ -142,7 +174,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             if (iconShift != null) {
                 dragView.animateShift(-iconShift.x, -iconShift.y);
             }
-            btv.getIcon().setIsDisabled(true);
+            btv.setIconDisabled(true);
             mControllers.taskbarAutohideSuspendController.updateFlag(
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING, true);
         });
@@ -170,31 +202,36 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         dragLayerY += dragRect.top;
 
         DragOptions dragOptions = new DragOptions();
-        dragOptions.preDragCondition = null;
-        if (FeatureFlags.ENABLE_TASKBAR_POPUP_MENU.get()) {
+        // First, see if view is a search result that needs custom pre-drag conditions.
+        dragOptions.preDragCondition =
+                mControllers.taskbarAllAppsController.createPreDragConditionForSearch(btv);
+
+        if (dragOptions.preDragCondition == null) {
+            // See if view supports a popup container.
             PopupContainerWithArrow<BaseTaskbarContext> popupContainer =
                     mControllers.taskbarPopupController.showForIcon(btv);
             if (popupContainer != null) {
                 dragOptions.preDragCondition = popupContainer.createPreDragCondition(false);
             }
         }
+
         if (dragOptions.preDragCondition == null) {
+            // Fallback pre-drag condition.
             dragOptions.preDragCondition = new DragOptions.PreDragCondition() {
                 private DragView mDragView;
 
                 @Override
                 public boolean shouldStartDrag(double distanceDragged) {
-                    return mDragView != null && mDragView.isAnimationFinished();
+                    return mDragView != null && mDragView.isScaleAnimationFinished();
                 }
 
                 @Override
                 public void onPreDragStart(DropTarget.DragObject dragObject) {
                     mDragView = dragObject.dragView;
 
-                    if (FeatureFlags.ENABLE_TASKBAR_POPUP_MENU.get()
-                            && !shouldStartDrag(0)) {
-                        // Immediately close the popup menu.
-                        mDragView.setOnAnimationEndCallback(() -> callOnDragStart());
+                    if (!shouldStartDrag(0)) {
+                        mDragView.setOnScaleAnimEndCallback(
+                                TaskbarDragController.this::onPreDragAnimationEnd);
                     }
                 }
 
@@ -205,15 +242,15 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             };
         }
 
+        Point dragOffset = dragOptions.preDragCondition.getDragOffset();
         return startDrag(
                 drawable,
                 /* view = */ null,
                 /* originalView = */ btv,
-                dragLayerX,
-                dragLayerY,
+                dragLayerX + dragOffset.x,
+                dragLayerY + dragOffset.y,
                 (View target, DropTarget.DragObject d, boolean success) -> {} /* DragSource */,
                 (ItemInfo) btv.getTag(),
-                /* dragVisualizeOffset = */ null,
                 dragRect,
                 scale * iconScale,
                 scale,
@@ -223,8 +260,10 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
     @Override
     protected DragView startDrag(@Nullable Drawable drawable, @Nullable View view,
             DraggableView originalView, int dragLayerX, int dragLayerY, DragSource source,
-            ItemInfo dragInfo, Point dragOffset, Rect dragRegion, float initialDragViewScale,
+            ItemInfo dragInfo, Rect dragRegion, float initialDragViewScale,
             float dragViewScaleOnDrop, DragOptions options) {
+        mActivity.hideKeyboard();
+
         mOptions = options;
 
         mRegistrationX = mMotionDown.x - dragLayerX;
@@ -266,6 +305,11 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         mDragObject.dragInfo = dragInfo;
         mDragObject.originalDragInfo = mDragObject.dragInfo.makeShallowCopy();
 
+        if (mOptions.preDragCondition != null) {
+            dragView.setHasDragOffset(mOptions.preDragCondition.getDragOffset().x != 0
+                    || mOptions.preDragCondition.getDragOffset().y != 0);
+        }
+
         if (dragRegion != null) {
             dragView.setDragRegion(new Rect(dragRegion));
         }
@@ -284,11 +328,22 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         return dragView;
     }
 
+    /** Invoked when an animation running as part of pre-drag finishes. */
+    public void onPreDragAnimationEnd() {
+        // Drag might be cancelled during the DragView animation, so check mIsPreDrag again.
+        if (mIsInPreDrag) {
+            callOnDragStart();
+        }
+    }
+
     @Override
     protected void callOnDragStart() {
         super.callOnDragStart();
         // Pre-drag has ended, start the global system drag.
-        AbstractFloatingView.closeAllOpenViews(mActivity);
+        if (mDisallowGlobalDrag) {
+            AbstractFloatingView.closeAllOpenViewsExcept(mActivity, TYPE_TASKBAR_ALL_APPS);
+            return;
+        }
         startSystemDrag((BubbleTextView) mDragObject.originalView);
     }
 
@@ -298,12 +353,26 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             @Override
             public void onProvideShadowMetrics(Point shadowSize, Point shadowTouchPoint) {
                 int iconSize = Math.max(mDragIconSize, btv.getWidth());
-                shadowSize.set(iconSize, iconSize);
+                if (iconSize > 0) {
+                    shadowSize.set(iconSize, iconSize);
+                } else {
+                    Log.d(TAG, "Invalid icon size, dragSize=" + mDragIconSize
+                            + " viewWidth=" + btv.getWidth());
+                }
+
                 // The registration point was taken before the icon scaled to mDragIconSize, so
                 // offset the registration to where the touch is on the new size.
                 int offsetX = (mDragIconSize - mDragObject.dragView.getDragRegionWidth()) / 2;
                 int offsetY = (mDragIconSize - mDragObject.dragView.getDragRegionHeight()) / 2;
-                shadowTouchPoint.set(mRegistrationX + offsetX, mRegistrationY + offsetY);
+                int touchX = mRegistrationX + offsetX;
+                int touchY = mRegistrationY + offsetY;
+                if (touchX >= 0 && touchY >= 0) {
+                    shadowTouchPoint.set(touchX, touchY);
+                } else {
+                    Log.d(TAG, "Invalid touch point, "
+                            + "registrationXY=(" + mRegistrationX + ", " + mRegistrationY + ") "
+                            + "offsetXY=(" + offsetX + ", " + offsetY + ")");
+                }
             }
 
             @Override
@@ -312,7 +381,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 if (DEBUG_DRAG_SHADOW_SURFACE) {
                     canvas.drawColor(0xffff0000);
                 }
-                float scale = mDragObject.dragView.getScaleX();
+                float scale = mDragObject.dragView.getEndScale();
                 canvas.scale(scale, scale);
                 mDragObject.dragView.draw(canvas);
                 canvas.restore();
@@ -342,6 +411,17 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                                 item.user));
                 intent.putExtra(Intent.EXTRA_PACKAGE_NAME, item.getIntent().getPackage());
                 intent.putExtra(Intent.EXTRA_SHORTCUT_ID, deepShortcutId);
+            } else if (item.itemType == ITEM_TYPE_SEARCH_ACTION) {
+                // TODO(b/289261756): Buggy behavior when split opposite to an existing search pane.
+                intent.putExtra(
+                        ClipDescription.EXTRA_PENDING_INTENT,
+                        PendingIntent.getActivityAsUser(
+                                mActivity,
+                                /* requestCode= */ 0,
+                                item.getIntent(),
+                                PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT,
+                                /* options= */ null,
+                                item.user));
             } else {
                 intent.putExtra(ClipDescription.EXTRA_PENDING_INTENT,
                         launcherApps.getMainActivityLaunchIntent(item.getIntent().getComponent(),
@@ -367,6 +447,15 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             com.android.launcher3.logging.InstanceId launcherInstanceId = instanceIds.second;
 
             intent.putExtra(ClipDescription.EXTRA_LOGGING_INSTANCE_ID, internalInstanceId);
+            if (DisplayController.isTransientTaskbar(mActivity)) {
+                // Tell WM Shell to ignore drag events in the provided transient taskbar region.
+                TaskbarDragLayer dragLayer = mControllers.taskbarActivityContext.getDragLayer();
+                int[] locationOnScreen = dragLayer.getLocationOnScreen();
+                RectF disallowExternalDropRegion = new RectF(dragLayer.getLastDrawnTransientRect());
+                disallowExternalDropRegion.offset(locationOnScreen[0], locationOnScreen[1]);
+                intent.putExtra(DragAndDropConstants.EXTRA_DISALLOW_HIT_REGION,
+                        disallowExternalDropRegion);
+            }
 
             ClipData clipData = new ClipData(clipDescription, new ClipData.Item(intent));
             if (btv.startDragAndDrop(clipData, shadowBuilder, null /* localState */,
@@ -379,6 +468,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                         .log(StatsLogManager.LauncherEvent.LAUNCHER_ITEM_DRAG_STARTED);
             }
         }
+
+        // Wait to close until after system drag has started, if applicable.
+        AbstractFloatingView.closeAllOpenViews(mActivity);
     }
 
     private void onSystemDragStarted(BubbleTextView btv) {
@@ -396,6 +488,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                         // This will take care of calling maybeOnDragEnd() after the animation
                         animateGlobalDragViewToOriginalPosition(btv, dragEvent);
                     }
+                    mActivity.getDragLayer().setOnDragListener(null);
+
                     return true;
             }
             return false;
@@ -414,11 +508,57 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     private void maybeOnDragEnd() {
         if (!isDragging()) {
-            ((BubbleTextView) mDragObject.originalView).getIcon().setIsDisabled(false);
+            ((BubbleTextView) mDragObject.originalView).setIconDisabled(false);
             mControllers.taskbarAutohideSuspendController.updateFlag(
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING, false);
             mActivity.onDragEnd();
+            if (mReturnAnimator == null) {
+                // Upon successful drag, immediately stash taskbar.
+                // Note, this must be done last to ensure no AutohideSuspendFlags are active, as
+                // that will prevent us from stashing until the timeout.
+                mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+            }
         }
+    }
+
+    @Override
+    protected void endDrag() {
+        if (mDisallowGlobalDrag) {
+            // We need to explicitly set deferDragViewCleanupPostAnimation to true here so the
+            // super call doesn't remove it from the drag layer before the animation completes.
+            // This variable gets set in to false in super.dispatchDropComplete() because it
+            // (rightfully so, perhaps) thinks this drag operation has failed, and does its own
+            // internal cleanup.
+            // Another way to approach this would be to make all of overview a drop target and
+            // accept the drop as successful and then run the setupReturnDragAnimator to simulate
+            // drop failure to the user
+            mDragObject.deferDragViewCleanupPostAnimation = true;
+
+            float fromX = mDragObject.x - mDragObject.xOffset;
+            float fromY = mDragObject.y - mDragObject.yOffset;
+            DragView dragView = mDragObject.dragView;
+            setupReturnDragAnimator(fromX, fromY, (View) mDragObject.originalView,
+                    (x, y, scale, alpha) -> {
+                        dragView.setTranslationX(x);
+                        dragView.setTranslationY(y);
+                        dragView.setScaleX(scale);
+                        dragView.setScaleY(scale);
+                        dragView.setAlpha(alpha);
+                    });
+            mReturnAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    callOnDragEnd();
+                    dragView.remove();
+                    dragView.clearAnimation();
+                    // Do this after callOnDragEnd(), because we use mReturnAnimator != null to
+                    // imply the drag was canceled rather than successful.
+                    mReturnAnimator = null;
+                }
+            });
+            mReturnAnimator.start();
+        }
+        super.endDrag();
     }
 
     @Override
@@ -432,56 +572,20 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         SurfaceControl dragSurface = dragEvent.getDragSurface();
 
         // For top level icons, the target is the icon itself
-        View target = btv;
-        Object tag = btv.getTag();
-        if (tag instanceof ItemInfo) {
-            ItemInfo item = (ItemInfo) tag;
-            TaskbarViewController taskbarViewController = mControllers.taskbarViewController;
-            if (item.container == CONTAINER_ALL_APPS || item.container == CONTAINER_PREDICTION) {
-                // Since all apps closes when the drag starts, target the all apps button instead.
-                target = taskbarViewController.getAllAppsButtonView();
-            } else if (item.container >= 0) {
-                // Since folders close when the drag starts, target the folder icon instead.
-                Predicate<ItemInfo> matcher = ItemInfoMatcher.forFolderMatch(
-                        ItemInfoMatcher.ofItemIds(IntSet.wrap(item.id)));
-                target = taskbarViewController.getFirstIconMatch(matcher);
-            } else if (item.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
-                // Find first icon with same package/user as the deep shortcut.
-                Predicate<ItemInfo> packageUserMatcher = ItemInfoMatcher.ofPackages(
-                        Collections.singleton(item.getTargetPackage()), item.user);
-                target = taskbarViewController.getFirstIconMatch(packageUserMatcher);
-            }
-        }
-
-        // Finish any pending return animation before starting a new drag
-        if (mReturnAnimator != null) {
-            mReturnAnimator.end();
-        }
+        View target = findTaskbarTargetForIconView(btv);
 
         float fromX = dragEvent.getX() - dragEvent.getOffsetX();
         float fromY = dragEvent.getY() - dragEvent.getOffsetY();
-        int[] toPosition = target.getLocationOnScreen();
-        float toScale = (float) target.getWidth() / mDragIconSize;
-        float toAlpha = (target == btv) ? 1f : 0f;
         final ViewRootImpl viewRoot = target.getViewRootImpl();
         SurfaceControl.Transaction tx = new SurfaceControl.Transaction();
-        mReturnAnimator = ValueAnimator.ofFloat(0f, 1f);
-        mReturnAnimator.setDuration(300);
-        mReturnAnimator.setInterpolator(Interpolators.FAST_OUT_SLOW_IN);
-        mReturnAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                float t = animation.getAnimatedFraction();
-                float accelT = Interpolators.ACCEL_2.getInterpolation(t);
-                float scale = 1f - t * (1f - toScale);
-                float alpha = 1f - accelT * (1f - toAlpha);
-                tx.setPosition(dragSurface, Utilities.mapRange(t, fromX, toPosition[0]),
-                        Utilities.mapRange(t, fromY, toPosition[1]));
-                tx.setScale(dragSurface, scale, scale);
-                tx.setAlpha(dragSurface, alpha);
-                tx.apply();
-            }
-        });
+        setupReturnDragAnimator(fromX, fromY, btv,
+                (x, y, scale, alpha) -> {
+                    tx.setPosition(dragSurface, x, y);
+                    tx.setScale(dragSurface, scale, scale);
+                    tx.setAlpha(dragSurface, alpha);
+                    tx.apply();
+                });
+
         mReturnAnimator.addListener(new AnimatorListenerAdapter() {
             private boolean mCanceled = false;
 
@@ -506,15 +610,96 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 // maybeOnDragEnd()
                 SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
                 transaction.remove(dragSurface);
-                SurfaceSyncer syncer = new SurfaceSyncer();
-                int syncId = syncer.setupSync(transaction::close);
-                syncer.addToSync(syncId, viewRoot.getView());
-                syncer.addTransactionToSync(syncId, transaction);
-                syncer.markSyncReady(syncId);
+                SurfaceSyncGroup syncGroup = new SurfaceSyncGroup("TaskBarController");
+                syncGroup.addSyncCompleteCallback(mActivity.getMainExecutor(), transaction::close);
+                syncGroup.add(viewRoot, null /* runnable */);
+                syncGroup.addTransaction(transaction);
+                syncGroup.markSyncReady();
+                // Do this after maybeOnDragEnd(), because we use mReturnAnimator != null to imply
+                // the drag was canceled rather than successful.
                 mReturnAnimator = null;
             }
         });
         mReturnAnimator.start();
+    }
+
+    private View findTaskbarTargetForIconView(@NonNull View iconView) {
+        Object tag = iconView.getTag();
+        TaskbarViewController taskbarViewController = mControllers.taskbarViewController;
+
+        if (tag instanceof ItemInfo) {
+            ItemInfo item = (ItemInfo) tag;
+            if (item.container == CONTAINER_ALL_APPS
+                    || item.container == CONTAINER_PREDICTION
+                    || isInSearchResultContainer(item)) {
+                if (mDisallowGlobalDrag) {
+                    // We're dragging in taskbarAllApps, we don't have folders or shortcuts
+                    return iconView;
+                }
+                // Since all apps closes when the drag starts, target the all apps button instead.
+                return taskbarViewController.getAllAppsButtonView();
+            } else if (item.container >= 0) {
+                // Since folders close when the drag starts, target the folder icon instead.
+                Predicate<ItemInfo> matcher = ItemInfoMatcher.forFolderMatch(
+                        ItemInfoMatcher.ofItemIds(IntSet.wrap(item.id)));
+                return taskbarViewController.getFirstIconMatch(matcher);
+            } else if (item.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
+                // Find first icon with same package/user as the deep shortcut.
+                Predicate<ItemInfo> packageUserMatcher = ItemInfoMatcher.ofPackages(
+                        Collections.singleton(item.getTargetPackage()), item.user);
+                return taskbarViewController.getFirstIconMatch(packageUserMatcher);
+            }
+        }
+        return iconView;
+    }
+
+    private static boolean isInSearchResultContainer(ItemInfo item) {
+        ContainerInfo containerInfo = item.getContainerInfo();
+        return containerInfo.getContainerCase() == EXTENDED_CONTAINERS
+                && containerInfo.getExtendedContainers().getContainerCase()
+                        == DEVICE_SEARCH_RESULT_CONTAINER;
+    }
+
+    private void setupReturnDragAnimator(float fromX, float fromY, View originalView,
+            TaskbarReturnPropertiesListener animListener) {
+        // Finish any pending return animation before starting a new return
+        if (mReturnAnimator != null) {
+            mReturnAnimator.end();
+        }
+
+        // For top level icons, the target is the icon itself
+        View target = findTaskbarTargetForIconView(originalView);
+
+        int[] toPosition = target.getLocationOnScreen();
+        float iconSize = target.getWidth();
+        if (target instanceof BubbleTextView) {
+            Rect bounds = new Rect();
+            ((BubbleTextView) target).getSourceVisualDragBounds(bounds);
+            toPosition[0] += bounds.left;
+            toPosition[1] += bounds.top;
+            iconSize = bounds.width();
+        }
+        float toScale = iconSize / mDragIconSize;
+        float toAlpha = (target == originalView) ? 1f : 0f;
+        MultiValueUpdateListener listener = new MultiValueUpdateListener() {
+            final FloatProp mDx = new FloatProp(fromX, toPosition[0], 0,
+                    ANIM_DURATION_RETURN_ICON_TO_TASKBAR, Interpolators.FAST_OUT_SLOW_IN);
+            final FloatProp mDy = new FloatProp(fromY, toPosition[1], 0,
+                    ANIM_DURATION_RETURN_ICON_TO_TASKBAR,
+                    FAST_OUT_SLOW_IN);
+            final FloatProp mScale = new FloatProp(1f, toScale, 0,
+                    ANIM_DURATION_RETURN_ICON_TO_TASKBAR, FAST_OUT_SLOW_IN);
+            final FloatProp mAlpha = new FloatProp(1f, toAlpha, 0,
+                    ANIM_DURATION_RETURN_ICON_TO_TASKBAR, Interpolators.ACCELERATE_2);
+            @Override
+            public void onUpdate(float percent, boolean initOnly) {
+                animListener.updateDragShadow(mDx.value, mDy.value, mScale.value, mAlpha.value);
+            }
+        };
+        mReturnAnimator = ValueAnimator.ofFloat(0f, 1f);
+        mReturnAnimator.setDuration(ANIM_DURATION_RETURN_ICON_TO_TASKBAR);
+        mReturnAnimator.setInterpolator(Interpolators.FAST_OUT_SLOW_IN);
+        mReturnAnimator.addUpdateListener(listener);
     }
 
     @Override
@@ -540,7 +725,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     @Override
     protected void exitDrag() {
-        if (mDragObject != null) {
+        if (mDragObject != null && !mDisallowGlobalDrag) {
             mActivity.getDragLayer().removeView(mDragObject.dragView);
         }
     }
@@ -556,6 +741,10 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         return null;
     }
 
+    interface TaskbarReturnPropertiesListener {
+        void updateDragShadow(float x, float y, float scale, float alpha);
+    }
+
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarDragController:");
@@ -566,5 +755,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         pw.println(prefix + "\tmRegistrationY=" + mRegistrationY);
         pw.println(prefix + "\tmIsSystemDragInProgress=" + mIsSystemDragInProgress);
         pw.println(prefix + "\tisInternalDragInProgess=" + super.isDragging());
+        pw.println(prefix + "\tmDisallowGlobalDrag=" + mDisallowGlobalDrag);
+        pw.println(prefix + "\tmDisallowLongClick=" + mDisallowLongClick);
     }
 }

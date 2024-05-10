@@ -24,17 +24,21 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherModel.CallbackTask;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
+import com.android.launcher3.celllayout.CellPosMapper;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Predicate;
@@ -68,7 +72,8 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
 
     @Override
     public final void run() {
-        if (!Objects.requireNonNull(mModel).isModelLoaded()) {
+        boolean isModelLoaded = Objects.requireNonNull(mModel).isModelLoaded();
+        if (!isModelLoaded) {
             if (DEBUG_TASKS) {
                 Log.d(TAG, "Ignoring model task since loader is pending=" + this);
             }
@@ -96,7 +101,7 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
     public ModelWriter getModelWriter() {
         // Updates from model task, do not deal with icon position in hotseat. Also no need to
         // verify changes as the ModelTasks always push the changes to callbacks
-        return mModel.getWriter(false /* hasVerticalHotseat */, false /* verifyChanges */, null);
+        return mModel.getWriter(false /* verifyChanges */, CellPosMapper.DEFAULT, null);
     }
 
     public void bindUpdatedWorkspaceItems(@NonNull final List<WorkspaceItemInfo> allUpdates) {
@@ -118,8 +123,7 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
     }
 
     public void bindExtraContainerItems(@NonNull final FixedContainerItems item) {
-        FixedContainerItems copy = item.clone();
-        scheduleCallbackTask(c -> c.bindExtraContainerItems(copy));
+        scheduleCallbackTask(c -> c.bindExtraContainerItems(item));
     }
 
     public void bindDeepShortcuts(@NonNull final BgDataModel dataModel) {
@@ -146,7 +150,11 @@ public abstract class BaseModelUpdateTask implements ModelUpdateTask {
         if (mAllAppsList.getAndResetChangeFlag()) {
             AppInfo[] apps = mAllAppsList.copyData();
             int flags = mAllAppsList.getFlags();
-            scheduleCallbackTask(c -> c.bindAllApplications(apps, flags));
+            Map<PackageUserKey, Integer> packageUserKeytoUidMap = Arrays.stream(apps).collect(
+                    Collectors.toMap(
+                            appInfo -> new PackageUserKey(appInfo.componentName.getPackageName(),
+                                    appInfo.user), appInfo -> appInfo.uid, (a, b) -> a));
+            scheduleCallbackTask(c -> c.bindAllApplications(apps, flags, packageUserKeytoUidMap));
         }
     }
 }

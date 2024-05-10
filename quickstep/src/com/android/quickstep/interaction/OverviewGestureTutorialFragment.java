@@ -33,7 +33,19 @@ import java.util.ArrayList;
 /** Shows the Overview gesture interactive tutorial. */
 public class OverviewGestureTutorialFragment extends TutorialFragment {
 
-    public OverviewGestureTutorialFragment() {}
+    public OverviewGestureTutorialFragment() {
+        this(false);
+    }
+
+    public OverviewGestureTutorialFragment(boolean fromTutorialMenu) {
+        super(fromTutorialMenu);
+    }
+
+    @NonNull
+    @Override
+    TutorialType getDefaultTutorialType() {
+        return TutorialType.OVERVIEW_NAVIGATION;
+    }
 
     @Nullable
     @Override
@@ -67,7 +79,7 @@ public class OverviewGestureTutorialFragment extends TutorialFragment {
             @Override
             public void onAnimationStart(Animator animation) {
                 super.onAnimationStart(animation);
-                controller.animateTaskViewToOverview();
+                controller.animateTaskViewToOverview(false);
             }
         });
 
@@ -76,7 +88,7 @@ public class OverviewGestureTutorialFragment extends TutorialFragment {
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
-                controller.resetFakeTaskView(false);
+                controller.resetFakeTaskViewFromOverview();
             }
         });
         ArrayList<Animator> animators = new ArrayList<>();

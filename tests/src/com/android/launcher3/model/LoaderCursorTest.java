@@ -18,21 +18,26 @@ package com.android.launcher3.model;
 
 import static androidx.test.InstrumentationRegistry.getContext;
 
+import static com.android.launcher3.LauncherSettings.Favorites.APPWIDGET_ID;
+import static com.android.launcher3.LauncherSettings.Favorites.APPWIDGET_PROVIDER;
+import static com.android.launcher3.LauncherSettings.Favorites.APPWIDGET_SOURCE;
 import static com.android.launcher3.LauncherSettings.Favorites.CELLX;
 import static com.android.launcher3.LauncherSettings.Favorites.CELLY;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.ICON;
-import static com.android.launcher3.LauncherSettings.Favorites.ICON_PACKAGE;
-import static com.android.launcher3.LauncherSettings.Favorites.ICON_RESOURCE;
 import static com.android.launcher3.LauncherSettings.Favorites.INTENT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
+import static com.android.launcher3.LauncherSettings.Favorites.OPTIONS;
 import static com.android.launcher3.LauncherSettings.Favorites.PROFILE_ID;
+import static com.android.launcher3.LauncherSettings.Favorites.RANK;
 import static com.android.launcher3.LauncherSettings.Favorites.RESTORED;
 import static com.android.launcher3.LauncherSettings.Favorites.SCREEN;
+import static com.android.launcher3.LauncherSettings.Favorites.SPANX;
+import static com.android.launcher3.LauncherSettings.Favorites.SPANY;
 import static com.android.launcher3.LauncherSettings.Favorites.TITLE;
 import static com.android.launcher3.LauncherSettings.Favorites._ID;
 import static com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY;
@@ -54,7 +59,6 @@ import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.Executors;
@@ -90,13 +94,14 @@ public class LoaderCursorTest {
         mApp = LauncherAppState.getInstance(mContext);
 
         mCursor = new MatrixCursor(new String[] {
-                ICON, ICON_PACKAGE, ICON_RESOURCE, TITLE,
-                _ID, CONTAINER, ITEM_TYPE, PROFILE_ID,
-                SCREEN, CELLX, CELLY, RESTORED, INTENT
+                ICON, TITLE, _ID, CONTAINER, ITEM_TYPE,
+                PROFILE_ID, SCREEN, CELLX, CELLY, RESTORED,
+                INTENT, APPWIDGET_ID, APPWIDGET_PROVIDER,
+                SPANX, SPANY, RANK, OPTIONS, APPWIDGET_SOURCE
         });
 
         UserManagerState ums = new UserManagerState();
-        mLoaderCursor = new LoaderCursor(mCursor, Favorites.CONTENT_URI, mApp, ums);
+        mLoaderCursor = new LoaderCursor(mCursor, mApp, ums);
         ums.allUsers.put(0, Process.myUserHandle());
     }
 
@@ -153,13 +158,13 @@ public class LoaderCursorTest {
 
     @Test
     public void loadSimpleShortcut() {
-        initCursor(ITEM_TYPE_SHORTCUT, "my-shortcut");
+        initCursor(ITEM_TYPE_DEEP_SHORTCUT, "my-shortcut");
         assertTrue(mLoaderCursor.moveToNext());
 
         WorkspaceItemInfo info = mLoaderCursor.loadSimpleWorkspaceItem();
         assertTrue(mApp.getIconCache().isDefaultIcon(info.bitmap, info.user));
         assertEquals("my-shortcut", info.title);
-        assertEquals(ITEM_TYPE_SHORTCUT, info.itemType);
+        assertEquals(ITEM_TYPE_DEEP_SHORTCUT, info.itemType);
     }
 
     @Test
@@ -170,7 +175,7 @@ public class LoaderCursorTest {
 
         // Item outside screen bounds are not placed
         assertFalse(mLoaderCursor.checkItemPlacement(
-                newItemInfo(4, 4, 1, 1, CONTAINER_DESKTOP, 1)));
+                newItemInfo(4, 4, 1, 1, CONTAINER_DESKTOP, 1), true));
     }
 
     @Test
@@ -181,22 +186,22 @@ public class LoaderCursorTest {
 
         // Overlapping mItems are not placed
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 1)));
+                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 1), true));
         assertFalse(mLoaderCursor.checkItemPlacement(
-                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 1)));
+                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 1), true));
 
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 2)));
+                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 2), true));
         assertFalse(mLoaderCursor.checkItemPlacement(
-                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 2)));
+                newItemInfo(0, 0, 1, 1, CONTAINER_DESKTOP, 2), true));
 
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(1, 1, 1, 1, CONTAINER_DESKTOP, 1)));
+                newItemInfo(1, 1, 1, 1, CONTAINER_DESKTOP, 1), true));
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(2, 2, 2, 2, CONTAINER_DESKTOP, 1)));
+                newItemInfo(2, 2, 2, 2, CONTAINER_DESKTOP, 1), true));
 
         assertFalse(mLoaderCursor.checkItemPlacement(
-                newItemInfo(3, 2, 1, 2, CONTAINER_DESKTOP, 1)));
+                newItemInfo(3, 2, 1, 2, CONTAINER_DESKTOP, 1), true));
     }
 
     @Test
@@ -207,12 +212,12 @@ public class LoaderCursorTest {
 
         // Hotseat mItems are only placed based on screenId
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 1)));
+                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 1), true));
         assertTrue(mLoaderCursor.checkItemPlacement(
-                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 2)));
+                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 2), true));
 
         assertFalse(mLoaderCursor.checkItemPlacement(
-                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 3)));
+                newItemInfo(3, 3, 1, 1, CONTAINER_HOTSEAT, 3), true));
     }
 
     private ItemInfo newItemInfo(int cellX, int cellY, int spanX, int spanY,

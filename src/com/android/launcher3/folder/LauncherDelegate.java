@@ -92,7 +92,7 @@ public class LauncherDelegate {
                         // Move the item from the folder to the workspace, in the position of the
                         // folder
                         CellLayout cellLayout = mLauncher.getCellLayout(info.container,
-                                info.screenId);
+                                mLauncher.getCellPosMapper().mapModelToPresenter(info).screenId);
                         finalItem =  info.contents.remove(0);
                         newIcon = mLauncher.createShortcut(cellLayout, finalItem);
                         mLauncher.getModelWriter().addOrMoveItemInDatabase(finalItem,
@@ -176,8 +176,8 @@ public class LauncherDelegate {
         @Override
         ModelWriter getModelWriter() {
             if (mWriter == null) {
-                mWriter = LauncherAppState.getInstance((Context) mContext).getModel()
-                        .getWriter(false, false, null);
+                mWriter = LauncherAppState.getInstance((Context) mContext).getModel().getWriter(
+                        false, mContext.getCellPosMapper(), null);
             }
             return mWriter;
         }

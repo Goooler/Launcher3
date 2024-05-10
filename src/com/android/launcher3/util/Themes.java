@@ -19,8 +19,8 @@ package com.android.launcher3.util;
 import static android.app.WallpaperColors.HINT_SUPPORTS_DARK_TEXT;
 import static android.app.WallpaperColors.HINT_SUPPORTS_DARK_THEME;
 
-import android.app.WallpaperColors;
-import android.app.WallpaperManager;
+import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
@@ -30,9 +30,13 @@ import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.util.TypedValue;
 
+import androidx.annotation.ColorInt;
+
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.GraphicsUtils;
+import com.android.launcher3.views.ActivityContext;
 
 /**
  * Various utility methods associated with theming.
@@ -42,16 +46,9 @@ public class Themes {
 
     public static final String KEY_THEMED_ICONS = "themed_icons";
 
+    /** Gets the WallpaperColorHints and then uses those to get the correct activity theme res. */
     public static int getActivityThemeRes(Context context) {
-        final int colorHints;
-        if (Utilities.ATLEAST_P) {
-            WallpaperColors colors = context.getSystemService(WallpaperManager.class)
-                    .getWallpaperColors(WallpaperManager.FLAG_SYSTEM);
-            colorHints = colors == null ? 0 : colors.getColorHints();
-        } else {
-            colorHints = 0;
-        }
-        return getActivityThemeRes(context, colorHints);
+        return getActivityThemeRes(context, WallpaperColorHints.get(context).getHints());
     }
 
     public static int getActivityThemeRes(Context context, int wallpaperColorHints) {
@@ -73,7 +70,7 @@ public class Themes {
      * Returns true if workspace icon theming is enabled
      */
     public static boolean isThemedIconEnabled(Context context) {
-        return Utilities.getPrefs(context).getBoolean(KEY_THEMED_ICONS, false);
+        return LauncherPrefs.get(context).get(THEMED_ICONS);
     }
 
     public static String getDefaultBodyFont(Context context) {
@@ -194,5 +191,13 @@ public class Themes {
         }
 
         return result;
+    }
+
+    /** Returns the desired navigation bar scrim color depending on the {@code DeviceProfile}. */
+    @ColorInt
+    public static <T extends Context & ActivityContext> int getNavBarScrimColor(T context) {
+        return context.getDeviceProfile().isTaskbarPresent
+                ? context.getColor(R.color.taskbar_background)
+                : Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor);
     }
 }

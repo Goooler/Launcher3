@@ -4,14 +4,26 @@ import android.util.Log;
 import android.view.Surface;
 
 import com.android.launcher3.tapl.TestHelpers;
+import com.android.launcher3.util.rule.TestStabilityRule;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
-class PortraitLandscapeRunner implements TestRule {
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+public class PortraitLandscapeRunner implements TestRule {
     private static final String TAG = "PortraitLandscapeRunner";
     private AbstractLauncherUiTest mTest;
+
+    // Annotation for tests that need to be run in portrait and landscape modes.
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface PortraitLandscape {
+    }
 
     public PortraitLandscapeRunner(AbstractLauncherUiTest test) {
         mTest = test;
@@ -19,8 +31,12 @@ class PortraitLandscapeRunner implements TestRule {
 
     @Override
     public Statement apply(Statement base, Description description) {
-        if (!TestHelpers.isInLauncherProcess() ||
-                description.getAnnotation(AbstractLauncherUiTest.PortraitLandscape.class) == null) {
+        if (!TestHelpers.isInLauncherProcess()
+                || description.getAnnotation(PortraitLandscape.class) == null
+                // If running in presubmit, don't run in both orientations.
+                // It's important to keep presubmits fast even if we will occasionally miss
+                // regressions in presubmit.
+                || TestStabilityRule.isPresubmit()) {
             return base;
         }
 
@@ -56,7 +72,7 @@ class PortraitLandscapeRunner implements TestRule {
             private void evaluateInPortrait() throws Throwable {
                 mTest.mDevice.setOrientationNatural();
                 mTest.mLauncher.setExpectedRotation(Surface.ROTATION_0);
-                AbstractLauncherUiTest.checkDetectedLeaks(mTest.mLauncher);
+                AbstractLauncherUiTest.checkDetectedLeaks(mTest.mLauncher, true);
                 base.evaluate();
                 mTest.getDevice().pressHome();
             }
@@ -64,7 +80,7 @@ class PortraitLandscapeRunner implements TestRule {
             private void evaluateInLandscape() throws Throwable {
                 mTest.mDevice.setOrientationLeft();
                 mTest.mLauncher.setExpectedRotation(Surface.ROTATION_90);
-                AbstractLauncherUiTest.checkDetectedLeaks(mTest.mLauncher);
+                AbstractLauncherUiTest.checkDetectedLeaks(mTest.mLauncher, true);
                 base.evaluate();
                 mTest.getDevice().pressHome();
             }

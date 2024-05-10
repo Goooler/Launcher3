@@ -22,7 +22,7 @@ import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBIL
 import static android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK;
 
 import static com.android.launcher3.taskbar.NavbarButtonsViewController.ALPHA_INDEX_IMMERSIVE_MODE;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IMMERSIVE_MODE;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY;
 
 import android.os.Bundle;
 import android.os.Handler;
@@ -30,13 +30,10 @@ import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
-import com.android.launcher3.util.MultiValueAlpha;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.TouchController;
-import com.android.quickstep.AnimatedFloat;
-
-import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * Controller for taskbar when force visible in immersive mode is set.
@@ -54,8 +51,6 @@ public class TaskbarForceVisibleImmersiveController implements TouchController {
     private final Runnable mUndimmingRunnable = this::undimIcons;
     private final AnimatedFloat mIconAlphaForDimming = new AnimatedFloat(
             this::updateIconDimmingAlpha);
-    private final Consumer<MultiValueAlpha> mImmersiveModeAlphaUpdater = alpha -> alpha.getProperty(
-            ALPHA_INDEX_IMMERSIVE_MODE).setValue(mIconAlphaForDimming.value);
     private final View.AccessibilityDelegate mKidsModeAccessibilityDelegate =
             new View.AccessibilityDelegate() {
                 @Override
@@ -89,7 +84,7 @@ public class TaskbarForceVisibleImmersiveController implements TouchController {
 
     /** Update values tracked via sysui flags. */
     public void updateSysuiFlags(int sysuiFlags) {
-        mIsImmersiveMode = (sysuiFlags & SYSUI_STATE_IMMERSIVE_MODE) != 0;
+        mIsImmersiveMode = (sysuiFlags & SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY) == 0;
         if (mContext.isNavBarForceVisible()) {
             if (mIsImmersiveMode) {
                 startIconDimming();
@@ -145,28 +140,25 @@ public class TaskbarForceVisibleImmersiveController implements TouchController {
     }
 
     private void updateIconDimmingAlpha() {
-        getBackButtonAlphaOptional().ifPresent(mImmersiveModeAlphaUpdater);
-        getHomeButtonAlphaOptional().ifPresent(mImmersiveModeAlphaUpdater);
-    }
-
-    private Optional<MultiValueAlpha> getBackButtonAlphaOptional() {
         if (mControllers == null || mControllers.navbarButtonsViewController == null) {
-            return Optional.empty();
+            return;
         }
-        return Optional.ofNullable(mControllers.navbarButtonsViewController.getBackButtonAlpha());
-    }
 
-    private Optional<MultiValueAlpha> getHomeButtonAlphaOptional() {
-        if (mControllers == null || mControllers.navbarButtonsViewController == null) {
-            return Optional.empty();
+        MultiPropertyFactory<View> ba =
+                mControllers.navbarButtonsViewController.getBackButtonAlpha();
+        if (ba != null) {
+            ba.get(ALPHA_INDEX_IMMERSIVE_MODE).setValue(mIconAlphaForDimming.value);
         }
-        return Optional.ofNullable(mControllers.navbarButtonsViewController.getHomeButtonAlpha());
+        MultiPropertyFactory<View> ha =
+                mControllers.navbarButtonsViewController.getHomeButtonAlpha();
+        if (ba != null) {
+            ha.get(ALPHA_INDEX_IMMERSIVE_MODE).setValue(mIconAlphaForDimming.value);
+        }
     }
 
     @Override
     public boolean onControllerInterceptTouchEvent(MotionEvent ev) {
-        if (!isNavbarShownInImmersiveMode()
-                || mControllers.taskbarStashController.supportsManualStashing()) {
+        if (!isNavbarShownInImmersiveMode()) {
             return false;
         }
         return onControllerTouchEvent(ev);

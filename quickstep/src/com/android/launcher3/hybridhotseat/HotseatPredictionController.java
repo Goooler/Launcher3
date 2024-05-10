@@ -22,26 +22,30 @@ import static com.android.launcher3.hybridhotseat.HotseatEduController.getSettin
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOTSEAT_PREDICTION_PINNED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOTSEAT_RANKED;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
+import static com.android.launcher3.util.OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.ComponentName;
+import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget;
 import com.android.launcher3.Hotseat;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimationSuccessListener;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.graphics.DragPreviewProvider;
@@ -52,15 +56,18 @@ import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.uioverrides.PredictedAppIcon;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
-import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.views.Snackbar;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -72,6 +79,7 @@ public class HotseatPredictionController implements DragController.DragListener,
         SystemShortcut.Factory<QuickstepLauncher>, DeviceProfile.OnDeviceProfileChangeListener,
         DragSource, ViewGroup.OnHierarchyChangeListener {
 
+    private static final String TAG = "HotseatPredictionController";
     private static final int FLAG_UPDATE_PAUSED = 1 << 0;
     private static final int FLAG_DRAG_IN_PROGRESS = 1 << 1;
     private static final int FLAG_FILL_IN_PROGRESS = 1 << 2;
@@ -90,15 +98,18 @@ public class HotseatPredictionController implements DragController.DragListener,
 
     private List<PredictedAppIcon.PredictedIconOutlineDrawing> mOutlineDrawings = new ArrayList<>();
 
+    private boolean mEnableHotseatLongPressTipForTesting = true;
+
     private final View.OnLongClickListener mPredictionLongClickListener = v -> {
         if (!ItemLongClickListener.canStartDrag(mLauncher)) return false;
         if (mLauncher.getWorkspace().isSwitchingState()) return false;
-        if (!mLauncher.getOnboardingPrefs().getBoolean(
-                OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN)) {
+
+        TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onWorkspaceItemLongClick");
+        if (mEnableHotseatLongPressTipForTesting && !HOTSEAT_LONGPRESS_TIP_SEEN.get(mLauncher)) {
             Snackbar.show(mLauncher, R.string.hotseat_tip_gaps_filled,
                     R.string.hotseat_prediction_settings, null,
                     () -> mLauncher.startActivity(getSettingsIntent()));
-            mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN);
+            LauncherPrefs.get(mLauncher).put(HOTSEAT_LONGPRESS_TIP_SEEN, true);
             mLauncher.getDragLayer().performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             return true;
         }
@@ -108,8 +119,7 @@ public class HotseatPredictionController implements DragController.DragListener,
         WorkspaceItemInfo dragItem = new WorkspaceItemInfo((WorkspaceItemInfo) v.getTag());
         v.setVisibility(View.INVISIBLE);
         mLauncher.getWorkspace().beginDragShared(
-                v, null, this, dragItem, new DragPreviewProvider(v),
-                mLauncher.getDefaultWorkspaceDragOptions());
+                v, null, this, dragItem, new DragPreviewProvider(v), new DragOptions());
         return true;
     };
 
@@ -131,6 +141,12 @@ public class HotseatPredictionController implements DragController.DragListener,
     @Override
     public void onChildViewRemoved(View parent, View child) {
         onHotseatHierarchyChanged();
+    }
+
+    /** Enables/disabled the hotseat prediction icon long press edu for testing. */
+    @VisibleForTesting
+    public void enableHotseatEdu(boolean enable) {
+        mEnableHotseatLongPressTipForTesting = enable;
     }
 
     private void onHotseatHierarchyChanged() {
@@ -172,6 +188,7 @@ public class HotseatPredictionController implements DragController.DragListener,
     }
 
     private void fillGapsWithPrediction(boolean animate) {
+        Log.d(TAG, "fillGapsWithPrediction flags: " + getStateString(mPauseFlags));
         if (mPauseFlags != 0) {
             return;
         }
@@ -196,12 +213,16 @@ public class HotseatPredictionController implements DragController.DragListener,
             View child = mHotseat.getChildAt(
                     mHotseat.getCellXFromOrder(rank),
                     mHotseat.getCellYFromOrder(rank));
+            Log.d(TAG, "Hotseat app child is: " + child + " and isPredictedIcon() evaluates to"
+                    + ": " + isPredictedIcon(child));
 
             if (child != null && !isPredictedIcon(child)) {
                 continue;
             }
             if (mPredictedItems.size() <= predictionIndex) {
                 // Remove predicted apps from the past
+                Log.d(TAG, "Remove predicted apps from the past\nPrediction Index: "
+                        + predictionIndex);
                 if (isPredictedIcon(child)) {
                     mHotseat.removeView(child);
                 }
@@ -209,6 +230,11 @@ public class HotseatPredictionController implements DragController.DragListener,
             }
             WorkspaceItemInfo predictedItem =
                     (WorkspaceItemInfo) mPredictedItems.get(predictionIndex++);
+            Log.d(TAG, "Predicted item is: " + predictedItem);
+            if (child != null) {
+                Log.d(TAG, "Predicted item is enabled: " + child.isEnabled());
+            }
+
             if (isPredictedIcon(child) && child.isEnabled()) {
                 PredictedAppIcon icon = (PredictedAppIcon) child;
                 boolean animateIconChange = icon.shouldAnimateIconChange(predictedItem);
@@ -228,6 +254,7 @@ public class HotseatPredictionController implements DragController.DragListener,
     }
 
     private void bindItems(List<WorkspaceItemInfo> itemsToAdd, boolean animate) {
+        Log.d(TAG, "bindItems to hotseat: " + itemsToAdd);
         AnimatorSet animationSet = new AnimatorSet();
         for (WorkspaceItemInfo item : itemsToAdd) {
             PredictedAppIcon icon = PredictedAppIcon.createIcon(mHotseat, item);
@@ -267,6 +294,7 @@ public class HotseatPredictionController implements DragController.DragListener,
      * start and pauses predicted apps update on the hotseat
      */
     public void setPauseUIUpdate(boolean paused) {
+        Log.d(TAG, "setPauseUIUpdate parameter `paused` is " + paused);
         mPauseFlags = paused
                 ? (mPauseFlags | FLAG_UPDATE_PAUSED)
                 : (mPauseFlags & ~FLAG_UPDATE_PAUSED);
@@ -279,36 +307,12 @@ public class HotseatPredictionController implements DragController.DragListener,
      * Sets or updates the predicted items
      */
     public void setPredictedItems(FixedContainerItems items) {
-        boolean shouldIgnoreVisibility = FeatureFlags.ENABLE_APP_PREDICTIONS_WHILE_VISIBLE.get()
-                || mLauncher.isWorkspaceLoading()
-                || mPredictedItems.equals(items.items)
-                || mHotseat.getShortcutsAndWidgets().getChildCount() < mHotSeatItemsCount;
-        if (!shouldIgnoreVisibility
-                && mHotseat.isShown()
-                && mHotseat.getWindowVisibility() == View.VISIBLE) {
-            mHotseat.setOnVisibilityAggregatedCallback((isVisible) -> {
-                if (isVisible) {
-                    return;
-                }
-                mHotseat.setOnVisibilityAggregatedCallback(null);
-
-                applyPredictedItems(items);
-            });
-        } else {
-            mHotseat.setOnVisibilityAggregatedCallback(null);
-
-            applyPredictedItems(items);
-        }
-    }
-
-    /**
-     * Sets or updates the predicted items only once the hotseat becomes hidden to the user
-     */
-    private void applyPredictedItems(FixedContainerItems items) {
-        mPredictedItems = items.items;
+        mPredictedItems = new ArrayList(items.items);
         if (mPredictedItems.isEmpty()) {
+            Log.d(TAG, "Predicted items is initially empty");
             HotseatRestoreHelper.restoreBackup(mLauncher);
         }
+        Log.d(TAG, "Predicted items: " + mPredictedItems);
         fillGapsWithPrediction();
     }
 
@@ -514,5 +518,22 @@ public class HotseatPredictionController implements DragController.DragListener,
         return view instanceof PredictedAppIcon && view.getTag() instanceof WorkspaceItemInfo
                 && ((WorkspaceItemInfo) view.getTag()).container
                 == LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
+    }
+
+    private static String getStateString(int flags) {
+        StringJoiner str = new StringJoiner("|");
+        appendFlag(str, flags, FLAG_UPDATE_PAUSED, "FLAG_UPDATE_PAUSED");
+        appendFlag(str, flags, FLAG_DRAG_IN_PROGRESS, "FLAG_DRAG_IN_PROGRESS");
+        appendFlag(str, flags, FLAG_FILL_IN_PROGRESS, "FLAG_FILL_IN_PROGRESS");
+        appendFlag(str, flags, FLAG_REMOVING_PREDICTED_ICON,
+                "FLAG_REMOVING_PREDICTED_ICON");
+        return str.toString();
+    }
+
+    public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + this.getClass().getSimpleName());
+        writer.println(prefix + "\tFlags: " + getStateString(mPauseFlags));
+        writer.println(prefix + "\tmHotSeatItemsCount: " + mHotSeatItemsCount);
+        writer.println(prefix + "\tmPredictedItems: " + mPredictedItems);
     }
 }

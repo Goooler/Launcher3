@@ -19,11 +19,11 @@ package com.android.launcher3.dragndrop;
 
 import static android.animation.ObjectAnimator.ofFloat;
 
+import static com.android.app.animation.Interpolators.DECELERATE_1_5;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.Utilities.mapRange;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
-import static com.android.launcher3.anim.Interpolators.DEACCEL_1_5;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 
 import android.animation.Animator;
@@ -42,33 +42,37 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.animation.Interpolator;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.AbstractFloatingView;
-import com.android.launcher3.CellLayout;
 import com.android.launcher3.DropTargetBar;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringProperty;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.graphics.Scrim;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
-import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayCallbacks;
 
 import java.util.ArrayList;
 
 /**
  * A ViewGroup that coordinates dragging across its descendants
  */
-public class DragLayer extends BaseDragLayer<Launcher> {
+public class DragLayer extends BaseDragLayer<Launcher> implements LauncherOverlayCallbacks {
 
     public static final int ALPHA_INDEX_OVERLAY = 0;
     private static final int ALPHA_CHANNEL_COUNT = 1;
 
     public static final int ANIMATION_END_DISAPPEAR = 0;
     public static final int ANIMATION_END_REMAIN_VISIBLE = 2;
+
+    private final boolean mIsRtl;
 
     private DragController mDragController;
 
@@ -100,6 +104,7 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         setChildrenDrawingOrderEnabled(true);
 
         mFocusIndicatorHelper = new ViewGroupFocusHelper(this);
+        mIsRtl = Utilities.isRtl(getResources());
     }
 
     /**
@@ -109,6 +114,7 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         mDragController = dragController;
         recreateControllers();
         mWorkspaceDragScrim = new Scrim(this);
+        workspace.addOverlayCallback(this);
     }
 
     @Override
@@ -237,7 +243,7 @@ public class DragLayer extends BaseDragLayer<Launcher> {
             View anchorView) {
 
         ShortcutAndWidgetContainer parentChildren = (ShortcutAndWidgetContainer) child.getParent();
-        CellLayout.LayoutParams lp =  (CellLayout.LayoutParams) child.getLayoutParams();
+        CellLayoutLayoutParams lp =  (CellLayoutLayoutParams) child.getLayoutParams();
         parentChildren.measureChild(child);
         parentChildren.layoutChild(child);
 
@@ -334,14 +340,14 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         if (duration < 0) {
             duration = res.getInteger(R.integer.config_dropAnimMaxDuration);
             if (dist < maxDist) {
-                duration *= DEACCEL_1_5.getInterpolation(dist / maxDist);
+                duration *= DECELERATE_1_5.getInterpolation(dist / maxDist);
             }
             duration = Math.max(duration, res.getInteger(R.integer.config_dropAnimMinDuration));
         }
 
         // Fall back to cubic ease out interpolator for the animation if none is specified
         TimeInterpolator interpolator =
-                motionInterpolator == null ? DEACCEL_1_5 : motionInterpolator;
+                motionInterpolator == null ? DECELERATE_1_5 : motionInterpolator;
 
         // Animate the view
         PendingAnimation anim = new PendingAnimation(duration);
@@ -467,13 +473,15 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         return mWorkspaceDragScrim;
     }
 
-    /**
-     * Called when one handed mode state changed.
-     * @param activated true if one handed mode activated, false otherwise.
-     */
-    public void onOneHandedModeStateChanged(boolean activated) {
-        for (TouchController controller : mControllers) {
-            controller.onOneHandedModeStateChanged(activated);
+    @Override
+    public void onOverlayScrollChanged(float progress) {
+        float alpha = 1 - Interpolators.DECELERATE_3.getInterpolation(progress);
+        float transX = getMeasuredWidth() * progress;
+
+        if (mIsRtl) {
+            transX = -transX;
         }
+        setTranslationX(transX);
+        getAlphaProperty(ALPHA_INDEX_OVERLAY).setValue(alpha);
     }
 }

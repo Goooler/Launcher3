@@ -21,11 +21,15 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
+import android.content.Intent;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.view.View;
 
 import androidx.annotation.IntDef;
 
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.data.ItemInfo;
 
 import java.lang.annotation.Retention;
 
@@ -73,11 +77,6 @@ public final class SplitConfigurationOptions {
     public @interface StageType {}
     ///////////////////////////////////
 
-    /**
-     * Default split ratio for launching app pair from overview.
-     */
-    public static final float DEFAULT_SPLIT_RATIO = 0.5f;
-
     public static class SplitPositionOption {
         public final int iconResId;
         public final int textResId;
@@ -100,6 +99,7 @@ public final class SplitConfigurationOptions {
      * with the same name/functionality in wm.shell.util (which launcher3 cannot be built against)
      *
      * If you make changes here, consider making the same changes there
+     * TODO(b/254378592): We really need to consolidate this
      */
     public static class SplitBounds {
         public final Rect leftTopBounds;
@@ -111,6 +111,8 @@ public final class SplitConfigurationOptions {
         public final float leftTaskPercent;
         public final float dividerWidthPercent;
         public final float dividerHeightPercent;
+        public final int snapPosition;
+
         /**
          * If {@code true}, that means at the time of creation of this object, the
          * split-screened apps were vertically stacked. This is useful in scenarios like
@@ -130,11 +132,12 @@ public final class SplitConfigurationOptions {
         public final int rightBottomTaskId;
 
         public SplitBounds(Rect leftTopBounds, Rect rightBottomBounds, int leftTopTaskId,
-                int rightBottomTaskId) {
+                int rightBottomTaskId, int snapPosition) {
             this.leftTopBounds = leftTopBounds;
             this.rightBottomBounds = rightBottomBounds;
             this.leftTopTaskId = leftTopTaskId;
             this.rightBottomTaskId = rightBottomTaskId;
+            this.snapPosition = snapPosition;
 
             if (rightBottomBounds.top > leftTopBounds.top) {
                 // vertical apps, horizontal divider
@@ -180,5 +183,52 @@ public final class SplitConfigurationOptions {
         return position == STAGE_POSITION_TOP_OR_LEFT
                 ? LAUNCHER_APP_ICON_MENU_SPLIT_LEFT_TOP
                 : LAUNCHER_APP_ICON_MENU_SPLIT_RIGHT_BOTTOM;
+    }
+
+    public static @StagePosition int getOppositeStagePosition(@StagePosition int position) {
+        if (position == STAGE_POSITION_UNDEFINED) {
+            return position;
+        }
+        return position == STAGE_POSITION_TOP_OR_LEFT ? STAGE_POSITION_BOTTOM_OR_RIGHT
+                : STAGE_POSITION_TOP_OR_LEFT;
+    }
+
+    public static class SplitSelectSource {
+
+        /** Keep in sync w/ ActivityTaskManager#INVALID_TASK_ID (unreference-able) */
+        private static final int INVALID_TASK_ID = -1;
+
+        private View view;
+        private Drawable drawable;
+        public final Intent intent;
+        public final SplitPositionOption position;
+        public final ItemInfo itemInfo;
+        public final StatsLogManager.EventEnum splitEvent;
+        /** Represents the taskId of the first app to start in split screen */
+        public int alreadyRunningTaskId = INVALID_TASK_ID;
+        /**
+         * If {@code true}, animates the view represented by {@link #alreadyRunningTaskId} into the
+         * split placeholder view
+         */
+        public boolean animateCurrentTaskDismissal;
+
+        public SplitSelectSource(View view, Drawable drawable, Intent intent,
+                SplitPositionOption position, ItemInfo itemInfo,
+                StatsLogManager.EventEnum splitEvent) {
+            this.view = view;
+            this.drawable = drawable;
+            this.intent = intent;
+            this.position = position;
+            this.itemInfo = itemInfo;
+            this.splitEvent = splitEvent;
+        }
+
+        public Drawable getDrawable() {
+            return drawable;
+        }
+
+        public View getView() {
+            return view;
+        }
     }
 }

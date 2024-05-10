@@ -23,8 +23,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
-import android.os.Build;
-import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 
@@ -61,6 +59,13 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
     // Section name used for indexing.
     public String sectionName = "";
 
+    /**
+     * The uid of the application.
+     * The kernel user-ID that has been assigned to this application. Currently this is not a unique
+     * ID (multiple applications can have the same uid).
+     */
+    public int uid = -1;
+
     public AppInfo() {
         itemType = LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
     }
@@ -87,6 +92,7 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
         if (quietModeEnabled) {
             runtimeStatusFlags |= FLAG_DISABLED_QUIET_USER;
         }
+        uid = info.getApplicationInfo().uid;
         updateRuntimeFlagsForActivityTarget(this, info);
     }
 
@@ -95,6 +101,7 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
         componentName = info.componentName;
         title = Utilities.trim(info.title);
         intent = new Intent(info.intent);
+        uid = info.uid;
     }
 
     @VisibleForTesting
@@ -167,12 +174,6 @@ public class AppInfo extends ItemInfoWithIcon implements WorkspaceItemFactory {
         }
         info.runtimeStatusFlags |= (appInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0
                 ? FLAG_SYSTEM_NO : FLAG_SYSTEM_YES;
-
-        if (appInfo.targetSdkVersion >= Build.VERSION_CODES.O
-                && Process.myUserHandle().equals(lai.getUser())) {
-            // The icon for a non-primary user is badged, hence it's not exactly an adaptive icon.
-            info.runtimeStatusFlags |= FLAG_ADAPTIVE_ICON;
-        }
 
         // Sets the progress level, installation and incremental download flags.
         info.setProgressLevel(

@@ -18,6 +18,7 @@ package com.android.quickstep.util;
 import android.app.WallpaperManager;
 import android.os.IBinder;
 import android.util.FloatProperty;
+import android.util.Log;
 import android.view.AttachedSurfaceControl;
 import android.view.SurfaceControl;
 
@@ -25,6 +26,7 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.MultiPropertyFactory;
+import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.systemui.shared.system.BlurUtils;
 
 /**
@@ -45,20 +47,18 @@ public class BaseDepthController {
                 }
             };
 
-    private static final MultiPropertyFactory<BaseDepthController> DEPTH_PROPERTY_FACTORY =
-            new MultiPropertyFactory<>("depthProperty", DEPTH, Float::max);
+    private static final int DEPTH_INDEX_STATE_TRANSITION = 0;
+    private static final int DEPTH_INDEX_WIDGET = 1;
+    private static final int DEPTH_INDEX_COUNT = 2;
 
-    private static final int DEPTH_INDEX_STATE_TRANSITION = 1;
-    private static final int DEPTH_INDEX_WIDGET = 2;
-
-    /** Property to set the depth for state transition. */
-    public static final FloatProperty<BaseDepthController> STATE_DEPTH =
-            DEPTH_PROPERTY_FACTORY.get(DEPTH_INDEX_STATE_TRANSITION);
-    /** Property to set the depth for widget picker. */
-    public static final FloatProperty<BaseDepthController> WIDGET_DEPTH =
-            DEPTH_PROPERTY_FACTORY.get(DEPTH_INDEX_WIDGET);
+    // b/291401432
+    private static final String TAG = "BaseDepthController";
 
     protected final Launcher mLauncher;
+    /** Property to set the depth for state transition. */
+    public final MultiProperty stateDepth;
+    /** Property to set the depth for widget picker. */
+    public final MultiProperty widgetDepth;
 
     /**
      * Blur radius when completely zoomed out, in pixels.
@@ -71,13 +71,17 @@ public class BaseDepthController {
      * Ratio from 0 to 1, where 0 is fully zoomed out, and 1 is zoomed in.
      * @see android.service.wallpaper.WallpaperService.Engine#onZoomChanged(float)
      */
-    protected float mDepth;
+    private float mDepth;
 
     protected SurfaceControl mSurface;
 
     // Hints that there is potentially content behind Launcher and that we shouldn't optimize by
     // marking the launcher surface as opaque.  Only used in certain Launcher states.
     private boolean mHasContentBehindLauncher;
+
+    /** Pause blur but allow transparent, can be used when launch something behind the Launcher. */
+    protected boolean mPauseBlurs;
+
     /**
      * Last blur value, in pixels, that was applied.
      * For debugging purposes.
@@ -88,10 +92,17 @@ public class BaseDepthController {
      */
     protected boolean mInEarlyWakeUp;
 
+    protected boolean mWaitingOnSurfaceValidity;
+
     public BaseDepthController(Launcher activity) {
         mLauncher = activity;
         mMaxBlurRadius = activity.getResources().getInteger(R.integer.max_depth_blur_radius);
         mWallpaperManager = activity.getSystemService(WallpaperManager.class);
+
+        MultiPropertyFactory<BaseDepthController> depthProperty =
+                new MultiPropertyFactory<>(this, DEPTH, DEPTH_INDEX_COUNT, Float::max);
+        stateDepth = depthProperty.get(DEPTH_INDEX_STATE_TRANSITION);
+        widgetDepth = depthProperty.get(DEPTH_INDEX_WIDGET);
     }
 
     protected void setCrossWindowBlursEnabled(boolean isEnabled) {
@@ -103,23 +114,43 @@ public class BaseDepthController {
         mHasContentBehindLauncher = hasContentBehindLauncher;
     }
 
+    public void pauseBlursOnWindows(boolean pause) {
+        if (pause != mPauseBlurs) {
+            mPauseBlurs = pause;
+            applyDepthAndBlur();
+        }
+    }
+
+    protected void onInvalidSurface() { }
+
     protected void applyDepthAndBlur() {
         float depth = mDepth;
         IBinder windowToken = mLauncher.getRootView().getWindowToken();
         if (windowToken != null) {
-            mWallpaperManager.setWallpaperZoomOut(windowToken, depth);
+            // The API's full zoom-out is three times larger than the zoom-out we apply to the
+            // icons. To keep the two consistent throughout the animation while keeping Launcher's
+            // concept of full depth unchanged, we divide the depth by 3 here.
+            mWallpaperManager.setWallpaperZoomOut(windowToken, depth / 3);
         }
 
         if (!BlurUtils.supportsBlursOnWindows()) {
             return;
         }
-        if (mSurface == null || !mSurface.isValid()) {
+        if (mSurface == null) {
+            Log.d(TAG, "mSurface is null and mCurrentBlur is: " + mCurrentBlur);
             return;
         }
+        if (!mSurface.isValid()) {
+            Log.d(TAG, "mSurface is not valid");
+            mWaitingOnSurfaceValidity = true;
+            onInvalidSurface();
+            return;
+        }
+        mWaitingOnSurfaceValidity = false;
         boolean hasOpaqueBg = mLauncher.getScrimView().isFullyOpaque();
-        boolean isSurfaceOpaque = !mHasContentBehindLauncher && hasOpaqueBg;
+        boolean isSurfaceOpaque = !mHasContentBehindLauncher && hasOpaqueBg && !mPauseBlurs;
 
-        mCurrentBlur = !mCrossWindowBlursEnabled || hasOpaqueBg
+        mCurrentBlur = !mCrossWindowBlursEnabled || hasOpaqueBg || mPauseBlurs
                 ? 0 : (int) (depth * mMaxBlurRadius);
         SurfaceControl.Transaction transaction = new SurfaceControl.Transaction()
                 .setBackgroundBlurRadius(mSurface, mCurrentBlur)
@@ -143,7 +174,7 @@ public class BaseDepthController {
         }
     }
 
-    protected void setDepth(float depth) {
+    private void setDepth(float depth) {
         depth = Utilities.boundToRange(depth, 0, 1);
         // Round out the depth to dedupe frequent, non-perceptable updates
         int depthI = (int) (depth * 256);
@@ -159,8 +190,10 @@ public class BaseDepthController {
      * Sets the specified app target surface to apply the blur to.
      */
     protected void setSurface(SurfaceControl surface) {
-        if (mSurface != surface) {
+        if (mSurface != surface || mWaitingOnSurfaceValidity) {
             mSurface = surface;
+            Log.d(TAG, "setSurface:\n\tmWaitingOnSurfaceValidity: " + mWaitingOnSurfaceValidity
+                    + "\n\tmSurface: " + mSurface);
             applyDepthAndBlur();
         }
     }

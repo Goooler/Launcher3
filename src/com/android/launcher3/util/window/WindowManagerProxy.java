@@ -57,6 +57,9 @@ import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ResourceBasedOverride;
 import com.android.launcher3.util.WindowBounds;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Utility class for mocking some window manager behaviours
  */
@@ -90,11 +93,11 @@ public class WindowManagerProxy implements ResourceBasedOverride {
      * Returns a map of normalized info of internal displays to estimated window bounds
      * for that display
      */
-    public ArrayMap<CachedDisplayInfo, WindowBounds[]> estimateInternalDisplayBounds(
+    public ArrayMap<CachedDisplayInfo, List<WindowBounds>> estimateInternalDisplayBounds(
             Context displayInfoContext) {
         CachedDisplayInfo info = getDisplayInfo(displayInfoContext).normalize();
-        WindowBounds[] bounds = estimateWindowBounds(displayInfoContext, info);
-        ArrayMap<CachedDisplayInfo, WindowBounds[]> result = new ArrayMap<>();
+        List<WindowBounds> bounds = estimateWindowBounds(displayInfoContext, info);
+        ArrayMap<CachedDisplayInfo, List<WindowBounds>> result = new ArrayMap<>();
         result.put(info, bounds);
         return result;
     }
@@ -161,12 +164,10 @@ public class WindowManagerProxy implements ResourceBasedOverride {
         insetsBuilder.setInsetsIgnoringVisibility(WindowInsets.Type.navigationBars(), newNavInsets);
 
         Insets statusBarInsets = oldInsets.getInsets(WindowInsets.Type.statusBars());
-        int statusBarHeight = getDimenByName(systemRes,
-                (isPortrait) ? STATUS_BAR_HEIGHT_PORTRAIT : STATUS_BAR_HEIGHT_LANDSCAPE,
-                STATUS_BAR_HEIGHT);
+
         Insets newStatusBarInsets = Insets.of(
                 statusBarInsets.left,
-                Math.max(statusBarInsets.top, statusBarHeight),
+                getStatusBarHeight(context, isPortrait, statusBarInsets.top),
                 statusBarInsets.right,
                 statusBarInsets.bottom);
         insetsBuilder.setInsets(WindowInsets.Type.statusBars(), newStatusBarInsets);
@@ -190,10 +191,20 @@ public class WindowManagerProxy implements ResourceBasedOverride {
         return result;
     }
 
+    protected int getStatusBarHeight(Context context, boolean isPortrait, int statusBarInset) {
+        Resources systemRes = context.getResources();
+        int statusBarHeight = getDimenByName(systemRes,
+                isPortrait ? STATUS_BAR_HEIGHT_PORTRAIT : STATUS_BAR_HEIGHT_LANDSCAPE,
+                STATUS_BAR_HEIGHT);
+
+        return Math.max(statusBarInset, statusBarHeight);
+    }
+
     /**
      * Returns a list of possible WindowBounds for the display keyed on the 4 surface rotations
      */
-    protected WindowBounds[] estimateWindowBounds(Context context, CachedDisplayInfo displayInfo) {
+    protected List<WindowBounds> estimateWindowBounds(Context context,
+            CachedDisplayInfo displayInfo) {
         int densityDpi = context.getResources().getConfiguration().densityDpi;
         int rotation = displayInfo.rotation;
         Rect safeCutout = displayInfo.cutout;
@@ -212,6 +223,9 @@ public class WindowManagerProxy implements ResourceBasedOverride {
         boolean isTabletOrGesture = isTablet
                 || (Utilities.ATLEAST_R && isGestureNav(context));
 
+        // Use the status bar height resources because current system API to get the status bar
+        // height doesn't allow to do this for an arbitrary display, it returns value only
+        // for the current active display (see com.android.internal.policy.StatusBarUtils)
         int statusBarHeightPortrait = getDimenByName(systemRes,
                 STATUS_BAR_HEIGHT_PORTRAIT, STATUS_BAR_HEIGHT);
         int statusBarHeightLandscape = getDimenByName(systemRes,
@@ -233,7 +247,7 @@ public class WindowManagerProxy implements ResourceBasedOverride {
                 ? 0
                 : getDimenByName(systemRes, NAVBAR_LANDSCAPE_LEFT_RIGHT_SIZE);
 
-        WindowBounds[] result = new WindowBounds[4];
+        List<WindowBounds> result = new ArrayList<>(4);
         Point tempSize = new Point();
         for (int i = 0; i < 4; i++) {
             int rotationChange = deltaRotation(rotation, i);
@@ -264,7 +278,7 @@ public class WindowManagerProxy implements ResourceBasedOverride {
             } else {
                 insets.right = Math.max(insets.right, navbarWidth);
             }
-            result[i] = new WindowBounds(bounds, insets, i);
+            result.add(new WindowBounds(bounds, insets, i));
         }
         return result;
     }
@@ -321,6 +335,20 @@ public class WindowManagerProxy implements ResourceBasedOverride {
                     cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
         }
         return new CachedDisplayInfo(size, rotation, cutoutRect);
+    }
+
+    /**
+     * Returns bounds of the display associated with the context, or bounds of DEFAULT_DISPLAY
+     * if the context isn't associated with a display.
+     */
+    public Rect getCurrentBounds(Context displayInfoContext) {
+        Resources res = displayInfoContext.getResources();
+        Configuration config = res.getConfiguration();
+
+        float screenWidth = config.screenWidthDp * res.getDisplayMetrics().density;
+        float screenHeight = config.screenHeightDp * res.getDisplayMetrics().density;
+
+        return new Rect(0, 0, (int) screenWidth, (int) screenHeight);
     }
 
     /**

@@ -26,6 +26,7 @@ import android.util.FloatProperty;
 import android.util.IntProperty;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.android.launcher3.util.MultiScalePropertyFactory;
@@ -200,6 +201,23 @@ public class LauncherAnimUtils {
                 }
             };
 
+    public static final FloatProperty<ImageView> ROTATION_DRAWABLE_PERCENT =
+            new FloatProperty<ImageView>("drawableRotationPercent") {
+                // RotateDrawable linearly interpolates the rotation degrees between fromDegrees
+                // and toDegrees using the drawable level as a percent of its MAX_LEVEL.
+                private static final int MAX_LEVEL = 10000;
+
+                @Override
+                public void setValue(ImageView view, float percent) {
+                    view.setImageLevel((int) (percent * MAX_LEVEL));
+                }
+
+                @Override
+                public Float get(ImageView view) {
+                    return view.getDrawable().getLevel() / (float) MAX_LEVEL;
+                }
+            };
+
     /**
      * Utility method to create an {@link AnimatorListener} which executes a callback on animation
      * cancel.
@@ -217,5 +235,33 @@ public class LauncherAnimUtils {
                 }
             }
         };
+    }
+
+    /**
+     * A property that updates the specified property within a given range of values (ie. even if
+     * the animator goes beyond 0..1, the interpolated value will still be bounded).
+     * @param <T> the specified property
+     */
+    public static class ClampedProperty<T> extends FloatProperty<T> {
+        private final FloatProperty<T> mProperty;
+        private final float mMinValue;
+        private final float mMaxValue;
+
+        public ClampedProperty(FloatProperty<T> property, float minValue, float maxValue) {
+            super(property.getName() + "Clamped");
+            mProperty = property;
+            mMinValue = minValue;
+            mMaxValue = maxValue;
+        }
+
+        @Override
+        public void setValue(T t, float v) {
+            mProperty.set(t, Utilities.boundToRange(v, mMinValue, mMaxValue));
+        }
+
+        @Override
+        public Float get(T t) {
+            return mProperty.get(t);
+        }
     }
 }

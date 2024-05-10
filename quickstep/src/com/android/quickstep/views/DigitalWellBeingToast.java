@@ -92,16 +92,13 @@ public final class DigitalWellBeingToast {
 
     private Task mTask;
     private boolean mHasLimit;
+
+    private long mAppUsageLimitTimeMs;
     private long mAppRemainingTimeMs;
     @Nullable
     private View mBanner;
     private ViewOutlineProvider mOldBannerOutlineProvider;
     private float mBannerOffsetPercentage;
-    /**
-     * Clips rect provided by {@link #mOldBannerOutlineProvider} when in the model state to
-     * hide this banner as the taskView scales up and down
-     */
-    private float mModalOffset = 0f;
     @Nullable
     private SplitBounds mSplitBounds;
     private int mSplitBannerConfig = SPLIT_BANNER_FULLSCREEN;
@@ -118,10 +115,12 @@ public final class DigitalWellBeingToast {
         mHasLimit = false;
         mTaskView.setContentDescription(mTask.titleDescription);
         replaceBanner(null);
-        mAppRemainingTimeMs = 0;
+        mAppUsageLimitTimeMs = -1;
+        mAppRemainingTimeMs = -1;
     }
 
     private void setLimit(long appUsageLimitTimeMs, long appRemainingTimeMs) {
+        mAppUsageLimitTimeMs = appUsageLimitTimeMs;
         mAppRemainingTimeMs = appRemainingTimeMs;
         mHasLimit = true;
         TextView toast = mActivity.getViewCache().getView(R.layout.digital_wellbeing_toast,
@@ -143,25 +142,32 @@ public final class DigitalWellBeingToast {
     }
 
     public void initialize(Task task) {
+        mAppUsageLimitTimeMs = mAppRemainingTimeMs = -1;
         mTask = task;
         THREAD_POOL_EXECUTOR.execute(() -> {
-            final AppUsageLimit usageLimit = mLauncherApps.getAppUsageLimit(
-                    task.getTopComponent().getPackageName(),
-                    UserHandle.of(task.key.userId));
+                    AppUsageLimit usageLimit = null;
+                    try {
+                        usageLimit = mLauncherApps.getAppUsageLimit(
+                                mTask.getTopComponent().getPackageName(),
+                                UserHandle.of(mTask.key.userId));
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error initializing digital well being toast", e);
+                    }
+                    final long appUsageLimitTimeMs =
+                            usageLimit != null ? usageLimit.getTotalUsageLimit() : -1;
+                    final long appRemainingTimeMs =
+                            usageLimit != null ? usageLimit.getUsageRemaining() : -1;
 
-            final long appUsageLimitTimeMs =
-                    usageLimit != null ? usageLimit.getTotalUsageLimit() : -1;
-            final long appRemainingTimeMs =
-                    usageLimit != null ? usageLimit.getUsageRemaining() : -1;
+                    mTaskView.post(() -> {
+                        if (appUsageLimitTimeMs < 0 || appRemainingTimeMs < 0) {
+                            setNoLimit();
+                        } else {
+                            setLimit(appUsageLimitTimeMs, appRemainingTimeMs);
+                        }
+                    });
 
-            mTaskView.post(() -> {
-                if (appUsageLimitTimeMs < 0 || appRemainingTimeMs < 0) {
-                    setNoLimit();
-                } else {
-                    setLimit(appUsageLimitTimeMs, appRemainingTimeMs);
                 }
-            });
-        });
+        );
     }
 
     public void setSplitConfiguration(SplitBounds splitBounds) {
@@ -174,7 +180,7 @@ public final class DigitalWellBeingToast {
         }
 
         // For portrait grid only height of task changes, not width. So we keep the text the same
-        if (!mActivity.getDeviceProfile().isLandscape) {
+        if (!mActivity.getDeviceProfile().isLeftRightSplit) {
             mSplitBannerConfig = SPLIT_GRID_BANNER_LARGE;
             return;
         }
@@ -331,22 +337,24 @@ public final class DigitalWellBeingToast {
     }
 
     private void setBannerOutline() {
-        mOldBannerOutlineProvider = mBanner.getOutlineProvider();
+        // TODO(b\273367585) to investigate why mBanner.getOutlineProvider() can be null
+        mOldBannerOutlineProvider = mBanner.getOutlineProvider() != null
+                ? mBanner.getOutlineProvider()
+                : ViewOutlineProvider.BACKGROUND;
+
         mBanner.setOutlineProvider(new ViewOutlineProvider() {
             @Override
             public void getOutline(View view, Outline outline) {
                 mOldBannerOutlineProvider.getOutline(view, outline);
-                float verticalTranslation = -view.getTranslationY() + mModalOffset
-                        + mSplitOffsetTranslationY;
+                float verticalTranslation = -view.getTranslationY() + mSplitOffsetTranslationY;
                 outline.offset(0, Math.round(verticalTranslation));
             }
         });
         mBanner.setClipToOutline(true);
     }
 
-    void updateBannerOffset(float offsetPercentage, float verticalOffset) {
+    void updateBannerOffset(float offsetPercentage) {
         if (mBanner != null && mBannerOffsetPercentage != offsetPercentage) {
-            mModalOffset = verticalOffset;
             mBannerOffsetPercentage = offsetPercentage;
             updateTranslationY();
             mBanner.invalidateOutline();
@@ -359,10 +367,7 @@ public final class DigitalWellBeingToast {
         }
 
         mBanner.setTranslationY(
-                (mBannerOffsetPercentage * mBanner.getHeight()) +
-                        mModalOffset +
-                        mSplitOffsetTranslationY
-        );
+                (mBannerOffsetPercentage * mBanner.getHeight()) + mSplitOffsetTranslationY);
     }
 
     private void updateTranslationX() {

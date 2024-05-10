@@ -146,8 +146,7 @@ public class DatabaseWidgetPreviewLoader {
             previewWidth = drawable.getIntrinsicWidth();
             previewHeight = drawable.getIntrinsicHeight();
         } else {
-            Size widgetSize = WidgetSizes.getWidgetPaddedSizePx(mContext, info.provider, dp, spanX,
-                    spanY);
+            Size widgetSize = WidgetSizes.getWidgetSizePx(dp, spanX, spanY);
             previewWidth = widgetSize.getWidth();
             previewHeight = widgetSize.getHeight();
         }
@@ -258,8 +257,6 @@ public class DatabaseWidgetPreviewLoader {
             throw new RuntimeException("Max size is too small for preview");
         }
         return BitmapRenderer.createHardwareBitmap(size, size, c -> {
-            drawBoxWithShadow(c, size, size);
-
             LauncherIcons li = LauncherIcons.obtain(mContext);
             Drawable icon = li.createBadgedIconBitmap(
                     mutateOnMainThread(info.getFullResIcon(

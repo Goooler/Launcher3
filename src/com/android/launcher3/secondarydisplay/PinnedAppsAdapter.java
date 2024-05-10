@@ -60,13 +60,15 @@ public class PinnedAppsAdapter extends BaseAdapter implements OnSharedPreference
     private final OnClickListener mOnClickListener;
     private final OnLongClickListener mOnLongClickListener;
     private final SharedPreferences mPrefs;
-    private final AllAppsStore mAllAppsList;
+    private final AllAppsStore<SecondaryDisplayLauncher> mAllAppsList;
     private final AppInfoComparator mAppNameComparator;
 
     private final Set<ComponentKey> mPinnedApps = new HashSet<>();
     private final ArrayList<AppInfo> mItems = new ArrayList<>();
 
-    public PinnedAppsAdapter(SecondaryDisplayLauncher launcher, AllAppsStore allAppsStore,
+    public PinnedAppsAdapter(
+            SecondaryDisplayLauncher launcher,
+            AllAppsStore<SecondaryDisplayLauncher> allAppsStore,
             OnLongClickListener onLongClickListener) {
         mLauncher = launcher;
         mOnClickListener = launcher.getItemOnClickListener();
@@ -168,15 +170,18 @@ public class PinnedAppsAdapter extends BaseAdapter implements OnSharedPreference
         mPrefs.unregisterOnSharedPreferenceChangeListener(this);
     }
 
-    private void update(ItemInfo info, Function<ComponentKey, Boolean> op) {
+    /**
+     * Pins or unpins apps from home screen
+     */
+    public void update(ItemInfo info, Function<ComponentKey, Boolean> op) {
         ComponentKey key = new ComponentKey(info.getTargetComponent(), info.user);
         if (op.apply(key)) {
             createFilteredAppsList();
             Set<ComponentKey> copy = new HashSet<>(mPinnedApps);
             Executors.MODEL_EXECUTOR.submit(() ->
                     mPrefs.edit().putStringSet(PINNED_APPS_KEY,
-                        copy.stream().map(this::encode).collect(Collectors.toSet()))
-                        .apply());
+                                    copy.stream().map(this::encode).collect(Collectors.toSet()))
+                            .apply());
         }
     }
 
@@ -208,6 +213,13 @@ public class PinnedAppsAdapter extends BaseAdapter implements OnSharedPreference
     public SystemShortcut getSystemShortcut(ItemInfo info, View originalView) {
         return new PinUnPinShortcut(mLauncher, info, originalView,
                 mPinnedApps.contains(new ComponentKey(info.getTargetComponent(), info.user)));
+    }
+
+    /**
+     * Pins app to home screen
+     */
+    public void addPinnedApp(ItemInfo info) {
+        update(info, mPinnedApps::add);
     }
 
     private class PinUnPinShortcut extends SystemShortcut<SecondaryDisplayLauncher> {

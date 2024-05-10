@@ -26,15 +26,16 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.UserHandle;
 import android.util.Log;
+import android.view.RemoteAnimationTarget;
 
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.TraceHelper;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.List;
 
@@ -51,7 +52,8 @@ public final class TaskUtils {
      * TODO: remove this once we switch to getting the icon and label from IconCache.
      */
     public static CharSequence getTitle(Context context, Task task) {
-        return getTitle(context, task.key.userId, task.getTopComponent().getPackageName());
+        return TraceHelper.allowIpcs("TaskUtils.getTitle", () ->
+                getTitle(context, task.key.userId, task.getTopComponent().getPackageName()));
     }
 
     public static CharSequence getTitle(
@@ -87,9 +89,9 @@ public final class TaskUtils {
     }
 
 
-    public static boolean taskIsATargetWithMode(RemoteAnimationTargetCompat[] targets,
+    public static boolean taskIsATargetWithMode(RemoteAnimationTarget[] targets,
             int taskId, int mode) {
-        for (RemoteAnimationTargetCompat target : targets) {
+        for (RemoteAnimationTarget target : targets) {
             if (target.mode == mode && target.taskId == taskId) {
                 return true;
             }

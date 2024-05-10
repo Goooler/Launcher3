@@ -142,7 +142,7 @@ public interface PagedOrientationHandler {
      * @param splitInstructionsWidth  The SplitInstructionView's width.
      */
     void setSplitInstructionsParams(View out, DeviceProfile dp, int splitInstructionsHeight,
-            int splitInstructionsWidth, int threeButtonNavShift);
+            int splitInstructionsWidth);
 
     /**
      * @param splitDividerSize height of split screen drag handle in portrait, width in landscape
@@ -173,6 +173,8 @@ public interface PagedOrientationHandler {
     // Overview TaskMenuView methods
     void setTaskIconParams(FrameLayout.LayoutParams iconParams,
             int taskIconMargin, int taskIconHeight, int thumbnailTopMargin, boolean isRtl);
+    void setIconAppChipMenuParams(View iconAppChipMenuView, FrameLayout.LayoutParams iconMenuParams,
+            int iconMenuMargin, int thumbnailTopMargin);
     void setSplitIconParams(View primaryIconView, View secondaryIconView,
             int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             int groupedTaskViewHeight, int groupedTaskViewWidth, boolean isRtl,
@@ -184,9 +186,12 @@ public interface PagedOrientationHandler {
      * taskMenu width is the same size as the thumbnail width (what got set below in
      * getTaskMenuWidth()), so we directly use that in the calculations.
      */
-    float getTaskMenuX(float x, View thumbnailView, int overScroll, DeviceProfile deviceProfile);
-    float getTaskMenuY(float y, View thumbnailView, int overScroll);
-    int getTaskMenuWidth(View view, DeviceProfile deviceProfile);
+    float getTaskMenuX(float x, View thumbnailView, DeviceProfile deviceProfile,
+            float taskInsetMargin, View taskViewIcon);
+    float getTaskMenuY(float y, View thumbnailView, int stagePosition,
+            View taskMenuView, float taskInsetMargin, View taskViewIcon);
+    int getTaskMenuWidth(View thumbnailView, DeviceProfile deviceProfile,
+            @StagePosition int stagePosition);
     /**
      * Sets linear layout orientation for {@link com.android.launcher3.popup.SystemShortcut} items
      * inside task menu view.
@@ -200,16 +205,6 @@ public interface PagedOrientationHandler {
      */
     void setLayoutParamsForTaskMenuOptionItem(LinearLayout.LayoutParams lp,
             LinearLayout viewGroup, DeviceProfile deviceProfile);
-    /**
-     * Adjusts margins for the entire task menu view itself, which comprises of both app title and
-     * shortcut options.
-     */
-    void setTaskMenuAroundTaskView(LinearLayout taskView, float margin);
-    /**
-     * Since the task menu layout is manually positioned on top of recents view, this method returns
-     * additional adjustments to the positioning based on fake land/seascape
-     */
-    PointF getAdditionalInsetForTaskMenu(float margin);
 
     /**
      * Calculates the position where a Digital Wellbeing Banner should be placed on its parent
@@ -230,14 +225,6 @@ public interface PagedOrientationHandler {
     /** @return Either 1 or -1, a factor to multiply by so the animation goes the correct way. */
     int getTaskDragDisplacementFactor(boolean isRtl);
 
-    /**
-     * Calls the corresponding {@link View#setX(float)} or {@link View#setY(float)}
-     * on {@param taskMenuView} by taking the space needed by {@param primarySnapshotView} into
-     * account.
-     * This is expected to only be called for secondary (bottom/right) tasks.
-     */
-    void setSecondaryTaskMenuPosition(SplitBounds splitBounds, View taskView,
-            DeviceProfile deviceProfile, View primarySnaphotView, View taskMenuView);
     /**
      * Maps the velocity from the coordinate plane of the foreground app to that
      * of Launcher's (which now will always be portrait)

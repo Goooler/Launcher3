@@ -15,9 +15,9 @@
  */
 package com.android.quickstep.fallback;
 
-import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
-import static com.android.launcher3.anim.Interpolators.INSTANT;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.app.animation.Interpolators.FINAL_FRAME;
+import static com.android.app.animation.Interpolators.INSTANT;
+import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_MODAL;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_TRANSLATE_X;
@@ -45,7 +45,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
-import com.android.launcher3.util.MultiValueAlpha;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.views.ClearAllButton;
 
@@ -95,7 +95,7 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
                 clearAllButtonAlpha, LINEAR);
         float overviewButtonAlpha = state.hasOverviewActions() ? 1 : 0;
         setter.setFloat(mActivity.getActionsView().getVisibilityAlpha(),
-                MultiValueAlpha.VALUE, overviewButtonAlpha, LINEAR);
+                MultiPropertyFactory.MULTI_PROPERTY_VALUE, overviewButtonAlpha, LINEAR);
 
         float[] scaleAndOffset = state.getOverviewScaleAndOffset(mActivity);
         setter.setFloat(mRecentsView, RECENTS_SCALE_PROPERTY, scaleAndOffset[0],
@@ -130,15 +130,9 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
                 mRecentsView.getPagedOrientationHandler().getSplitSelectTaskOffset(
                         TASK_PRIMARY_SPLIT_TRANSLATION, TASK_SECONDARY_SPLIT_TRANSLATION,
                         mActivity.getDeviceProfile());
+        setter.setFloat(mRecentsView, taskViewsFloat.first, isSplitSelectionState(state)
+                ? mRecentsView.getSplitSelectTranslation() : 0, LINEAR);
         setter.setFloat(mRecentsView, taskViewsFloat.second, 0, LINEAR);
-        if (isSplitSelectionState(state)) {
-            mRecentsView.applySplitPrimaryScrollOffset();
-            setter.setFloat(mRecentsView, taskViewsFloat.first,
-                    mRecentsView.getSplitSelectTranslation(), LINEAR);
-        } else {
-            mRecentsView.resetSplitPrimaryScrollOffset();
-            setter.setFloat(mRecentsView, taskViewsFloat.first, 0, LINEAR);
-        }
     }
 
     /**

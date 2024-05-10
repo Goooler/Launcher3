@@ -20,6 +20,8 @@ import static android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND;
 import static android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID;
 import static android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER;
 
+import static com.android.launcher3.config.FeatureFlags.shouldShowFirstPageWidget;
+
 import android.app.Activity;
 import android.app.Fragment;
 import android.app.SearchManager;
@@ -40,11 +42,12 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.graphics.FragmentWithPreview;
 import com.android.launcher3.widget.util.WidgetSizes;
@@ -65,6 +68,7 @@ public class QsbContainerView extends FrameLayout {
      * @param context
      * @return String
      */
+    @WorkerThread
     @Nullable
     public static String getSearchWidgetPackageName(@NonNull Context context) {
         String providerPkg = Settings.Global.getString(context.getContentResolver(),
@@ -84,6 +88,7 @@ public class QsbContainerView extends FrameLayout {
      * @param context
      * @return AppWidgetProviderInfo
      */
+    @WorkerThread
     @Nullable
     public static AppWidgetProviderInfo getSearchWidgetProviderInfo(@NonNull Context context) {
         String providerPkg = getSearchWidgetPackageName(context);
@@ -110,6 +115,7 @@ public class QsbContainerView extends FrameLayout {
     /**
      * returns componentName for searchWidget if package name is known.
      */
+    @WorkerThread
     @Nullable
     public static ComponentName getSearchComponentName(@NonNull  Context context) {
         AppWidgetProviderInfo providerInfo =
@@ -200,7 +206,7 @@ public class QsbContainerView extends FrameLayout {
             Context context = getContext();
             AppWidgetManager widgetManager = AppWidgetManager.getInstance(context);
 
-            int widgetId = Utilities.getPrefs(context).getInt(mKeyWidgetId, -1);
+            int widgetId = LauncherPrefs.getPrefs(context).getInt(mKeyWidgetId, -1);
             AppWidgetProviderInfo widgetInfo = widgetManager.getAppWidgetInfo(widgetId);
             boolean isWidgetBound = (widgetInfo != null) &&
                     widgetInfo.provider.equals(mWidgetInfo.provider);
@@ -244,7 +250,7 @@ public class QsbContainerView extends FrameLayout {
         }
 
         private void saveWidgetId(int widgetId) {
-            Utilities.getPrefs(getContext()).edit().putInt(mKeyWidgetId, widgetId).apply();
+            LauncherPrefs.getPrefs(getContext()).edit().putInt(mKeyWidgetId, widgetId).apply();
         }
 
         @Override
@@ -286,7 +292,7 @@ public class QsbContainerView extends FrameLayout {
         }
 
         public boolean isQsbEnabled() {
-            return FeatureFlags.QSB_ON_FIRST_SCREEN;
+            return FeatureFlags.QSB_ON_FIRST_SCREEN && !shouldShowFirstPageWidget();
         }
 
         protected Bundle createBindOptions() {
@@ -317,6 +323,7 @@ public class QsbContainerView extends FrameLayout {
          * If widgetCategory is not supported, or no such widget is found, returns the first widget
          * provided by the package.
          */
+        @WorkerThread
         protected AppWidgetProviderInfo getSearchWidgetProvider() {
             return getSearchWidgetProviderInfo(getContext());
         }

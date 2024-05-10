@@ -15,16 +15,16 @@
  */
 package com.android.launcher3.uioverrides.states;
 
-import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
+import static com.android.app.animation.Interpolators.DECELERATE;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_ALLAPPS;
 
 import android.content.Context;
 
-import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.util.Themes;
+import com.android.launcher3.views.ActivityContext;
 
 /**
  * Definition for AllApps state
@@ -40,7 +40,7 @@ public class AllAppsState extends LauncherState {
     }
 
     @Override
-    public <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfileListenable>
+    public <DEVICE_PROFILE_CONTEXT extends Context & ActivityContext>
     int getTransitionDuration(DEVICE_PROFILE_CONTEXT context, boolean isToState) {
         return isToState
                 ? context.getDeviceProfile().allAppsOpenDuration
@@ -80,7 +80,7 @@ public class AllAppsState extends LauncherState {
     @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
         PageAlphaProvider superPageAlphaProvider = super.getWorkspacePageAlphaProvider(launcher);
-        return new PageAlphaProvider(DEACCEL_2) {
+        return new PageAlphaProvider(DECELERATE) {
             @Override
             public float getPageAlpha(int pageIndex) {
                 return launcher.getDeviceProfile().isTablet

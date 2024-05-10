@@ -40,10 +40,12 @@ import com.android.launcher3.CellLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.Workspace;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.util.TouchUtil;
 
 /**
  * Helper class to handle touch on empty space in workspace and show options popup on long press
@@ -105,6 +107,11 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
             if (handleLongPress) {
                 mLongPressState = STATE_REQUESTED;
                 mTouchDownPoint.set(ev.getX(), ev.getY());
+                // Mouse right button's ACTION_DOWN should immediately show menu
+                if (TouchUtil.isMouseRightClickDownOrMove(ev)) {
+                    maybeShowMenu();
+                    return true;
+                }
             }
 
             mWorkspace.onTouchEvent(ev);
@@ -185,6 +192,10 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
 
     @Override
     public void onLongPress(MotionEvent event) {
+        maybeShowMenu();
+    }
+
+    private void maybeShowMenu() {
         if (mLongPressState == STATE_REQUESTED) {
             TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "Workspace.longPress");
             if (canHandleLongPress()) {
@@ -195,6 +206,9 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
                         HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
                 mLauncher.getStatsLogManager().logger().log(LAUNCHER_WORKSPACE_LONGPRESS);
                 mLauncher.showDefaultOptions(mTouchDownPoint.x, mTouchDownPoint.y);
+                if (FeatureFlags.enableSplitContextually() && mLauncher.isSplitSelectionEnabled()) {
+                    mLauncher.dismissSplitSelection();
+                }
             } else {
                 cancelLongPress();
             }

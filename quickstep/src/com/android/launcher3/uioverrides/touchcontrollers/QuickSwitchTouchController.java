@@ -15,12 +15,12 @@
  */
 package com.android.launcher3.uioverrides.touchcontrollers;
 
+import static com.android.app.animation.Interpolators.ACCELERATE_2;
+import static com.android.app.animation.Interpolators.DECELERATE_2;
+import static com.android.app.animation.Interpolators.INSTANT;
+import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.LauncherState.NORMAL;
-import static com.android.launcher3.LauncherState.QUICK_SWITCH;
-import static com.android.launcher3.anim.Interpolators.ACCEL_2;
-import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
-import static com.android.launcher3.anim.Interpolators.INSTANT;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.LauncherState.QUICK_SWITCH_FROM_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_FADE;
@@ -30,6 +30,7 @@ import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PR
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
@@ -78,6 +79,10 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
         if ((ev.getEdgeFlags() & Utilities.EDGE_NAV_BAR) == 0) {
             return false;
         }
+        if (isDesktopModeSupported()) {
+            // TODO(b/268075592): add support for quickswitch to/from desktop
+            return false;
+        }
         return true;
     }
 
@@ -87,7 +92,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
             return NORMAL;
         }
-        return isDragTowardPositive ? QUICK_SWITCH : NORMAL;
+        return isDragTowardPositive ? QUICK_SWITCH_FROM_HOME : NORMAL;
     }
 
     @Override
@@ -110,7 +115,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
 
         // Set RecentView's initial properties for coming in from the side.
         RECENTS_SCALE_PROPERTY.set(mOverviewPanel,
-                QUICK_SWITCH.getOverviewScaleAndOffset(mLauncher)[0] * 0.85f);
+                QUICK_SWITCH_FROM_HOME.getOverviewScaleAndOffset(mLauncher)[0] * 0.85f);
         ADJACENT_PAGE_HORIZONTAL_OFFSET.set(mOverviewPanel, 1f);
         mOverviewPanel.setContentAlpha(1);
 
@@ -123,14 +128,14 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
     }
 
     private void setupInterpolators(StateAnimationConfig stateAnimationConfig) {
-        stateAnimationConfig.setInterpolator(ANIM_WORKSPACE_FADE, DEACCEL_2);
-        stateAnimationConfig.setInterpolator(ANIM_ALL_APPS_FADE, DEACCEL_2);
+        stateAnimationConfig.setInterpolator(ANIM_WORKSPACE_FADE, DECELERATE_2);
+        stateAnimationConfig.setInterpolator(ANIM_ALL_APPS_FADE, DECELERATE_2);
         if (DisplayController.getNavigationMode(mLauncher) == NavigationMode.NO_BUTTON) {
             // Overview lives to the left of workspace, so translate down later than over
-            stateAnimationConfig.setInterpolator(ANIM_WORKSPACE_TRANSLATE, ACCEL_2);
-            stateAnimationConfig.setInterpolator(ANIM_VERTICAL_PROGRESS, ACCEL_2);
-            stateAnimationConfig.setInterpolator(ANIM_OVERVIEW_SCALE, ACCEL_2);
-            stateAnimationConfig.setInterpolator(ANIM_OVERVIEW_TRANSLATE_Y, ACCEL_2);
+            stateAnimationConfig.setInterpolator(ANIM_WORKSPACE_TRANSLATE, ACCELERATE_2);
+            stateAnimationConfig.setInterpolator(ANIM_VERTICAL_PROGRESS, ACCELERATE_2);
+            stateAnimationConfig.setInterpolator(ANIM_OVERVIEW_SCALE, ACCELERATE_2);
+            stateAnimationConfig.setInterpolator(ANIM_OVERVIEW_TRANSLATE_Y, ACCELERATE_2);
             stateAnimationConfig.setInterpolator(ANIM_OVERVIEW_FADE, INSTANT);
         } else {
             stateAnimationConfig.setInterpolator(ANIM_WORKSPACE_TRANSLATE, LINEAR);

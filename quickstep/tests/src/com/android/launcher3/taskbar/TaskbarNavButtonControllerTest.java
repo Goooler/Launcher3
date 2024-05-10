@@ -17,7 +17,9 @@ import static com.android.quickstep.OverviewCommandHelper.TYPE_TOGGLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,12 +27,14 @@ import static org.mockito.Mockito.when;
 import android.os.Handler;
 import android.view.View;
 
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
+import com.android.quickstep.util.AssistUtils;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -52,6 +56,8 @@ public class TaskbarNavButtonControllerTest {
     @Mock
     Handler mockHandler;
     @Mock
+    AssistUtils mockAssistUtils;
+    @Mock
     StatsLogManager mockStatsLogManager;
     @Mock
     StatsLogManager.StatsLogger mockStatsLogger;
@@ -69,12 +75,15 @@ public class TaskbarNavButtonControllerTest {
         MockitoAnnotations.initMocks(this);
         when(mockService.getDisplayId()).thenReturn(DISPLAY_ID);
         when(mockService.getOverviewCommandHelper()).thenReturn(mockCommandHelper);
+        when(mockService.getApplicationContext())
+                .thenReturn(InstrumentationRegistry.getInstrumentation().getTargetContext()
+                        .getApplicationContext());
         when(mockStatsLogManager.logger()).thenReturn(mockStatsLogger);
         when(mockTaskbarControllers.getTaskbarActivityContext())
                 .thenReturn(mockTaskbarActivityContext);
         doReturn(mockStatsLogManager).when(mockTaskbarActivityContext).getStatsLogManager();
         mNavButtonController = new TaskbarNavButtonController(mockService,
-                mockSystemUiProxy, mockHandler);
+                mockSystemUiProxy, mockHandler, mockAssistUtils);
     }
 
     @Test
@@ -103,9 +112,43 @@ public class TaskbarNavButtonControllerTest {
     }
 
     @Test
-    public void testLongPressHome() {
+    public void testLongPressHome_enabled_withoutOverride() {
+        mNavButtonController.setAssistantLongPressEnabled(true /*assistantLongPressEnabled*/);
+        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(false);
+
         mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
+        verify(mockAssistUtils, times(1)).tryStartAssistOverride(anyInt());
         verify(mockSystemUiProxy, times(1)).startAssistant(any());
+    }
+
+    @Test
+    public void testLongPressHome_enabled_withOverride() {
+        mNavButtonController.setAssistantLongPressEnabled(true /*assistantLongPressEnabled*/);
+        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(true);
+
+        mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
+        verify(mockAssistUtils, times(1)).tryStartAssistOverride(anyInt());
+        verify(mockSystemUiProxy, never()).startAssistant(any());
+    }
+
+    @Test
+    public void testLongPressHome_disabled_withoutOverride() {
+        mNavButtonController.setAssistantLongPressEnabled(false /*assistantLongPressEnabled*/);
+        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(false);
+
+        mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
+        verify(mockAssistUtils, never()).tryStartAssistOverride(anyInt());
+        verify(mockSystemUiProxy, never()).startAssistant(any());
+    }
+
+    @Test
+    public void testLongPressHome_disabled_withOverride() {
+        mNavButtonController.setAssistantLongPressEnabled(false /*assistantLongPressEnabled*/);
+        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(true);
+
+        mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
+        verify(mockAssistUtils, never()).tryStartAssistOverride(anyInt());
+        verify(mockSystemUiProxy, never()).startAssistant(any());
     }
 
     @Test

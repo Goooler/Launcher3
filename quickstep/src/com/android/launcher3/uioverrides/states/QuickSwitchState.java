@@ -16,6 +16,9 @@
 package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
+
+import android.graphics.Color;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
@@ -43,6 +46,12 @@ public class QuickSwitchState extends BackgroundAppState {
 
     @Override
     public int getWorkspaceScrimColor(Launcher launcher) {
+        if (isDesktopModeSupported()) {
+            if (launcher.areFreeformTasksVisible()) {
+                // No scrim while freeform tasks are visible
+                return Color.TRANSPARENT;
+            }
+        }
         DeviceProfile dp = launcher.getDeviceProfile();
         if (dp.isTaskbarPresentInApps) {
             return launcher.getColor(R.color.taskbar_background);

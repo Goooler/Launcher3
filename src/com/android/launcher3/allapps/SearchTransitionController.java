@@ -18,75 +18,32 @@ package com.android.launcher3.allapps;
 
 import static android.view.View.VISIBLE;
 
-import static androidx.recyclerview.widget.RecyclerView.NO_POSITION;
-
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
+import static com.android.app.animation.Interpolators.DECELERATE_1_7;
+import static com.android.app.animation.Interpolators.INSTANT;
+import static com.android.app.animation.Interpolators.clampToProgress;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
-import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
-import static com.android.launcher3.anim.Interpolators.INSTANT;
-import static com.android.launcher3.anim.Interpolators.clampToProgress;
 
 import android.animation.ObjectAnimator;
-import android.graphics.drawable.Drawable;
-import android.util.FloatProperty;
-import android.util.Log;
+import android.animation.TimeInterpolator;
 import android.view.View;
 import android.view.animation.Interpolator;
 
-import com.android.launcher3.BubbleTextView;
-import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
-import com.android.launcher3.model.data.ItemInfo;
 
 /** Coordinates the transition between Search and A-Z in All Apps. */
-public class SearchTransitionController {
-
-    private static final String LOG_TAG = "SearchTransitionCtrl";
+public class SearchTransitionController extends RecyclerViewAnimationController {
 
     // Interpolator when the user taps the QSB while already in All Apps.
-    private static final Interpolator INTERPOLATOR_WITHIN_ALL_APPS = DEACCEL_1_7;
+    private static final Interpolator INTERPOLATOR_WITHIN_ALL_APPS = DECELERATE_1_7;
     // Interpolator when the user taps the QSB from home screen, so transition to all apps is
     // happening simultaneously.
     private static final Interpolator INTERPOLATOR_TRANSITIONING_TO_ALL_APPS = INSTANT;
 
-    /**
-     * These values represent points on the [0, 1] animation progress spectrum. They are used to
-     * animate items in the {@link SearchRecyclerView}.
-     */
-    private static final float TOP_CONTENT_FADE_PROGRESS_START = 0.133f;
-    private static final float CONTENT_FADE_PROGRESS_DURATION = 0.083f;
-    private static final float TOP_BACKGROUND_FADE_PROGRESS_START = 0.633f;
-    private static final float BACKGROUND_FADE_PROGRESS_DURATION = 0.15f;
-    private static final float CONTENT_STAGGER = 0.01f;  // Progress before next item starts fading.
-
-    private static final FloatProperty<SearchTransitionController> SEARCH_TO_AZ_PROGRESS =
-            new FloatProperty<SearchTransitionController>("searchToAzProgress") {
-                @Override
-                public Float get(SearchTransitionController controller) {
-                    return controller.getSearchToAzProgress();
-                }
-
-                @Override
-                public void setValue(SearchTransitionController controller, float progress) {
-                    controller.setSearchToAzProgress(progress);
-                }
-            };
-
-    private final ActivityAllAppsContainerView<?> mAllAppsContainerView;
-
-    private ObjectAnimator mSearchToAzAnimator = null;
-    private float mSearchToAzProgress = 1f;
+    private boolean mSkipNextAnimationWithinAllApps;
 
     public SearchTransitionController(ActivityAllAppsContainerView<?> allAppsContainerView) {
-        mAllAppsContainerView = allAppsContainerView;
-    }
-
-    /** Returns true if a transition animation is currently in progress. */
-    public boolean isRunning() {
-        return mSearchToAzAnimator != null;
+        super(allAppsContainerView);
     }
 
     /**
@@ -99,46 +56,31 @@ public class SearchTransitionController {
      * @param onEndRunnable will be called when the animation finishes, unless another animation is
      *                      scheduled in the meantime
      */
-    public void animateToSearchState(boolean goingToSearch, long duration, Runnable onEndRunnable) {
-        float targetProgress = goingToSearch ? 0 : 1;
-
-        if (mSearchToAzAnimator != null) {
-            mSearchToAzAnimator.cancel();
-        }
-
-        mSearchToAzAnimator = ObjectAnimator.ofFloat(this, SEARCH_TO_AZ_PROGRESS, targetProgress);
-        boolean inAllApps = Launcher.getLauncher(
-                mAllAppsContainerView.getContext()).getStateManager().isInStableState(
-                LauncherState.ALL_APPS);
-        if (!inAllApps) {
-            duration = 0;  // Don't want to animate when coming from QSB.
-        }
-        mSearchToAzAnimator.setDuration(duration).setInterpolator(
-                inAllApps ? INTERPOLATOR_WITHIN_ALL_APPS : INTERPOLATOR_TRANSITIONING_TO_ALL_APPS);
-        mSearchToAzAnimator.addListener(forEndCallback(() -> mSearchToAzAnimator = null));
+    @Override
+    protected void animateToState(boolean goingToSearch, long duration, Runnable onEndRunnable) {
+        super.animateToState(goingToSearch, duration, onEndRunnable);
         if (!goingToSearch) {
-            mSearchToAzAnimator.addListener(forSuccessCallback(() -> {
+            mAnimator.addListener(forSuccessCallback(() -> {
                 mAllAppsContainerView.getFloatingHeaderView().setFloatingRowsCollapsed(false);
                 mAllAppsContainerView.getFloatingHeaderView().reset(false /* animate */);
                 mAllAppsContainerView.getAppsRecyclerViewContainer().setTranslationY(0);
             }));
         }
-        mSearchToAzAnimator.addListener(forSuccessCallback(onEndRunnable));
-
         mAllAppsContainerView.getFloatingHeaderView().setFloatingRowsCollapsed(true);
+        mAllAppsContainerView.getFloatingHeaderView().setVisibility(VISIBLE);
+        mAllAppsContainerView.getFloatingHeaderView().maybeSetTabVisibility(VISIBLE);
         mAllAppsContainerView.getAppsRecyclerViewContainer().setVisibility(VISIBLE);
-        getSearchRecyclerView().setVisibility(VISIBLE);
-        getSearchRecyclerView().setChildAttachedConsumer(this::onSearchChildAttached);
-        mSearchToAzAnimator.start();
+        getRecyclerView().setVisibility(VISIBLE);
     }
 
-    private SearchRecyclerView getSearchRecyclerView() {
+    @Override
+    protected SearchRecyclerView getRecyclerView() {
         return mAllAppsContainerView.getSearchRecyclerView();
     }
 
-    private void setSearchToAzProgress(float searchToAzProgress) {
-        mSearchToAzProgress = searchToAzProgress;
-        int searchHeight = updateSearchRecyclerViewProgress();
+    @Override
+    protected int onProgressUpdated(float searchToAzProgress) {
+        int searchHeight = super.onProgressUpdated(searchToAzProgress);
 
         FloatingHeaderView headerView = mAllAppsContainerView.getFloatingHeaderView();
 
@@ -164,141 +106,34 @@ public class SearchTransitionController {
         appsContainer.setTranslationY(appsTranslationY);
         // Fade apps out with tabs (in 20% of the total animation).
         appsContainer.setAlpha(clampToProgress(searchToAzProgress, 0.8f, 1f));
+        return searchHeight;
     }
 
     /**
-     * Updates the children views of SearchRecyclerView based on the current animation progress.
-     *
-     * @return the total height of animating views (excluding any app icons).
+     * Should only animate if the view is not an app icon or if the app row is complete.
      */
-    private int updateSearchRecyclerViewProgress() {
-        int numSearchResultsAnimated = 0;
-        int totalHeight = 0;
-        int appRowHeight = 0;
-        Integer top = null;
-        SearchRecyclerView searchRecyclerView = getSearchRecyclerView();
-
-        for (int i = 0; i < searchRecyclerView.getChildCount(); i++) {
-            View searchResultView = searchRecyclerView.getChildAt(i);
-            if (searchResultView == null) {
-                continue;
-            }
-
-            if (top == null) {
-                top = searchResultView.getTop();
-            }
-
-            if (searchResultView instanceof BubbleTextView
-                    && searchResultView.getTag() instanceof ItemInfo
-                    && ((ItemInfo) searchResultView.getTag()).itemType == ITEM_TYPE_APPLICATION) {
-                // The first app icon will set appRowHeight, which will also contribute to
-                // totalHeight. Additional app icons should remove the appRowHeight to remain in
-                // the same row as the first app.
-                searchResultView.setY(top + totalHeight - appRowHeight);
-                if (appRowHeight == 0) {
-                    appRowHeight = searchResultView.getHeight();
-                    totalHeight += appRowHeight;
-                }
-                // Don't scale/fade app row.
-                searchResultView.setScaleY(1);
-                searchResultView.setAlpha(1);
-                continue;
-            }
-
-            // Adjust content alpha based on start progress and stagger.
-            float startContentFadeProgress = Math.max(0,
-                    TOP_CONTENT_FADE_PROGRESS_START - CONTENT_STAGGER * numSearchResultsAnimated);
-            float endContentFadeProgress = Math.min(1,
-                    startContentFadeProgress + CONTENT_FADE_PROGRESS_DURATION);
-            searchResultView.setAlpha(1 - clampToProgress(mSearchToAzProgress,
-                    startContentFadeProgress, endContentFadeProgress));
-
-            // Adjust background (or decorator) alpha based on start progress and stagger.
-            float startBackgroundFadeProgress = Math.max(0,
-                    TOP_BACKGROUND_FADE_PROGRESS_START
-                            - CONTENT_STAGGER * numSearchResultsAnimated);
-            float endBackgroundFadeProgress = Math.min(1,
-                    startBackgroundFadeProgress + BACKGROUND_FADE_PROGRESS_DURATION);
-            float backgroundAlpha = 1 - clampToProgress(mSearchToAzProgress,
-                    startBackgroundFadeProgress, endBackgroundFadeProgress);
-            int adapterPosition = searchRecyclerView.getChildAdapterPosition(searchResultView);
-            boolean decoratorFilled =
-                    adapterPosition != NO_POSITION
-                            && searchRecyclerView.getApps().getAdapterItems().get(adapterPosition)
-                            .setDecorationFillAlpha((int) (255 * backgroundAlpha));
-            if (!decoratorFilled) {
-                // Try to adjust background alpha instead (e.g. for Search Edu card).
-                Drawable background = searchResultView.getBackground();
-                if (background != null) {
-                    background.setAlpha((int) (255 * backgroundAlpha));
-                }
-            }
-
-            float scaleY = 1 - mSearchToAzProgress;
-            int scaledHeight = (int) (searchResultView.getHeight() * scaleY);
-            searchResultView.setScaleY(scaleY);
-
-            // For rows with multiple elements, only count the height once and translate elements to
-            // the same y position.
-            int y = top + totalHeight;
-            int spanIndex = getSpanIndex(searchRecyclerView, adapterPosition);
-            if (spanIndex > 0) {
-                // Continuation of an existing row; move this item into the row.
-                y -= scaledHeight;
-            } else {
-                // Start of a new row contributes to total height and animation stagger.
-                numSearchResultsAnimated++;
-                totalHeight += scaledHeight;
-            }
-            searchResultView.setY(y);
-        }
-
-        return totalHeight - appRowHeight;
+    @Override
+    protected boolean shouldAnimate(View view, boolean hasDecorationInfo, boolean appRowComplete) {
+        return !isAppIcon(view) || appRowComplete;
     }
 
-    /** @return the column that the view at this position is found (0 assumed if indeterminate). */
-    private int getSpanIndex(SearchRecyclerView searchRecyclerView, int adapterPosition) {
-        if (adapterPosition == NO_POSITION) {
-            Log.w(LOG_TAG, "Can't determine span index - child not found in adapter");
-            return 0;
+    @Override
+    protected TimeInterpolator getInterpolator() {
+        TimeInterpolator timeInterpolator =
+                mAllAppsContainerView.isInAllApps()
+                        ? INTERPOLATOR_WITHIN_ALL_APPS : INTERPOLATOR_TRANSITIONING_TO_ALL_APPS;
+        if (mSkipNextAnimationWithinAllApps) {
+            timeInterpolator = INSTANT;
+            mSkipNextAnimationWithinAllApps = false;
         }
-        if (!(searchRecyclerView.getAdapter() instanceof AllAppsGridAdapter<?>)) {
-            Log.e(LOG_TAG, "Search RV doesn't have an AllAppsGridAdapter?");
-            // This case shouldn't happen, but for debug devices we will continue to create a more
-            // visible crash.
-            if (!Utilities.IS_DEBUG_DEVICE) {
-                return 0;
-            }
-        }
-        AllAppsGridAdapter<?> adapter = (AllAppsGridAdapter<?>) searchRecyclerView.getAdapter();
-        return adapter.getSpanIndex(adapterPosition);
+        return timeInterpolator;
     }
 
-    /** Called just before a child is attached to the SearchRecyclerView. */
-    private void onSearchChildAttached(View child) {
-        // Avoid allocating hardware layers for alpha changes.
-        child.forceHasOverlappingRendering(false);
-        child.setPivotY(0);
-        if (mSearchToAzProgress > 0) {
-            // Before the child is rendered, apply the animation including it to avoid flicker.
-            updateSearchRecyclerViewProgress();
-        } else {
-            // Apply default states without processing the full layout.
-            child.setAlpha(1);
-            child.setScaleY(1);
-            child.setTranslationY(0);
-            int adapterPosition = getSearchRecyclerView().getChildAdapterPosition(child);
-            if (adapterPosition != NO_POSITION) {
-                getSearchRecyclerView().getApps().getAdapterItems().get(adapterPosition)
-                        .setDecorationFillAlpha(255);
-            }
-            if (child.getBackground() != null) {
-                child.getBackground().setAlpha(255);
-            }
-        }
-    }
-
-    private float getSearchToAzProgress() {
-        return mSearchToAzProgress;
+    /**
+     * This should only be called from {@code LauncherSearchSessionManager} when app restarts due to
+     * theme changes.
+     */
+    public void setSkipAnimationWithinAllApps(boolean skip) {
+        mSkipNextAnimationWithinAllApps = skip;
     }
 }

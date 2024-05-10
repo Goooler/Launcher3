@@ -56,6 +56,7 @@ public class StatsLogManager implements ResourceBasedOverride {
     private InstanceId mInstanceId;
 
     protected @Nullable ActivityContext mActivityContext = null;
+    protected @Nullable Context mContext = null;
     private KeyboardStateManager mKeyboardStateManager;
 
     /**
@@ -274,6 +275,12 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User swipes or fling in DOWN direction on the bottom bazel area.")
         LAUNCHER_SWIPEDOWN_NAVBAR(573),
 
+        @UiEvent(doc = "User deep presses on the bottom bezel area.")
+        LAUNCHER_DEEP_PRESS_NAVBAR(1543),
+
+        @UiEvent(doc = "User long presses on the bottom bezel area.")
+        LAUNCHER_LONG_PRESS_NAVBAR(1544),
+
         @UiEvent(doc = "User swipes or fling in UP direction from bottom bazel area.")
         LAUNCHER_HOME_GESTURE(574),
 
@@ -339,6 +346,12 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User tapped on image content in Overview Select mode.")
         LAUNCHER_SELECT_MODE_IMAGE(627),
+
+        @UiEvent(doc = "User tapped on barcode content in Overview Select mode.")
+        LAUNCHER_SELECT_MODE_BARCODE(1531),
+
+        @UiEvent(doc = "Highlight gleams for barcode content in Overview Select mode.")
+        LAUNCHER_SELECT_MODE_SHOW_BARCODE_REGIONS(1532),
 
         @UiEvent(doc = "Activity to add external item was started")
         LAUNCHER_ADD_EXTERNAL_ITEM_START(641),
@@ -497,6 +510,21 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User taps the More button to share an image")
         LAUNCHER_OVERVIEW_SHARING_TAP_MORE_TO_SHARE_IMAGE(778),
 
+        @UiEvent(doc = "Show Barode indicator for overview sharing")
+        LAUNCHER_OVERVIEW_SHARING_SHOW_BARCODE_INDICATOR(1533),
+
+        @UiEvent(doc = "User taps barcode indicator in overview")
+        LAUNCHER_OVERVIEW_SHARING_BARCODE_INDICATOR_TAP(1534),
+
+        @UiEvent(doc = "Configure barcode region for long_press action for overview sharing")
+        LAUNCHER_OVERVIEW_SHARING_CONFIGURE_BARCODE_REGION_LONG_PRESS(1535),
+
+        @UiEvent(doc = "User long presses a barcode region in overview")
+        LAUNCHER_OVERVIEW_SHARING_BARCODE_REGION_LONG_PRESS(1536),
+
+        @UiEvent(doc = "User drags a barcode region in overview")
+        LAUNCHER_OVERVIEW_SHARING_BARCODE_REGION_DRAG(1537),
+
         @UiEvent(doc = "User started resizing a widget on their home screen.")
         LAUNCHER_WIDGET_RESIZE_STARTED(820),
 
@@ -520,12 +548,6 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "Launcher item drop failed since there was not enough room on the screen.")
         LAUNCHER_ITEM_DROP_FAILED_INSUFFICIENT_SPACE(872),
-
-        @UiEvent(doc = "User long pressed on the taskbar background to hide the taskbar")
-        LAUNCHER_TASKBAR_LONGPRESS_HIDE(896),
-
-        @UiEvent(doc = "User long pressed on the taskbar gesture handle to show the taskbar")
-        LAUNCHER_TASKBAR_LONGPRESS_SHOW(897),
 
         @UiEvent(doc = "User clicks on the search icon on header to launch search in app.")
         LAUNCHER_ALLAPPS_SEARCHINAPP_LAUNCH(913),
@@ -554,6 +576,17 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
                 + "result page etc.")
         LAUNCHER_ALLAPPS_SCROLLED(985),
+
+        @UiEvent(doc = "User scrolled up on the all apps personal A-Z list.")
+        LAUNCHER_ALLAPPS_PERSONAL_SCROLLED_UP(1287),
+
+        @UiEvent(doc = "User scrolled down on the all apps personal A-Z list.")
+        LAUNCHER_ALLAPPS_PERSONAL_SCROLLED_DOWN(1288),
+
+        @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
+                + "result page etc and we don't know the direction since user came back to "
+                + "original position from which they scrolled.")
+        LAUNCHER_ALLAPPS_SCROLLED_UNKNOWN_DIRECTION(1231),
 
         @UiEvent(doc = "User tapped taskbar home button")
         LAUNCHER_TASKBAR_HOME_BUTTON_TAP(1003),
@@ -598,10 +631,75 @@ public class StatsLogManager implements ResourceBasedOverride {
         LAUNCHER_APP_ICON_MENU_SPLIT_RIGHT_BOTTOM(1199),
 
         @UiEvent(doc = "User has invoked split to left half from an app icon menu")
-        LAUNCHER_APP_ICON_MENU_SPLIT_LEFT_TOP(1200)
-        ;
+        LAUNCHER_APP_ICON_MENU_SPLIT_LEFT_TOP(1200),
+
+        @UiEvent(doc = "Number of apps in A-Z list (personal and work profile)")
+        LAUNCHER_ALLAPPS_COUNT(1225),
+
+        @UiEvent(doc = "User has invoked split to right half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_RIGHT_BOTTOM(1232),
+
+        @UiEvent(doc = "User has invoked split to left half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_LEFT_TOP(1233),
+
+        @UiEvent(doc = "User has invoked split to right half from desktop mode.")
+        LAUNCHER_DESKTOP_MODE_SPLIT_RIGHT_BOTTOM(1412),
+
+        @UiEvent(doc = "User has invoked split to left half from desktop mode.")
+        LAUNCHER_DESKTOP_MODE_SPLIT_LEFT_TOP(1464),
+
+        @UiEvent(doc = "User has collapsed the work FAB button by scrolling down in the all apps"
+                + " work A-Z list.")
+        LAUNCHER_WORK_FAB_BUTTON_COLLAPSE(1276),
+
+        @UiEvent(doc = "User has collapsed the work FAB button by scrolling up in the all apps"
+                + " work A-Z list.")
+        LAUNCHER_WORK_FAB_BUTTON_EXTEND(1277),
+
+        @UiEvent(doc = "User scrolled down on the search result page.")
+        LAUNCHER_ALLAPPS_SEARCH_SCROLLED_DOWN(1285),
+
+        @UiEvent(doc = "User scrolled up on the search result page.")
+        LAUNCHER_ALLAPPS_SEARCH_SCROLLED_UP(1286),
+
+        @UiEvent(doc = "User or automatic timeout has hidden transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_HIDE(1330),
+
+        @UiEvent(doc = "User has swiped upwards from the gesture handle to show transient taskbar.")
+        LAUNCHER_TRANSIENT_TASKBAR_SHOW(1331),
+
+        @UiEvent(doc = "User has clicked an app pair and launched directly into split screen.")
+        LAUNCHER_APP_PAIR_LAUNCH(1374),
+
+        @UiEvent(doc = "User saved an app pair.")
+        LAUNCHER_APP_PAIR_SAVE(1456),
+
+        @UiEvent(doc = "App launched through pending intent")
+        LAUNCHER_APP_LAUNCH_PENDING_INTENT(1394),
+
+        @UiEvent(doc = "User long pressed on taskbar divider icon to open popup menu")
+        LAUNCHER_TASKBAR_DIVIDER_MENU_OPEN(1488),
+
+        @UiEvent(doc = "User long pressed on taskbar divider icon to close popup menu")
+        LAUNCHER_TASKBAR_DIVIDER_MENU_CLOSE(1489),
+
+        @UiEvent(doc = "User has pinned taskbar using taskbar divider menu")
+        LAUNCHER_TASKBAR_PINNED(1490),
+
+        @UiEvent(doc = "User has unpinned taskbar using taskbar divider menu")
+        LAUNCHER_TASKBAR_UNPINNED(1491),
+
+        @UiEvent(doc = "User tapped private space lock button")
+        LAUNCHER_PRIVATE_SPACE_LOCK_TAP(1548),
+
+        @UiEvent(doc = "User tapped private space unlock button")
+        LAUNCHER_PRIVATE_SPACE_UNLOCK_TAP(1549),
+
+        @UiEvent(doc = "User tapped private space settings button")
+        LAUNCHER_PRIVATE_SPACE_SETTINGS_TAP(1550),
 
         // ADD MORE
+        ;
 
         private final int mId;
 
@@ -609,6 +707,36 @@ public class StatsLogManager implements ResourceBasedOverride {
             mId = id;
         }
 
+        public int getId() {
+            return mId;
+        }
+    }
+
+    /** Launcher's latency events. */
+    public enum LauncherLatencyEvent implements EventEnum {
+        // Details of below 6 events with prefix of "LAUNCHER_LATENCY_STARTUP_" are discussed in
+        // go/launcher-startup-latency
+        @UiEvent(doc = "The total duration of launcher startup latency.")
+        LAUNCHER_LATENCY_STARTUP_TOTAL_DURATION(1362),
+
+        @UiEvent(doc = "The duration of launcher activity's onCreate().")
+        LAUNCHER_LATENCY_STARTUP_ACTIVITY_ON_CREATE(1363),
+
+        @UiEvent(doc =
+                "The duration to inflate launcher root view in launcher activity's onCreate().")
+        LAUNCHER_LATENCY_STARTUP_VIEW_INFLATION(1364),
+
+        @UiEvent(doc = "The duration of asynchronous loading workspace")
+        LAUNCHER_LATENCY_STARTUP_WORKSPACE_LOADER_ASYNC(1367),
+        ;
+
+        private final int mId;
+
+        LauncherLatencyEvent(int id) {
+            mId = id;
+        }
+
+        @Override
         public int getId() {
             return mId;
         }
@@ -720,6 +848,34 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets cardinality of log message.
+         */
+        default StatsLogger withCardinality(int cardinality) {
+            return this;
+        }
+
+        /**
+         * Sets the input type of the log message.
+         */
+        default StatsLogger withInputType(int inputType) {
+            return this;
+        }
+
+        /**
+         * Set the features of the log message.
+         */
+        default StatsLogger withFeatures(int feature) {
+            return this;
+        }
+
+        /**
+         * Set the package name of the log message.
+         */
+        default StatsLogger withPackageName(@Nullable String packageName) {
+            return this;
+        }
+
+        /**
          * Builds the final message and logs it as {@link EventEnum}.
          */
         default void log(EventEnum event) {
@@ -738,15 +894,26 @@ public class StatsLogManager implements ResourceBasedOverride {
      */
     public interface StatsLatencyLogger {
 
+        /**
+         * Should be in sync with:
+         * google3/wireless/android/sysui/aster/asterstats/launcher_event_processed.proto
+         */
         enum LatencyType {
             UNKNOWN(0),
+            // example: launcher restart that happens via daily backup and restore
             COLD(1),
             HOT(2),
             TIMEOUT(3),
             FAIL(4),
             COLD_USERWAITING(5),
             ATOMIC(6),
-            CONTROLLED(7);
+            CONTROLLED(7),
+            CACHED(8),
+            // example: device is rebooting via power key or shell command `adb reboot`
+            COLD_DEVICE_REBOOTING(9),
+            // Tracking warm startup latency:
+            // https://developer.android.com/topic/performance/vitals/launch-time#warm
+            WARM(10);
             private final int mId;
 
             LatencyType(int id) {
@@ -756,7 +923,6 @@ public class StatsLogManager implements ResourceBasedOverride {
             public int getId() {
                 return mId;
             }
-
         }
 
         /**
@@ -789,9 +955,100 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets sub event type.
+         */
+        default StatsLatencyLogger withSubEventType(int type) {
+            return this;
+        }
+
+
+        /** Sets cardinality of the event. */
+        default StatsLatencyLogger withCardinality(int cardinality) {
+            return this;
+        }
+
+        /**
          * Sets packageId of log message.
          */
         default StatsLatencyLogger withPackageId(int packageId) {
+            return this;
+        }
+
+        /**
+         * Builds the final message and logs it as {@link EventEnum}.
+         */
+        default void log(EventEnum event) {
+        }
+    }
+
+    /**
+     * Helps to construct and log impression event.
+     */
+    public interface StatsImpressionLogger {
+
+        enum State {
+            UNKNOWN(0),
+            ALLAPPS(1),
+            SEARCHBOX_WIDGET(2);
+            private final int mLauncherState;
+
+            State(int id) {
+                this.mLauncherState = id;
+            }
+
+            public int getLauncherState() {
+                return mLauncherState;
+            }
+        }
+
+        /**
+         * Sets {@link InstanceId} of log message.
+         */
+        default StatsImpressionLogger withInstanceId(InstanceId instanceId) {
+            return this;
+        }
+
+        /**
+         * Sets {@link State} of impression event.
+         */
+        default StatsImpressionLogger withState(State state) {
+            return this;
+        }
+
+        /**
+         * Sets query length of the event.
+         */
+        default StatsImpressionLogger withQueryLength(int queryLength) {
+            return this;
+        }
+
+        /**
+         * Sets {@link com.android.app.search.ResultType} for the impression event.
+         */
+        default StatsImpressionLogger withResultType(int resultType) {
+            return this;
+        }
+
+        /**
+         * Sets boolean for each of {@link com.android.app.search.ResultType} that indicates
+         * if this result is above keyboard or not for the impression event.
+         */
+        default StatsImpressionLogger withAboveKeyboard(boolean aboveKeyboard) {
+            return this;
+        }
+
+        /**
+         * Sets uid for each of {@link com.android.app.search.ResultType} that indicates
+         * package name for the impression event.
+         */
+        default StatsImpressionLogger withUid(int uid) {
+            return this;
+        }
+
+        /**
+         * Sets result source that indicates the origin of the result for the impression event.
+         */
+        default StatsImpressionLogger withResultSource(int resultSource) {
             return this;
         }
 
@@ -825,11 +1082,24 @@ public class StatsLogManager implements ResourceBasedOverride {
     }
 
     /**
+     * Returns new impression logger object.
+     */
+    public StatsImpressionLogger impressionLogger() {
+        StatsImpressionLogger logger = createImpressionLogger();
+        if (mInstanceId != null) {
+            logger.withInstanceId(mInstanceId);
+        }
+        return logger;
+    }
+
+    /**
      * Returns a singleton KeyboardStateManager.
      */
     public KeyboardStateManager keyboardStateManager() {
         if (mKeyboardStateManager == null) {
-            mKeyboardStateManager = new KeyboardStateManager();
+            mKeyboardStateManager = new KeyboardStateManager(
+                    mContext != null ? mContext.getResources().getDimensionPixelSize(
+                            R.dimen.default_ime_height) : 0);
         }
         return mKeyboardStateManager;
     }
@@ -841,6 +1111,11 @@ public class StatsLogManager implements ResourceBasedOverride {
 
     protected StatsLatencyLogger createLatencyLogger() {
         return new StatsLatencyLogger() {
+        };
+    }
+
+    protected StatsImpressionLogger createImpressionLogger() {
+        return new StatsImpressionLogger() {
         };
     }
 
@@ -860,6 +1135,7 @@ public class StatsLogManager implements ResourceBasedOverride {
         StatsLogManager manager = Overrides.getObject(StatsLogManager.class,
                 context.getApplicationContext(), R.string.stats_log_manager_class);
         manager.mActivityContext = ActivityContext.lookupContextNoThrow(context);
+        manager.mContext = context;
         return manager;
     }
 }

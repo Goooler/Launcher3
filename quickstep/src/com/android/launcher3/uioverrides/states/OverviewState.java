@@ -15,7 +15,7 @@
  */
 package com.android.launcher3.uioverrides.states;
 
-import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
+import static com.android.app.animation.Interpolators.DECELERATE_2;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 
 import android.content.Context;
@@ -75,9 +75,17 @@ public class OverviewState extends LauncherState {
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
-        float workspacePageHeight = launcher.getDeviceProfile().getCellLayoutHeight();
         recentsView.getTaskSize(sTempRect);
-        float scale = (float) sTempRect.height() / workspacePageHeight;
+        float scale;
+        DeviceProfile deviceProfile = launcher.getDeviceProfile();
+        if (deviceProfile.isTwoPanels) {
+            // In two panel layout, width does not include both panels or space between them, so
+            // use height instead. We do not use height for handheld, as cell layout can be
+            // shorter than a task and we want the workspace to scale down to task size.
+            scale = (float) sTempRect.height() / deviceProfile.getCellLayoutHeight();
+        } else {
+            scale = (float) sTempRect.width() / deviceProfile.getCellLayoutWidth();
+        }
         float parallaxFactor = 0.5f;
         return new ScaleAndTranslation(scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor);
     }
@@ -89,7 +97,7 @@ public class OverviewState extends LauncherState {
 
     @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
-        return new PageAlphaProvider(DEACCEL_2) {
+        return new PageAlphaProvider(DECELERATE_2) {
             @Override
             public float getPageAlpha(int pageIndex) {
                 return 0;
@@ -99,12 +107,37 @@ public class OverviewState extends LauncherState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return CLEAR_ALL_BUTTON | OVERVIEW_ACTIONS;
+        int elements = CLEAR_ALL_BUTTON | OVERVIEW_ACTIONS;
+        DeviceProfile dp = launcher.getDeviceProfile();
+        boolean showFloatingSearch;
+        if (dp.isPhone) {
+            // Only show search in phone overview in portrait mode.
+            showFloatingSearch = !dp.isLandscape;
+        } else {
+            // Only show search in tablet overview if taskbar is not visible.
+            showFloatingSearch = !dp.isTaskbarPresent || isTaskbarStashed(launcher);
+        }
+        if (showFloatingSearch) {
+            elements |= FLOATING_SEARCH_BAR;
+        }
+        return elements;
     }
 
     @Override
-    public boolean isTaskbarStashed(Launcher launcher) {
-        return true;
+    public int getFloatingSearchBarRestingMarginBottom(Launcher launcher) {
+        return areElementsVisible(launcher, FLOATING_SEARCH_BAR) ? 0
+                : super.getFloatingSearchBarRestingMarginBottom(launcher);
+    }
+
+    @Override
+    public boolean shouldFloatingSearchBarUsePillWhenUnfocused(Launcher launcher) {
+        DeviceProfile dp = launcher.getDeviceProfile();
+        return dp.isPhone && !dp.isLandscape;
+    }
+
+    @Override
+    public boolean isTaskbarAlignedWithHotseat(Launcher launcher) {
+        return false;
     }
 
     @Override
@@ -115,6 +148,18 @@ public class OverviewState extends LauncherState {
     @Override
     public boolean displayOverviewTasksAsGrid(DeviceProfile deviceProfile) {
         return deviceProfile.isTablet;
+    }
+
+    @Override
+    public boolean disallowTaskbarGlobalDrag() {
+        // Disable global drag in overview
+        return true;
+    }
+
+    @Override
+    public boolean allowTaskbarInitialSplitSelection() {
+        // Allow split select from taskbar items in overview
+        return true;
     }
 
     @Override

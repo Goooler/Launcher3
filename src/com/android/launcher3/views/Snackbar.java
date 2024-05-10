@@ -30,9 +30,10 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
-import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.dragndrop.DragLayer;
 
@@ -64,15 +65,32 @@ public class Snackbar extends AbstractFloatingView {
         show(activity, labelStringRedId, NO_ID, onDismissed, null);
     }
 
+    /** Show a snackbar with just a label. */
+    public static void show(
+            ActivityContext activity, CharSequence labelString, Runnable onDismissed) {
+        show(activity, labelString, NO_ID, onDismissed, null);
+    }
+
     /** Show a snackbar with a label and action. */
     public static <T extends Context & ActivityContext> void show(T activity, int labelStringResId,
             int actionStringResId, Runnable onDismissed, @Nullable Runnable onActionClicked) {
+        show(
+                activity,
+                activity.getResources().getText(labelStringResId),
+                actionStringResId,
+                onDismissed,
+                onActionClicked);
+    }
+
+    /** Show a snackbar with a label and action. */
+    public static void show(ActivityContext activity, CharSequence labelString,
+            int actionStringResId, Runnable onDismissed, @Nullable Runnable onActionClicked) {
         closeOpenViews(activity, true, TYPE_SNACKBAR);
-        Snackbar snackbar = new Snackbar(activity, null);
+        Snackbar snackbar = new Snackbar((Context) activity, null);
         // Set some properties here since inflated xml only contains the children.
         snackbar.setOrientation(HORIZONTAL);
         snackbar.setGravity(Gravity.CENTER_VERTICAL);
-        Resources res = activity.getResources();
+        Resources res = snackbar.getResources();
         snackbar.setElevation(res.getDimension(R.dimen.snackbar_elevation));
         int padding = res.getDimensionPixelSize(R.dimen.snackbar_padding);
         snackbar.setPadding(padding, padding, padding, padding);
@@ -97,11 +115,14 @@ public class Snackbar extends AbstractFloatingView {
                 dragLayer.getWidth() - maxMarginLeftRight * 2 - insets.left - insets.right,
                 absoluteMaxWidth);
         params.width = minWidth;
-        params.setMargins(0, 0, 0, marginBottom + insets.bottom);
+        DeviceProfile deviceProfile = activity.getDeviceProfile();
+        params.setMargins(0, 0, 0, marginBottom
+                + (deviceProfile.isTaskbarPresent
+                ? deviceProfile.taskbarHeight + deviceProfile.getTaskbarOffsetY()
+                : insets.bottom));
 
         TextView labelView = snackbar.findViewById(R.id.label);
-        String labelText = res.getString(labelStringResId);
-        labelView.setText(labelText);
+        labelView.setText(labelString);
 
         TextView actionView = snackbar.findViewById(R.id.action);
         float actionWidth;
@@ -122,7 +143,8 @@ public class Snackbar extends AbstractFloatingView {
             actionView.setVisibility(GONE);
         }
 
-        int totalContentWidth = (int) (labelView.getPaint().measureText(labelText) + actionWidth)
+        int totalContentWidth = (int) (labelView.getPaint().measureText(labelString.toString())
+                    + actionWidth)
                 + labelView.getPaddingRight() + labelView.getPaddingLeft()
                 + padding * 2;
         if (totalContentWidth > params.width) {
@@ -154,9 +176,9 @@ public class Snackbar extends AbstractFloatingView {
                 .scaleX(1)
                 .scaleY(1)
                 .setDuration(SHOW_DURATION_MS)
-                .setInterpolator(Interpolators.ACCEL_DEACCEL)
+                .setInterpolator(Interpolators.ACCELERATE_DECELERATE)
                 .start();
-        int timeout = AccessibilityManagerCompat.getRecommendedTimeoutMillis(activity,
+        int timeout = AccessibilityManagerCompat.getRecommendedTimeoutMillis(snackbar.getContext(),
                 TIMEOUT_DURATION_MS, FLAG_CONTENT_TEXT | FLAG_CONTENT_CONTROLS);
         snackbar.postDelayed(() -> snackbar.close(true), timeout);
     }
@@ -169,7 +191,7 @@ public class Snackbar extends AbstractFloatingView {
                         .withLayer()
                         .setStartDelay(0)
                         .setDuration(HIDE_DURATION_MS)
-                        .setInterpolator(Interpolators.ACCEL)
+                        .setInterpolator(Interpolators.ACCELERATE)
                         .withEndAction(this::onClosed)
                         .start();
             } else {
