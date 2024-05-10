@@ -33,4 +33,17 @@
     <dimen name="overview_page_spacing">44dp</dimen>
     <!--  The space to the left and to the right of the "Clear all" button  -->
     <dimen name="overview_grid_side_margin">64dp</dimen>
+
+    <!-- All Set page-->
+    <dimen name="allset_page_allset_text_size">42sp</dimen>
+    <dimen name="allset_page_swipe_up_text_size">16sp</dimen>
+
+    <!-- Taskbar swipe up thresholds -->
+    <dimen name="taskbar_from_nav_threshold">30dp</dimen>
+    <dimen name="taskbar_app_window_threshold">100dp</dimen>
+    <dimen name="taskbar_home_overview_threshold">180dp</dimen>
+    <dimen name="taskbar_catch_up_threshold">300dp</dimen>
+
+    <!-- Taskbar swipe up threshold multipliers -->
+    <item name="taskbar_nav_threshold_mult" format="float" type="dimen">3</item>
 </resources>

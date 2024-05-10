@@ -15,11 +15,11 @@
  */
 package com.android.quickstep.util;
 
+import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_DEPTH_CONTROLLER;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW;
@@ -46,6 +46,7 @@ import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringAnimationBuilder;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -122,9 +123,8 @@ public class StaggeredWorkspaceAnim {
             if (grid.isVerticalBarLayout()) {
                 for (int i = hotseatIcons.getChildCount() - 1; i >= 0; i--) {
                     View child = hotseatIcons.getChildAt(i);
-                    CellLayout.LayoutParams lp =
-                            ((CellLayout.LayoutParams) child.getLayoutParams());
-                    addStaggeredAnimationForView(child, lp.cellY + 1, totalRows, duration);
+                    CellLayoutLayoutParams lp = ((CellLayoutLayoutParams) child.getLayoutParams());
+                    addStaggeredAnimationForView(child, lp.getCellY() + 1, totalRows, duration);
                 }
             } else {
                 final int hotseatRow, qsbRow;
@@ -177,8 +177,8 @@ public class StaggeredWorkspaceAnim {
 
         addDepthAnimationForState(launcher, NORMAL, duration);
 
-        mAnimators.play(launcher.getRootView().getSysUiScrim().createSysuiMultiplierAnim(0f, 1f)
-                .setDuration(duration));
+        mAnimators.play(launcher.getRootView().getSysUiScrim().getSysUIMultiplier()
+                .animateToValue(0f, 1f).setDuration(duration));
     }
 
     private void addAnimationForPage(CellLayout page, int totalRows, long duration) {
@@ -193,8 +193,8 @@ public class StaggeredWorkspaceAnim {
         // Set up springs on workspace items.
         for (int i = itemsContainer.getChildCount() - 1; i >= 0; i--) {
             View child = itemsContainer.getChildAt(i);
-            CellLayout.LayoutParams lp = ((CellLayout.LayoutParams) child.getLayoutParams());
-            addStaggeredAnimationForView(child, lp.cellY + lp.cellVSpan, totalRows, duration);
+            CellLayoutLayoutParams lp = ((CellLayoutLayoutParams) child.getLayoutParams());
+            addStaggeredAnimationForView(child, lp.getCellY() + lp.cellVSpan, totalRows, duration);
         }
 
         mAnimators.addListener(new AnimatorListenerAdapter() {

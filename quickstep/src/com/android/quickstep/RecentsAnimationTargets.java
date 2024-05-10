@@ -15,11 +15,14 @@
  */
 package com.android.quickstep;
 
-import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_CLOSING;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.view.RemoteAnimationTarget.MODE_CLOSING;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 
+import android.app.WindowConfiguration;
 import android.graphics.Rect;
-
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
+import android.os.Bundle;
+import android.view.RemoteAnimationTarget;
 
 /**
  * Extension of {@link RemoteAnimationTargets} with additional information about swipe
@@ -30,15 +33,33 @@ public class RecentsAnimationTargets extends RemoteAnimationTargets {
     public final Rect homeContentInsets;
     public final Rect minimizedHomeBounds;
 
-    public RecentsAnimationTargets(RemoteAnimationTargetCompat[] apps,
-            RemoteAnimationTargetCompat[] wallpapers, RemoteAnimationTargetCompat[] nonApps,
-            Rect homeContentInsets, Rect minimizedHomeBounds) {
-        super(apps, wallpapers, nonApps, MODE_CLOSING);
+    public RecentsAnimationTargets(RemoteAnimationTarget[] apps,
+            RemoteAnimationTarget[] wallpapers, RemoteAnimationTarget[] nonApps,
+            Rect homeContentInsets, Rect minimizedHomeBounds, Bundle extras) {
+        super(apps, wallpapers, nonApps, MODE_CLOSING, extras);
         this.homeContentInsets = homeContentInsets;
         this.minimizedHomeBounds = minimizedHomeBounds;
     }
 
     public boolean hasTargets() {
         return unfilteredApps.length != 0;
+    }
+
+    /**
+     * Check if target apps contain desktop tasks which have windowing mode set to {@link
+     * WindowConfiguration#WINDOWING_MODE_FREEFORM}
+     *
+     * @return {@code true} if at least one target app is a desktop task
+     */
+    public boolean hasDesktopTasks() {
+        if (!isDesktopModeSupported()) {
+            return false;
+        }
+        for (RemoteAnimationTarget target : apps) {
+            if (target.windowConfiguration.getWindowingMode() == WINDOWING_MODE_FREEFORM) {
+                return true;
+            }
+        }
+        return false;
     }
 }

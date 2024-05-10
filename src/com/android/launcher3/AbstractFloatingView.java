@@ -24,7 +24,9 @@ import static com.android.launcher3.compat.AccessibilityManagerCompat.isAccessib
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.Context;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.MotionEvent;
@@ -32,6 +34,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
+import android.window.OnBackAnimationCallback;
 
 import androidx.annotation.IntDef;
 
@@ -46,7 +49,9 @@ import java.lang.annotation.RetentionPolicy;
 /**
  * Base class for a View which shows a floating UI on top of the launcher UI.
  */
-public abstract class AbstractFloatingView extends LinearLayout implements TouchController {
+@TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+public abstract class AbstractFloatingView extends LinearLayout implements TouchController,
+        OnBackAnimationCallback {
 
     @IntDef(flag = true, value = {
             TYPE_FOLDER,
@@ -63,11 +68,14 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             TYPE_TASK_MENU,
             TYPE_OPTIONS_POPUP,
             TYPE_ICON_SURFACE,
+            TYPE_OPTIONS_POPUP_DIALOG,
             TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP,
             TYPE_WIDGETS_EDUCATION_DIALOG,
             TYPE_TASKBAR_EDUCATION_DIALOG,
             TYPE_TASKBAR_ALL_APPS,
-            TYPE_OPTIONS_POPUP_DIALOG
+            TYPE_ADD_TO_HOME_CONFIRMATION,
+            TYPE_TASKBAR_OVERLAY_PROXY,
+            TYPE_TASKBAR_PINNING_POPUP
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FloatingViewType {}
@@ -87,13 +95,16 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public static final int TYPE_TASK_MENU = 1 << 11;
     public static final int TYPE_OPTIONS_POPUP = 1 << 12;
     public static final int TYPE_ICON_SURFACE = 1 << 13;
-    public static final int TYPE_OPTIONS_POPUP_DIALOG = 1 << 18;
+    public static final int TYPE_OPTIONS_POPUP_DIALOG = 1 << 14;
 
-    public static final int TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP = 1 << 14;
-    public static final int TYPE_WIDGETS_EDUCATION_DIALOG = 1 << 15;
-    public static final int TYPE_TASKBAR_EDUCATION_DIALOG = 1 << 16;
-    public static final int TYPE_TASKBAR_ALL_APPS = 1 << 17;
-    public static final int TYPE_ADD_TO_HOME_CONFIRMATION = 1 << 18;
+    public static final int TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP = 1 << 15;
+    public static final int TYPE_WIDGETS_EDUCATION_DIALOG = 1 << 16;
+    public static final int TYPE_TASKBAR_EDUCATION_DIALOG = 1 << 17;
+    public static final int TYPE_TASKBAR_ALL_APPS = 1 << 18;
+    public static final int TYPE_ADD_TO_HOME_CONFIRMATION = 1 << 19;
+    public static final int TYPE_TASKBAR_OVERLAY_PROXY = 1 << 20;
+    public static final int TYPE_TASKBAR_PINNING_POPUP = 1 << 21;
+    public static final int TYPE_PIN_IME_POPUP = 1 << 22;
 
     public static final int TYPE_ALL = TYPE_FOLDER | TYPE_ACTION_POPUP
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_WIDGETS_FULL_SHEET
@@ -101,21 +112,35 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             | TYPE_OPTIONS_POPUP | TYPE_SNACKBAR | TYPE_LISTENER | TYPE_ALL_APPS_EDU
             | TYPE_ICON_SURFACE | TYPE_DRAG_DROP_POPUP | TYPE_PIN_WIDGET_FROM_EXTERNAL_POPUP
             | TYPE_WIDGETS_EDUCATION_DIALOG | TYPE_TASKBAR_EDUCATION_DIALOG | TYPE_TASKBAR_ALL_APPS
-            | TYPE_OPTIONS_POPUP_DIALOG | TYPE_ADD_TO_HOME_CONFIRMATION;
+            | TYPE_OPTIONS_POPUP_DIALOG | TYPE_ADD_TO_HOME_CONFIRMATION
+            | TYPE_TASKBAR_OVERLAY_PROXY | TYPE_TASKBAR_PINNING_POPUP | TYPE_PIN_IME_POPUP;
 
     // Type of popups which should be kept open during launcher rebind
     public static final int TYPE_REBIND_SAFE = TYPE_WIDGETS_FULL_SHEET
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_ON_BOARD_POPUP | TYPE_DISCOVERY_BOUNCE
             | TYPE_ALL_APPS_EDU | TYPE_ICON_SURFACE | TYPE_WIDGETS_EDUCATION_DIALOG
-            | TYPE_TASKBAR_EDUCATION_DIALOG | TYPE_TASKBAR_ALL_APPS | TYPE_OPTIONS_POPUP_DIALOG;
+            | TYPE_TASKBAR_EDUCATION_DIALOG | TYPE_TASKBAR_ALL_APPS | TYPE_OPTIONS_POPUP_DIALOG
+            | TYPE_TASKBAR_OVERLAY_PROXY | TYPE_PIN_IME_POPUP;
 
+    /** Type of popups that should get exclusive accessibility focus. */
     public static final int TYPE_ACCESSIBLE = TYPE_ALL & ~TYPE_DISCOVERY_BOUNCE & ~TYPE_LISTENER
-            & ~TYPE_ALL_APPS_EDU;
+            & ~TYPE_ALL_APPS_EDU & ~TYPE_TASKBAR_ALL_APPS & ~TYPE_PIN_IME_POPUP;
 
     // These view all have particular operation associated with swipe down interaction.
     public static final int TYPE_STATUS_BAR_SWIPE_DOWN_DISALLOW = TYPE_WIDGETS_BOTTOM_SHEET |
             TYPE_WIDGETS_FULL_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_ON_BOARD_POPUP |
             TYPE_DISCOVERY_BOUNCE | TYPE_TASK_MENU | TYPE_DRAG_DROP_POPUP;
+
+    // Floating views that are exclusive to the taskbar overlay window.
+    public static final int TYPE_TASKBAR_OVERLAYS =
+            TYPE_TASKBAR_ALL_APPS | TYPE_TASKBAR_EDUCATION_DIALOG;
+
+    // Floating views that a TouchController should not try to intercept touches from.
+    public static final int TYPE_TOUCH_CONTROLLER_NO_INTERCEPT = TYPE_ALL & ~TYPE_DISCOVERY_BOUNCE
+            & ~TYPE_LISTENER & ~TYPE_TASKBAR_OVERLAYS;
+
+    public static final int TYPE_ALL_EXCEPT_ON_BOARD_POPUP = TYPE_ALL & ~TYPE_ON_BOARD_POPUP
+            & ~TYPE_PIN_IME_POPUP;
 
     protected boolean mIsOpen;
 
@@ -160,10 +185,14 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
 
     protected abstract boolean isOfType(@FloatingViewType int type);
 
-    /** @return Whether the back is consumed. If false, Launcher will handle the back as well. */
-    public boolean onBackPressed() {
-        close(true);
+    /** Return true if this view can consume back press. */
+    public boolean canHandleBack() {
         return true;
+    }
+
+    @Override
+    public void onBackInvoked() {
+        close(true);
     }
 
     @Override

@@ -18,13 +18,17 @@ package com.android.quickstep.util;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.ArrayMap;
+import android.util.DisplayMetrics;
+import android.view.RemoteAnimationTarget;
 import android.view.Surface;
-import android.view.SurfaceControl;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
@@ -35,21 +39,22 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.LauncherModelHelper;
 import com.android.launcher3.util.NavigationMode;
-import com.android.launcher3.util.ReflectionHelpers;
 import com.android.launcher3.util.RotationUtils;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.quickstep.FallbackActivityInterface;
 import com.android.quickstep.SystemUiProxy;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
-import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
+import com.android.quickstep.util.SurfaceTransaction.MockProperties;
 
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -59,6 +64,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_portrait_noRotation_sameInsets1() {
         new TaskMatrixVerifier()
                 .withLauncherSize(1200, 2450)
+                .withDensityDpi(420)
                 .withInsets(new Rect(0, 80, 0, 120))
                 .verifyNoTransforms();
     }
@@ -67,6 +73,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_portrait_noRotation_sameInsets2() {
         new TaskMatrixVerifier()
                 .withLauncherSize(1200, 2450)
+                .withDensityDpi(420)
                 .withInsets(new Rect(55, 80, 55, 120))
                 .verifyNoTransforms();
     }
@@ -75,6 +82,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_landscape_noRotation_sameInsets1() {
         new TaskMatrixVerifier()
                 .withLauncherSize(2450, 1250)
+                .withDensityDpi(420)
                 .withInsets(new Rect(0, 80, 0, 40))
                 .verifyNoTransforms();
     }
@@ -83,6 +91,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_landscape_noRotation_sameInsets2() {
         new TaskMatrixVerifier()
                 .withLauncherSize(2450, 1250)
+                .withDensityDpi(420)
                 .withInsets(new Rect(0, 80, 120, 0))
                 .verifyNoTransforms();
     }
@@ -91,6 +100,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_landscape_noRotation_sameInsets3() {
         new TaskMatrixVerifier()
                 .withLauncherSize(2450, 1250)
+                .withDensityDpi(420)
                 .withInsets(new Rect(55, 80, 55, 120))
                 .verifyNoTransforms();
     }
@@ -99,6 +109,7 @@ public class TaskViewSimulatorTest {
     public void taskProperlyScaled_landscape_rotated() {
         new TaskMatrixVerifier()
                 .withLauncherSize(1200, 2450)
+                .withDensityDpi(420)
                 .withInsets(new Rect(0, 80, 0, 120))
                 .withAppBounds(
                         new Rect(0, 0, 2450, 1200),
@@ -110,6 +121,7 @@ public class TaskViewSimulatorTest {
     private static class TaskMatrixVerifier extends TransformParams {
 
         private Point mDisplaySize = new Point();
+        private int mDensityDpi = DisplayMetrics.DENSITY_DEFAULT;
         private Rect mDisplayInsets = new Rect();
         private Rect mAppBounds = new Rect();
         private Rect mLauncherInsets = new Rect();
@@ -124,6 +136,11 @@ public class TaskViewSimulatorTest {
             if (mAppBounds.isEmpty()) {
                 mAppBounds.set(0, 0, width, height);
             }
+            return this;
+        }
+
+        TaskMatrixVerifier withDensityDpi(int densityDpi) {
+            mDensityDpi = densityDpi;
             return this;
         }
 
@@ -151,7 +168,7 @@ public class TaskViewSimulatorTest {
                 WindowBounds wm = new WindowBounds(
                         new Rect(0, 0, mDisplaySize.x, mDisplaySize.y),
                         mDisplayInsets);
-                WindowBounds[] allBounds = new WindowBounds[4];
+                List<WindowBounds> allBounds = new ArrayList<>(4);
                 for (int i = 0; i < 4; i++) {
                     Rect boundsR = new Rect(wm.bounds);
                     Rect insetsR = new Rect(wm.insets);
@@ -159,7 +176,7 @@ public class TaskViewSimulatorTest {
                     RotationUtils.rotateRect(insetsR, RotationUtils.deltaRotation(rotation, i));
                     RotationUtils.rotateRect(boundsR, RotationUtils.deltaRotation(rotation, i));
                     boundsR.set(0, 0, Math.abs(boundsR.width()), Math.abs(boundsR.height()));
-                    allBounds[i] = new WindowBounds(boundsR, insetsR);
+                    allBounds.add(new WindowBounds(boundsR, insetsR));
                 }
 
                 WindowManagerProxy wmProxy = mock(WindowManagerProxy.class);
@@ -167,17 +184,21 @@ public class TaskViewSimulatorTest {
                 doReturn(wm).when(wmProxy).getRealBounds(any(), any());
                 doReturn(NavigationMode.NO_BUTTON).when(wmProxy).getNavigationMode(any());
 
-                ArrayMap<CachedDisplayInfo, WindowBounds[]> perDisplayBoundsCache =
+                ArrayMap<CachedDisplayInfo, List<WindowBounds>> perDisplayBoundsCache =
                         new ArrayMap<>();
                 perDisplayBoundsCache.put(cdi.normalize(), allBounds);
 
-                DisplayController.Info mockInfo = new Info(
-                        helper.sandboxContext, wmProxy, perDisplayBoundsCache);
+                Configuration configuration = new Configuration();
+                configuration.densityDpi = mDensityDpi;
+                Context configurationContext = helper.sandboxContext.createConfigurationContext(
+                        configuration);
 
-                DisplayController controller =
-                        DisplayController.INSTANCE.get(helper.sandboxContext);
-                controller.close();
-                ReflectionHelpers.setField(controller, "mInfo", mockInfo);
+                DisplayController.Info info = new Info(
+                        configurationContext, wmProxy, perDisplayBoundsCache);
+
+                DisplayController mockController = mock(DisplayController.class);
+                when(mockController.getInfo()).thenReturn(info);
+                helper.sandboxContext.putObject(DisplayController.INSTANCE, mockController);
 
                 mDeviceProfile = InvariantDeviceProfile.INSTANCE.get(helper.sandboxContext)
                         .getBestMatch(mAppBounds.width(), mAppBounds.height(), rotation);
@@ -187,7 +208,7 @@ public class TaskViewSimulatorTest {
                         FallbackActivityInterface.INSTANCE);
                 tvs.setDp(mDeviceProfile);
 
-                int launcherRotation = mockInfo.rotation;
+                int launcherRotation = info.rotation;
                 if (mAppRotation < 0) {
                     mAppRotation = launcherRotation;
                 }
@@ -207,17 +228,21 @@ public class TaskViewSimulatorTest {
         }
 
         @Override
-        public SurfaceParams[] createSurfaceParams(BuilderProxy proxy) {
-            SurfaceParams.Builder builder = new SurfaceParams.Builder((SurfaceControl) null);
-            proxy.onBuildTargetParams(builder, mock(RemoteAnimationTargetCompat.class), this);
-            return new SurfaceParams[] {builder.build()};
+        public SurfaceTransaction createSurfaceParams(BuilderProxy proxy) {
+            RecordingSurfaceTransaction transaction = new RecordingSurfaceTransaction();
+            proxy.onBuildTargetParams(
+                    transaction.mockProperties, mock(RemoteAnimationTarget.class), this);
+            return transaction;
         }
 
         @Override
-        public void applySurfaceParams(SurfaceParams[] params) {
+        public void applySurfaceParams(SurfaceTransaction params) {
+            Assert.assertTrue(params instanceof RecordingSurfaceTransaction);
+            MockProperties p = ((RecordingSurfaceTransaction) params).mockProperties;
+
             // Verify that the task position remains the same
             RectF newAppBounds = new RectF(mAppBounds);
-            params[0].matrix.mapRect(newAppBounds);
+            p.matrix.mapRect(newAppBounds);
             Assert.assertThat(newAppBounds, new AlmostSame(mAppBounds));
 
             System.err.println("Bounds mapped: " + mAppBounds + " => " + newAppBounds);

@@ -21,7 +21,6 @@ import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
-import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SEARCH_RESULTS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SETTINGS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SHORTCUTS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_TASKSWITCHER;
@@ -31,7 +30,6 @@ import static com.android.launcher3.LauncherSettings.Favorites.EXTENDED_CONTAINE
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_TASK;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.CONTAINER_NOT_SET;
 import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
@@ -39,20 +37,22 @@ import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Process;
 import android.os.UserHandle;
+import android.provider.Settings;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.LauncherSettings.Animation;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logger.LauncherAtom.AllAppsContainer;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logger.LauncherAtom.PredictionContainer;
-import com.android.launcher3.logger.LauncherAtom.SearchResultContainer;
 import com.android.launcher3.logger.LauncherAtom.SettingsContainer;
 import com.android.launcher3.logger.LauncherAtom.Shortcut;
 import com.android.launcher3.logger.LauncherAtom.ShortcutsContainer;
@@ -60,7 +60,12 @@ import com.android.launcher3.logger.LauncherAtom.TaskSwitcherContainer;
 import com.android.launcher3.logger.LauncherAtom.WallpapersContainer;
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.model.ModelWriter;
+import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.ContentWriter;
+import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.UserIconInfo;
+import com.android.systemui.shared.system.SysUiStatsLog;
 
 import java.util.Optional;
 
@@ -74,6 +79,9 @@ public class ItemInfo {
     // An id that doesn't match any item, including predicted apps with have an id=NO_ID
     public static final int NO_MATCHING_ID = Integer.MIN_VALUE;
 
+    /** Hidden field Settings.Secure.NAV_BAR_KIDS_MODE */
+    private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor("nav_bar_kids_mode");
+
     /**
      * The id in the settings database for this item
      */
@@ -81,13 +89,19 @@ public class ItemInfo {
 
     /**
      * One of {@link Favorites#ITEM_TYPE_APPLICATION},
-     * {@link Favorites#ITEM_TYPE_SHORTCUT},
      * {@link Favorites#ITEM_TYPE_DEEP_SHORTCUT}
      * {@link Favorites#ITEM_TYPE_FOLDER},
+     * {@link Favorites#ITEM_TYPE_APP_PAIR},
      * {@link Favorites#ITEM_TYPE_APPWIDGET} or
      * {@link Favorites#ITEM_TYPE_CUSTOM_APPWIDGET}.
      */
     public int itemType;
+
+    /**
+     * One of {@link Animation#DEFAULT},
+     * {@link Animation#VIEW_BACKGROUND}.
+     */
+    public int animationType = Animation.DEFAULT;
 
     /**
      * The id of the container that holds this item. For the desktop, this will be
@@ -181,6 +195,7 @@ public class ItemInfo {
         rank = info.rank;
         screenId = info.screenId;
         itemType = info.itemType;
+        animationType = info.animationType;
         container = info.container;
         user = info.user;
         contentDescription = info.contentDescription;
@@ -195,6 +210,12 @@ public class ItemInfo {
     @Nullable
     public ComponentName getTargetComponent() {
         return Optional.ofNullable(getIntent()).map(Intent::getComponent).orElse(mComponentName);
+    }
+
+    @Nullable
+    public final ComponentKey getComponentKey() {
+        ComponentName targetComponent = getTargetComponent();
+        return targetComponent == null ? null : new ComponentKey(targetComponent, user);
     }
 
     /**
@@ -294,6 +315,20 @@ public class ItemInfo {
     }
 
     /**
+     * Returns if an Item is in the hotseat.
+     */
+    public boolean isInHotseat() {
+        return container == CONTAINER_HOTSEAT || container == CONTAINER_HOTSEAT_PREDICTION;
+    }
+
+    /**
+     * Returns whether this item should use the background animation.
+     */
+    public boolean shouldUseBackgroundAnimation() {
+        return animationType == LauncherSettings.Animation.VIEW_BACKGROUND;
+    }
+
+    /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
     @NonNull
@@ -331,13 +366,6 @@ public class ItemInfo {
                                 })
                                 .orElse(LauncherAtom.Shortcut.newBuilder()));
                 break;
-            case ITEM_TYPE_SHORTCUT:
-                itemBuilder
-                        .setShortcut(nullableComponent
-                                .map(component -> LauncherAtom.Shortcut.newBuilder()
-                                        .setShortcutName(component.flattenToShortString()))
-                                .orElse(LauncherAtom.Shortcut.newBuilder()));
-                break;
             case ITEM_TYPE_APPWIDGET:
                 itemBuilder
                         .setWidget(nullableComponent
@@ -350,9 +378,11 @@ public class ItemInfo {
                 break;
             case ITEM_TYPE_TASK:
                 itemBuilder
-                        .setTask(LauncherAtom.Task.newBuilder()
-                                .setComponentName(getTargetComponent().flattenToShortString())
-                                .setIndex(screenId));
+                        .setTask(nullableComponent
+                                .map(component -> LauncherAtom.Task.newBuilder()
+                                        .setComponentName(component.flattenToShortString())
+                                        .setIndex(screenId))
+                                .orElse(LauncherAtom.Task.newBuilder()));
                 break;
             default:
                 break;
@@ -387,7 +417,12 @@ public class ItemInfo {
     @NonNull
     protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder() {
         LauncherAtom.ItemInfo.Builder itemBuilder = LauncherAtom.ItemInfo.newBuilder();
-        itemBuilder.setIsWork(!Process.myUserHandle().equals(user));
+        UserIconInfo info = getUserInfo();
+        itemBuilder.setIsWork(info != null && info.isWork());
+        itemBuilder.setUserType(getUserType(info));
+        SettingsCache settingsCache = SettingsCache.INSTANCE.getNoCreate();
+        boolean isKidsMode = settingsCache != null && settingsCache.getValue(NAV_BAR_KIDS_MODE, 0);
+        itemBuilder.setIsKidsMode(isKidsMode);
         itemBuilder.setRank(rank);
         return itemBuilder;
     }
@@ -428,10 +463,6 @@ public class ItemInfo {
                 return ContainerInfo.newBuilder()
                         .setPredictionContainer(PredictionContainer.getDefaultInstance())
                         .build();
-            case CONTAINER_SEARCH_RESULTS:
-                return ContainerInfo.newBuilder()
-                        .setSearchResultContainer(SearchResultContainer.getDefaultInstance())
-                        .build();
             case CONTAINER_SHORTCUTS:
                 return ContainerInfo.newBuilder()
                         .setShortcutsContainer(ShortcutsContainer.getDefaultInstance())
@@ -448,10 +479,12 @@ public class ItemInfo {
                 return ContainerInfo.newBuilder()
                         .setWallpapersContainer(WallpapersContainer.getDefaultInstance())
                         .build();
-            case EXTENDED_CONTAINERS:
-                return ContainerInfo.newBuilder()
-                        .setExtendedContainers(getExtendedContainer())
-                        .build();
+            default:
+                if (container <= EXTENDED_CONTAINERS) {
+                    return ContainerInfo.newBuilder()
+                            .setExtendedContainers(getExtendedContainer())
+                            .build();
+                }
         }
         return ContainerInfo.getDefaultInstance();
     }
@@ -481,5 +514,30 @@ public class ItemInfo {
     public void setTitle(@Nullable final CharSequence title,
             @Nullable final ModelWriter modelWriter) {
         this.title = title;
+    }
+
+    private UserIconInfo getUserInfo() {
+        UserCache userCache = UserCache.INSTANCE.getNoCreate();
+        if (userCache == null) {
+            return null;
+        }
+
+        return userCache.getUserInfo(user);
+    }
+
+    private int getUserType(UserIconInfo info) {
+        if (info == null) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_UNKNOWN;
+        } else if (info.isMain()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_MAIN;
+        } else if (info.isPrivate()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_PRIVATE;
+        } else if (info.isWork()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_WORK;
+        } else if (info.isCloned()) {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_CLONED;
+        } else {
+            return SysUiStatsLog.LAUNCHER_UICHANGED__USER_TYPE__TYPE_UNKNOWN;
+        }
     }
 }

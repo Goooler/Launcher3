@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -26,13 +28,15 @@ import android.view.View;
 import android.view.ViewOutlineProvider;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
+import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
-import com.android.quickstep.AnimatedFloat;
 import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 
 import java.io.PrintWriter;
@@ -45,7 +49,8 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     public static final int ALPHA_INDEX_STASHED = 0;
     public static final int ALPHA_INDEX_HOME_DISABLED = 1;
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 2;
-    private static final int NUM_ALPHA_CHANNELS = 3;
+    public static final int ALPHA_INDEX_HIDDEN_WHILE_DREAMING = 3;
+    private static final int NUM_ALPHA_CHANNELS = 4;
 
     /**
      * The SharedPreferences key for whether the stashed handle region is dark.
@@ -65,6 +70,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
 
     // Initialized in init.
     private TaskbarControllers mControllers;
+    private int mTaskbarSize;
 
     // The bounds we want to clip to in the settled state when showing the stashed handle.
     private final Rect mStashedHandleBounds = new Rect();
@@ -75,10 +81,17 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     private float mStartProgressForNextRevealAnim;
     private boolean mWasLastRevealAnimReversed;
 
+    // States that affect whether region sampling is enabled or not
+    private boolean mIsStashed;
+    private boolean mTaskbarHidden;
+
+    private float mTranslationYForSwipe;
+    private float mTranslationYForStash;
+
     public StashedHandleViewController(TaskbarActivityContext activity,
             StashedHandleView stashedHandleView) {
         mActivity = activity;
-        mPrefs = Utilities.getPrefs(mActivity);
+        mPrefs = LauncherPrefs.getPrefs(mActivity);
         mStashedHandleView = stashedHandleView;
         mTaskbarStashedHandleAlpha = new MultiValueAlpha(mStashedHandleView, NUM_ALPHA_CHANNELS);
         mTaskbarStashedHandleAlpha.setUpdateVisibility(true);
@@ -95,17 +108,18 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         Resources resources = mActivity.getResources();
         if (isPhoneGestureNavMode(mActivity.getDeviceProfile())) {
-            mStashedHandleView.getLayoutParams().height =
-                    resources.getDimensionPixelSize(R.dimen.taskbar_size);
+            mTaskbarSize = resources.getDimensionPixelSize(R.dimen.taskbar_phone_size);
             mStashedHandleWidth =
                     resources.getDimensionPixelSize(R.dimen.taskbar_stashed_small_screen);
         } else {
-            mStashedHandleView.getLayoutParams().height = deviceProfile.taskbarSize;
-            mStashedHandleWidth =
-                    resources.getDimensionPixelSize(R.dimen.taskbar_stashed_handle_width);
+            mTaskbarSize = deviceProfile.taskbarHeight;
+            mStashedHandleWidth = resources
+                    .getDimensionPixelSize(R.dimen.taskbar_stashed_handle_width);
         }
+        int taskbarBottomMargin = deviceProfile.taskbarBottomMargin;
+        mStashedHandleView.getLayoutParams().height = mTaskbarSize + taskbarBottomMargin;
 
-        mTaskbarStashedHandleAlpha.getProperty(ALPHA_INDEX_STASHED).setValue(
+        mTaskbarStashedHandleAlpha.get(ALPHA_INDEX_STASHED).setValue(
                 isPhoneGestureNavMode(deviceProfile) ? 1 : 0);
         mTaskbarStashedHandleHintScale.updateValue(1f);
 
@@ -139,6 +153,14 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         }
     }
 
+    /**
+     * Returns the stashed handle bounds.
+     * @param out The destination rect.
+     */
+    public void getStashedHandleBounds(Rect out) {
+        out.set(mStashedHandleBounds);
+    }
+
     private void initRegionSampler() {
         mRegionSamplingHelper = new RegionSamplingHelper(mStashedHandleView,
                 new RegionSamplingHelper.SamplingCallback() {
@@ -166,7 +188,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         return TaskbarManager.isPhoneMode(deviceProfile) && !mActivity.isThreeButtonNav();
     }
 
-    public MultiValueAlpha getStashedHandleAlpha() {
+    public MultiPropertyFactory<View> getStashedHandleAlpha() {
         return mTaskbarStashedHandleAlpha;
     }
 
@@ -180,9 +202,20 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
      * morphs into the size of where the taskbar icons will be.
      */
     public Animator createRevealAnimToIsStashed(boolean isStashed) {
+        Rect visualBounds = new Rect(mControllers.taskbarViewController.getIconLayoutBounds());
+        float startRadius = mStashedHandleRadius;
+
+        if (DisplayController.isTransientTaskbar(mActivity)) {
+            // Account for the full visual height of the transient taskbar.
+            int heightDiff = (mTaskbarSize - visualBounds.height()) / 2;
+            visualBounds.top -= heightDiff;
+            visualBounds.bottom += heightDiff;
+
+            startRadius = visualBounds.height() / 2f;
+        }
+
         final RevealOutlineAnimation handleRevealProvider = new RoundedRectRevealOutlineProvider(
-                mStashedHandleRadius, mStashedHandleRadius,
-                mControllers.taskbarViewController.getIconLayoutBounds(), mStashedHandleBounds);
+                startRadius, mStashedHandleRadius, visualBounds, mStashedHandleBounds);
 
         boolean isReversed = !isStashed;
         boolean changingDirection = mWasLastRevealAnimReversed != isReversed;
@@ -204,7 +237,8 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
 
     /** Called when taskbar is stashed or unstashed. */
     public void onIsStashedChanged(boolean isStashed) {
-        mRegionSamplingHelper.setWindowVisible(isStashed);
+        mIsStashed = isStashed;
+        updateRegionSamplingWindowVisibility();
         if (isStashed) {
             mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
             mRegionSamplingHelper.start(mStashedHandleView.getSampledRegion());
@@ -219,11 +253,40 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     }
 
     /**
+     * Sets the translation of the stashed handle during the swipe up gesture.
+     */
+    protected void setTranslationYForSwipe(float transY) {
+        mTranslationYForSwipe = transY;
+        updateTranslationY();
+    }
+
+    /**
+     * Sets the translation of the stashed handle during the spring on stash animation.
+     */
+    protected void setTranslationYForStash(float transY) {
+        mTranslationYForStash = transY;
+        updateTranslationY();
+    }
+
+    private void updateTranslationY() {
+        mStashedHandleView.setTranslationY(mTranslationYForSwipe + mTranslationYForStash);
+    }
+
+    /**
      * Should be called when the home button is disabled, so we can hide this handle as well.
      */
     public void setIsHomeButtonDisabled(boolean homeDisabled) {
-        mTaskbarStashedHandleAlpha.getProperty(ALPHA_INDEX_HOME_DISABLED).setValue(
+        mTaskbarStashedHandleAlpha.get(ALPHA_INDEX_HOME_DISABLED).setValue(
                 homeDisabled ? 0 : 1);
+    }
+
+    public void updateStateForSysuiFlags(int systemUiStateFlags) {
+        mTaskbarHidden = (systemUiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) != 0;
+        updateRegionSamplingWindowVisibility();
+    }
+
+    private void updateRegionSamplingWindowVisibility() {
+        mRegionSamplingHelper.setWindowVisible(mIsStashed && !mTaskbarHidden);
     }
 
     public boolean isStashedHandleVisible() {

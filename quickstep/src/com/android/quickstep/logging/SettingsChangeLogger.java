@@ -16,8 +16,9 @@
 
 package com.android.quickstep.logging;
 
-import static com.android.launcher3.Utilities.getDevicePrefs;
-import static com.android.launcher3.Utilities.getPrefs;
+import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+import static com.android.launcher3.LauncherPrefs.getDevicePrefs;
+import static com.android.launcher3.LauncherPrefs.getPrefs;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_SCREEN_SUGGESTIONS_DISABLED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_SCREEN_SUGGESTIONS_ENABLED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NOTIFICATION_DOT_DISABLED;
@@ -25,7 +26,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_THEMED_ICON_DISABLED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_THEMED_ICON_ENABLED;
 import static com.android.launcher3.model.DeviceGridState.KEY_WORKSPACE_SIZE;
-import static com.android.launcher3.model.QuickstepModelDelegate.LAST_PREDICTION_ENABLED_STATE;
+import static com.android.launcher3.model.PredictionUpdateTask.LAST_PREDICTION_ENABLED;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.SettingsCache.NOTIFICATION_BADGING_URI;
 import static com.android.launcher3.util.Themes.KEY_THEMED_ICONS;
@@ -39,6 +40,7 @@ import android.util.Log;
 import android.util.Xml;
 
 import com.android.launcher3.AutoInstallsLayout;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
@@ -48,6 +50,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.NavigationMode;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.SettingsCache;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -60,7 +63,8 @@ import java.util.Optional;
  * Utility class to log launcher settings changes
  */
 public class SettingsChangeLogger implements
-        DisplayController.DisplayInfoChangeListener, OnSharedPreferenceChangeListener {
+        DisplayController.DisplayInfoChangeListener, OnSharedPreferenceChangeListener,
+        SafeCloseable {
 
     /**
      * Singleton instance
@@ -151,13 +155,12 @@ public class SettingsChangeLogger implements
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-        if (LAST_PREDICTION_ENABLED_STATE.equals(key)
+        if (LAST_PREDICTION_ENABLED.getSharedPrefKey().equals(key)
                 || KEY_WORKSPACE_SIZE.equals(key)
                 || KEY_THEMED_ICONS.equals(key)
                 || mLoggablePrefs.containsKey(key)) {
 
-            mHomeScreenSuggestionEvent = getDevicePrefs(mContext)
-                    .getBoolean(LAST_PREDICTION_ENABLED_STATE, true)
+            mHomeScreenSuggestionEvent = LauncherPrefs.get(mContext).get(LAST_PREDICTION_ENABLED)
                     ? LAUNCHER_HOME_SCREEN_SUGGESTIONS_ENABLED
                     : LAUNCHER_HOME_SCREEN_SUGGESTIONS_DISABLED;
 
@@ -178,12 +181,18 @@ public class SettingsChangeLogger implements
                 logger::log);
 
         SharedPreferences prefs = getPrefs(mContext);
-        logger.log(prefs.getBoolean(KEY_THEMED_ICONS, false)
+        logger.log(LauncherPrefs.get(mContext).get(THEMED_ICONS)
                 ? LAUNCHER_THEMED_ICON_ENABLED
                 : LAUNCHER_THEMED_ICON_DISABLED);
 
         mLoggablePrefs.forEach((key, lp) -> logger.log(() ->
                 prefs.getBoolean(key, lp.defaultValue) ? lp.eventIdOn : lp.eventIdOff));
+    }
+
+    @Override
+    public void close() {
+        getPrefs(mContext).unregisterOnSharedPreferenceChangeListener(this);
+        getDevicePrefs(mContext).unregisterOnSharedPreferenceChangeListener(this);
     }
 
     private static class LoggablePref {

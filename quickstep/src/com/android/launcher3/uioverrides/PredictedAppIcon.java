@@ -15,8 +15,9 @@
  */
 package com.android.launcher3.uioverrides;
 
-import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
+import static com.android.app.animation.Interpolators.ACCELERATE_DECELERATE;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
+import static com.android.launcher3.icons.FastBitmapDrawable.getDisabledColorFilter;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -43,18 +44,19 @@ import android.view.ViewGroup;
 
 import androidx.core.graphics.ColorUtils;
 
-import com.android.launcher3.CellLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
+import com.android.launcher3.celllayout.DelegatedCellDrawing;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.icons.LauncherIcons;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.views.ActivityContext;
@@ -123,7 +125,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         int shadowSize = context.getResources().getDimensionPixelSize(
                 R.dimen.blur_size_thin_outline);
         mShadowFilter = new BlurMaskFilter(shadowSize, BlurMaskFilter.Blur.OUTER);
-        mShapePath = GraphicsUtils.getShapePath(mNormalizedIconSize);
+        mShapePath = GraphicsUtils.getShapePath(context, mNormalizedIconSize);
     }
 
     @Override
@@ -180,7 +182,16 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
                 : null;
         super.applyFromWorkspaceItem(info, animate, staggerIndex);
         int oldPlateColor = mPlateColor;
-        int newPlateColor = ColorUtils.setAlphaComponent(mDotParams.appColor, 200);
+
+        int newPlateColor;
+        if (getIcon().isThemed()) {
+            newPlateColor = getResources().getColor(android.R.color.system_accent1_300);
+        } else {
+            float[] hctPlateColor = new float[3];
+            ColorUtils.colorToM3HCT(mDotParams.appColor, hctPlateColor);
+            newPlateColor = ColorUtils.M3HCTToColor(hctPlateColor[0], 36, 85);
+        }
+
         if (!animate) {
             mPlateColor = newPlateColor;
         }
@@ -249,8 +260,8 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
                 Keyframe.ofFloat(0.82f, finalTrans - getOutlineOffsetY() / 2f), // Overshoot
                 Keyframe.ofFloat(1f, finalTrans) // Ease back into the final position
         };
-        keyframes[1].setInterpolator(ACCEL_DEACCEL);
-        keyframes[2].setInterpolator(ACCEL_DEACCEL);
+        keyframes[1].setInterpolator(ACCELERATE_DECELERATE);
+        keyframes[2].setInterpolator(ACCELERATE_DECELERATE);
 
         mSlotMachineAnim = ObjectAnimator.ofPropertyValuesHolder(this,
                 PropertyValuesHolder.ofKeyframe(SLOT_MACHINE_TRANSLATION_Y, keyframes));
@@ -271,7 +282,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         mIsPinned = true;
         applyFromWorkspaceItem(info);
         setOnLongClickListener(ItemLongClickListener.INSTANCE_WORKSPACE);
-        ((CellLayout.LayoutParams) getLayoutParams()).canReorder = true;
+        ((CellLayoutLayoutParams) getLayoutParams()).canReorder = true;
         invalidate();
     }
 
@@ -280,7 +291,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
      */
     public void finishBinding(OnLongClickListener longClickListener) {
         setOnLongClickListener(longClickListener);
-        ((CellLayout.LayoutParams) getLayoutParams()).canReorder = false;
+        ((CellLayoutLayoutParams) getLayoutParams()).canReorder = false;
         setTextVisibility(false);
         verifyHighRes();
     }
@@ -326,7 +337,6 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         if (getTag() instanceof WorkspaceItemInfo) {
             WorkspaceItemInfo info = (WorkspaceItemInfo) getTag();
             isBadged = !Process.myUserHandle().equals(info.user)
-                    || info.itemType == LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT
                     || info.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
         }
 
@@ -360,6 +370,19 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     }
 
     @Override
+    public void setIconDisabled(boolean isDisabled) {
+        super.setIconDisabled(isDisabled);
+        mIconRingPaint.setColorFilter(isDisabled ? getDisabledColorFilter() : null);
+        invalidate();
+    }
+
+    @Override
+    protected void setItemInfo(ItemInfoWithIcon itemInfo) {
+        super.setItemInfo(itemInfo);
+        setIconDisabled(itemInfo.isDisabled());
+    }
+
+    @Override
     public void getSourceVisualDragBounds(Rect bounds) {
         super.getSourceVisualDragBounds(bounds);
         if (!mIsPinned) {
@@ -386,15 +409,16 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         PredictedAppIcon icon = (PredictedAppIcon) LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.predicted_app_icon, parent, false);
         icon.applyFromWorkspaceItem(info);
-        icon.setOnClickListener(ItemClickHandler.INSTANCE);
-        icon.setOnFocusChangeListener(Launcher.getLauncher(parent.getContext()).getFocusHandler());
+        Launcher launcher = Launcher.getLauncher(parent.getContext());
+        icon.setOnClickListener(launcher.getItemOnClickListener());
+        icon.setOnFocusChangeListener(launcher.getFocusHandler());
         return icon;
     }
 
     /**
      * Draws Predicted Icon outline on cell layout
      */
-    public static class PredictedIconOutlineDrawing extends CellLayout.DelegatedCellDrawing {
+    public static class PredictedIconOutlineDrawing extends DelegatedCellDrawing {
 
         private final PredictedAppIcon mIcon;
         private final Paint mOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);

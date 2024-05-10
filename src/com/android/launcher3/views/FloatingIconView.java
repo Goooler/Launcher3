@@ -17,8 +17,9 @@ package com.android.launcher3.views;
 
 import static android.view.Gravity.LEFT;
 
-import static com.android.launcher3.Utilities.getBadge;
+import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.Utilities.getFullDrawable;
+import static com.android.launcher3.Utilities.mapToRange;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.views.IconLabelDotView.setIconAndDotVisible;
 
@@ -34,6 +35,7 @@ import android.os.Build;
 import android.os.CancellationSignal;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
@@ -78,7 +80,6 @@ public class FloatingIconView extends FrameLayout implements
 
     public static final float SHAPE_PROGRESS_DURATION = 0.10f;
     private static final RectF sTmpRectF = new RectF();
-    private static final Object[] sTmpObjArray = new Object[1];
 
     private Runnable mEndRunnable;
     private CancellationSignal mLoadIconSignal;
@@ -94,6 +95,12 @@ public class FloatingIconView extends FrameLayout implements
 
     private ClipIconView mClipIconView;
     private @Nullable Drawable mBadge;
+
+    // A view whose visibility should update in sync with mOriginalIcon.
+    private @Nullable View mMatchVisibilityView;
+
+    // A view that will fade out as the animation progresses.
+    private @Nullable View mFadeOutView;
 
     private View mOriginalIcon;
     private RectF mPositionOut;
@@ -143,17 +150,21 @@ public class FloatingIconView extends FrameLayout implements
     /**
      * Positions this view to match the size and location of {@param rect}.
      * @param alpha The alpha[0, 1] of the entire floating view.
-     * @param fgIconAlpha The alpha[0-255] of the foreground layer of the icon (if applicable).
      * @param progress A value from [0, 1] that represents the animation progress.
      * @param shapeProgressStart The progress value at which to start the shape reveal.
      * @param cornerRadius The corner radius of {@param rect}.
      * @param isOpening True if view is used for app open animation, false for app close animation.
      */
-    public void update(float alpha, int fgIconAlpha, RectF rect, float progress,
-            float shapeProgressStart, float cornerRadius, boolean isOpening) {
+    public void update(float alpha, RectF rect, float progress, float shapeProgressStart,
+            float cornerRadius, boolean isOpening) {
         setAlpha(alpha);
-        mClipIconView.update(rect, progress, shapeProgressStart, cornerRadius, fgIconAlpha,
-                isOpening, this, mLauncher.getDeviceProfile());
+        mClipIconView.update(rect, progress, shapeProgressStart, cornerRadius, isOpening, this,
+                mLauncher.getDeviceProfile());
+
+        if (mFadeOutView != null) {
+            // The alpha goes from 1 to 0 when progress is 0 and 0.33 respectively.
+            mFadeOutView.setAlpha(1 - Math.min(1f, mapToRange(progress, 0, 0.33f, 0, 1, LINEAR)));
+        }
     }
 
     @Override
@@ -277,25 +288,20 @@ public class FloatingIconView extends FrameLayout implements
         } else {
             int width = (int) pos.width();
             int height = (int) pos.height();
+            Pair<AdaptiveIconDrawable, Drawable> fullIcon = null;
             if (supportsAdaptiveIcons) {
-                boolean shouldThemeIcon = btvIcon instanceof FastBitmapDrawable
-                        && ((FastBitmapDrawable) btvIcon).isThemed();
-                drawable = getFullDrawable(l, info, width, height, shouldThemeIcon, sTmpObjArray);
-                if (drawable instanceof AdaptiveIconDrawable) {
-                    badge = getBadge(l, info, sTmpObjArray[0]);
-                } else {
-                    // The drawable we get back is not an adaptive icon, so we need to use the
-                    // BubbleTextView icon that is already legacy treated.
-                    drawable = btvIcon;
-                }
+                boolean shouldThemeIcon = (btvIcon instanceof FastBitmapDrawable fbd)
+                        && fbd.isCreatedForTheme();
+                fullIcon = getFullDrawable(l, info, width, height, shouldThemeIcon);
+            } else if (!(originalView instanceof BubbleTextView)) {
+                fullIcon = getFullDrawable(l, info, width, height, true /* shouldThemeIcon */);
+            }
+
+            if (fullIcon != null) {
+                drawable = fullIcon.first;
+                badge = fullIcon.second;
             } else {
-                if (originalView instanceof BubbleTextView) {
-                    // Similar to DragView, we simply use the BubbleTextView icon here.
-                    drawable = btvIcon;
-                } else {
-                    drawable = getFullDrawable(l, info, width, height, true /* shouldThemeIcon */,
-                            sTmpObjArray);
-                }
+                drawable = btvIcon;
             }
         }
 
@@ -386,7 +392,7 @@ public class FloatingIconView extends FrameLayout implements
      * Checks if the icon result is loaded. If true, we set the icon immediately. Else, we add a
      * callback to set the icon once the icon result is loaded.
      */
-    private void checkIconResult(View originalView) {
+    private void checkIconResult() {
         CancellationSignal cancellationSignal = new CancellationSignal();
 
         if (mIconLoadResult == null) {
@@ -399,7 +405,7 @@ public class FloatingIconView extends FrameLayout implements
                 setIcon(mIconLoadResult.drawable, mIconLoadResult.badge,
                         mIconLoadResult.btvDrawable, mIconLoadResult.iconOffset);
                 setVisibility(VISIBLE);
-                setIconAndDotVisible(originalView, false);
+                updateViewsVisibility(false  /* isVisible */);
             } else {
                 mIconLoadResult.onIconLoaded = () -> {
                     if (cancellationSignal.isCanceled()) {
@@ -410,7 +416,7 @@ public class FloatingIconView extends FrameLayout implements
                             mIconLoadResult.btvDrawable, mIconLoadResult.iconOffset);
 
                     setVisibility(VISIBLE);
-                    setIconAndDotVisible(originalView, false);
+                    updateViewsVisibility(false  /* isVisible */);
                 };
                 mLoadIconSignal = cancellationSignal;
             }
@@ -481,9 +487,9 @@ public class FloatingIconView extends FrameLayout implements
             // No need to wait for icon load since we can display the BubbleTextView drawable.
             setVisibility(View.VISIBLE);
         }
-        if (!mIsOpening && mOriginalIcon != null) {
+        if (!mIsOpening) {
             // When closing an app, we want the item on the workspace to be invisible immediately
-            setIconAndDotVisible(mOriginalIcon, false);
+            updateViewsVisibility(false  /* isVisible */);
         }
     }
 
@@ -560,15 +566,25 @@ public class FloatingIconView extends FrameLayout implements
     }
 
     /**
+     * Resets the static icon load result used for preloading the icon for a launching app.
+     */
+    public static void resetIconLoadResult() {
+        sIconLoadResult = null;
+    }
+
+    /**
      * Creates a floating icon view for {@param originalView}.
      * @param originalView The view to copy
+     * @param visibilitySyncView A view whose visibility should update in sync with originalView.
+     * @param fadeOutView A view that will fade out as the animation progresses.
      * @param hideOriginal If true, it will hide {@param originalView} while this view is visible.
      *                     Else, we will not draw anything in this view.
      * @param positionOut Rect that will hold the size and position of v.
      * @param isOpening True if this view replaces the icon for app open animation.
      */
     public static FloatingIconView getFloatingIconView(Launcher launcher, View originalView,
-            boolean hideOriginal, RectF positionOut, boolean isOpening) {
+            @Nullable View visibilitySyncView, @Nullable View fadeOutView, boolean hideOriginal,
+            RectF positionOut, boolean isOpening) {
         final DragLayer dragLayer = launcher.getDragLayer();
         ViewGroup parent = (ViewGroup) dragLayer.getParent();
         FloatingIconView view = launcher.getViewCache().getView(R.layout.floating_icon_view,
@@ -578,6 +594,8 @@ public class FloatingIconView extends FrameLayout implements
         // Init properties before getting the drawable.
         view.mIsOpening = isOpening;
         view.mOriginalIcon = originalView;
+        view.mMatchVisibilityView = visibilitySyncView;
+        view.mFadeOutView = fadeOutView;
         view.mPositionOut = positionOut;
 
         // Get the drawable on the background thread
@@ -591,13 +609,14 @@ public class FloatingIconView extends FrameLayout implements
             }
             view.setOriginalDrawableBackground(view.mIconLoadResult.btvDrawable);
         }
-        sIconLoadResult = null;
+        resetIconLoadResult();
 
         // Match the position of the original view.
         view.matchPositionOf(launcher, originalView, isOpening, positionOut);
 
         // We need to add it to the overlay, but keep it invisible until animation starts..
-        setIconAndDotVisible(view, false);
+        view.setVisibility(View.INVISIBLE);
+
         parent.addView(view);
         dragLayer.addView(view.mListenerView);
         view.mListenerView.setListener(view::fastFinish);
@@ -605,8 +624,12 @@ public class FloatingIconView extends FrameLayout implements
         view.mEndRunnable = () -> {
             view.mEndRunnable = null;
 
+            if (view.mFadeOutView != null) {
+                view.mFadeOutView.setAlpha(1f);
+            }
+
             if (hideOriginal) {
-                setIconAndDotVisible(originalView, true);
+                view.updateViewsVisibility(true /* isVisible */);
                 view.finish(dragLayer);
             } else {
                 view.finish(dragLayer);
@@ -617,10 +640,19 @@ public class FloatingIconView extends FrameLayout implements
         // Must be called after the fastFinish listener and end runnable is created so that
         // the icon is not left in a hidden state.
         if (shouldLoadIcon) {
-            view.checkIconResult(originalView);
+            view.checkIconResult();
         }
 
         return view;
+    }
+
+    private void updateViewsVisibility(boolean isVisible) {
+        if (mOriginalIcon != null) {
+            setIconAndDotVisible(mOriginalIcon, isVisible);
+        }
+        if (mMatchVisibilityView != null) {
+            setIconAndDotVisible(mMatchVisibilityView, isVisible);
+        }
     }
 
     private void finish(DragLayer dragLayer) {
@@ -648,13 +680,14 @@ public class FloatingIconView extends FrameLayout implements
         mOriginalIcon = null;
         mOnTargetChangeRunnable = null;
         mBadge = null;
-        sTmpObjArray[0] = null;
         sRecycledFetchIconId = sFetchIconId;
         mIconLoadResult = null;
         mClipIconView.recycle();
         mBtvDrawable.setBackground(null);
         mFastFinishRunnable = null;
         mIconOffsetY = 0;
+        mMatchVisibilityView = null;
+        mFadeOutView = null;
     }
 
     private static class IconLoadResult {

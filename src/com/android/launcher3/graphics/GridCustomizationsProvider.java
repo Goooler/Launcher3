@@ -1,8 +1,22 @@
+/*
+ * Copyright (C) 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.android.launcher3.graphics;
 
-import static com.android.launcher3.Utilities.getPrefs;
+import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.launcher3.util.Themes.KEY_THEMED_ICONS;
 import static com.android.launcher3.util.Themes.isThemedIconEnabled;
 
 import android.annotation.TargetApi;
@@ -22,9 +36,11 @@ import android.os.Message;
 import android.os.Messenger;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.Pair;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile.GridOption;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.Executors;
 
@@ -66,8 +82,15 @@ public class GridCustomizationsProvider extends ContentProvider {
 
     private static final String KEY_SURFACE_PACKAGE = "surface_package";
     private static final String KEY_CALLBACK = "callback";
+    public static final String KEY_HIDE_BOTTOM_ROW = "hide_bottom_row";
 
-    private final ArrayMap<IBinder, PreviewLifecycleObserver> mActivePreviews = new ArrayMap<>();
+    private static final int MESSAGE_ID_UPDATE_PREVIEW = 1337;
+
+    /**
+     * Here we use the IBinder and the screen ID as the key of the active previews.
+     */
+    private final ArrayMap<Pair<IBinder, Integer>, PreviewLifecycleObserver> mActivePreviews =
+            new ArrayMap<>();
 
     @Override
     public boolean onCreate() {
@@ -79,7 +102,7 @@ public class GridCustomizationsProvider extends ContentProvider {
             String[] selectionArgs, String sortOrder) {
         switch (uri.getPath()) {
             case KEY_LIST_OPTIONS: {
-                MatrixCursor cursor = new MatrixCursor(new String[] {
+                MatrixCursor cursor = new MatrixCursor(new String[]{
                         KEY_NAME, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT, KEY_IS_DEFAULT});
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
                 for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
@@ -95,7 +118,7 @@ public class GridCustomizationsProvider extends ContentProvider {
             }
             case GET_ICON_THEMED:
             case ICON_THEMED: {
-                MatrixCursor cursor = new MatrixCursor(new String[] {BOOLEAN_VALUE});
+                MatrixCursor cursor = new MatrixCursor(new String[]{BOOLEAN_VALUE});
                 cursor.newRow().add(BOOLEAN_VALUE, isThemedIconEnabled(getContext()) ? 1 : 0);
                 return cursor;
             }
@@ -138,13 +161,14 @@ public class GridCustomizationsProvider extends ContentProvider {
                 }
 
                 idp.setCurrentGrid(getContext(), gridName);
+                getContext().getContentResolver().notifyChange(uri, null);
                 return 1;
             }
             case ICON_THEMED:
             case SET_ICON_THEMED: {
-                getPrefs(getContext()).edit()
-                        .putBoolean(KEY_THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE))
-                        .apply();
+                LauncherPrefs.get(getContext())
+                        .put(THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE));
+                getContext().getContentResolver().notifyChange(uri, null);
                 return 1;
             }
             default:
@@ -172,11 +196,10 @@ public class GridCustomizationsProvider extends ContentProvider {
         try {
             PreviewSurfaceRenderer renderer = new PreviewSurfaceRenderer(getContext(), request);
 
-            // Destroy previous
-            destroyObserver(mActivePreviews.get(renderer.getHostToken()));
-
             observer = new PreviewLifecycleObserver(renderer);
-            mActivePreviews.put(renderer.getHostToken(), observer);
+            // Destroy previous
+            destroyObserver(mActivePreviews.get(observer.getIdentifier()));
+            mActivePreviews.put(observer.getIdentifier(), observer);
 
             renderer.loadAsync();
             renderer.getHostToken().linkToDeath(observer, 0);
@@ -206,9 +229,9 @@ public class GridCustomizationsProvider extends ContentProvider {
         observer.destroyed = true;
         observer.renderer.getHostToken().unlinkToDeath(observer, 0);
         Executors.MAIN_EXECUTOR.execute(observer.renderer::destroy);
-        PreviewLifecycleObserver cached = mActivePreviews.get(observer.renderer.getHostToken());
+        PreviewLifecycleObserver cached = mActivePreviews.get(observer.getIdentifier());
         if (cached == observer) {
-            mActivePreviews.remove(observer.renderer.getHostToken());
+            mActivePreviews.remove(observer.getIdentifier());
         }
     }
 
@@ -223,13 +246,29 @@ public class GridCustomizationsProvider extends ContentProvider {
 
         @Override
         public boolean handleMessage(Message message) {
-            destroyObserver(this);
+            if (destroyed) {
+                return true;
+            }
+            if (message.what == MESSAGE_ID_UPDATE_PREVIEW) {
+                renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
+            } else {
+                destroyObserver(this);
+            }
             return true;
         }
 
         @Override
         public void binderDied() {
             destroyObserver(this);
+        }
+
+        /**
+         * Returns a key that should make the PreviewSurfaceRenderer unique and if two of them have
+         * the same key they will be treated as the same PreviewSurfaceRenderer. Primary this is
+         * used to prevent memory leaks by removing the old PreviewSurfaceRenderer.
+         */
+        public Pair<IBinder, Integer> getIdentifier() {
+            return new Pair<>(renderer.getHostToken(), renderer.getDisplayId());
         }
     }
 }

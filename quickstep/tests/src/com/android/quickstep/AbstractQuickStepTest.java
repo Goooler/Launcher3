@@ -16,13 +16,17 @@
 
 package com.android.quickstep;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.launcher3.ui.TaplTestsLauncher3.getAppPackageName;
 
 import static org.junit.Assert.assertTrue;
 
 import android.os.SystemProperties;
 
+import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.Until;
+
 import com.android.launcher3.Launcher;
+import com.android.launcher3.tapl.LaunchedAppState;
 import com.android.launcher3.tapl.LauncherInstrumentation;
 import com.android.launcher3.tapl.LauncherInstrumentation.ContainerType;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
@@ -36,11 +40,12 @@ import org.junit.rules.TestRule;
  */
 public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
     public static final boolean ENABLE_SHELL_TRANSITIONS =
-            SystemProperties.getBoolean("persist.wm.debug.shell_transit", false);
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit", true);
     @Override
     protected TestRule getRulesInsideActivityMonitor() {
         return RuleChain.
                 outerRule(new NavigationModeSwitchRule(mLauncher)).
+                around(new TaskbarModeSwitchRule(mLauncher)).
                 around(super.getRulesInsideActivityMonitor());
     }
 
@@ -77,10 +82,24 @@ public abstract class AbstractQuickStepTest extends AbstractLauncherUiTest {
         }
     }
 
+    protected void assertTestActivityIsRunning(int activityNumber, String message) {
+        assertTrue(message, mDevice.wait(
+                Until.hasObject(By.pkg(getAppPackageName()).text("TestActivity" + activityNumber)),
+                DEFAULT_UI_TIMEOUT));
+    }
+
+    protected LaunchedAppState getAndAssertLaunchedApp() {
+        final LaunchedAppState launchedAppState = mLauncher.getLaunchedAppState();
+        executeOnLauncher(launcher -> assertTrue(
+                "Launcher activity is the top activity; expecting another activity to be the top "
+                        + "one",
+                isInLaunchedApp(launcher)));
+        return launchedAppState;
+    }
+
     private boolean isInLiveTileMode(Launcher launcher,
             LauncherInstrumentation.ContainerType expectedContainerType) {
-        if (!ENABLE_QUICKSTEP_LIVE_TILE.get()
-                || expectedContainerType != LauncherInstrumentation.ContainerType.OVERVIEW) {
+        if (expectedContainerType != LauncherInstrumentation.ContainerType.OVERVIEW) {
             return false;
         }
 

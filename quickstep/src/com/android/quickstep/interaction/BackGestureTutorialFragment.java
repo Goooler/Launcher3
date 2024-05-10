@@ -34,7 +34,19 @@ import java.util.ArrayList;
 /** Shows the Back gesture interactive tutorial. */
 public class BackGestureTutorialFragment extends TutorialFragment {
 
-    public BackGestureTutorialFragment() {}
+    public BackGestureTutorialFragment() {
+        this(false);
+    }
+
+    public BackGestureTutorialFragment(boolean fromTutorialMenu) {
+        super(fromTutorialMenu);
+    }
+
+    @NonNull
+    @Override
+    TutorialType getDefaultTutorialType() {
+        return TutorialType.BACK_NAVIGATION;
+    }
 
     @Nullable
     @Override

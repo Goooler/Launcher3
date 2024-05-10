@@ -18,12 +18,13 @@ package com.android.launcher3.model;
 import static android.text.format.DateUtils.DAY_IN_MILLIS;
 import static android.text.format.DateUtils.formatElapsedTime;
 
+import static com.android.launcher3.LauncherPrefs.nonRestorableItem;
+import static com.android.launcher3.EncryptionType.ENCRYPTED;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
-import static com.android.launcher3.Utilities.getDevicePrefs;
 import static com.android.launcher3.hybridhotseat.HotseatPredictionModel.convertDataModelToAppTargetBundle;
 import static com.android.launcher3.model.PredictionHelper.getAppTargetFromItemInfo;
 import static com.android.launcher3.model.PredictionHelper.wrapAppTargetWithItemLocation;
@@ -39,7 +40,6 @@ import android.app.prediction.AppTarget;
 import android.app.prediction.AppTargetEvent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.ShortcutInfo;
@@ -48,11 +48,18 @@ import android.os.UserHandle;
 import android.util.Log;
 import android.util.StatsEvent;
 
+import androidx.annotation.AnyThread;
+import androidx.annotation.CallSuper;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.ConstantItem;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
@@ -62,6 +69,7 @@ import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
+import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSparseArrayMap;
 import com.android.launcher3.util.PersistedItemArray;
 import com.android.quickstep.logging.SettingsChangeLogger;
@@ -80,19 +88,23 @@ import java.util.stream.IntStream;
  */
 public class QuickstepModelDelegate extends ModelDelegate {
 
-    public static final String LAST_PREDICTION_ENABLED_STATE = "last_prediction_enabled_state";
-    private static final String LAST_SNAPSHOT_TIME_MILLIS = "LAST_SNAPSHOT_TIME_MILLIS";
     private static final String BUNDLE_KEY_ADDED_APP_WIDGETS = "added_app_widgets";
     private static final int NUM_OF_RECOMMENDED_WIDGETS_PREDICATION = 20;
 
     private static final boolean IS_DEBUG = false;
     private static final String TAG = "QuickstepModelDelegate";
 
-    private final PredictorState mAllAppsState =
+    private static final ConstantItem<Long> LAST_SNAPSHOT_TIME_MILLIS =
+            nonRestorableItem("LAST_SNAPSHOT_TIME_MILLIS", 0L, ENCRYPTED);
+
+    @VisibleForTesting
+    final PredictorState mAllAppsState =
             new PredictorState(CONTAINER_PREDICTION, "all_apps_predictions");
-    private final PredictorState mHotseatState =
+    @VisibleForTesting
+    final PredictorState mHotseatState =
             new PredictorState(CONTAINER_HOTSEAT_PREDICTION, "hotseat_predictions");
-    private final PredictorState mWidgetsRecommendationState =
+    @VisibleForTesting
+    final PredictorState mWidgetsRecommendationState =
             new PredictorState(CONTAINER_WIDGETS_PREDICTION, "widgets_prediction");
 
     private final InvariantDeviceProfile mIDP;
@@ -111,28 +123,82 @@ public class QuickstepModelDelegate extends ModelDelegate {
         mStatsManager = context.getSystemService(StatsManager.class);
     }
 
+    @CallSuper
     @Override
+    public void loadAndBindWorkspaceItems(@NonNull UserManagerState ums,
+            @NonNull BgDataModel.Callbacks[] callbacks,
+            @NonNull Map<ShortcutKey, ShortcutInfo> pinnedShortcuts) {
+        loadAndBindItems(ums, pinnedShortcuts, callbacks, mIDP.numDatabaseHotseatIcons,
+                mHotseatState);
+    }
+
+    @CallSuper
+    @Override
+    public void loadAndBindAllAppsItems(@NonNull UserManagerState ums,
+            @NonNull BgDataModel.Callbacks[] callbacks,
+            @NonNull Map<ShortcutKey, ShortcutInfo> pinnedShortcuts) {
+        loadAndBindItems(ums, pinnedShortcuts, callbacks, mIDP.numDatabaseAllAppsColumns,
+                mAllAppsState);
+    }
+
     @WorkerThread
-    public void loadItems(UserManagerState ums, Map<ShortcutKey, ShortcutInfo> pinnedShortcuts) {
+    private void loadAndBindItems(@NonNull UserManagerState ums,
+            @NonNull Map<ShortcutKey, ShortcutInfo> pinnedShortcuts,
+            @NonNull BgDataModel.Callbacks[] callbacks,
+            int numColumns, @NonNull PredictorState state) {
         // TODO: Implement caching and preloading
-        super.loadItems(ums, pinnedShortcuts);
 
-        WorkspaceItemFactory allAppsFactory = new WorkspaceItemFactory(mApp, ums, pinnedShortcuts,
-                mIDP.numDatabaseAllAppsColumns, mAllAppsState.containerId);
-        FixedContainerItems allAppsPredictionItems = new FixedContainerItems(
-                mAllAppsState.containerId, mAllAppsState.storage.read(mApp.getContext(),
-                allAppsFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(mAllAppsState.containerId, allAppsPredictionItems);
+        WorkspaceItemFactory factory =
+                new WorkspaceItemFactory(mApp, ums, pinnedShortcuts, numColumns, state.containerId);
+        FixedContainerItems fci = new FixedContainerItems(state.containerId,
+                state.storage.read(mApp.getContext(), factory, ums.allUsers::get));
+        if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
+            bindPredictionItems(callbacks, fci);
+        }
+        mDataModel.extraItems.put(state.containerId, fci);
+    }
 
-        WorkspaceItemFactory hotseatFactory = new WorkspaceItemFactory(mApp, ums, pinnedShortcuts,
-                mIDP.numDatabaseHotseatIcons, mHotseatState.containerId);
-        FixedContainerItems hotseatItems = new FixedContainerItems(mHotseatState.containerId,
-                mHotseatState.storage.read(mApp.getContext(), hotseatFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(mHotseatState.containerId, hotseatItems);
+    @CallSuper
+    @Override
+    public void loadAndBindOtherItems(@NonNull BgDataModel.Callbacks[] callbacks) {
+        FixedContainerItems widgetPredictionFCI = new FixedContainerItems(
+                mWidgetsRecommendationState.containerId, new ArrayList<>());
 
         // Widgets prediction isn't used frequently. And thus, it is not persisted on disk.
-        mDataModel.extraItems.put(mWidgetsRecommendationState.containerId,
-                new FixedContainerItems(mWidgetsRecommendationState.containerId));
+        mDataModel.extraItems.put(mWidgetsRecommendationState.containerId, widgetPredictionFCI);
+
+        bindPredictionItems(callbacks, widgetPredictionFCI);
+        loadStringCache(mDataModel.stringCache);
+    }
+
+    @AnyThread
+    private void bindPredictionItems(@NonNull BgDataModel.Callbacks[] callbacks,
+            @NonNull FixedContainerItems fci) {
+        Executors.MAIN_EXECUTOR.execute(() -> {
+            for (BgDataModel.Callbacks c : callbacks) {
+                c.bindExtraContainerItems(fci);
+            }
+        });
+    }
+
+    @Override
+    @WorkerThread
+    public void bindAllModelExtras(@NonNull BgDataModel.Callbacks[] callbacks) {
+        Iterable<FixedContainerItems> containerItems;
+        synchronized (mDataModel.extraItems) {
+            containerItems = mDataModel.extraItems.clone();
+        }
+        Executors.MAIN_EXECUTOR.execute(() -> {
+            for (BgDataModel.Callbacks c : callbacks) {
+                for (FixedContainerItems fci : containerItems) {
+                    c.bindExtraContainerItems(fci);
+                }
+            }
+        });
+    }
+
+    public void markActive() {
+        super.markActive();
         mActive = true;
     }
 
@@ -148,8 +214,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
         super.modelLoadComplete();
 
         // Log snapshot of the model
-        SharedPreferences prefs = getDevicePrefs(mApp.getContext());
-        long lastSnapshotTimeMillis = prefs.getLong(LAST_SNAPSHOT_TIME_MILLIS, 0);
+        LauncherPrefs prefs = LauncherPrefs.get(mApp.getContext());
+        long lastSnapshotTimeMillis = prefs.get(LAST_SNAPSHOT_TIME_MILLIS);
         // Log snapshot only if previous snapshot was older than a day
         long now = System.currentTimeMillis();
         if (now - lastSnapshotTimeMillis < DAY_IN_MILLIS) {
@@ -170,7 +236,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
                 StatsLogCompatManager.writeSnapshot(info.buildProto(parent), instanceId);
             }
             additionalSnapshotEvents(instanceId);
-            prefs.edit().putLong(LAST_SNAPSHOT_TIME_MILLIS, now).apply();
+            prefs.put(LAST_SNAPSHOT_TIME_MILLIS, now);
         }
 
         // Only register for launcher snapshot logging if this is the primary ModelDelegate
@@ -289,12 +355,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
                         .build()));
 
         // TODO: get bundle
-        registerPredictor(mHotseatState, apm.createAppPredictionSession(
-                new AppPredictionContext.Builder(context)
-                        .setUiSurface("hotseat")
-                        .setPredictedTargetCount(mIDP.numDatabaseHotseatIcons)
-                        .setExtras(convertDataModelToAppTargetBundle(context, mDataModel))
-                        .build()));
+        registerHotseatPredictor(apm, context);
 
         registerWidgetsPredictor(apm.createAppPredictionSession(
                 new AppPredictionContext.Builder(context)
@@ -304,7 +365,31 @@ public class QuickstepModelDelegate extends ModelDelegate {
                         .build()));
     }
 
+    @WorkerThread
+    private void recreateHotseatPredictor() {
+        mHotseatState.destroyPredictor();
+        if (!mActive) {
+            return;
+        }
+        Context context = mApp.getContext();
+        AppPredictionManager apm = context.getSystemService(AppPredictionManager.class);
+        if (apm == null) {
+            return;
+        }
+        registerHotseatPredictor(apm, context);
+    }
+
+    private void registerHotseatPredictor(AppPredictionManager apm, Context context) {
+        registerPredictor(mHotseatState, apm.createAppPredictionSession(
+                new AppPredictionContext.Builder(context)
+                        .setUiSurface("hotseat")
+                        .setPredictedTargetCount(mIDP.numDatabaseHotseatIcons)
+                        .setExtras(convertDataModelToAppTargetBundle(context, mDataModel))
+                        .build()));
+    }
+
     private void registerPredictor(PredictorState state, AppPredictor predictor) {
+        state.setTargets(Collections.emptyList());
         state.predictor = predictor;
         state.predictor.registerPredictionUpdates(
                 MODEL_EXECUTOR, t -> handleUpdate(state, t));
@@ -333,7 +418,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
         mWidgetsRecommendationState.predictor.requestPredictionUpdate();
     }
 
-    private void onAppTargetEvent(AppTargetEvent event, int client) {
+    @VisibleForTesting
+    void onAppTargetEvent(AppTargetEvent event, int client) {
         PredictorState state;
         switch(client) {
             case CONTAINER_PREDICTION:
@@ -351,6 +437,13 @@ public class QuickstepModelDelegate extends ModelDelegate {
             state.predictor.notifyAppTargetEvent(event);
             Log.d(TAG, "notifyAppTargetEvent action=" + event.getAction()
                     + " launchLocation=" + event.getLaunchLocation());
+            if (state == mHotseatState
+                    && (event.getAction() == AppTargetEvent.ACTION_PIN
+                            || event.getAction() == AppTargetEvent.ACTION_UNPIN)) {
+                // Recreate hot seat predictor when we need to query for hot seat due to pin or
+                // unpin app icons.
+                recreateHotseatPredictor();
+            }
         }
     }
 

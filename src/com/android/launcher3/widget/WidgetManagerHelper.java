@@ -57,10 +57,15 @@ public class WidgetManagerHelper {
     /**
      * @see AppWidgetManager#getAppWidgetInfo(int)
      */
-    public LauncherAppWidgetProviderInfo getLauncherAppWidgetInfo(int appWidgetId) {
-        if (appWidgetId <= LauncherAppWidgetInfo.CUSTOM_WIDGET_ID) {
-            return CustomWidgetManager.INSTANCE.get(mContext).getWidgetProvider(appWidgetId);
+    public LauncherAppWidgetProviderInfo getLauncherAppWidgetInfo(
+            int appWidgetId, ComponentName componentName) {
+
+        // For custom widgets.
+        if (appWidgetId <= LauncherAppWidgetInfo.CUSTOM_WIDGET_ID && !CustomWidgetManager
+                .INSTANCE.get(mContext).getWidgetIdForCustomProvider(componentName).equals("")) {
+            return CustomWidgetManager.INSTANCE.get(mContext).getWidgetProvider(componentName);
         }
+
         AppWidgetProviderInfo info = mAppWidgetManager.getAppWidgetInfo(appWidgetId);
         return info == null ? null : LauncherAppWidgetProviderInfo.fromProviderInfo(mContext, info);
     }
@@ -78,8 +83,16 @@ public class WidgetManagerHelper {
             return allWidgetsSteam(mContext).collect(Collectors.toList());
         }
 
-        return mAppWidgetManager.getInstalledProvidersForPackage(
-                packageUser.mPackageName, packageUser.mUser);
+        try {
+            return mAppWidgetManager.getInstalledProvidersForPackage(
+                    packageUser.mPackageName, packageUser.mUser);
+        } catch (IllegalStateException e) {
+            // b/277189566: Launcher will load the widget when it gets the user-unlock event.
+            // If exception is thrown because of device is locked, it means a race condition occurs
+            // that the user got locked again while launcher is processing the event. In this case
+            // we should return empty list.
+            return Collections.emptyList();
+        }
     }
 
     /**

@@ -21,27 +21,25 @@ import static android.content.Intent.ACTION_PACKAGE_CHANGED;
 import static android.content.Intent.ACTION_PACKAGE_REMOVED;
 
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
-import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
 import static com.android.systemui.shared.system.PackageManagerWrapper.ACTION_PREFERRED_ACTIVITY_CHANGED;
 
 import android.content.ActivityNotFoundException;
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.SparseIntArray;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.tracing.OverviewComponentObserverProto;
-import com.android.launcher3.tracing.TouchInteractionServiceProto;
+import com.android.launcher3.R;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
+import com.android.quickstep.util.ActiveGestureLog;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 
 import java.io.PrintWriter;
@@ -54,9 +52,11 @@ import java.util.function.Consumer;
  * and provide callers the relevant classes.
  */
 public final class OverviewComponentObserver {
-    private final BroadcastReceiver mUserPreferenceChangeReceiver =
+    private static final String TAG = "OverviewComponentObserver";
+
+    private final SimpleBroadcastReceiver mUserPreferenceChangeReceiver =
             new SimpleBroadcastReceiver(this::updateOverviewTargets);
-    private final BroadcastReceiver mOtherHomeAppUpdateReceiver =
+    private final SimpleBroadcastReceiver mOtherHomeAppUpdateReceiver =
             new SimpleBroadcastReceiver(this::updateOverviewTargets);
 
     private final Context mContext;
@@ -65,6 +65,7 @@ public final class OverviewComponentObserver {
     private final Intent mMyHomeIntent;
     private final Intent mFallbackIntent;
     private final SparseIntArray mConfigChangesMap = new SparseIntArray();
+    private final String mSetupWizardPkg;
 
     private Consumer<Boolean> mOverviewChangeListener = b -> { };
 
@@ -86,6 +87,7 @@ public final class OverviewComponentObserver {
                 new ComponentName(context.getPackageName(), info.activityInfo.name);
         mMyHomeIntent.setComponent(myHomeComponent);
         mConfigChangesMap.append(myHomeComponent.hashCode(), info.activityInfo.configChanges);
+        mSetupWizardPkg = context.getString(R.string.setup_wizard_pkg);
 
         ComponentName fallbackComponent = new ComponentName(mContext, RecentsActivity.class);
         mFallbackIntent = new Intent(Intent.ACTION_MAIN)
@@ -99,8 +101,7 @@ public final class OverviewComponentObserver {
             mConfigChangesMap.append(fallbackComponent.hashCode(), fallbackInfo.configChanges);
         } catch (PackageManager.NameNotFoundException ignored) { /* Impossible */ }
 
-        mContext.registerReceiver(mUserPreferenceChangeReceiver,
-                new IntentFilter(ACTION_PREFERRED_ACTIVITY_CHANGED));
+        mUserPreferenceChangeReceiver.register(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
         updateOverviewTargets();
     }
 
@@ -115,11 +116,6 @@ public final class OverviewComponentObserver {
         if (mDeviceState.isHomeDisabled() != mIsHomeDisabled) {
             updateOverviewTargets();
         }
-
-        // Notify ALL_APPS touch controller when one handed mode state activated or deactivated
-        if (mDeviceState.isOneHandedModeEnabled()) {
-            mActivityInterface.onOneHandedModeStateChanged(mDeviceState.isOneHandedModeActive());
-        }
     }
 
     private void updateOverviewTargets(Intent unused) {
@@ -133,6 +129,12 @@ public final class OverviewComponentObserver {
     private void updateOverviewTargets() {
         ComponentName defaultHome = PackageManagerWrapper.getInstance()
                 .getHomeActivities(new ArrayList<>());
+        if (defaultHome != null && defaultHome.getPackageName().equals(mSetupWizardPkg)) {
+            // Treat setup wizard as null default home, because there is a period between setup and
+            // launcher being default home where it is briefly null. Otherwise, it would appear as
+            // if overview targets are changing twice, giving the listener an incorrect signal.
+            defaultHome = null;
+        }
 
         mIsHomeDisabled = mDeviceState.isHomeDisabled();
         mIsDefaultHome = Objects.equals(mMyHomeIntent.getComponent(), defaultHome);
@@ -151,7 +153,12 @@ public final class OverviewComponentObserver {
             }
         }
 
-        if (!mDeviceState.isHomeDisabled() && (defaultHome == null || mIsDefaultHome)) {
+        // TODO(b/258022658): Remove temporary logging.
+        Log.i(TAG, "updateOverviewTargets: mIsHomeDisabled=" + mIsHomeDisabled
+                + ", isDefaultHomeNull=" + (defaultHome == null)
+                + ", mIsDefaultHome=" + mIsDefaultHome);
+
+        if (!mIsHomeDisabled && (defaultHome == null || mIsDefaultHome)) {
             // User default home is same as out home app. Use Overview integrated in Launcher.
             mActivityInterface = LauncherActivityInterface.INSTANCE;
             mIsHomeAndOverviewSame = true;
@@ -178,9 +185,8 @@ public final class OverviewComponentObserver {
                 unregisterOtherHomeAppUpdateReceiver();
 
                 mUpdateRegisteredPackage = defaultHome.getPackageName();
-                mContext.registerReceiver(mOtherHomeAppUpdateReceiver, getPackageFilter(
-                        mUpdateRegisteredPackage, ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED,
-                        ACTION_PACKAGE_REMOVED));
+                mOtherHomeAppUpdateReceiver.registerPkgActions(mContext, mUpdateRegisteredPackage,
+                        ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED);
             }
         }
         mOverviewChangeListener.accept(mIsHomeAndOverviewSame);
@@ -269,35 +275,26 @@ public final class OverviewComponentObserver {
     }
 
     /**
-     * Used for winscope tracing, see launcher_trace.proto
-     * @see com.android.systemui.shared.tracing.ProtoTraceable#writeToProto
-     * @param serviceProto The parent of this proto message.
-     */
-    public void writeToProto(TouchInteractionServiceProto.Builder serviceProto) {
-        OverviewComponentObserverProto.Builder overviewComponentObserver =
-                OverviewComponentObserverProto.newBuilder();
-        overviewComponentObserver.setOverviewActivityStarted(mActivityInterface.isStarted());
-        overviewComponentObserver.setOverviewActivityResumed(mActivityInterface.isResumed());
-        serviceProto.setOverviewComponentObvserver(overviewComponentObserver);
-    }
-
-    /**
      * Starts the intent for the current home activity.
      */
-    public static void startHomeIntentSafely(@NonNull Context context, @Nullable Bundle options) {
+    public static void startHomeIntentSafely(@NonNull Context context, @Nullable Bundle options,
+            @NonNull String reason) {
         RecentsAnimationDeviceState deviceState = new RecentsAnimationDeviceState(context);
         OverviewComponentObserver observer = new OverviewComponentObserver(context, deviceState);
         Intent intent = observer.getHomeIntent();
         observer.onDestroy();
         deviceState.destroy();
-        startHomeIntentSafely(context, intent, options);
+        startHomeIntentSafely(context, intent, options, reason);
     }
 
     /**
      * Starts the intent for the current home activity.
      */
     public static void startHomeIntentSafely(
-            @NonNull Context context, @NonNull Intent homeIntent, @Nullable Bundle options) {
+            @NonNull Context context, @NonNull Intent homeIntent, @Nullable Bundle options,
+            @NonNull String reason) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "OverviewComponentObserver.startHomeIntent: ").append(reason));
         try {
             context.startActivity(homeIntent, options);
         } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {

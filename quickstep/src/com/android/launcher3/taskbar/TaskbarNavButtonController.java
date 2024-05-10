@@ -27,6 +27,8 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_TAP;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
+import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 
@@ -42,12 +44,15 @@ import androidx.annotation.StringRes;
 
 import com.android.launcher3.R;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TouchInteractionService;
+import com.android.quickstep.util.AssistUtils;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -67,6 +72,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
 
     private long mLastScreenPinLongPress;
     private boolean mScreenPinned;
+    private boolean mAssistantLongPressEnabled;
 
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
@@ -103,15 +109,17 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     private final TouchInteractionService mService;
     private final SystemUiProxy mSystemUiProxy;
     private final Handler mHandler;
+    private final AssistUtils mAssistUtils;
     @Nullable private StatsLogManager mStatsLogManager;
 
     private final Runnable mResetLongPress = this::resetScreenUnpin;
 
     public TaskbarNavButtonController(TouchInteractionService service,
-            SystemUiProxy systemUiProxy, Handler handler) {
+            SystemUiProxy systemUiProxy, Handler handler, AssistUtils assistUtils) {
         mService = service;
         mSystemUiProxy = systemUiProxy;
         mHandler = handler;
+        mAssistUtils = assistUtils;
     }
 
     public void onButtonClick(@TaskbarButton int buttonType, View view) {
@@ -153,7 +161,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         switch (buttonType) {
             case BUTTON_HOME:
                 logEvent(LAUNCHER_TASKBAR_HOME_BUTTON_LONGPRESS);
-                startAssistant();
+                onLongPressHome();
                 return true;
             case BUTTON_A11Y:
                 logEvent(LAUNCHER_TASKBAR_A11Y_BUTTON_LONGPRESS);
@@ -251,6 +259,10 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         mStatsLogManager = null;
     }
 
+    public void setAssistantLongPressEnabled(boolean assistantLongPressEnabled) {
+        mAssistantLongPressEnabled = assistantLongPressEnabled;
+    }
+
     private void logEvent(StatsLogManager.LauncherEvent event) {
         if (mStatsLogManager == null) {
             Log.w(TAG, "No stats log manager to log taskbar button event");
@@ -260,6 +272,16 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     }
 
     private void navigateHome() {
+        TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY);
+
+        if (isDesktopModeSupported()) {
+            DesktopVisibilityController desktopVisibilityController =
+                    LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+            if (desktopVisibilityController != null) {
+                desktopVisibilityController.onHomeActionTriggered();
+            }
+        }
+
         mService.getOverviewCommandHelper().addCommand(OverviewCommandHelper.TYPE_HOME);
     }
 
@@ -288,13 +310,16 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         }
     }
 
-    private void startAssistant() {
-        if (mScreenPinned) {
+    private void onLongPressHome() {
+        if (mScreenPinned || !mAssistantLongPressEnabled) {
             return;
         }
-        Bundle args = new Bundle();
-        args.putInt(INVOCATION_TYPE_KEY, INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS);
-        mSystemUiProxy.startAssistant(args);
+        // Attempt to start Assist with AssistUtils, otherwise fall back to SysUi's implementation.
+        if (!mAssistUtils.tryStartAssistOverride(INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS)) {
+            Bundle args = new Bundle();
+            args.putInt(INVOCATION_TYPE_KEY, INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS);
+            mSystemUiProxy.startAssistant(args);
+        }
     }
 
     private void showQuickSettings() {

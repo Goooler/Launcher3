@@ -17,7 +17,6 @@ package com.android.launcher3.allapps;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.ArrayMap;
@@ -33,7 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.BaseAllAppsContainerView.AdapterHolder;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.views.ActivityContext;
@@ -73,8 +72,8 @@ public class FloatingHeaderView extends LinearLayout implements
                     moved(current);
                     applyVerticalMove();
                     if (headerCollapsed != mHeaderCollapsed) {
-                        BaseAllAppsContainerView<?> parent =
-                                (BaseAllAppsContainerView<?>) getParent();
+                        ActivityAllAppsContainerView<?> parent =
+                                (ActivityAllAppsContainerView<?>) getParent();
                         parent.invalidateHeader();
                     }
                 }
@@ -85,7 +84,6 @@ public class FloatingHeaderView extends LinearLayout implements
     // These two values are necessary to ensure that the header protection is drawn correctly.
     private final int mTabsAdditionalPaddingTop;
     private final int mTabsAdditionalPaddingBottom;
-    private boolean mHeaderProtectionSupported;
 
     protected ViewGroup mTabLayout;
     private AllAppsRecyclerView mMainRV;
@@ -115,7 +113,6 @@ public class FloatingHeaderView extends LinearLayout implements
     // enabled or disabled, and represent the current set of all rows.
     private FloatingHeaderRow[] mAllRows = FloatingHeaderRow.NO_ROWS;
 
-
     public FloatingHeaderView(@NonNull Context context) {
         this(context, null);
     }
@@ -126,15 +123,6 @@ public class FloatingHeaderView extends LinearLayout implements
                 .getDimensionPixelSize(R.dimen.all_apps_header_top_adjustment);
         mTabsAdditionalPaddingBottom = context.getResources()
                 .getDimensionPixelSize(R.dimen.all_apps_header_bottom_adjustment);
-        mHeaderProtectionSupported = context.getResources().getBoolean(
-                R.bool.config_header_protection_supported);
-    }
-
-    @Override
-    protected void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        mHeaderProtectionSupported = getContext().getResources().getBoolean(
-                R.bool.config_header_protection_supported);
     }
 
     @Override
@@ -203,7 +191,7 @@ public class FloatingHeaderView extends LinearLayout implements
         updateExpectedHeight();
 
         if (mMaxTranslation != oldMaxHeight || mFloatingRowsCollapsed) {
-            BaseAllAppsContainerView<?> parent = (BaseAllAppsContainerView<?>) getParent();
+            ActivityAllAppsContainerView parent = (ActivityAllAppsContainerView) getParent();
             if (parent != null) {
                 parent.setupHeader();
             }
@@ -240,7 +228,7 @@ public class FloatingHeaderView extends LinearLayout implements
         updateExpectedHeight();
 
         mTabsHidden = tabsHidden;
-        mTabLayout.setVisibility(tabsHidden ? View.GONE : View.VISIBLE);
+        maybeSetTabVisibility(VISIBLE);
         mMainRV = mainRV;
         mWorkRV = workRV;
         mSearchRV = searchRV;
@@ -262,6 +250,12 @@ public class FloatingHeaderView extends LinearLayout implements
                 rvType == AdapterHolder.MAIN ? mMainRV
                 : rvType == AdapterHolder.WORK ? mWorkRV : mSearchRV;
         mCurrentRV.addOnScrollListener(mOnScrollListener);
+        maybeSetTabVisibility(rvType == AdapterHolder.SEARCH ? GONE : VISIBLE);
+    }
+
+    /** Update tab visibility to the given state, only if tabs are active (work profile exists). */
+    void maybeSetTabVisibility(int visibility) {
+        mTabLayout.setVisibility(mTabsHidden ? GONE : visibility);
     }
 
     private void updateExpectedHeight() {
@@ -364,6 +358,10 @@ public class FloatingHeaderView extends LinearLayout implements
         onHeightUpdated();
     }
 
+    public int getClipTop() {
+        return mHeaderClip.top;
+    }
+
     public void reset(boolean animate) {
         if (mAnimator.isStarted()) {
             mAnimator.cancel();
@@ -406,10 +404,6 @@ public class FloatingHeaderView extends LinearLayout implements
         return mFloatingRowsHeight;
     }
 
-    int getTabsAdditionalPaddingTop() {
-        return mTabsAdditionalPaddingTop;
-    }
-
     int getTabsAdditionalPaddingBottom() {
         return mTabsAdditionalPaddingBottom;
     }
@@ -450,10 +444,6 @@ public class FloatingHeaderView extends LinearLayout implements
         p.y = getTop() - mCurrentRV.getTop() - ((ViewGroup) mCurrentRV.getParent()).getTop();
     }
 
-    public boolean isHeaderProtectionSupported() {
-        return mHeaderProtectionSupported;
-    }
-
     @Override
     public boolean hasOverlappingRendering() {
         return false;
@@ -461,9 +451,9 @@ public class FloatingHeaderView extends LinearLayout implements
 
     @Override
     public void setInsets(Rect insets) {
-        int leftRightPadding = ActivityContext.lookupContext(getContext())
-                .getDeviceProfile().allAppsLeftRightPadding;
-        setPadding(leftRightPadding, getPaddingTop(), leftRightPadding, getPaddingBottom());
+        Rect allAppsPadding = ActivityContext.lookupContext(getContext())
+                .getDeviceProfile().allAppsPadding;
+        setPadding(allAppsPadding.left, getPaddingTop(), allAppsPadding.right, getPaddingBottom());
     }
 
     public <T extends FloatingHeaderRow> T findFixedRowByType(Class<T> type) {
@@ -479,10 +469,6 @@ public class FloatingHeaderView extends LinearLayout implements
      * Returns visible height of FloatingHeaderView contents requiring header protection
      */
     int getPeripheralProtectionHeight() {
-        if (!mHeaderProtectionSupported) {
-            return 0;
-        }
-
         // we only want to show protection when work tab is available and header is either
         // collapsed or animating to/from collapsed state
         if (mTabsHidden || mFloatingRowsCollapsed || !mHeaderCollapsed) {

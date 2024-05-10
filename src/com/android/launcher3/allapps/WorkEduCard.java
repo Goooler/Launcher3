@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.LauncherPrefs.WORK_EDU_STEP;
 import static com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.getTabWidth;
 
 import android.content.Context;
@@ -26,8 +27,8 @@ import android.view.animation.AnimationUtils;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.views.ActivityContext;
 
@@ -75,18 +76,13 @@ public class WorkEduCard extends FrameLayout implements
         super.onFinishInflate();
         findViewById(R.id.action_btn).setOnClickListener(this);
 
-        StringCache cache = mActivityContext.getStringCache();
-        if (cache != null) {
-            TextView title = findViewById(R.id.work_apps_paused_title);
-            title.setText(cache.workProfileEdu);
-        }
+        updateStringFromCache();
     }
 
     @Override
     public void onClick(View view) {
         startAnimation(mDismissAnim);
-        Utilities.getPrefs(getContext()).edit().putInt(WorkProfileManager.KEY_WORK_EDU_STEP,
-                1).apply();
+        LauncherPrefs.get(getContext()).put(WORK_EDU_STEP, 1);
     }
 
     @Override
@@ -120,5 +116,13 @@ public class WorkEduCard extends FrameLayout implements
 
     public void setPosition(int position) {
         mPosition = position;
+    }
+
+    public void updateStringFromCache() {
+        StringCache cache = mActivityContext.getStringCache();
+        if (cache != null) {
+            TextView title = findViewById(R.id.work_apps_paused_title);
+            title.setText(cache.workProfileEdu);
+        }
     }
 }

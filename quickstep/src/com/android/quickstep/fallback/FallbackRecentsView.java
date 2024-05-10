@@ -15,6 +15,8 @@
  */
 package com.android.quickstep.fallback;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.fallback.RecentsState.DEFAULT;
 import static com.android.quickstep.fallback.RecentsState.HOME;
@@ -33,10 +35,12 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.popup.QuickstepSystemShortcut;
 import com.android.launcher3.statemanager.StateManager.StateListener;
 import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.quickstep.FallbackActivityInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsActivity;
@@ -70,16 +74,22 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void init(OverviewActionsView actionsView, SplitSelectStateController splitController) {
-        super.init(actionsView, splitController);
+    public void init(OverviewActionsView actionsView, SplitSelectStateController splitController,
+            @Nullable DesktopRecentsTransitionController desktopRecentsTransitionController) {
+        super.init(actionsView, splitController, desktopRecentsTransitionController);
         setOverviewStateEnabled(true);
         setOverlayEnabled(true);
     }
 
     @Override
-    public void startHome() {
+    protected void handleStartHome(boolean animated) {
         mActivity.startHome();
         AbstractFloatingView.closeAllOpenViews(mActivity, mActivity.isStarted());
+    }
+
+    @Override
+    protected boolean canStartHomeSafely() {
+        return mActivity.canStartHomeSafely();
     }
 
     /**
@@ -200,13 +210,13 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void setModalStateEnabled(boolean isModalState) {
-        super.setModalStateEnabled(isModalState);
-        if (isModalState) {
-            mActivity.getStateManager().goToState(RecentsState.MODAL_TASK);
+    public void setModalStateEnabled(int taskId, boolean animate) {
+        if (taskId != INVALID_TASK_ID) {
+            setSelectedTask(taskId);
+            mActivity.getStateManager().goToState(RecentsState.MODAL_TASK, animate);
         } else {
             if (mActivity.isInState(RecentsState.MODAL_TASK)) {
-                mActivity.getStateManager().goToState(DEFAULT);
+                mActivity.getStateManager().goToState(DEFAULT, animate);
                 resetModalVisuals();
             }
         }
@@ -228,6 +238,12 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         if (toState == MODAL_TASK) {
             setOverviewSelectEnabled(true);
         }
+
+        // Set border after select mode changes to avoid showing border during state transition
+        if (!toState.overviewUi() || toState == MODAL_TASK) {
+            setTaskBorderEnabled(false);
+        }
+
         setFreezeViewVisibility(true);
     }
 
@@ -242,6 +258,18 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         setFreezeViewVisibility(false);
         if (finalState != MODAL_TASK) {
             setOverviewSelectEnabled(false);
+        }
+
+        if (finalState.overviewUi() && finalState != MODAL_TASK) {
+            setTaskBorderEnabled(true);
+        }
+
+        if (finalState != OVERVIEW_SPLIT_SELECT) {
+            if (FeatureFlags.enableSplitContextually()) {
+                mSplitSelectStateController.resetState();
+            } else {
+                resetFromSplitSelectionState();
+            }
         }
 
         if (isOverlayEnabled) {
@@ -267,7 +295,7 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
+    public void initiateSplitSelect(SplitSelectSource splitSelectSource) {
         super.initiateSplitSelect(splitSelectSource);
         mActivity.getStateManager().goToState(OVERVIEW_SPLIT_SELECT);
     }

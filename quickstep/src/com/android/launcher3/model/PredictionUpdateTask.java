@@ -15,8 +15,9 @@
  */
 package com.android.launcher3.model;
 
+import static com.android.launcher3.LauncherPrefs.nonRestorableItem;
+import static com.android.launcher3.EncryptionType.ENCRYPTED;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
-import static com.android.launcher3.model.QuickstepModelDelegate.LAST_PREDICTION_ENABLED_STATE;
 import static com.android.quickstep.InstantAppResolverImpl.COMPONENT_CLASS_MARKER;
 
 import android.app.prediction.AppTarget;
@@ -29,13 +30,16 @@ import android.os.UserHandle;
 
 import androidx.annotation.NonNull;
 
+import com.android.launcher3.ConstantItem;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.Utilities;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.QuickstepModelDelegate.PredictorState;
 import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -44,6 +48,9 @@ import java.util.stream.Collectors;
  * Task to update model as a result of predicted apps update
  */
 public class PredictionUpdateTask extends BaseModelUpdateTask {
+
+    public static final ConstantItem<Boolean> LAST_PREDICTION_ENABLED =
+            nonRestorableItem("last_prediction_enabled_state", true, ENCRYPTED);
 
     private final List<AppTarget> mTargets;
     private final PredictorState mPredictorState;
@@ -59,8 +66,7 @@ public class PredictionUpdateTask extends BaseModelUpdateTask {
         Context context = app.getContext();
 
         // TODO: remove this
-        Utilities.getDevicePrefs(context).edit()
-                .putBoolean(LAST_PREDICTION_ENABLED_STATE, !mTargets.isEmpty()).apply();
+        LauncherPrefs.get(context).put(LAST_PREDICTION_ENABLED, !mTargets.isEmpty());
 
         Set<UserHandle> usersForChangedShortcuts =
                 dataModel.extraItems.get(mPredictorState.containerId).items.stream()
@@ -68,7 +74,7 @@ public class PredictionUpdateTask extends BaseModelUpdateTask {
                         .map(info -> info.user)
                         .collect(Collectors.toSet());
 
-        FixedContainerItems fci = new FixedContainerItems(mPredictorState.containerId);
+        List<ItemInfo> items = new ArrayList<>(mTargets.size());
         for (AppTarget target : mTargets) {
             WorkspaceItemInfo itemInfo;
             ShortcutInfo si = target.getShortcutInfo();
@@ -107,10 +113,11 @@ public class PredictionUpdateTask extends BaseModelUpdateTask {
                 }
             }
 
-            itemInfo.container = fci.containerId;
-            fci.items.add(itemInfo);
+            itemInfo.container = mPredictorState.containerId;
+            items.add(itemInfo);
         }
 
+        FixedContainerItems fci = new FixedContainerItems(mPredictorState.containerId, items);
         dataModel.extraItems.put(fci.containerId, fci);
         bindExtraContainerItems(fci);
         usersForChangedShortcuts.forEach(

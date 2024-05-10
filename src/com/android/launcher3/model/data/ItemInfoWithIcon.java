@@ -83,17 +83,6 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
     public static final int FLAG_SYSTEM_MASK = FLAG_SYSTEM_YES | FLAG_SYSTEM_NO;
 
     /**
-     * Flag indicating that the icon is an {@link android.graphics.drawable.AdaptiveIconDrawable}
-     * that can be optimized in various way.
-     */
-    public static final int FLAG_ADAPTIVE_ICON = 1 << 8;
-
-    /**
-     * Flag indicating that the icon is badged.
-     */
-    public static final int FLAG_ICON_BADGED = 1 << 9;
-
-    /**
      * The icon is being installed. If {@link WorkspaceItemInfo#FLAG_RESTORED_ICON} or
      * {@link WorkspaceItemInfo#FLAG_AUTOINSTALL_ICON} is set, then the icon is either being
      * installed or is in a broken state.
@@ -117,6 +106,11 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
             | FLAG_DISABLED_NOT_AVAILABLE | FLAG_DISABLED_SUSPENDED
             | FLAG_DISABLED_QUIET_USER | FLAG_DISABLED_BY_PUBLISHER | FLAG_DISABLED_LOCKED_USER
             | FLAG_DISABLED_VERSION_LOWER;
+
+    /**
+     * Flag indicating this item can't be pinned to home screen.
+     */
+    public static final int FLAG_NOT_PINNABLE = 1 << 13;
 
     /**
      * Status associated with the system state of the underlying item. This is calculated every

@@ -16,15 +16,19 @@
 
 package com.android.launcher3.tapl;
 
+import static com.android.launcher3.tapl.LauncherInstrumentation.TASKBAR_RES_ID;
+
 import android.graphics.Rect;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.Direction;
 import androidx.test.uiautomator.UiObject2;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -72,6 +76,44 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     /**
+     * Flings backward (right) and waits the fling's end.
+     */
+    public void flingBackward() {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
+            flingBackwardImpl();
+        }
+    }
+
+    private void flingBackwardImpl() {
+        try (LauncherInstrumentation.Closable c =
+                     mLauncher.addContextLayer("want to fling backward in overview")) {
+            LauncherInstrumentation.log("Overview.flingBackward before fling");
+            final UiObject2 overview = verifyActiveContainer();
+            final int rightMargin =
+                    mLauncher.getTargetInsets().right + mLauncher.getEdgeSensitivityWidth();
+            mLauncher.scroll(
+                    overview, Direction.RIGHT, new Rect(0, 0, rightMargin + 1, 0), 20, false);
+            try (LauncherInstrumentation.Closable c2 =
+                         mLauncher.addContextLayer("flung backwards")) {
+                verifyActiveContainer();
+                verifyActionsViewVisibility();
+            }
+        }
+    }
+
+    private OverviewTask flingToFirstTask() {
+        OverviewTask currentTask = getCurrentTask();
+
+        while (mLauncher.getRealDisplaySize().x - currentTask.getUiObject().getVisibleBounds().right
+                <= mLauncher.getOverviewPageSpacing()) {
+            flingBackwardImpl();
+            currentTask = getCurrentTask();
+        }
+
+        return currentTask;
+    }
+
+    /**
      * Dismissed all tasks by scrolling to Clear-all button and pressing it.
      */
     public void dismissAllTasks() {
@@ -94,20 +136,61 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     /**
-     * Flings backward (right) and waits the fling's end.
+     * Touch to the right of current task. This should dismiss overview and go back to Workspace.
      */
-    public void flingBackward() {
+    public Workspace touchOutsideFirstTask() {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
-             LauncherInstrumentation.Closable c =
-                     mLauncher.addContextLayer("want to fling backward in overview")) {
-            LauncherInstrumentation.log("Overview.flingBackward before fling");
-            final UiObject2 overview = verifyActiveContainer();
-            final int rightMargin =
-                    mLauncher.getTargetInsets().right + mLauncher.getEdgeSensitivityWidth();
-            mLauncher.scroll(
-                    overview, Direction.RIGHT, new Rect(0, 0, rightMargin + 1, 0), 20, false);
-            try (LauncherInstrumentation.Closable c2 =
-                         mLauncher.addContextLayer("flung backwards")) {
+             LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                     "touching outside the focused task")) {
+
+            if (getTaskCount() < 2) {
+                throw new IllegalStateException(
+                        "Need to have at least 2 tasks");
+            }
+
+            OverviewTask currentTask = flingToFirstTask();
+
+            mLauncher.touchOutsideContainer(currentTask.getUiObject(),
+                    /* tapRight= */ true,
+                    /* halfwayToEdge= */ false);
+
+            return new Workspace(mLauncher);
+        }
+    }
+
+    /**
+     * Touch between two tasks
+     */
+    public void touchBetweenTasks() {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
+             LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                     "touching outside the focused task")) {
+            if (getTaskCount() < 2) {
+                throw new IllegalStateException(
+                        "Need to have at least 2 tasks");
+            }
+
+            OverviewTask currentTask = flingToFirstTask();
+
+            mLauncher.touchOutsideContainer(currentTask.getUiObject(),
+                    /* tapRight= */ false,
+                    /* halfwayToEdge= */ false);
+        }
+    }
+
+    /**
+     * Touch either on the right or the left corner of the screen, 1 pixel from the bottom and
+     * from the sides.
+     */
+    public void touchTaskbarBottomCorner(boolean tapRight) {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
+            Taskbar taskbar = new Taskbar(mLauncher);
+            taskbar.touchBottomCorner(tapRight);
+            if (mLauncher.isTransientTaskbar()) {
+                // Tapping outside Transient Taskbar returns to Workspace, wait for that state.
+                new Workspace(mLauncher);
+            } else {
+                // Should stay in Overview.
                 verifyActiveContainer();
                 verifyActionsViewVisibility();
             }
@@ -129,7 +212,8 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             OverviewTask task = getCurrentTask();
             mLauncher.assertNotNull("current task is null", task);
             mLauncher.scrollLeftByDistance(verifyActiveContainer(),
-                    task.getVisibleWidth() + mLauncher.getOverviewPageSpacing());
+                    mLauncher.getRealDisplaySize().x - task.getUiObject().getVisibleBounds().left
+                            + mLauncher.getOverviewPageSpacing());
 
             try (LauncherInstrumentation.Closable c2 =
                          mLauncher.addContextLayer("scrolled task off screen")) {
@@ -159,14 +243,13 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         final List<UiObject2> taskViews = getTasks();
         mLauncher.assertNotEquals("Unable to find a task", 0, taskViews.size());
 
-        // taskViews contains up to 3 task views: the 'main' (having the widest visible part) one
-        // in the center, and parts of its right and left siblings. Find the main task view by
-        // its width.
-        final UiObject2 widestTask = Collections.max(taskViews,
-                (t1, t2) -> Integer.compare(mLauncher.getVisibleBounds(t1).width(),
-                        mLauncher.getVisibleBounds(t2).width()));
-
-        return new OverviewTask(mLauncher, widestTask, this);
+        // The widest, and most top-right task should be the current task
+        UiObject2 currentTask = Collections.max(taskViews,
+                Comparator.comparingInt((UiObject2 t) -> t.getParent().getVisibleBounds().width())
+                        .thenComparingInt((UiObject2 t) -> t.getParent().getVisibleCenter().x)
+                        .thenComparing(Comparator.comparing(
+                                (UiObject2 t) -> t.getParent().getVisibleCenter().y).reversed()));
+        return new OverviewTask(mLauncher, currentTask, this);
     }
 
     /** Returns an overview task matching TestActivity {@param activityNumber}. */
@@ -244,40 +327,55 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
      * Returns if clear all button is visible.
      */
     public boolean isClearAllVisible() {
-        return mLauncher.hasLauncherObject(mLauncher.getOverviewObjectSelector("clear_all"));
+        return verifyActiveContainer().hasObject(
+                mLauncher.getOverviewObjectSelector("clear_all"));
+    }
+
+    /**
+     * Returns the taskbar if it's a tablet, or {@code null} otherwise.
+     */
+    @Nullable
+    public Taskbar getTaskbar() {
+        if (!mLauncher.isTablet()) {
+            return null;
+        }
+        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                "want to get the taskbar")) {
+            mLauncher.waitForSystemLauncherObject(TASKBAR_RES_ID);
+
+            return new Taskbar(mLauncher);
+        }
     }
 
     protected boolean isActionsViewVisible() {
-        OverviewTask task = mLauncher.isTablet() ? getFocusedTaskForTablet() : getCurrentTask();
+        if (!hasTasks() || isClearAllVisible()) {
+            return false;
+        }
+        boolean isTablet = mLauncher.isTablet();
+        if (isTablet && mLauncher.isGridOnlyOverviewEnabled()) {
+            return false;
+        }
+        OverviewTask task = isTablet ? getFocusedTaskForTablet() : getCurrentTask();
         if (task == null) {
             return false;
         }
+        // In tablets, if focused task is not in center, overview actions aren't visible.
+        if (isTablet && Math.abs(task.getExactCenterX() - mLauncher.getExactScreenCenterX()) >= 1) {
+            return false;
+        }
+        // Overview actions aren't visible for split screen tasks.
         return !task.isTaskSplit();
     }
 
     private void verifyActionsViewVisibility() {
-        if (!hasTasks() || !isActionsViewVisible()) {
-            return;
-        }
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                 "want to assert overview actions view visibility")) {
-            if (mLauncher.isTablet() && !isOverviewSnappedToFocusedTaskForTablet()) {
-                mLauncher.waitUntilOverviewObjectGone("action_buttons");
-            } else {
+            if (isActionsViewVisible()) {
                 mLauncher.waitForOverviewObject("action_buttons");
+            } else {
+                mLauncher.waitUntilOverviewObjectGone("action_buttons");
             }
         }
-    }
-
-    /**
-     * Returns if focused task is currently snapped task in tablet grid overview.
-     */
-    private boolean isOverviewSnappedToFocusedTaskForTablet() {
-        OverviewTask focusedTask = getFocusedTaskForTablet();
-        if (focusedTask == null) {
-            return false;
-        }
-        return Math.abs(focusedTask.getExactCenterX() - mLauncher.getExactScreenCenterX()) < 1;
     }
 
     /**
@@ -295,8 +393,10 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         }
         int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
         for (UiObject2 task : taskViews) {
-            if (task.getVisibleBounds().height() == focusedTaskHeight) {
-                return new OverviewTask(mLauncher, task, this);
+            OverviewTask overviewTask = new OverviewTask(mLauncher, task, this);
+
+            if (overviewTask.getVisibleHeight() == focusedTaskHeight) {
+                return overviewTask;
             }
         }
         return null;

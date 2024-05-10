@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Test rule that allows executing a test with Quickstep on and then Quickstep off.
- * The test should be annotated with @QuickstepOnOff.
+ * The test should be annotated with @NavigationModeSwitch.
  */
 public class NavigationModeSwitchRule implements TestRule {
 
@@ -185,7 +185,7 @@ public class NavigationModeSwitchRule implements TestRule {
                         + launcher.getNavigationModeMismatchError(false),
                 () -> launcher.getNavigationModeMismatchError(false) == null,
                 WAIT_TIME_MS, launcher);
-        AbstractLauncherUiTest.checkDetectedLeaks(launcher);
+        AbstractLauncherUiTest.checkDetectedLeaks(launcher, false);
         return true;
     }
 

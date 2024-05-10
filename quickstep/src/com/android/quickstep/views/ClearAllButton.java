@@ -16,6 +16,8 @@
 
 package com.android.quickstep.views;
 
+import static com.android.launcher3.Flags.enableGridOnlyOverview;
+
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
@@ -67,7 +69,6 @@ public class ClearAllButton extends Button {
     private float mGridTranslationPrimary;
     private float mGridScrollOffset;
     private float mScrollOffsetPrimary;
-    private float mSplitSelectScrollOffsetPrimary;
 
     private int mSidePadding;
 
@@ -97,6 +98,10 @@ public class ClearAllButton extends Button {
     @Override
     public boolean hasOverlappingRendering() {
         return false;
+    }
+
+    public float getScrollAlpha() {
+        return mScrollAlpha;
     }
 
     public void setContentAlpha(float alpha) {
@@ -172,10 +177,6 @@ public class ClearAllButton extends Button {
         mScrollOffsetPrimary = scrollOffsetPrimary;
     }
 
-    public void setSplitSelectScrollOffsetPrimary(float splitSelectScrollOffsetPrimary) {
-        mSplitSelectScrollOffsetPrimary = splitSelectScrollOffsetPrimary;
-    }
-
     public float getScrollAdjustment(boolean fullscreenEnabled, boolean gridEnabled) {
         float scrollAdjustment = 0;
         if (fullscreenEnabled) {
@@ -185,7 +186,6 @@ public class ClearAllButton extends Button {
             scrollAdjustment += mGridTranslationPrimary + mGridScrollOffset;
         }
         scrollAdjustment += mScrollOffsetPrimary;
-        scrollAdjustment += mSplitSelectScrollOffsetPrimary;
         return scrollAdjustment;
     }
 
@@ -250,8 +250,15 @@ public class ClearAllButton extends Button {
      */
     private float getOriginalTranslationY() {
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
-        return deviceProfile.isTablet
-                ? deviceProfile.overviewRowSpacing
-                : deviceProfile.overviewTaskThumbnailTopMarginPx / 2.0f;
+        if (deviceProfile.isTablet) {
+            if (enableGridOnlyOverview()) {
+                return (getRecentsView().getLastComputedTaskSize().height()
+                        + deviceProfile.overviewTaskThumbnailTopMarginPx) / 2.0f
+                        + deviceProfile.overviewRowSpacing;
+            } else {
+                return deviceProfile.overviewRowSpacing;
+            }
+        }
+        return deviceProfile.overviewTaskThumbnailTopMarginPx / 2.0f;
     }
 }

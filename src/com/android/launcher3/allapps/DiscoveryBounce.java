@@ -17,6 +17,7 @@
 package com.android.launcher3.allapps;
 
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.util.OnboardingPrefs.HOME_BOUNCE_SEEN;
 
 import android.animation.Animator;
 import android.animation.AnimatorInflater;
@@ -81,10 +82,10 @@ public class DiscoveryBounce extends AbstractFloatingView {
     }
 
     @Override
-    public boolean onBackPressed() {
-        super.onBackPressed();
-        // Go back to the previous state (from a user's perspective this floating view isn't
-        // something to go back from).
+    public boolean canHandleBack() {
+        // Since DiscoveryBounce doesn't handle back, onBackInvoked() won't be called and we should
+        // close it without animation.
+        close(false);
         return false;
     }
 
@@ -122,12 +123,11 @@ public class DiscoveryBounce extends AbstractFloatingView {
     }
 
     private static void showForHomeIfNeeded(Launcher launcher, boolean withDelay) {
-        OnboardingPrefs onboardingPrefs = launcher.getOnboardingPrefs();
         if (!launcher.isInState(NORMAL)
-                || onboardingPrefs.getBoolean(OnboardingPrefs.HOME_BOUNCE_SEEN)
+                || HOME_BOUNCE_SEEN.get(launcher)
                 || AbstractFloatingView.getTopOpenView(launcher) != null
                 || launcher.getSystemService(UserManager.class).isDemoUser()
-                || Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+                || Utilities.isRunningInTestHarness()) {
             return;
         }
 
@@ -135,7 +135,7 @@ public class DiscoveryBounce extends AbstractFloatingView {
             new Handler().postDelayed(() -> showForHomeIfNeeded(launcher, false), DELAY_MS);
             return;
         }
-        onboardingPrefs.incrementEventCount(OnboardingPrefs.HOME_BOUNCE_COUNT);
+        OnboardingPrefs.HOME_BOUNCE_COUNT.increment(launcher);
         new DiscoveryBounce(launcher).show();
     }
 
