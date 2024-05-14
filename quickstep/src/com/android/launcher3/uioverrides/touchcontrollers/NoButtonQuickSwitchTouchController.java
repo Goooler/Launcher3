@@ -172,7 +172,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         if ((ev.getEdgeFlags() & Utilities.EDGE_NAV_BAR) == 0) {
             return false;
         }
-        int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
+        long stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
             return false;
         }
@@ -248,7 +248,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         TASK_THUMBNAIL_SPLASH_ALPHA.set(mRecentsView, fromState.showTaskThumbnailSplash() ? 1f : 0);
         mRecentsView.setContentAlpha(1);
         mRecentsView.setFullscreenProgress(fromState.getOverviewFullscreenProgress());
-        mLauncher.getActionsView().getVisibilityAlphaSetter().accept(
+        mLauncher.getActionsView().getVisibilityAlpha().updateValue(
                 (fromState.getVisibleElements(mLauncher) & OVERVIEW_ACTIONS) != 0 ? 1f : 0f);
         mRecentsView.setTaskIconScaledDown(true);
 
