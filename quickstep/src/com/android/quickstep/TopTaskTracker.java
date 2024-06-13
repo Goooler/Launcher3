@@ -64,7 +64,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
         implements TaskStackChangeListener, SafeCloseable {
 
     private static final String TAG = "TopTaskTracker";
-    
+
     private static final boolean DEBUG = true;
 
     public static MainThreadInitializedObject<TopTaskTracker> INSTANCE =
@@ -204,7 +204,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
 
     /**
      * @return index 0 will be task in left/top position, index 1 in right/bottom position.
-     *         Will return empty array if device is not in staged split
+     * Will return empty array if device is not in staged split
      */
     public int[] getRunningSplitTaskIds() {
         if (mMainStagePosition.taskId == INVALID_TASK_ID
@@ -295,7 +295,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
          * If the given task holds an activity that is excluded from recents, and there
          * is another running task that is not excluded from recents, returns that underlying task.
          */
-        public @Nullable CachedTaskInfo otherVisibleTaskThisIsExcludedOver() {
+        public @Nullable CachedTaskInfo getVisibleNonExcludedTask() {
             if (mTopTask == null
                     || (mTopTask.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) == 0) {
                 // Not an excluded task.
@@ -303,7 +303,9 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
             }
             List<RunningTaskInfo> visibleNonExcludedTasks = mAllCachedTasks.stream()
                     .filter(t -> t.isVisible
-                            && (t.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) == 0)
+                            && (t.baseIntent.getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) == 0
+                            && t.getActivityType() != ACTIVITY_TYPE_HOME
+                            && t.getActivityType() != ACTIVITY_TYPE_RECENTS)
                     .toList();
             return visibleNonExcludedTasks.isEmpty() ? null
                     : new CachedTaskInfo(visibleNonExcludedTasks);
@@ -337,7 +339,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
          */
         public Task[] getPlaceholderTasks() {
             return mTopTask == null ? new Task[0]
-                    : new Task[] {Task.from(new TaskKey(mTopTask), mTopTask, false)};
+                    : new Task[]{Task.from(new TaskKey(mTopTask), mTopTask, false)};
         }
 
         /**
