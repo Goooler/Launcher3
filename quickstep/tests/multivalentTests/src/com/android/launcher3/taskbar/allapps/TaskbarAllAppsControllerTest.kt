@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar.allapps
 
+import android.animation.AnimatorTestRule
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Process
@@ -42,6 +43,7 @@ import org.junit.runner.RunWith
 class TaskbarAllAppsControllerTest {
 
     @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule()
+    @get:Rule val animatorTestRule = AnimatorTestRule(this)
 
     @InjectController lateinit var allAppsController: TaskbarAllAppsController
     @InjectController lateinit var overlayController: TaskbarOverlayController
@@ -164,6 +166,21 @@ class TaskbarAllAppsControllerTest {
                 .findFixedRowByType(PredictionRowView::class.java)
         val btv = predictionRowView.getChildAt(0) as BubbleTextView
         assertThat(btv.hasDot()).isTrue()
+    }
+
+    @Test
+    fun testToggleSearch_searchEditTextFocused() {
+        getInstrumentation().runOnMainSync { allAppsController.toggleSearch() }
+        getInstrumentation().runOnMainSync {
+            // All Apps is now attached to window. Open animation is posted but not started.
+        }
+
+        getInstrumentation().runOnMainSync {
+            // Animation has started. Advance to end of animation.
+            animatorTestRule.advanceTimeBy(overlayController.openDuration.toLong())
+        }
+        val editText = overlayController.requestWindow().appsView.searchUiManager.editText
+        assertThat(editText?.hasFocus()).isTrue()
     }
 
     private companion object {

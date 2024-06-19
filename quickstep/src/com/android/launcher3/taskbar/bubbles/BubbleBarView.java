@@ -258,6 +258,7 @@ public class BubbleBarView extends FrameLayout {
         }
         if (!Flags.animateBubbleSizeChange()) {
             setIconSizeAndPadding(newIconSize, newBubbleBarPadding);
+            return;
         }
         if (mScalePaddingAnimator != null && mScalePaddingAnimator.isRunning()) {
             mScalePaddingAnimator.cancel();

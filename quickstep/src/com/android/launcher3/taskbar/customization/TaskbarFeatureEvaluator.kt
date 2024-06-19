@@ -19,7 +19,6 @@ package com.android.launcher3.taskbar.customization
 import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarControllers
-import com.android.launcher3.taskbar.TaskbarRecentAppsController
 import com.android.launcher3.util.DisplayController
 
 /** Evaluates all the features taskbar can have. */
@@ -41,4 +40,7 @@ class TaskbarFeatureEvaluator(
 
     val isTransient: Boolean
         get() = DisplayController.isTransientTaskbar(taskbarActivityContext)
+
+    val isLandscape: Boolean
+        get() = taskbarActivityContext.deviceProfile.isLandscape
 }

@@ -40,7 +40,6 @@ import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ComponentKey;
-import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.picker.WidgetRecommendationCategoryProvider;
 
@@ -67,10 +66,10 @@ public class WidgetPredictionsRequester {
     @NonNull
     private final String mUiSurface;
     @NonNull
-    private final Map<PackageUserKey, List<WidgetItem>> mAllWidgets;
+    private final Map<ComponentKey, WidgetItem> mAllWidgets;
 
     public WidgetPredictionsRequester(Context context, @NonNull String uiSurface,
-            @NonNull Map<PackageUserKey, List<WidgetItem>> allWidgets) {
+            @NonNull Map<ComponentKey, WidgetItem> allWidgets) {
         mContext = context;
         mUiSurface = uiSurface;
         mAllWidgets = Collections.unmodifiableMap(allWidgets);
@@ -172,33 +171,19 @@ public class WidgetPredictionsRequester {
      */
     @VisibleForTesting
     static List<WidgetItem> filterPredictions(List<AppTarget> predictions,
-            Map<PackageUserKey, List<WidgetItem>> allWidgets, Predicate<WidgetItem> filter) {
+            Map<ComponentKey, WidgetItem> allWidgets, Predicate<WidgetItem> filter) {
         List<WidgetItem> servicePredictedItems = new ArrayList<>();
-        List<WidgetItem> localFilteredWidgets = new ArrayList<>();
 
         for (AppTarget prediction : predictions) {
-            List<WidgetItem> widgetsInPackage = allWidgets.get(
-                    new PackageUserKey(prediction.getPackageName(), prediction.getUser()));
-            if (widgetsInPackage == null || widgetsInPackage.isEmpty()) {
-                continue;
-            }
             String className = prediction.getClassName();
             if (!TextUtils.isEmpty(className)) {
-                WidgetItem item = widgetsInPackage.stream()
-                        .filter(w -> className.equals(w.componentName.getClassName()))
-                        .filter(filter)
-                        .findFirst().orElse(null);
-                if (item != null) {
-                    servicePredictedItems.add(item);
-                    continue;
+                WidgetItem widgetItem = allWidgets.get(
+                        new ComponentKey(new ComponentName(prediction.getPackageName(), className),
+                                prediction.getUser()));
+                if (widgetItem != null && filter.test(widgetItem)) {
+                    servicePredictedItems.add(widgetItem);
                 }
             }
-            // No widget was added by the service, try local filtering
-            widgetsInPackage.stream().filter(filter).findFirst()
-                    .ifPresent(localFilteredWidgets::add);
-        }
-        if (servicePredictedItems.isEmpty()) {
-            servicePredictedItems.addAll(localFilteredWidgets);
         }
 
         return servicePredictedItems;

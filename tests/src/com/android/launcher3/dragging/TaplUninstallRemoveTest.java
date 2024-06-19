@@ -159,13 +159,13 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher> {
                     mLauncher.getWorkspace().getWorkspaceIconsPositions();
             assertThat(initialPositions.keySet()).containsAtLeastElementsIn(appNames);
 
-            mLauncher.getWorkspace().getWorkspaceAppIcon(DUMMY_APP_NAME).uninstall();
-            mLauncher.getWorkspace().verifyWorkspaceAppIconIsGone(
+            final Workspace workspace = mLauncher.getWorkspace().getWorkspaceAppIcon(
+                    DUMMY_APP_NAME).uninstall();
+            workspace.verifyWorkspaceAppIconIsGone(
                     DUMMY_APP_NAME + " was expected to disappear after uninstall.", DUMMY_APP_NAME);
 
             Log.d(UIOBJECT_STALE_ELEMENT, "second getWorkspaceIconsPositions()");
-            Map<String, Point> finalPositions =
-                    mLauncher.getWorkspace().getWorkspaceIconsPositions();
+            Map<String, Point> finalPositions = workspace.getWorkspaceIconsPositions();
             assertThat(finalPositions).doesNotContainKey(DUMMY_APP_NAME);
         } finally {
             TestUtil.uninstallDummyApp();

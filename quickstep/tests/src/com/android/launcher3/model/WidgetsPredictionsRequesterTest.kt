@@ -34,7 +34,7 @@ import com.android.launcher3.model.WidgetPredictionsRequester.buildBundleForPred
 import com.android.launcher3.model.WidgetPredictionsRequester.filterPredictions
 import com.android.launcher3.model.WidgetPredictionsRequester.notOnUiSurfaceFilter
 import com.android.launcher3.util.ActivityContextWrapper
-import com.android.launcher3.util.PackageUserKey
+import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.WidgetUtils.createAppWidgetProviderInfo
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo
 import com.google.common.truth.Truth.assertThat
@@ -62,7 +62,7 @@ class WidgetsPredictionsRequesterTest {
     private lateinit var widgetItem1b: WidgetItem
     private lateinit var widgetItem2: WidgetItem
 
-    private lateinit var allWidgets: Map<PackageUserKey, List<WidgetItem>>
+    private lateinit var allWidgets: Map<ComponentKey, WidgetItem>
 
     @Mock private lateinit var iconCache: IconCache
 
@@ -93,9 +93,9 @@ class WidgetsPredictionsRequesterTest {
 
         allWidgets =
             mapOf(
-                PackageUserKey(APP_1_PACKAGE_NAME, mUserHandle) to
-                    listOf(widgetItem1a, widgetItem1b),
-                PackageUserKey(APP_2_PACKAGE_NAME, mUserHandle) to listOf(widgetItem2),
+                ComponentKey(widgetItem1a.componentName, widgetItem1a.user) to widgetItem1a,
+                ComponentKey(widgetItem1b.componentName, widgetItem1b.user) to widgetItem1b,
+                ComponentKey(widgetItem2.componentName, widgetItem2.user) to widgetItem2,
             )
     }
 
@@ -156,7 +156,7 @@ class WidgetsPredictionsRequesterTest {
     }
 
     @Test
-    fun filterPredictions_appPredictions_returnsWidgetFromPackage() {
+    fun filterPredictions_appPredictions_returnsEmptyList() {
         val widgetsAlreadyOnSurface = arrayListOf(widget1bInfo)
         val filter: Predicate<WidgetItem> = notOnUiSurfaceFilter(widgetsAlreadyOnSurface)
 
@@ -176,8 +176,7 @@ class WidgetsPredictionsRequesterTest {
                 ),
             )
 
-        assertThat(filterPredictions(predictions, allWidgets, filter))
-            .containsExactly(widgetItem1a, widgetItem2)
+        assertThat(filterPredictions(predictions, allWidgets, filter)).isEmpty()
     }
 
     private fun createWidgetItem(

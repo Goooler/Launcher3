@@ -18,8 +18,12 @@ package com.android.launcher3.taskbar.bubbles.animation
 
 import android.view.View
 import android.view.View.VISIBLE
+import androidx.core.animation.Animator
+import androidx.core.animation.AnimatorListenerAdapter
+import androidx.core.animation.ObjectAnimator
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringForce
+import com.android.launcher3.R
 import com.android.launcher3.taskbar.bubbles.BubbleBarBubble
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleStashController
@@ -36,6 +40,8 @@ constructor(
 ) {
 
     private var animatingBubble: AnimatingBubble? = null
+    private val bubbleBarBounceDistanceInPx =
+            bubbleBarView.resources.getDimensionPixelSize(R.dimen.bubblebar_bounce_distance)
 
     private companion object {
         /** The time to show the flyout. */
@@ -44,6 +50,8 @@ constructor(
         const val BUBBLE_ANIMATION_INITIAL_SCALE_Y = 0.3f
         /** The minimum alpha value to make the bubble bar touchable. */
         const val MIN_ALPHA_FOR_TOUCHABLE = 0.5f
+        /** The duration of the bounce animation. */
+        const val BUBBLE_BAR_BOUNCE_ANIMATION_DURATION_MS = 250L
     }
 
     /** Wrapper around the animating bubble with its show and hide animations. */
@@ -277,7 +285,7 @@ constructor(
         if (animator.isRunning()) animator.cancel()
         // the animation of a new bubble is divided into 2 parts. The first part shows the bubble
         // and the second part hides it after a delay if we are in an app.
-        val showAnimation = buildBubbleBarBounceAnimation()
+        val showAnimation = buildBubbleBarSpringInAnimation()
         val hideAnimation =
             if (isInApp && !isExpanding) {
                 buildBubbleBarToHandleAnimation()
@@ -296,7 +304,7 @@ constructor(
         scheduler.postDelayed(FLYOUT_DELAY_MS, hideAnimation)
     }
 
-    private fun buildBubbleBarBounceAnimation() = Runnable {
+    private fun buildBubbleBarSpringInAnimation() = Runnable {
         // prepare the bubble bar for the animation
         bubbleBarView.onAnimatingBubbleStarted()
         bubbleBarView.translationY = bubbleBarView.height.toFloat()
@@ -314,6 +322,42 @@ constructor(
             bubbleStashController.updateTaskbarTouchRegion()
         }
         animator.start()
+    }
+
+    fun animateBubbleBarForCollapsed(b: BubbleBarBubble) {
+        val bubbleView = b.view
+        val animator = PhysicsAnimator.getInstance(bubbleView)
+        if (animator.isRunning()) animator.cancel()
+        val showAnimation = buildBubbleBarBounceAnimation()
+        val hideAnimation = Runnable {
+            animatingBubble = null
+            bubbleStashController.showBubbleBarImmediate()
+            bubbleBarView.onAnimatingBubbleCompleted()
+            bubbleStashController.updateTaskbarTouchRegion()
+        }
+        animatingBubble = AnimatingBubble(bubbleView, showAnimation, hideAnimation)
+        scheduler.post(showAnimation)
+        scheduler.postDelayed(FLYOUT_DELAY_MS, hideAnimation)
+    }
+
+    /**
+     * The bubble bar animation when it is collapsed is divided into 2 chained animations. The first
+     * animation is a regular accelerate animation that moves the bubble bar upwards. When it ends
+     * the bubble bar moves back to its initial position with a spring animation.
+     */
+    private fun buildBubbleBarBounceAnimation() = Runnable {
+        bubbleBarView.onAnimatingBubbleStarted()
+        val ty = bubbleBarView.translationY
+
+        val springBackAnimation = PhysicsAnimator.getInstance(bubbleBarView)
+        springBackAnimation.setDefaultSpringConfig(springConfig)
+        springBackAnimation.spring(DynamicAnimation.TRANSLATION_Y, ty)
+
+        // animate the bubble bar up and start the spring back down animation when it ends.
+        ObjectAnimator.ofFloat(bubbleBarView, View.TRANSLATION_Y, ty - bubbleBarBounceDistanceInPx)
+            .withDuration(BUBBLE_BAR_BOUNCE_ANIMATION_DURATION_MS)
+            .withEndAction { springBackAnimation.start() }
+            .start()
     }
 
     /** Handles touching the animating bubble bar. */
@@ -343,5 +387,21 @@ constructor(
 
     private fun <T> PhysicsAnimator<T>.cancelIfRunning() {
         if (isRunning()) cancel()
+    }
+
+    private fun ObjectAnimator.withDuration(duration: Long): ObjectAnimator {
+        setDuration(duration)
+        return this
+    }
+
+    private fun ObjectAnimator.withEndAction(endAction: () -> Unit): ObjectAnimator {
+        addListener(
+            object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    endAction()
+                }
+            }
+        )
+        return this
     }
 }

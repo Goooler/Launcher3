@@ -22,7 +22,7 @@ class TaskbarSpecsEvaluator(private val taskbarFeatureEvaluator: TaskbarFeatureE
     fun getIconSizeByGrid(row: Int, column: Int): TaskbarIconSize {
         return if (taskbarFeatureEvaluator.isTransient) {
             TaskbarIconSpecs.transientTaskbarIconSizeByGridSize.getOrDefault(
-                Pair(row, column),
+                TransientTaskbarIconSizeKey(row, column, taskbarFeatureEvaluator.isLandscape),
                 TaskbarIconSpecs.defaultTransientIconSize,
             )
         } else {
@@ -58,3 +58,5 @@ class TaskbarSpecsEvaluator(private val taskbarFeatureEvaluator: TaskbarFeatureE
 }
 
 data class TaskbarIconSize(val size: Int)
+
+data class TransientTaskbarIconSizeKey(val row: Int, val column: Int, val isLandscape: Boolean)
