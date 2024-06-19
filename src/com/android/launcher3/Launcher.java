@@ -2797,9 +2797,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void updateDisallowBack() {
-        if (BuildCompat.isAtLeastV() && Flags.enableDesktopWindowingMode()
-            && mDeviceProfile.isTablet) {
-            // TODO(b/330183377) disable back in launcher when when we productionize
+        if (BuildCompat.isAtLeastV()
+                && Flags.enableDesktopWindowingMode()
+                && !Flags.enableDesktopWindowingWallpaperActivity()
+                && mDeviceProfile.isTablet) {
+            // TODO(b/333533253): Clean up after desktop wallpaper activity flag is rolled out
             return;
         }
         LauncherRootView rv = getRootView();
