@@ -42,6 +42,7 @@ import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.recents.data.RecentTasksDataSource;
+import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.systemui.shared.recents.model.Task;
@@ -301,6 +302,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
 
     /**
      * Registers a listener for running tasks
+     * TODO(b/343292503): Should we remove RunningTasksListener entirely if it's not needed?
+     *  (Note that Desktop mode gets the running tasks by checking {@link DesktopTask#tasks}
      */
     public void registerRunningTasksListener(RunningTasksListener listener) {
         mTaskList.registerRunningTasksListener(listener);
@@ -311,6 +314,20 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      */
     public void unregisterRunningTasksListener() {
         mTaskList.unregisterRunningTasksListener();
+    }
+
+    /**
+     * Registers a listener for recent tasks
+     */
+    public void registerRecentTasksChangedListener(RecentTasksChangedListener listener) {
+        mTaskList.registerRecentTasksChangedListener(listener);
+    }
+
+    /**
+     * Removes the previously registered running tasks listener
+     */
+    public void unregisterRecentTasksChangedListener() {
+        mTaskList.unregisterRecentTasksChangedListener();
     }
 
     /**
@@ -378,5 +395,15 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
          * Called when there's a change to running tasks
          */
         void onRunningTasksChanged();
+    }
+
+    /**
+     * Listener for receiving recent tasks changes
+     */
+    public interface RecentTasksChangedListener {
+        /**
+         * Called when there's a change to recent tasks
+         */
+        void onRecentTasksChanged();
     }
 }

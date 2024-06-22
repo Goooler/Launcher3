@@ -388,7 +388,7 @@ public class BubbleBarViewController {
      */
     public void removeBubble(BubbleBarItem b) {
         if (b != null) {
-            mBarView.removeView(b.getView());
+            mBarView.removeBubble(b.getView());
         } else {
             Log.w(TAG, "removeBubble, bubble was null!");
         }

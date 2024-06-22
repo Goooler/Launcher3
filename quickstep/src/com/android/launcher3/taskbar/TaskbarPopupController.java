@@ -148,8 +148,8 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
             icon.clearFocus();
             return null;
         }
-        ItemInfo item = (ItemInfo) icon.getTag();
-        if (!ShortcutUtil.supportsShortcuts(item)) {
+        // TODO(b/344657629) support GroupTask as well, for Taskbar Recent apps
+        if (!(icon.getTag() instanceof ItemInfo item) || !ShortcutUtil.supportsShortcuts(item)) {
             return null;
         }
 

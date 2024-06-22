@@ -182,6 +182,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         return INSTANCE.get(context).getInfo().isTransientTaskbar();
     }
 
+    /** Returns whether we are currently in Desktop mode. */
+    public static boolean isInDesktopMode(Context context) {
+        return INSTANCE.get(context).getInfo().isInDesktopMode();
+    }
+
     /**
      * Handles info change for desktop mode.
      */

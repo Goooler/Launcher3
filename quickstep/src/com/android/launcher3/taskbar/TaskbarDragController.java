@@ -82,6 +82,7 @@ import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.views.BubbleTextHolder;
 import com.android.quickstep.LauncherActivityInterface;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LogUtils;
 import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.systemui.shared.recents.model.Task;
@@ -181,7 +182,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     private DragView startInternalDrag(
             BubbleTextView btv, @Nullable DragPreviewProvider dragPreviewProvider) {
-        float iconScale = btv.getIcon().getAnimatedScale();
+        // TODO(b/344038728): null check is only necessary because Recents doesn't use
+        //  FastBitmapDrawable
+        float iconScale = btv.getIcon() == null ? 1f : btv.getIcon().getAnimatedScale();
 
         // Clear the pressed state if necessary
         btv.clearFocus();
@@ -248,7 +251,7 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 dragLayerX + dragOffset.x,
                 dragLayerY + dragOffset.y,
                 (View target, DropTarget.DragObject d, boolean success) -> {} /* DragSource */,
-                (ItemInfo) btv.getTag(),
+                btv.getTag() instanceof ItemInfo itemInfo ? itemInfo : null,
                 dragRect,
                 scale * iconScale,
                 scale,
@@ -288,7 +291,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 initialDragViewScale,
                 dragViewScaleOnDrop,
                 scalePx);
-        dragView.setItemInfo(dragInfo);
+        if (dragInfo != null) {
+            dragView.setItemInfo(dragInfo);
+        }
         mDragObject.dragComplete = false;
 
         mDragObject.xOffset = mMotionDown.x - (dragLayerX + dragRegionLeft);
@@ -301,7 +306,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
         mDragObject.dragSource = source;
         mDragObject.dragInfo = dragInfo;
-        mDragObject.originalDragInfo = mDragObject.dragInfo.makeShallowCopy();
+        mDragObject.originalDragInfo =
+                mDragObject.dragInfo != null ? mDragObject.dragInfo.makeShallowCopy() : null;
 
         if (mOptions.preDragCondition != null) {
             dragView.setHasDragOffset(mOptions.preDragCondition.getDragOffset().x != 0
@@ -431,8 +437,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                                 null, item.user));
             }
             intent.putExtra(Intent.EXTRA_USER, item.user);
-        } else if (tag instanceof Task) {
-            Task task = (Task) tag;
+        } else if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
+            Task task = groupTask.task1;
             clipDescription = new ClipDescription(task.titleDescription,
                     new String[] {
                             ClipDescription.MIMETYPE_APPLICATION_TASK

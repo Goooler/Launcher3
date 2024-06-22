@@ -34,4 +34,8 @@ data class BubbleBarBubble(
 ) : BubbleBarItem(info.key, view)
 
 /** Represents the overflow bubble in the bubble bar. */
-data class BubbleBarOverflow(override var view: BubbleView) : BubbleBarItem("Overflow", view)
+data class BubbleBarOverflow(override var view: BubbleView) : BubbleBarItem(KEY, view) {
+    companion object {
+        const val KEY = "Overflow"
+    }
+}

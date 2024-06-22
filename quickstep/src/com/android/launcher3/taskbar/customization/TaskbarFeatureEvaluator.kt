@@ -33,7 +33,7 @@ class TaskbarFeatureEvaluator(
     val hasNavButtons = taskbarActivityContext.isThreeButtonNav
 
     val hasRecents: Boolean
-        get() = taskbarControllers.taskbarRecentAppsController.isEnabled
+        get() = taskbarControllers.taskbarRecentAppsController.shownTasks.isNotEmpty()
 
     val hasDivider: Boolean
         get() = enableTaskbarPinning() || hasRecents

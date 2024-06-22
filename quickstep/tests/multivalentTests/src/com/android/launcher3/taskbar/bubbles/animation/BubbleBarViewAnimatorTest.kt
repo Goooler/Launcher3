@@ -388,7 +388,8 @@ class BubbleBarViewAnimatorTest {
     fun animateBubbleBarForCollapsed() {
         setUpBubbleBar()
         setUpBubbleStashController()
-        bubbleBarView.translationY = BAR_TRANSLATION_Y_FOR_HOTSEAT
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 

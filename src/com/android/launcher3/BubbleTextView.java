@@ -430,10 +430,21 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         setDownloadStateContentDescription(info, info.getProgressLevel());
     }
 
+    /**
+     * Directly set the icon and label.
+     */
+    @UiThread
+    public void applyIconAndLabel(Drawable icon, CharSequence label) {
+        applyCompoundDrawables(icon);
+        setText(label);
+        setContentDescription(label);
+    }
+
     /** Updates whether the app this view represents is currently running. */
     @UiThread
     public void updateRunningState(RunningAppState runningAppState) {
         mRunningAppState = runningAppState;
+        invalidate();
     }
 
     protected void setItemInfo(ItemInfoWithIcon itemInfo) {
@@ -1290,14 +1301,5 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      */
     public boolean canShowLongPressPopup() {
         return getTag() instanceof ItemInfo && ShortcutUtil.supportsShortcuts((ItemInfo) getTag());
-    }
-
-    /** Returns the package name of the app this icon represents. */
-    public String getTargetPackageName() {
-        Object tag = getTag();
-        if (tag instanceof ItemInfo itemInfo) {
-            return itemInfo.getTargetPackage();
-        }
-        return null;
     }
 }

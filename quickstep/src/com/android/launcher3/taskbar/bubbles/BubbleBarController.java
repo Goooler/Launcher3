@@ -600,7 +600,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         Bitmap bitmap = createOverflowBitmap(context);
         LayoutInflater inflater = LayoutInflater.from(context);
         BubbleView bubbleView = (BubbleView) inflater.inflate(
-                R.layout.bubblebar_item_view, mBarView, false /* attachToRoot */);
+                R.layout.bubble_bar_overflow_button, mBarView, false /* attachToRoot */);
         BubbleBarOverflow overflow = new BubbleBarOverflow(bubbleView);
         bubbleView.setOverflow(overflow, bitmap);
         return overflow;

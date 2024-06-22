@@ -164,22 +164,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         }
 
         if (sourceRectHint.isEmpty()) {
-            // Crop a Rect matches the aspect ratio and pivots at the center point.
-            // To make the animation path simplified.
-            if ((appBounds.width() / (float) appBounds.height()) > aspectRatio) {
-                // use the full height.
-                mSourceRectHint.set(0, 0,
-                        (int) (appBounds.height() * aspectRatio), appBounds.height());
-                mSourceRectHint.offset(
-                        (appBounds.width() - mSourceRectHint.width()) / 2, 0);
-            } else {
-                // use the full width.
-                mSourceRectHint.set(0, 0,
-                        appBounds.width(), (int) (appBounds.width() / aspectRatio));
-                mSourceRectHint.offset(
-                        0, (appBounds.height() - mSourceRectHint.height()) / 2);
-            }
-
+            mSourceRectHint.set(getEnterPipWithOverlaySrcRectHint(appBounds, aspectRatio));
             // Create a new overlay layer. We do not call detach on this instance, it's propagated
             // to other classes like PipTaskOrganizer / RecentsAnimationController to complete
             // the cleanup.
@@ -223,6 +208,26 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             }
         });
         addOnUpdateListener(this::onAnimationUpdate);
+    }
+
+    /**
+     * Crop a Rect matches the aspect ratio and pivots at the center point.
+     */
+    private Rect getEnterPipWithOverlaySrcRectHint(Rect appBounds, float aspectRatio) {
+        final float appBoundsAspectRatio = appBounds.width() / (float) appBounds.height();
+        final int width, height;
+        int left = appBounds.left;
+        int top = appBounds.top;
+        if (appBoundsAspectRatio < aspectRatio) {
+            width = appBounds.width();
+            height = (int) (width / aspectRatio);
+            top = appBounds.top + (appBounds.height() - height) / 2;
+        } else {
+            height = appBounds.height();
+            width = (int) (height * aspectRatio);
+            left = appBounds.left + (appBounds.width() - width) / 2;
+        }
+        return new Rect(left, top, left + width, top + height);
     }
 
     private void onAnimationUpdate(RectF currentRect, float progress) {

@@ -41,7 +41,7 @@ constructor(
 
     private var animatingBubble: AnimatingBubble? = null
     private val bubbleBarBounceDistanceInPx =
-            bubbleBarView.resources.getDimensionPixelSize(R.dimen.bubblebar_bounce_distance)
+        bubbleBarView.resources.getDimensionPixelSize(R.dimen.bubblebar_bounce_distance)
 
     private companion object {
         /** The time to show the flyout. */
@@ -347,7 +347,7 @@ constructor(
      */
     private fun buildBubbleBarBounceAnimation() = Runnable {
         bubbleBarView.onAnimatingBubbleStarted()
-        val ty = bubbleBarView.translationY
+        val ty = bubbleStashController.bubbleBarTranslationY
 
         val springBackAnimation = PhysicsAnimator.getInstance(bubbleBarView)
         springBackAnimation.setDefaultSpringConfig(springConfig)

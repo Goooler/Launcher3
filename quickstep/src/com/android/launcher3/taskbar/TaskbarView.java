@@ -19,6 +19,7 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_
 
 import static com.android.launcher3.BubbleTextView.DISPLAY_TASKBAR;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
+import static com.android.launcher3.Flags.enableRecentsInTaskbar;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_ALL_APPS_SEARCH_IN_TASKBAR;
@@ -30,6 +31,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.DisplayCutout;
@@ -67,7 +69,11 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.IconButtonView;
 import com.android.quickstep.DeviceConfigWrapper;
 import com.android.quickstep.util.AssistStateManager;
+import com.android.quickstep.util.DesktopTask;
+import com.android.quickstep.util.GroupTask;
+import com.android.systemui.shared.recents.model.Task;
 
+import java.util.List;
 import java.util.function.Predicate;
 
 /**
@@ -168,7 +174,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mAllAppsButton.setForegroundTint(
                 mActivityContext.getColor(R.color.all_apps_button_color));
 
-        if (enableTaskbarPinning()) {
+        if (enableTaskbarPinning() || enableRecentsInTaskbar()) {
             mTaskbarDivider = (IconButtonView) LayoutInflater.from(context).inflate(
                     R.layout.taskbar_divider,
                     this, false);
@@ -308,9 +314,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     /**
      * Inflates/binds the Hotseat views to show in the Taskbar given their ItemInfos.
      */
-    protected void updateHotseatItems(ItemInfo[] hotseatItemInfos) {
+    protected void updateHotseatItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
         int nextViewIndex = 0;
         int numViewsAnimated = 0;
+        boolean addedDividerForRecents = false;
 
         if (mAllAppsButton != null) {
             removeView(mAllAppsButton);
@@ -321,8 +328,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
         removeView(mQsb);
 
-        for (int i = 0; i < hotseatItemInfos.length; i++) {
-            ItemInfo hotseatItemInfo = hotseatItemInfos[i];
+        // Add Hotseat icons.
+        for (ItemInfo hotseatItemInfo : hotseatItemInfos) {
             if (hotseatItemInfo == null) {
                 continue;
             }
@@ -388,11 +395,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             // Apply the Hotseat ItemInfos, or hide the view if there is none for a given index.
-            if (hotseatView instanceof BubbleTextView
-                    && hotseatItemInfo instanceof WorkspaceItemInfo) {
-                BubbleTextView btv = (BubbleTextView) hotseatView;
-                WorkspaceItemInfo workspaceInfo = (WorkspaceItemInfo) hotseatItemInfo;
-
+            if (hotseatView instanceof BubbleTextView btv
+                    && hotseatItemInfo instanceof WorkspaceItemInfo workspaceInfo) {
                 boolean animate = btv.shouldAnimateIconChange((WorkspaceItemInfo) hotseatItemInfo);
                 btv.applyFromWorkspaceItem(workspaceInfo, animate, numViewsAnimated);
                 if (animate) {
@@ -405,6 +409,67 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
             nextViewIndex++;
         }
+
+        if (mTaskbarDivider != null && !recentTasks.isEmpty()) {
+            addView(mTaskbarDivider, nextViewIndex++);
+            addedDividerForRecents = true;
+        }
+
+        // Add Recent/Running icons.
+        for (GroupTask task : recentTasks) {
+            // Replace any Recent views with the appropriate type if it's not already that type.
+            final int expectedLayoutResId;
+            boolean isCollection = false;
+            if (task.hasMultipleTasks()) {
+                if (task instanceof DesktopTask) {
+                    // TODO(b/316004172): use Desktop tile layout.
+                    expectedLayoutResId = -1;
+                } else {
+                    // TODO(b/343289567): use R.layout.app_pair_icon
+                    expectedLayoutResId = -1;
+                }
+                isCollection = true;
+            } else {
+                expectedLayoutResId = R.layout.taskbar_app_icon;
+            }
+
+            View recentIcon = null;
+            while (nextViewIndex < getChildCount()) {
+                recentIcon = getChildAt(nextViewIndex);
+
+                // see if the view can be reused
+                if ((recentIcon.getSourceLayoutResId() != expectedLayoutResId)
+                        || (isCollection && (recentIcon.getTag() != task))) {
+                    removeAndRecycle(recentIcon);
+                    recentIcon = null;
+                } else {
+                    // View found
+                    break;
+                }
+            }
+
+            if (recentIcon == null) {
+                if (isCollection) {
+                    // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
+                    continue;
+                }
+
+                recentIcon = inflate(expectedLayoutResId);
+                LayoutParams lp = new LayoutParams(mIconTouchSize, mIconTouchSize);
+                recentIcon.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
+                addView(recentIcon, nextViewIndex, lp);
+            }
+
+            if (recentIcon instanceof BubbleTextView btv) {
+                applyGroupTaskToBubbleTextView(btv, task);
+            }
+            setClickAndLongClickListenersForIcon(recentIcon);
+            if (enableCursorHoverStates()) {
+                setHoverListenerForIcon(recentIcon);
+            }
+            nextViewIndex++;
+        }
+
         // Remove remaining views
         while (nextViewIndex < getChildCount()) {
             removeAndRecycle(getChildAt(nextViewIndex));
@@ -413,8 +478,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mAllAppsButton != null) {
             addView(mAllAppsButton, mIsRtl ? getChildCount() : 0);
 
-            // if only all apps button present, don't include divider view.
-            if (mTaskbarDivider != null && getChildCount() > 1) {
+            // If there are no recent tasks, add divider after All Apps (unless it's the only view).
+            if (!addedDividerForRecents && mTaskbarDivider != null && getChildCount() > 1) {
                 addView(mTaskbarDivider, mIsRtl ? (getChildCount() - 1) : 1);
             }
         }
@@ -423,6 +488,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             // Always set QSB to invisible after re-adding.
             mQsb.setVisibility(View.INVISIBLE);
         }
+    }
+
+    /** Binds the GroupTask to the BubbleTextView to be ready to present to the user. */
+    public void applyGroupTaskToBubbleTextView(BubbleTextView btv, GroupTask groupTask) {
+        // TODO(b/343289567): support app pairs.
+        Task task1 = groupTask.task1;
+        // TODO(b/344038728): use FastBitmapDrawable instead of Drawable, to get disabled state
+        //  while dragging.
+        Drawable taskIcon = groupTask.task1.icon;
+        if (taskIcon != null) {
+            taskIcon = taskIcon.getConstantState().newDrawable().mutate();
+        }
+        btv.applyIconAndLabel(taskIcon, task1.titleDescription);
+        btv.setTag(groupTask);
     }
 
     /**
@@ -677,7 +756,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // map over all the shortcuts on the taskbar
         for (int i = 0; i < getChildCount(); i++) {
             View item = getChildAt(i);
-            if (op.evaluate((ItemInfo) item.getTag(), item)) {
+            // TODO(b/344657629): Support GroupTask as well for notification dots/popup
+            if (item.getTag() instanceof ItemInfo itemInfo && op.evaluate(itemInfo, item)) {
                 return;
             }
         }
@@ -694,6 +774,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 View item = getChildAt(i);
                 if (!(item.getTag() instanceof ItemInfo)) {
                     // Should only happen for All Apps button.
+                    // Will also happen for Recent/Running app icons. (Which have GroupTask as tags)
                     continue;
                 }
                 ItemInfo info = (ItemInfo) item.getTag();
