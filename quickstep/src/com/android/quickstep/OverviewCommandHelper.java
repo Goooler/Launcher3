@@ -265,6 +265,10 @@ public class OverviewCommandHelper {
                 case TYPE_HOME:
                     ActiveGestureLog.INSTANCE.addLog(
                             "OverviewCommandHelper.executeCommand(TYPE_HOME)");
+                    // Although IActivityTaskManager$Stub$Proxy.startActivity is a slow binder call,
+                    // we should still call it on main thread because launcher is waiting for
+                    // ActivityTaskManager to resume it. Also calling startActivity() on bg thread
+                    // could potentially delay resuming launcher. See b/348668521 for more details.
                     mService.startActivity(mOverviewComponentObserver.getHomeIntent());
                     return true;
                 case TYPE_SHOW:

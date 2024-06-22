@@ -88,6 +88,7 @@ import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
 import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
+import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
@@ -667,6 +668,7 @@ constructor(
                     taskOverlayFactory
                 )
             )
+        taskContainers.forEach { it.bind() }
         setOrientationState(orientedState)
     }
 
@@ -693,24 +695,16 @@ constructor(
         }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
-                task,
-                thumbnailView,
-                thumbnailViewDeprecated,
-                iconView,
-                TransformingTouchDelegate(iconView.asView()),
-                stagePosition,
-                DigitalWellBeingToast(container, this),
-                findViewById(showWindowViewId)!!,
-                taskOverlayFactory
-            )
-            .apply {
-                if (enableRefactorTaskThumbnail()) {
-                    thumbnailViewDeprecated.setTaskOverlay(overlay)
-                    bindThumbnailView()
-                } else {
-                    thumbnailViewDeprecated.bind(task, overlay)
-                }
-            }
+            task,
+            thumbnailView,
+            thumbnailViewDeprecated,
+            iconView,
+            TransformingTouchDelegate(iconView.asView()),
+            stagePosition,
+            DigitalWellBeingToast(container, this),
+            findViewById(showWindowViewId)!!,
+            taskOverlayFactory
+        )
     }
 
     protected fun getOrInflateIconView(@IdRes iconViewId: Int): TaskViewIcon {
@@ -1379,7 +1373,6 @@ constructor(
     open fun setColorTint(amount: Float, tintColor: Int) {
         taskContainers.forEach {
             if (!enableRefactorTaskThumbnail()) {
-                // TODO(b/334832108) Add scrim to new TTV
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
@@ -1522,6 +1515,9 @@ constructor(
         resetViewTransforms()
     }
 
+    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
+        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
+
     open fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
         // resetViewTransforms is called during QuickSwitch scrolling.
@@ -1623,6 +1619,7 @@ constructor(
         taskOverlayFactory: TaskOverlayFactory
     ) {
         val overlay: TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
+        val taskContainerData = TaskContainerData()
 
         val snapshotView: View
             get() = thumbnailView ?: thumbnailViewDeprecated
@@ -1654,6 +1651,15 @@ constructor(
         fun destroy() {
             digitalWellBeingToast?.destroy()
             thumbnailView?.let { taskView.removeView(it) }
+        }
+
+        fun bind() {
+            if (enableRefactorTaskThumbnail() && thumbnailView != null) {
+                thumbnailViewDeprecated.setTaskOverlay(overlay)
+                bindThumbnailView()
+            } else {
+                thumbnailViewDeprecated.bind(task, overlay)
+            }
         }
 
         // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM

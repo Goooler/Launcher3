@@ -28,6 +28,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
+import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
@@ -43,9 +44,10 @@ import org.mockito.kotlin.whenever
 class TaskThumbnailViewModelTest {
     private val recentsViewData = RecentsViewData()
     private val taskViewData = TaskViewData()
+    private val taskContainerData = TaskContainerData()
     private val tasksRepository = FakeTasksRepository()
     private val systemUnderTest =
-        TaskThumbnailViewModel(recentsViewData, taskViewData, tasksRepository)
+        TaskThumbnailViewModel(recentsViewData, taskViewData, taskContainerData, tasksRepository)
 
     private val tasks = (0..5).map(::createTaskWithId)
 

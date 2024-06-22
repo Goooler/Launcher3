@@ -193,23 +193,23 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             }
             val taskContainer =
                 TaskContainer(
-                        task,
-                        // TODO(b/338360089): Support new TTV for DesktopTaskView
-                        thumbnailView = null,
-                        thumbnailViewDeprecated,
-                        iconView,
-                        TransformingTouchDelegate(iconView.asView()),
-                        SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
-                        digitalWellBeingToast = null,
-                        showWindowsView = null,
-                        taskOverlayFactory
-                    )
-                    .apply { thumbnailViewDeprecated.bind(task, overlay) }
+                    task,
+                    // TODO(b/338360089): Support new TTV for DesktopTaskView
+                    thumbnailView = null,
+                    thumbnailViewDeprecated,
+                    iconView,
+                    TransformingTouchDelegate(iconView.asView()),
+                    SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                    digitalWellBeingToast = null,
+                    showWindowsView = null,
+                    taskOverlayFactory
+                )
             if (index >= taskContainers.size) {
                 taskContainers.add(taskContainer)
             } else {
                 taskContainers[index] = taskContainer
             }
+            taskContainer.bind()
         }
         repeat(taskContainers.size - tasks.size) {
             with(taskContainers.removeLast()) {

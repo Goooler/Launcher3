@@ -19,6 +19,7 @@ package com.android.launcher3.config;
 import static com.android.launcher3.config.FeatureFlags.BooleanFlag.DISABLED;
 import static com.android.launcher3.config.FeatureFlags.BooleanFlag.ENABLED;
 import static com.android.wm.shell.Flags.enableTaskbarNavbarUnification;
+import static com.android.wm.shell.Flags.enableTaskbarOnPhones;
 
 import android.content.res.Resources;
 
@@ -143,7 +144,7 @@ public final class FeatureFlags {
             DISABLED, "Sends a notification whenever launcher encounters an uncaught exception.");
 
     public static final boolean ENABLE_TASKBAR_NAVBAR_UNIFICATION =
-            enableTaskbarNavbarUnification() && !isPhone();
+            enableTaskbarNavbarUnification() && (!isPhone() || enableTaskbarOnPhones());
 
     private static boolean isPhone() {
         final boolean isPhone;

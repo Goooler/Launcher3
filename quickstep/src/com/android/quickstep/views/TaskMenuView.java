@@ -18,6 +18,7 @@ package com.android.quickstep.views;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.Flags.enableOverviewIconMenu;
+import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.quickstep.views.TaskThumbnailViewDeprecated.DIM_ALPHA;
@@ -367,6 +368,14 @@ public class TaskMenuView extends AbstractFloatingView {
                         mTaskContainer.getThumbnailViewDeprecated(), DIM_ALPHA,
                         closing ? 0 : TaskView.MAX_PAGE_SCRIM_ALPHA),
                 ObjectAnimator.ofFloat(this, ALPHA, closing ? 0 : 1));
+        if (enableRefactorTaskThumbnail()) {
+            mRevealAnimator.addUpdateListener(animation -> {
+                float animatedFraction = animation.getAnimatedFraction();
+                float openProgress = closing ? (1 - animatedFraction) : animatedFraction;
+                mTaskContainer.getTaskContainerData()
+                        .getTaskMenuOpenProgress().setValue(openProgress);
+            });
+        }
         mOpenCloseAnimator.addListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {

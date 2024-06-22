@@ -228,6 +228,7 @@ public interface TaskShortcutFactory {
 
                 // Take the thumbnail of the task without a scrim and apply it back after
                 float alpha = mThumbnailView.getDimAlpha();
+                // TODO(b/348643341) add ability to get override the scrim for this Bitmap retrieval
                 mThumbnailView.setDimAlpha(0);
                 Bitmap thumbnail = RecentsTransition.drawViewIntoHardwareBitmap(
                         taskBounds.width(), taskBounds.height(), mThumbnailView, 1f,

@@ -415,7 +415,7 @@ public class TaskbarUIController {
     /**
      * Sets whether the user is going home based on the current gesture.
      */
-    public void setUserIsGoingHome(boolean isGoingHome) {
-        mControllers.taskbarStashController.setUserIsGoingHome(isGoingHome);
+    public void setUserIsNotGoingHome(boolean isNotGoingHome) {
+        mControllers.taskbarStashController.setUserIsNotGoingHome(isNotGoingHome);
     }
 }

@@ -1196,7 +1196,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
         if (mContainerInterface.getTaskbarController() != null) {
             // Resets this value as the gesture is now complete.
-            mContainerInterface.getTaskbarController().setUserIsGoingHome(false);
+            mContainerInterface.getTaskbarController().setUserIsNotGoingHome(false);
         }
         ActiveGestureLog.INSTANCE.addLog(
                 new ActiveGestureLog.CompoundString("onSettledOnEndTarget ")
@@ -1350,7 +1350,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 && mIsTransientTaskbar
                 && mContainerInterface.getTaskbarController() != null) {
             mContainerInterface.getTaskbarController()
-                    .setUserIsGoingHome(endTarget == GestureState.GestureEndTarget.HOME);
+                    .setUserIsNotGoingHome(endTarget != GestureState.GestureEndTarget.HOME);
         }
 
         float endShift = endTarget == ALL_APPS ? mDragLengthFactor

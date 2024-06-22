@@ -53,25 +53,31 @@ class TaskThumbnailView : View {
         TaskThumbnailViewModel(
             recentsView.mRecentsViewData,
             (parent as TaskView).taskViewData,
+            (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
             recentsView.mTasksRepository,
         )
     }
 
     private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
+    private var dimProgress: Float = 0f
 
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val scrimPaint = Paint().apply { color = Color.BLACK }
     private val _measuredBounds = Rect()
     private val measuredBounds: Rect
         get() {
             _measuredBounds.set(0, 0, measuredWidth, measuredHeight)
             return _measuredBounds
         }
+
     private var cornerRadius: Float = TaskCornerRadius.get(context)
     private var fullscreenCornerRadius: Float = QuickStepContract.getWindowCornerRadius(context)
 
     constructor(context: Context?) : super(context)
+
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
+
     constructor(
         context: Context?,
         attrs: AttributeSet?,
@@ -84,6 +90,13 @@ class TaskThumbnailView : View {
         MainScope().launch {
             viewModel.uiState.collect { viewModelUiState ->
                 uiState = viewModelUiState
+                invalidate()
+            }
+        }
+        MainScope().launch {
+            viewModel.dimProgress.collect { dimProgress ->
+                // TODO(b/348195366) Add fade in/out for scrim
+                this@TaskThumbnailView.dimProgress = dimProgress
                 invalidate()
             }
         }
@@ -111,6 +124,10 @@ class TaskThumbnailView : View {
             is Snapshot -> drawSnapshotState(canvas, uiStateVal)
             is BackgroundOnly -> drawBackgroundOnly(canvas, uiStateVal.backgroundColor)
         }
+
+        if (dimProgress > 0) {
+            drawScrim(canvas)
+        }
     }
 
     private fun drawBackgroundOnly(canvas: Canvas, @ColorInt backgroundColor: Int) {
@@ -135,6 +152,11 @@ class TaskThumbnailView : View {
         canvas.drawBitmap(snapshot.bitmap, snapshot.drawnRect, measuredBounds, null)
     }
 
+    private fun drawScrim(canvas: Canvas) {
+        scrimPaint.alpha = (dimProgress * MAX_SCRIM_ALPHA).toInt()
+        canvas.drawRect(measuredBounds, scrimPaint)
+    }
+
     private fun getCurrentCornerRadius() =
         Utilities.mapRange(
             viewModel.recentsFullscreenProgress.value,
@@ -145,5 +167,6 @@ class TaskThumbnailView : View {
     companion object {
         private val CLEAR_PAINT =
             Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
+        private const val MAX_SCRIM_ALPHA = (0.4f * 255).toInt()
     }
 }

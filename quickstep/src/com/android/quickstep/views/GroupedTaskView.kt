@@ -145,6 +145,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     taskOverlayFactory
                 )
             )
+        taskContainers.forEach { it.bind() }
+
         this.splitBoundsConfig =
             splitBoundsConfig?.also {
                 taskContainers[0]

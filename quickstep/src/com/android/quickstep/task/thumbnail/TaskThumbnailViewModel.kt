@@ -25,6 +25,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
+import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.map
 class TaskThumbnailViewModel(
     recentsViewData: RecentsViewData,
     taskViewData: TaskViewData,
+    taskContainerData: TaskContainerData,
     private val tasksRepository: RecentTasksRepository,
 ) {
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
@@ -50,6 +52,7 @@ class TaskThumbnailViewModel(
         combine(recentsViewData.scale, taskViewData.scale) { recentsScale, taskScale ->
             recentsScale * taskScale
         }
+    val dimProgress: Flow<Float> = taskContainerData.taskMenuOpenProgress
     val uiState: Flow<TaskThumbnailUiState> =
         task
             .flatMapLatest { taskFlow ->
