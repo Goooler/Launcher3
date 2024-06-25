@@ -93,12 +93,12 @@ public class UserCache implements SafeCloseable {
 
     @Override
     public void close() {
-        MODEL_EXECUTOR.execute(() -> mUserChangeReceiver.unregisterReceiverSafely(mContext));
+        MODEL_EXECUTOR.execute(() -> mUserChangeReceiver.unregisterReceiverSafelySync(mContext));
     }
 
     @WorkerThread
     private void initAsync() {
-        mUserChangeReceiver.register(mContext,
+        mUserChangeReceiver.registerSync(mContext,
                 Intent.ACTION_MANAGED_PROFILE_AVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_REMOVED,

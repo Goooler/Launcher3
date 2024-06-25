@@ -442,13 +442,21 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             return this;
         }
 
+        public Builder setDisplayCutoutInsets(@NonNull Rect displayCutoutInsets) {
+            mDisplayCutoutInsets = new Rect(displayCutoutInsets);
+            return this;
+        }
+
         public SwipePipToHomeAnimator build() {
             if (mDestinationBoundsTransformed.isEmpty()) {
                 mDestinationBoundsTransformed.set(mDestinationBounds);
             }
             // adjust the mSourceRectHint / mAppBounds by display cutout if applicable.
             if (mSourceRectHint != null && mDisplayCutoutInsets != null) {
-                if (mFromRotation == Surface.ROTATION_90) {
+                if (mFromRotation == Surface.ROTATION_0 && mDisplayCutoutInsets.top >= 0) {
+                    // TODO: this is to special case the issues on Pixel Foldable device(s).
+                    mSourceRectHint.offset(mDisplayCutoutInsets.left, mDisplayCutoutInsets.top);
+                } else if (mFromRotation == Surface.ROTATION_90) {
                     mSourceRectHint.offset(mDisplayCutoutInsets.left, mDisplayCutoutInsets.top);
                 } else if (mFromRotation == Surface.ROTATION_270) {
                     mAppBounds.inset(mDisplayCutoutInsets);
@@ -462,15 +470,6 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         }
     }
 
-    private static class RotatedPosition {
-        private final float degree;
-        private final float positionX;
-        private final float positionY;
-
-        private RotatedPosition(float degree, float positionX, float positionY) {
-            this.degree = degree;
-            this.positionX = positionX;
-            this.positionY = positionY;
-        }
+    private record RotatedPosition(float degree, float positionX, float positionY) {
     }
 }

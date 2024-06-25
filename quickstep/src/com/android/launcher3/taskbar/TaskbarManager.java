@@ -304,7 +304,7 @@ public class TaskbarManager {
                 .register(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "registering component callbacks from constructor.");
         mContext.registerComponentCallbacks(mComponentCallbacks);
-        mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
+        mShutdownReceiver.registerAsync(mContext, Intent.ACTION_SHUTDOWN);
         UI_HELPER_EXECUTOR.execute(() -> {
             mSharedState.taskbarSystemActionPendingIntent = PendingIntent.getBroadcast(
                     mContext,
@@ -582,8 +582,7 @@ public class TaskbarManager {
     public void destroy() {
         debugWhyTaskbarNotDestroyed("TaskbarManager#destroy()");
         removeActivityCallbacksAndListeners();
-        UI_HELPER_EXECUTOR.execute(
-                () -> mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext));
+        mTaskbarBroadcastReceiver.unregisterReceiverSafelyAsync(mContext);
         destroyExistingTaskbar();
         removeTaskbarRootViewFromWindow();
         if (mUserUnlocked) {
@@ -595,7 +594,7 @@ public class TaskbarManager {
                 .unregister(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "unregistering component callbacks from destroy().");
         mContext.unregisterComponentCallbacks(mComponentCallbacks);
-        mContext.unregisterReceiver(mShutdownReceiver);
+        mShutdownReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 
     public @Nullable TaskbarActivityContext getCurrentActivityContext() {

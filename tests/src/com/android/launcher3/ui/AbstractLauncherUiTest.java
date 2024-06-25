@@ -239,7 +239,8 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
         final CountDownLatch count = new CountDownLatch(2);
         final SimpleBroadcastReceiver broadcastReceiver =
                 new SimpleBroadcastReceiver(i -> count.countDown());
-        broadcastReceiver.registerPkgActions(mTargetContext, pkg,
+        // We OK to make binder calls on main thread in test.
+        broadcastReceiver.registerPkgActionsSync(mTargetContext, pkg,
                 Intent.ACTION_PACKAGE_RESTARTED, Intent.ACTION_PACKAGE_DATA_CLEARED);
 
         mDevice.executeShellCommand("pm clear " + pkg);

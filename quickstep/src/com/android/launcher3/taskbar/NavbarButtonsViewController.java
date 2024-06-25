@@ -47,6 +47,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
+import static com.android.wm.shell.Flags.enableTaskbarOnPhones;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -678,14 +679,19 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 mLightIconColorOnHome,
                 mDarkIconColorOnHome);
 
-        // Override the color from framework if nav buttons are over an opaque Taskbar surface.
-        final int iconColor = (int) argbEvaluator.evaluate(
-                mOnBackgroundNavButtonColorOverrideMultiplier.value
-                        * Math.max(
-                                mOnTaskbarBackgroundNavButtonColorOverride.value,
-                                mSlideInViewVisibleNavButtonColorOverride.value),
-                sysUiNavButtonIconColorOnHome,
-                mOnBackgroundIconColor);
+        final int iconColor;
+        if (ENABLE_TASKBAR_NAVBAR_UNIFICATION && enableTaskbarOnPhones()
+                && mContext.isPhoneMode()) {
+            iconColor = sysUiNavButtonIconColorOnHome;
+        } else {
+            // Override the color from framework if nav buttons are over an opaque Taskbar surface.
+            iconColor = (int) argbEvaluator.evaluate(
+                    mOnBackgroundNavButtonColorOverrideMultiplier.value * Math.max(
+                            mOnTaskbarBackgroundNavButtonColorOverride.value,
+                            mSlideInViewVisibleNavButtonColorOverride.value),
+                    sysUiNavButtonIconColorOnHome,
+                    mOnBackgroundIconColor);
+        }
 
         for (ImageView button : mAllButtons) {
             button.setImageTintList(ColorStateList.valueOf(iconColor));

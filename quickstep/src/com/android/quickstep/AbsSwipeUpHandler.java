@@ -1205,17 +1205,28 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     /** @return Whether this was the task we were waiting to appear, and thus handled it. */
-    protected boolean handleTaskAppeared(RemoteAnimationTarget[] appearedTaskTarget) {
+    protected boolean handleTaskAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTargets,
+            @NonNull ActiveGestureLog.CompoundString failureReason) {
         if (mStateCallback.hasStates(STATE_HANDLER_INVALIDATED)) {
+            failureReason.append("State handler was invalidated");
             return false;
         }
-        boolean hasStartedTaskBefore = Arrays.stream(appearedTaskTarget).anyMatch(
-                mGestureState.mLastStartedTaskIdPredicate);
-        if (mStateCallback.hasStates(STATE_START_NEW_TASK) && hasStartedTaskBefore) {
-            reset();
-            return true;
+        boolean stateStartNewTaskSet = mStateCallback.hasStates(STATE_START_NEW_TASK);
+        if (!stateStartNewTaskSet || !hasStartedTaskBefore(appearedTaskTargets)) {
+            if (!stateStartNewTaskSet) {
+                failureReason.append("STATE_START_NEW_TASK was never set");
+            } else {
+                TaskInfo taskInfo = appearedTaskTargets[0].taskInfo;
+                failureReason.append("Unexpected task appeared")
+                                .append(" id=")
+                                .append(taskInfo.taskId)
+                                .append(" pkg=")
+                                .append(taskInfo.baseIntent.getComponent().getPackageName());
+            }
+            return false;
         }
-        return false;
+        reset();
+        return true;
     }
 
     private float dpiFromPx(float pixels) {
@@ -1796,6 +1807,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 && (windowRotation == ROTATION_90 || windowRotation == ROTATION_270)) {
             builder.setFromRotation(mRemoteTargetHandles[0].getTaskViewSimulator(), windowRotation,
                     taskInfo.displayCutoutInsets);
+        } else if (taskInfo.displayCutoutInsets != null) {
+            builder.setDisplayCutoutInsets(taskInfo.displayCutoutInsets);
         }
         final SwipePipToHomeAnimator swipePipToHomeAnimator = builder.build();
         AnimatorPlaybackController activityAnimationToHome =
@@ -2400,14 +2413,18 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
     }
 
+    private boolean hasStartedTaskBefore(@NonNull RemoteAnimationTarget[] appearedTaskTargets) {
+        return Arrays.stream(appearedTaskTargets)
+                .anyMatch(mGestureState.mLastStartedTaskIdPredicate);
+    }
+
     @Override
     public void onTasksAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTargets) {
         if (mRecentsAnimationController == null) {
             return;
         }
-        boolean hasStartedTaskBefore = Arrays.stream(appearedTaskTargets).anyMatch(
-                mGestureState.mLastStartedTaskIdPredicate);
-        if (!mStateCallback.hasStates(STATE_GESTURE_COMPLETED) && !hasStartedTaskBefore) {
+        if (!mStateCallback.hasStates(STATE_GESTURE_COMPLETED)
+                && !hasStartedTaskBefore(appearedTaskTargets)) {
             // This is a special case, if a task is started mid-gesture that wasn't a part of a
             // previous quickswitch task launch, then cancel the animation back to the app
             RemoteAnimationTarget appearedTaskTarget = appearedTaskTargets[0];
@@ -2421,7 +2438,11 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }
-        if (!handleTaskAppeared(appearedTaskTargets)) {
+        ActiveGestureLog.CompoundString handleTaskFailureReason =
+                new ActiveGestureLog.CompoundString("handleTaskAppeared check failed: ");
+        if (!handleTaskAppeared(appearedTaskTargets, handleTaskFailureReason)) {
+            ActiveGestureLog.INSTANCE.addLog(handleTaskFailureReason);
+            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }
         Optional<RemoteAnimationTarget> taskTargetOptional =

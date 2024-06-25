@@ -184,7 +184,8 @@ public class BubbleStashController {
 
     /** Whether bubbles are showing on the launcher home page. */
     public boolean isBubblesShowingOnHome() {
-        return mBubblesShowingOnHome;
+        boolean hasBubbles = mBarViewController != null && mBarViewController.hasBubbles();
+        return mBubblesShowingOnHome && hasBubbles;
     }
 
     // TODO: when tapping on an app in overview, this is a bit delayed compared to taskbar stashing

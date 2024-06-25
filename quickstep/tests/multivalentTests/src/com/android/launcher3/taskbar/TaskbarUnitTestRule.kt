@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar
 
 import android.app.Instrumentation
 import android.app.PendingIntent
+import android.content.Context
 import android.content.IIntentSender
 import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
@@ -36,6 +37,8 @@ import org.junit.runners.model.Statement
 
 /**
  * Manages the Taskbar lifecycle for unit tests.
+ *
+ * Tests need to provide their target [context] through the constructor.
  *
  * See [InjectController] for grabbing controller(s) under test with minimal boilerplate.
  *
@@ -58,7 +61,7 @@ import org.junit.runners.model.Statement
  * }
  * ```
  */
-class TaskbarUnitTestRule : MethodRule {
+class TaskbarUnitTestRule(private val context: Context) : MethodRule {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val serviceTestRule = ServiceTestRule()
 
@@ -76,7 +79,6 @@ class TaskbarUnitTestRule : MethodRule {
             override fun evaluate() {
                 this@TaskbarUnitTestRule.target = target
 
-                val context = instrumentation.targetContext
                 instrumentation.runOnMainSync {
                     assumeTrue(
                         LauncherAppState.getIDP(context).getDeviceProfile(context).isTaskbarPresent

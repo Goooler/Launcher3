@@ -198,10 +198,11 @@ public class WallpaperOffsetInterpolator {
     public void setWindowToken(IBinder token) {
         mWindowToken = token;
         if (mWindowToken == null && mRegistered) {
-            mWallpaperChangeReceiver.unregisterReceiverSafely(mWorkspace.getContext());
+            mWallpaperChangeReceiver.unregisterReceiverSafelyAsync(mWorkspace.getContext());
             mRegistered = false;
         } else if (mWindowToken != null && !mRegistered) {
-            mWallpaperChangeReceiver.register(mWorkspace.getContext(), ACTION_WALLPAPER_CHANGED);
+            mWallpaperChangeReceiver.registerAsync(
+                    mWorkspace.getContext(), ACTION_WALLPAPER_CHANGED);
             onWallpaperChanged();
             mRegistered = true;
         }

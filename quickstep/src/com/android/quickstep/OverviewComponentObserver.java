@@ -36,6 +36,7 @@ import android.util.SparseIntArray;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 import com.android.launcher3.R;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
@@ -101,7 +102,7 @@ public final class OverviewComponentObserver {
             mConfigChangesMap.append(fallbackComponent.hashCode(), fallbackInfo.configChanges);
         } catch (PackageManager.NameNotFoundException ignored) { /* Impossible */ }
 
-        mUserPreferenceChangeReceiver.register(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
+        mUserPreferenceChangeReceiver.registerAsync(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
         updateOverviewTargets();
     }
 
@@ -114,6 +115,8 @@ public final class OverviewComponentObserver {
         mOverviewChangeListener = overviewChangeListener;
     }
 
+    /** Called on {@link TouchInteractionService#onSystemUiFlagsChanged} */
+    @UiThread
     public void onSystemUiStateChanged() {
         if (mDeviceState.isHomeDisabled() != mIsHomeDisabled) {
             updateOverviewTargets();
@@ -128,6 +131,7 @@ public final class OverviewComponentObserver {
      * Update overview intent and {@link BaseActivityInterface} based off the current launcher home
      * component.
      */
+    @UiThread
     private void updateOverviewTargets() {
         ComponentName defaultHome = PackageManagerWrapper.getInstance()
                 .getHomeActivities(new ArrayList<>());
@@ -187,8 +191,9 @@ public final class OverviewComponentObserver {
                 unregisterOtherHomeAppUpdateReceiver();
 
                 mUpdateRegisteredPackage = defaultHome.getPackageName();
-                mOtherHomeAppUpdateReceiver.registerPkgActions(mContext, mUpdateRegisteredPackage,
-                        ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED);
+                mOtherHomeAppUpdateReceiver.registerPkgActionsAsync(
+                        mContext, mUpdateRegisteredPackage, ACTION_PACKAGE_ADDED,
+                        ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED);
             }
         }
         mOverviewChangeListener.accept(mIsHomeAndOverviewSame);
@@ -198,13 +203,13 @@ public final class OverviewComponentObserver {
      * Clean up any registered receivers.
      */
     public void onDestroy() {
-        mContext.unregisterReceiver(mUserPreferenceChangeReceiver);
+        mUserPreferenceChangeReceiver.unregisterReceiverSafelyAsync(mContext);
         unregisterOtherHomeAppUpdateReceiver();
     }
 
     private void unregisterOtherHomeAppUpdateReceiver() {
         if (mUpdateRegisteredPackage != null) {
-            mContext.unregisterReceiver(mOtherHomeAppUpdateReceiver);
+            mOtherHomeAppUpdateReceiver.unregisterReceiverSafelyAsync(mContext);
             mUpdateRegisteredPackage = null;
         }
     }

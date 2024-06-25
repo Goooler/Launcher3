@@ -42,7 +42,7 @@ import org.junit.runner.RunWith
 @EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
 class TaskbarAllAppsControllerTest {
 
-    @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule()
+    @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule(getInstrumentation().targetContext)
     @get:Rule val animatorTestRule = AnimatorTestRule(this)
 
     @InjectController lateinit var allAppsController: TaskbarAllAppsController

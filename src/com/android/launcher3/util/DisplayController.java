@@ -132,11 +132,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mWindowContext.registerComponentCallbacks(this);
         } else {
             mWindowContext = null;
-            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
+            mReceiver.registerAsync(mContext, ACTION_CONFIGURATION_CHANGED);
         }
 
         // Initialize navigation mode change listener
-        mReceiver.registerPkgActions(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
+        mReceiver.registerPkgActionsAsync(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
 
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
         Context displayInfoContext = getDisplayInfoContext(display);
@@ -223,6 +223,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         } else {
             // TODO: unregister broadcast receiver
         }
+        mReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 
     /**

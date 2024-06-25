@@ -41,7 +41,7 @@ import org.junit.runner.RunWith
 @EmulatedDevices(["pixelFoldable2023"])
 class TaskbarOverlayControllerTest {
 
-    @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule()
+    @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule(getInstrumentation().targetContext)
     @InjectController lateinit var overlayController: TaskbarOverlayController
 
     private val taskbarContext: TaskbarActivityContext

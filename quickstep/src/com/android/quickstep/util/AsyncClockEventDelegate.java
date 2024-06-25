@@ -18,8 +18,6 @@ package com.android.quickstep.util;
 import static android.content.Intent.ACTION_TIMEZONE_CHANGED;
 import static android.content.Intent.ACTION_TIME_CHANGED;
 
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -64,9 +62,7 @@ public class AsyncClockEventDelegate extends ClockEventDelegate
     private AsyncClockEventDelegate(Context context) {
         super(context);
         mContext = context;
-
-        UI_HELPER_EXECUTOR.execute(() ->
-                mReceiver.register(mContext, ACTION_TIME_CHANGED, ACTION_TIMEZONE_CHANGED));
+        mReceiver.registerAsync(mContext, ACTION_TIME_CHANGED, ACTION_TIMEZONE_CHANGED);
     }
 
     @Override
@@ -127,6 +123,6 @@ public class AsyncClockEventDelegate extends ClockEventDelegate
     public void close() {
         mDestroyed = true;
         SettingsCache.INSTANCE.get(mContext).unregister(mFormatUri, this);
-        UI_HELPER_EXECUTOR.execute(() -> mReceiver.unregisterReceiverSafely(mContext));
+        mReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 }

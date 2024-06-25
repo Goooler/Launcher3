@@ -25,6 +25,7 @@ class LockedUserState(private val mContext: Context) : SafeCloseable {
     val isUserUnlockedAtLauncherStartup: Boolean
     var isUserUnlocked: Boolean
         private set
+
     private val mUserUnlockedActions: RunnableList = RunnableList()
 
     @VisibleForTesting
@@ -50,22 +51,18 @@ class LockedUserState(private val mContext: Context) : SafeCloseable {
         if (isUserUnlocked) {
             notifyUserUnlocked()
         } else {
-            mUserUnlockedReceiver.register(mContext, Intent.ACTION_USER_UNLOCKED)
+            mUserUnlockedReceiver.registerAsync(mContext, Intent.ACTION_USER_UNLOCKED)
         }
     }
 
     private fun notifyUserUnlocked() {
         mUserUnlockedActions.executeAllAndDestroy()
-        Executors.THREAD_POOL_EXECUTOR.execute {
-            mUserUnlockedReceiver.unregisterReceiverSafely(mContext)
-        }
+        mUserUnlockedReceiver.unregisterReceiverSafelyAsync(mContext)
     }
 
     /** Stops the receiver from listening for ACTION_USER_UNLOCK broadcasts. */
     override fun close() {
-        Executors.THREAD_POOL_EXECUTOR.execute {
-            mUserUnlockedReceiver.unregisterReceiverSafely(mContext)
-        }
+        mUserUnlockedReceiver.unregisterReceiverSafelyAsync(mContext)
     }
 
     /**

@@ -111,6 +111,7 @@ public final class WellbeingModel implements SafeCloseable {
         mWorkerHandler.post(this::initializeInBackground);
     }
 
+    @WorkerThread
     private void initializeInBackground() {
         if (!TextUtils.isEmpty(mWellbeingProviderPkg)) {
             mContext.registerReceiver(
@@ -134,8 +135,8 @@ public final class WellbeingModel implements SafeCloseable {
     public void close() {
         if (!TextUtils.isEmpty(mWellbeingProviderPkg)) {
             mWorkerHandler.post(() -> {
-                mWellbeingAppChangeReceiver.unregisterReceiverSafely(mContext);
-                mAppAddRemoveReceiver.unregisterReceiverSafely(mContext);
+                mWellbeingAppChangeReceiver.unregisterReceiverSafelySync(mContext);
+                mAppAddRemoveReceiver.unregisterReceiverSafelySync(mContext);
                 mContext.getContentResolver().unregisterContentObserver(mContentObserver);
             });
         }

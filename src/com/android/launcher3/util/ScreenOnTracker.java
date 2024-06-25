@@ -42,12 +42,12 @@ public class ScreenOnTracker implements SafeCloseable {
         // Assume that the screen is on to begin with
         mContext = context;
         mIsScreenOn = true;
-        mReceiver.register(context, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
+        mReceiver.registerAsync(context, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
     }
 
     @Override
     public void close() {
-        mReceiver.unregisterReceiverSafely(mContext);
+        mReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 
     private void onReceive(Intent intent) {

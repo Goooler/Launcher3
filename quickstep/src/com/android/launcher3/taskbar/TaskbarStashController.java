@@ -338,7 +338,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         // For now, assume we're in an app, since LauncherTaskbarUIController won't be able to tell
         // us that we're paused until a bit later. This avoids flickering upon recreating taskbar.
         updateStateForFlag(FLAG_IN_APP, true);
+
         applyState(/* duration = */ 0);
+
+        // Hide the background while stashed so it doesn't show on fast swipes home
+        boolean shouldHideTaskbarBackground = enableScalingRevealHomeAnimation()
+                && DisplayController.isTransientTaskbar(mActivity)
+                && isStashed();
+
+        mTaskbarBackgroundAlphaForStash.setValue(shouldHideTaskbarBackground ? 0 : 1);
+
         if (mTaskbarSharedState.getTaskbarWasPinned()
                 || !mTaskbarSharedState.taskbarWasStashedAuto) {
             tryStartTaskbarTimeout();
