@@ -238,12 +238,12 @@ public class TaskMenuView extends AbstractFloatingView {
         mContainer.getDragLayer().getDescendantRectRelativeToSelf(
                 enableOverviewIconMenu()
                         ? getIconView().findViewById(R.id.icon_view_menu_anchor)
-                        : taskContainer.getThumbnailViewDeprecated(),
+                        : taskContainer.getSnapshotView(),
                 sTempRect);
         Rect insets = mContainer.getDragLayer().getInsets();
         BaseDragLayer.LayoutParams params = (BaseDragLayer.LayoutParams) getLayoutParams();
         params.width = orientationHandler.getTaskMenuWidth(
-                taskContainer.getThumbnailViewDeprecated(), deviceProfile,
+                taskContainer.getSnapshotView(), deviceProfile,
                 taskContainer.getStagePosition());
         // Gravity set to Left instead of Start as sTempRect.left measures Left distance not Start
         params.gravity = Gravity.LEFT;
@@ -277,10 +277,10 @@ public class TaskMenuView extends AbstractFloatingView {
             // Margin that insets the menuView inside the taskView
             float taskInsetMargin = getResources().getDimension(R.dimen.task_card_margin);
             setTranslationX(orientationHandler.getTaskMenuX(thumbnailAlignedX,
-                    mTaskContainer.getThumbnailViewDeprecated(), deviceProfile, taskInsetMargin,
+                    mTaskContainer.getSnapshotView(), deviceProfile, taskInsetMargin,
                     getIconView()));
             setTranslationY(orientationHandler.getTaskMenuY(
-                    thumbnailAlignedY, mTaskContainer.getThumbnailViewDeprecated(),
+                    thumbnailAlignedY, mTaskContainer.getSnapshotView(),
                     mTaskContainer.getStagePosition(), this, taskInsetMargin,
                     getIconView()));
         }
@@ -316,7 +316,7 @@ public class TaskMenuView extends AbstractFloatingView {
                 .createRevealAnimator(this, closing, revealAnimationStartProgress);
         mRevealAnimator.setInterpolator(enableOverviewIconMenu() ? Interpolators.EMPHASIZED
                 : Interpolators.DECELERATE);
-
+        AnimatorSet.Builder openCloseAnimatorBuilder = mOpenCloseAnimator.play(mRevealAnimator);
         if (enableOverviewIconMenu()) {
             IconAppChipView iconAppChip = (IconAppChipView) mTaskContainer.getIconView().asView();
 
@@ -334,11 +334,13 @@ public class TaskMenuView extends AbstractFloatingView {
                     closing ? mMenuTranslationYBeforeOpen
                             : mMenuTranslationYBeforeOpen + additionalTranslationY);
             translationYAnim.setInterpolator(EMPHASIZED);
+            openCloseAnimatorBuilder.with(translationYAnim);
 
             ObjectAnimator menuTranslationYAnim = ObjectAnimator.ofFloat(
                     iconAppChip.getMenuTranslationY(),
                     MULTI_PROPERTY_VALUE, closing ? 0 : additionalTranslationY);
             menuTranslationYAnim.setInterpolator(EMPHASIZED);
+            openCloseAnimatorBuilder.with(menuTranslationYAnim);
 
             float additionalTranslationX = 0;
             if (mContainer.getDeviceProfile().isLandscape
@@ -354,20 +356,15 @@ public class TaskMenuView extends AbstractFloatingView {
                     closing ? mMenuTranslationXBeforeOpen
                             : mMenuTranslationXBeforeOpen - additionalTranslationX);
             translationXAnim.setInterpolator(EMPHASIZED);
+            openCloseAnimatorBuilder.with(translationXAnim);
 
             ObjectAnimator menuTranslationXAnim = ObjectAnimator.ofFloat(
                     iconAppChip.getMenuTranslationX(),
                     MULTI_PROPERTY_VALUE, closing ? 0 : -additionalTranslationX);
             menuTranslationXAnim.setInterpolator(EMPHASIZED);
-
-            mOpenCloseAnimator.playTogether(translationYAnim, translationXAnim,
-                    menuTranslationXAnim, menuTranslationYAnim);
+            openCloseAnimatorBuilder.with(menuTranslationXAnim);
         }
-        mOpenCloseAnimator.playTogether(mRevealAnimator,
-                ObjectAnimator.ofFloat(
-                        mTaskContainer.getThumbnailViewDeprecated(), DIM_ALPHA,
-                        closing ? 0 : TaskView.MAX_PAGE_SCRIM_ALPHA),
-                ObjectAnimator.ofFloat(this, ALPHA, closing ? 0 : 1));
+        openCloseAnimatorBuilder.with(ObjectAnimator.ofFloat(this, ALPHA, closing ? 0 : 1));
         if (enableRefactorTaskThumbnail()) {
             mRevealAnimator.addUpdateListener(animation -> {
                 float animatedFraction = animation.getAnimatedFraction();
@@ -375,6 +372,10 @@ public class TaskMenuView extends AbstractFloatingView {
                 mTaskContainer.getTaskContainerData()
                         .getTaskMenuOpenProgress().setValue(openProgress);
             });
+        } else {
+            openCloseAnimatorBuilder.with(ObjectAnimator.ofFloat(
+                    mTaskContainer.getThumbnailViewDeprecated(), DIM_ALPHA,
+                    closing ? 0 : TaskView.MAX_PAGE_SCRIM_ALPHA));
         }
         mOpenCloseAnimator.addListener(new AnimationSuccessListener() {
             @Override

@@ -31,27 +31,11 @@ class SplitScreenUtils {
                 null
             } else {
                 SplitConfigurationOptions.SplitBounds(
-                    shellSplitBounds.leftTopBounds, shellSplitBounds.rightBottomBounds,
-                    shellSplitBounds.leftTopTaskId, shellSplitBounds.rightBottomTaskId,
+                    shellSplitBounds.leftTopBounds,
+                    shellSplitBounds.rightBottomBounds,
+                    shellSplitBounds.leftTopTaskId,
+                    shellSplitBounds.rightBottomTaskId,
                     shellSplitBounds.snapPosition
-                )
-            }
-        }
-
-        /** Converts the launcher version of SplitBounds to the shell version */
-        @JvmStatic
-        fun convertLauncherSplitBoundsToShell(
-            launcherSplitBounds: SplitConfigurationOptions.SplitBounds?
-        ): SplitBounds? {
-            return if (launcherSplitBounds == null) {
-                null
-            } else {
-                SplitBounds(
-                    launcherSplitBounds.leftTopBounds,
-                    launcherSplitBounds.rightBottomBounds,
-                    launcherSplitBounds.leftTopTaskId,
-                    launcherSplitBounds.rightBottomTaskId,
-                    launcherSplitBounds.snapPosition
                 )
             }
         }

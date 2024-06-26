@@ -31,14 +31,15 @@ import com.android.quickstep.AllAppsActionManager
 import com.android.quickstep.TouchInteractionService
 import com.android.quickstep.TouchInteractionService.TISBinder
 import org.junit.Assume.assumeTrue
-import org.junit.rules.MethodRule
-import org.junit.runners.model.FrameworkMethod
+import org.junit.rules.TestRule
+import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 /**
  * Manages the Taskbar lifecycle for unit tests.
  *
- * Tests need to provide their target [context] through the constructor.
+ * Tests should pass in themselves as [testInstance]. They also need to provide their target
+ * [context] through the constructor.
  *
  * See [InjectController] for grabbing controller(s) under test with minimal boilerplate.
  *
@@ -61,12 +62,11 @@ import org.junit.runners.model.Statement
  * }
  * ```
  */
-class TaskbarUnitTestRule(private val context: Context) : MethodRule {
+class TaskbarUnitTestRule(private val testInstance: Any, private val context: Context) : TestRule {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val serviceTestRule = ServiceTestRule()
 
     private lateinit var taskbarManager: TaskbarManager
-    private lateinit var target: Any
 
     val activityContext: TaskbarActivityContext
         get() {
@@ -74,10 +74,9 @@ class TaskbarUnitTestRule(private val context: Context) : MethodRule {
                 ?: throw RuntimeException("Failed to obtain TaskbarActivityContext.")
         }
 
-    override fun apply(base: Statement, method: FrameworkMethod, target: Any): Statement {
+    override fun apply(base: Statement, description: Description): Statement {
         return object : Statement() {
             override fun evaluate() {
-                this@TaskbarUnitTestRule.target = target
 
                 instrumentation.runOnMainSync {
                     assumeTrue(
@@ -141,11 +140,11 @@ class TaskbarUnitTestRule(private val context: Context) : MethodRule {
     private fun injectControllers() {
         val controllers = activityContext.controllers
         val controllerFieldsByType = controllers.javaClass.fields.associateBy { it.type }
-        target.javaClass.fields
+        testInstance.javaClass.fields
             .filter { it.isAnnotationPresent(InjectController::class.java) }
             .forEach {
                 it.set(
-                    target,
+                    testInstance,
                     controllerFieldsByType[it.type]?.get(controllers)
                         ?: throw NoSuchElementException("Failed to find controller for ${it.type}"),
                 )

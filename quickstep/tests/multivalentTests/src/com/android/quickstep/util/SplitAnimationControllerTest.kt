@@ -33,7 +33,6 @@ import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.views.GroupedTaskView
 import com.android.quickstep.views.IconView
-import com.android.quickstep.views.TaskThumbnailViewDeprecated
 import com.android.quickstep.views.TaskView
 import com.android.quickstep.views.TaskView.TaskContainer
 import com.android.systemui.shared.recents.model.Task
@@ -59,7 +58,7 @@ class SplitAnimationControllerTest {
     private val mockSplitSelectStateController: SplitSelectStateController = mock()
     // TaskView
     private val mockTaskView: TaskView = mock()
-    private val mockThumbnailView: TaskThumbnailViewDeprecated = mock()
+    private val mockSnapshotView: View = mock()
     private val mockBitmap: Bitmap = mock()
     private val mockIconView: IconView = mock()
     private val mockTaskViewDrawable: Drawable = mock()
@@ -87,8 +86,8 @@ class SplitAnimationControllerTest {
 
     @Before
     fun setup() {
-        whenever(mockTaskContainer.thumbnailViewDeprecated).thenReturn(mockThumbnailView)
-        whenever(mockThumbnailView.thumbnail).thenReturn(mockBitmap)
+        whenever(mockTaskContainer.snapshotView).thenReturn(mockSnapshotView)
+        whenever(mockTaskContainer.thumbnail).thenReturn(mockBitmap)
         whenever(mockTaskContainer.iconView).thenReturn(mockIconView)
         whenever(mockIconView.drawable).thenReturn(mockTaskViewDrawable)
         whenever(mockTaskView.taskContainers).thenReturn(List(1) { mockTaskContainer })
@@ -180,7 +179,6 @@ class SplitAnimationControllerTest {
 
         whenever(mockTaskContainer.task).thenReturn(mockTask)
         whenever(mockTaskContainer.iconView).thenReturn(mockIconView)
-        whenever(mockTaskContainer.thumbnailViewDeprecated).thenReturn(mockThumbnailView)
         whenever(mockTask.getKey()).thenReturn(mockTaskKey)
         whenever(mockTaskKey.getId()).thenReturn(taskId)
         whenever(mockSplitSelectStateController.initialTaskId).thenReturn(taskId)

@@ -20,6 +20,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.view.Surface.ROTATION_0;
 
+import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_FREE_FORM_TAP;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.window.flags.Flags.enableDesktopWindowingMode;
@@ -55,7 +56,6 @@ import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
-import com.android.quickstep.views.TaskThumbnailViewDeprecated;
 import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
@@ -174,7 +174,7 @@ public interface TaskShortcutFactory {
         private Handler mHandler;
 
         private final RecentsView mRecentsView;
-        private final TaskThumbnailViewDeprecated mThumbnailView;
+        private final TaskContainer mTaskContainer;
         private final TaskView mTaskView;
         private final LauncherEvent mLauncherEvent;
 
@@ -186,7 +186,7 @@ public interface TaskShortcutFactory {
             mHandler = new Handler(Looper.getMainLooper());
             mTaskView = taskContainer.getTaskView();
             mRecentsView = container.getOverviewPanel();
-            mThumbnailView = taskContainer.getThumbnailViewDeprecated();
+            mTaskContainer = taskContainer;
         }
 
         @Override
@@ -220,20 +220,25 @@ public interface TaskShortcutFactory {
                 };
 
                 final int[] position = new int[2];
-                mThumbnailView.getLocationOnScreen(position);
-                final int width = (int) (mThumbnailView.getWidth() * mTaskView.getScaleX());
-                final int height = (int) (mThumbnailView.getHeight() * mTaskView.getScaleY());
+                View snapShotView = mTaskContainer.getSnapshotView();
+                snapShotView.getLocationOnScreen(position);
+                final int width = (int) (snapShotView.getWidth() * mTaskView.getScaleX());
+                final int height = (int) (snapShotView.getHeight() * mTaskView.getScaleY());
                 final Rect taskBounds = new Rect(position[0], position[1],
                         position[0] + width, position[1] + height);
 
                 // Take the thumbnail of the task without a scrim and apply it back after
-                float alpha = mThumbnailView.getDimAlpha();
                 // TODO(b/348643341) add ability to get override the scrim for this Bitmap retrieval
-                mThumbnailView.setDimAlpha(0);
+                float alpha = 0f;
+                if (!enableRefactorTaskThumbnail()) {
+                    alpha = mTaskContainer.getThumbnailViewDeprecated().getDimAlpha();
+                    mTaskContainer.getThumbnailViewDeprecated().setDimAlpha(0);
+                }
                 Bitmap thumbnail = RecentsTransition.drawViewIntoHardwareBitmap(
-                        taskBounds.width(), taskBounds.height(), mThumbnailView, 1f,
-                        Color.BLACK);
-                mThumbnailView.setDimAlpha(alpha);
+                        taskBounds.width(), taskBounds.height(), snapShotView, 1f, Color.BLACK);
+                if (!enableRefactorTaskThumbnail()) {
+                    mTaskContainer.getThumbnailViewDeprecated().setDimAlpha(alpha);
+                }
 
                 AppTransitionAnimationSpecsFuture future =
                         new AppTransitionAnimationSpecsFuture(mHandler) {

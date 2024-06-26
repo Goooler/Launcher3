@@ -21,6 +21,7 @@ import static com.android.launcher3.UtilitiesKt.CLIP_CHILDREN_FALSE_MODIFIER;
 import static com.android.launcher3.UtilitiesKt.CLIP_TO_PADDING_FALSE_MODIFIER;
 import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
 import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
+import static com.android.launcher3.widget.picker.WidgetsListItemAnimator.WIDGET_LIST_ITEM_APPEARANCE_DELAY;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -31,6 +32,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -281,10 +283,19 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mRightPane.removeAllViews();
             mRightPane.addView(mWidgetRecommendationsContainer);
             mRightPaneScrollView.setScrollY(0);
-            mRightPane.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
             mSuggestedWidgetsPackageUserKey = PackageUserKey.fromPackageItemInfo(packageItemInfo);
             final boolean isChangingHeaders = mSelectedHeader == null
                     || !mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey);
+            // If the initial focus view is still focused, it is likely a programmatic header
+            // click.
+            if (mSelectedHeader != null
+                    && !getAccessibilityInitialFocusView().isAccessibilityFocused()) {
+                post(() -> {
+                    mRightPaneScrollView.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
+                    mRightPaneScrollView.performAccessibilityAction(
+                            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
+                });
+            }
             if (isChangingHeaders)  {
                 // If switching from another header, unselect any WidgetCells. This is necessary
                 // because we do not clear/recycle the WidgetCells in the recommendations container
@@ -296,7 +307,6 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mSelectedHeader = mSuggestedWidgetsPackageUserKey;
         });
         mSuggestedWidgetsContainer.addView(mSuggestedWidgetsHeader);
-        mRightPane.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
     }
 
     @Override
@@ -313,6 +323,30 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     }
 
     @Override
+    @Px
+    protected int getAvailableWidthForSuggestions(int pickerAvailableWidth) {
+        int rightPaneWidth = (int) Math.ceil(0.67 * pickerAvailableWidth);
+
+        if (mDeviceProfile.isTwoPanels && enableUnfoldedTwoPanePicker()) {
+            // See onLayout
+            int leftPaneWidth = (int) (0.33 * pickerAvailableWidth);
+            @Px int minLeftPaneWidthPx = Utilities.dpToPx(MINIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP);
+            @Px int maxLeftPaneWidthPx = Utilities.dpToPx(MAXIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP);
+            if (leftPaneWidth < minLeftPaneWidthPx) {
+                leftPaneWidth = minLeftPaneWidthPx;
+            } else if (leftPaneWidth > maxLeftPaneWidthPx) {
+                leftPaneWidth = maxLeftPaneWidthPx;
+            }
+            rightPaneWidth = pickerAvailableWidth - leftPaneWidth;
+        }
+
+        // Since suggestions are shown in right pane, the available width is 2/3 of total width of
+        // bottom sheet.
+        return rightPaneWidth - getResources().getDimensionPixelSize(
+                R.dimen.widget_list_horizontal_margin_two_pane); // right pane end margin.
+    }
+
+    @Override
     public void onActivePageChanged(int currentActivePage) {
         super.onActivePageChanged(currentActivePage);
 
@@ -323,12 +357,14 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
         mActivePage = currentActivePage;
 
-        if (mSuggestedWidgetsHeader == null) {
-            mAdapters.get(currentActivePage).mWidgetsListAdapter.selectFirstHeaderEntry();
-            mAdapters.get(currentActivePage).mWidgetsRecyclerView.scrollToTop();
-        } else if (currentActivePage == PERSONAL_TAB || currentActivePage == WORK_TAB) {
-            mSuggestedWidgetsHeader.callOnClick();
-        }
+        // When using talkback, swiping left while on right pane, should navigate to the widgets
+        // list on left.
+        mAdapters.get(mActivePage).mWidgetsRecyclerView.setAccessibilityTraversalBefore(
+                mRightPaneScrollView.getId());
+
+        // On page change, select the first item in the list to show in the right pane.
+        mAdapters.get(currentActivePage).mWidgetsListAdapter.selectFirstHeaderEntry();
+        mAdapters.get(currentActivePage).mWidgetsRecyclerView.scrollToTop();
     }
 
     @Override
@@ -372,17 +408,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
     }
 
-    @Override
-    protected View getContentView() {
-        return mRightPane;
-    }
-
     private HeaderChangeListener getHeaderChangeListener() {
         return new HeaderChangeListener() {
             @Override
             public void onHeaderChanged(@NonNull PackageUserKey selectedHeader) {
                 final boolean isSameHeader = mSelectedHeader != null
                         && mSelectedHeader.equals(selectedHeader);
+                // If the initial focus view is still focused, it is likely a programmatic header
+                // click.
+                final boolean isUserClick = mSelectedHeader != null
+                        && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
                 WidgetsListContentEntry contentEntry = mActivityContext.getPopupDataProvider()
                         .getSelectedAppWidgets(selectedHeader);
@@ -427,11 +462,14 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 };
                 mRightPane.removeAllViews();
                 mRightPane.addView(widgetsRowViewHolder.itemView);
+                if (isUserClick) {
+                    mRightPaneScrollView.setAccessibilityPaneTitle(getContext().getString(
+                            R.string.widget_picker_right_pane_accessibility_title,
+                            contentEntry.mPkgItem.title));
+                    postDelayed(() -> focusOnFirstWidgetCell(widgetsRowViewHolder.tableContainer),
+                            WIDGET_LIST_ITEM_APPEARANCE_DELAY);
+                }
                 mRightPaneScrollView.setScrollY(0);
-                mRightPane.setAccessibilityPaneTitle(
-                        getContext().getString(
-                                R.string.widget_picker_right_pane_accessibility_title,
-                                contentEntry.mPkgItem.title));
             }
         };
     }
@@ -442,6 +480,18 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 && wc.matchesItem(item));
         if (cell != null && !cell.isShowingAddButton()) {
             cell.callOnClick();
+        }
+    }
+
+    /**
+     * Requests focus on the first widget cell in the given widget section.
+     */
+    private static void focusOnFirstWidgetCell(ViewGroup parent) {
+        if (parent == null) return;
+        WidgetCell cell = Utilities.findViewByPredicate(parent, v -> v instanceof WidgetCell);
+        if (cell != null) {
+            cell.performAccessibilityAction(
+                    AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
         }
     }
 

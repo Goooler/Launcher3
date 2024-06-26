@@ -311,6 +311,13 @@ flag {
 }
 
 flag {
+    name: "enable_container_return_animations"
+    namespace: "launcher"
+    description: "Enables the container return animation mirroring launches."
+    bug: "341017746"
+}
+
+flag {
     name: "floating_search_bar"
     namespace: "launcher"
     description: "Search bar persists at the bottom of the screen across Launcher states"

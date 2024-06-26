@@ -99,36 +99,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
                 }
             };
 
-    /** Use to animate thumbnail translationX while first app in split selection is initiated */
-    public static final Property<TaskThumbnailViewDeprecated, Float> SPLIT_SELECT_TRANSLATE_X =
-            new FloatProperty<TaskThumbnailViewDeprecated>("splitSelectTranslateX") {
-                @Override
-                public void setValue(TaskThumbnailViewDeprecated thumbnail,
-                        float splitSelectTranslateX) {
-                    thumbnail.applySplitSelectTranslateX(splitSelectTranslateX);
-                }
-
-                @Override
-                public Float get(TaskThumbnailViewDeprecated thumbnailView) {
-                    return thumbnailView.mSplitSelectTranslateX;
-                }
-            };
-
-    /** Use to animate thumbnail translationY while first app in split selection is initiated */
-    public static final Property<TaskThumbnailViewDeprecated, Float> SPLIT_SELECT_TRANSLATE_Y =
-            new FloatProperty<TaskThumbnailViewDeprecated>("splitSelectTranslateY") {
-                @Override
-                public void setValue(TaskThumbnailViewDeprecated thumbnail,
-                        float splitSelectTranslateY) {
-                    thumbnail.applySplitSelectTranslateY(splitSelectTranslateY);
-                }
-
-                @Override
-                public Float get(TaskThumbnailViewDeprecated thumbnailView) {
-                    return thumbnailView.mSplitSelectTranslateY;
-                }
-            };
-
     private final RecentsViewContainer mContainer;
     private TaskOverlay<?> mOverlay;
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -160,8 +130,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
     private boolean mOverlayEnabled;
     /** Used as a placeholder when the original thumbnail animates out to. */
     private boolean mShowSplashForSplitSelection;
-    private float mSplitSelectTranslateX;
-    private float mSplitSelectTranslateY;
 
     public TaskThumbnailViewDeprecated(Context context) {
         this(context, null);
@@ -413,31 +381,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
                 mSplashView.draw(canvas);
             }
         }
-    }
-
-    /** See {@link #SPLIT_SELECT_TRANSLATE_X} */
-    protected void applySplitSelectTranslateX(float splitSelectTranslateX) {
-        mSplitSelectTranslateX = splitSelectTranslateX;
-        applyTranslateX();
-    }
-
-    /** See {@link #SPLIT_SELECT_TRANSLATE_Y} */
-    protected void applySplitSelectTranslateY(float splitSelectTranslateY) {
-        mSplitSelectTranslateY = splitSelectTranslateY;
-        applyTranslateY();
-    }
-
-    private void applyTranslateX() {
-        setTranslationX(mSplitSelectTranslateX);
-    }
-
-    private void applyTranslateY() {
-        setTranslationY(mSplitSelectTranslateY);
-    }
-
-    protected void resetViewTransforms() {
-        mSplitSelectTranslateX = 0;
-        mSplitSelectTranslateY = 0;
     }
 
     public TaskView getTaskView() {

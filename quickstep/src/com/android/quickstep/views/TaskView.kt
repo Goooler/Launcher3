@@ -23,7 +23,9 @@ import android.annotation.IdRes
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Insets
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
@@ -138,8 +140,8 @@ constructor(
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
 
-    val thumbnailViews: Array<TaskThumbnailViewDeprecated>
-        get() = taskContainers.map { it.thumbnailViewDeprecated }.toTypedArray()
+    val snapshotViews: Array<View>
+        get() = taskContainers.map { it.snapshotView }.toTypedArray()
 
     val isGridTask: Boolean
         /** Returns whether the task is part of overview grid and not being focused. */
@@ -169,6 +171,11 @@ constructor(
     val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
         /** Returns the first thumbnailView of the TaskView. */
         get() = taskContainers[0].thumbnailViewDeprecated
+
+    @get:Deprecated("Use [taskContainers] instead.")
+    val firstSnapshotView: View
+        /** Returns the first snapshotView of the TaskView. */
+        get() = taskContainers[0].snapshotView
 
     @get:Deprecated("Use [taskContainers] instead.")
     val firstItemInfo: ItemInfo
@@ -1197,10 +1204,10 @@ constructor(
             this,
             container.task,
             container.iconView.drawable,
-            container.thumbnailViewDeprecated,
-            container.thumbnailViewDeprecated.thumbnail, /* intent */
-            null, /* user */
-            null,
+            container.snapshotView,
+            container.thumbnail,
+            /* intent */ null,
+            /* user */ null,
             container.itemInfo
         )
     }
@@ -1512,6 +1519,10 @@ constructor(
         gridTranslationY = 0f
         boxTranslationY = 0f
         nonGridPivotTranslationX = 0f
+        taskContainers.forEach {
+            it.snapshotView.translationX = 0f
+            it.snapshotView.translationY = 0f
+        }
         resetViewTransforms()
     }
 
@@ -1537,10 +1548,6 @@ constructor(
         alpha = stableAlpha
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
-        if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/335399428) add split select functionality to new TTV
-            taskContainers.forEach { it.thumbnailViewDeprecated.resetViewTransforms() }
-        }
     }
 
     private fun getGridTrans(endTranslation: Float) =
@@ -1623,6 +1630,18 @@ constructor(
 
         val snapshotView: View
             get() = thumbnailView ?: thumbnailViewDeprecated
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val thumbnail: Bitmap?
+            get() = thumbnailViewDeprecated.thumbnail
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val isRealSnapshot: Boolean
+            get() = thumbnailViewDeprecated.isRealSnapshot()
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val scaledInsets: Insets
+            get() = thumbnailViewDeprecated.scaledInsets
 
         /** Builds proto for logging */
         val itemInfo: WorkspaceItemInfo

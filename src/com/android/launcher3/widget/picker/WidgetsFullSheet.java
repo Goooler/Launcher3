@@ -55,7 +55,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
@@ -416,19 +415,18 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int availableWidth = MeasureSpec.getSize(widthMeasureSpec);
+        updateMaxSpansPerRow(availableWidth);
         doMeasure(widthMeasureSpec, heightMeasureSpec);
-
-        if (updateMaxSpansPerRow()) {
-            doMeasure(widthMeasureSpec, heightMeasureSpec);
-        }
     }
 
-    /** Returns {@code true} if the max spans have been updated. */
-    private boolean updateMaxSpansPerRow() {
-        if (getMeasuredWidth() == 0) return false;
-
-        @Px int maxHorizontalSpan = getContentView().getMeasuredWidth()
-                - (2 * mContentHorizontalMargin);
+    /** Returns {@code true} if the max spans have been updated.
+     *
+     * @param availableWidth Total width available within parent (includes insets).
+     */
+    private void updateMaxSpansPerRow(int availableWidth) {
+        @Px int maxHorizontalSpan = getAvailableWidthForSuggestions(
+                availableWidth - getInsetsWidth());
         if (mMaxSpanPerRow != maxHorizontalSpan) {
             mMaxSpanPerRow = maxHorizontalSpan;
             mAdapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(
@@ -439,16 +437,15 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                 mAdapters.get(AdapterHolder.WORK).mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(
                         maxHorizontalSpan);
             }
-            onRecommendedWidgetsBound();
-            return true;
+            post(this::onRecommendedWidgetsBound);
         }
-        return false;
     }
 
-    protected View getContentView() {
-        return mHasWorkProfile
-                ? mViewPager
-                : mAdapters.get(AdapterHolder.PRIMARY).mWidgetsRecyclerView;
+    /**
+     * Returns the width available to display suggestions.
+     */
+    protected int getAvailableWidthForSuggestions(int pickerAvailableWidth) {
+        return pickerAvailableWidth -  (2 * mContentHorizontalMargin);
     }
 
     @Override
@@ -493,7 +490,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                         .mWidgetsListAdapter.hasVisibleEntries());
         if (mIsNoWidgetsViewNeeded != isNoWidgetsViewNeeded) {
             mIsNoWidgetsViewNeeded = isNoWidgetsViewNeeded;
-            onRecommendedWidgetsBound();
+            post(this::onRecommendedWidgetsBound);
         }
     }
 
@@ -549,7 +546,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.setVisibility(GONE);
             // Visibility of recommended widgets, recycler views and headers are handled in methods
             // below.
-            onRecommendedWidgetsBound();
+            post(this::onRecommendedWidgetsBound);
             onWidgetsBound();
         }
     }

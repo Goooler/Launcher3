@@ -44,7 +44,6 @@ import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
-import com.android.quickstep.views.TaskThumbnailViewDeprecated;
 import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
@@ -134,20 +133,20 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             mApplicationContext = taskContainer.getTaskView().getContext().getApplicationContext();
             mTaskContainer = taskContainer;
             mImageApi = new ImageActionsApi(
-                    mApplicationContext, mTaskContainer.getThumbnailViewDeprecated()::getThumbnail);
+                    mApplicationContext, mTaskContainer::getThumbnail);
         }
 
         protected T getActionsView() {
             if (mActionsView == null) {
                 mActionsView = BaseActivity.fromContext(
-                        mTaskContainer.getThumbnailViewDeprecated().getContext()).findViewById(
+                        mTaskContainer.getTaskView().getContext()).findViewById(
                         R.id.overview_actions_view);
             }
             return mActionsView;
         }
 
-        public TaskThumbnailViewDeprecated getThumbnailView() {
-            return mTaskContainer.getThumbnailViewDeprecated();
+        public TaskView getTaskView() {
+            return mTaskContainer.getTaskView();
         }
 
         /**
@@ -159,8 +158,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
             if (thumbnail != null) {
                 getActionsView().updateDisabledFlags(DISABLED_ROTATED, rotated);
-                boolean isAllowedByPolicy =
-                        mTaskContainer.getThumbnailViewDeprecated().isRealSnapshot();
+                boolean isAllowedByPolicy = mTaskContainer.isRealSnapshot();
                 getActionsView().setCallbacks(new OverlayUICallbacksImpl(isAllowedByPolicy, task));
             }
         }
@@ -172,7 +170,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         public void endLiveTileMode(@NonNull Runnable callback) {
             RecentsView recentsView =
-                    mTaskContainer.getThumbnailViewDeprecated().getTaskView().getRecentsView();
+                    mTaskContainer.getTaskView().getRecentsView();
             // Task has already been dismissed
             if (recentsView == null) return;
             recentsView.switchToScreenshot(
@@ -185,8 +183,8 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         @SuppressLint("NewApi")
         protected void saveScreenshot(Task task) {
-            if (mTaskContainer.getThumbnailViewDeprecated().isRealSnapshot()) {
-                mImageApi.saveScreenshot(mTaskContainer.getThumbnailViewDeprecated().getThumbnail(),
+            if (mTaskContainer.isRealSnapshot()) {
+                mImageApi.saveScreenshot(mTaskContainer.getThumbnail(),
                         getTaskSnapshotBounds(), getTaskSnapshotInsets(), task.key);
             } else {
                 showBlockedByPolicyMessage();
@@ -194,17 +192,14 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         }
 
         protected void enterSplitSelect() {
-            RecentsView overviewPanel =
-                    mTaskContainer.getThumbnailViewDeprecated().getTaskView().getRecentsView();
+            RecentsView overviewPanel = mTaskContainer.getTaskView().getRecentsView();
             // Task has already been dismissed
             if (overviewPanel == null) return;
-            overviewPanel.initiateSplitSelect(
-                    mTaskContainer.getThumbnailViewDeprecated().getTaskView());
+            overviewPanel.initiateSplitSelect(mTaskContainer.getTaskView());
         }
 
         protected void saveAppPair() {
-            GroupedTaskView taskView =
-                    (GroupedTaskView) mTaskContainer.getThumbnailViewDeprecated().getTaskView();
+            GroupedTaskView taskView = (GroupedTaskView) mTaskContainer.getTaskView();
             taskView.getRecentsView().getSplitSelectController().getAppPairsController()
                     .saveAppPair(taskView);
         }
@@ -250,11 +245,11 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         public Rect getTaskSnapshotBounds() {
             int[] location = new int[2];
-            mTaskContainer.getThumbnailViewDeprecated().getLocationOnScreen(location);
+            mTaskContainer.getSnapshotView().getLocationOnScreen(location);
 
             return new Rect(location[0], location[1],
-                    mTaskContainer.getThumbnailViewDeprecated().getWidth() + location[0],
-                    mTaskContainer.getThumbnailViewDeprecated().getHeight() + location[1]);
+                    mTaskContainer.getSnapshotView().getWidth() + location[0],
+                    mTaskContainer.getSnapshotView().getHeight() + location[1]);
         }
 
         /**
@@ -264,7 +259,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         @RequiresApi(api = Build.VERSION_CODES.Q)
         public Insets getTaskSnapshotInsets() {
-            return mTaskContainer.getThumbnailViewDeprecated().getScaledInsets();
+            return mTaskContainer.getScaledInsets();
         }
 
         /**
@@ -275,14 +270,14 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
         protected void showBlockedByPolicyMessage() {
             ActivityContext activityContext = ActivityContext.lookupContext(
-                    mTaskContainer.getThumbnailViewDeprecated().getContext());
+                    mTaskContainer.getTaskView().getContext());
             String message = activityContext.getStringCache() != null
                     ? activityContext.getStringCache().disabledByAdminMessage
-                    : mTaskContainer.getThumbnailViewDeprecated().getContext().getString(
+                    : mTaskContainer.getTaskView().getContext().getString(
                             R.string.blocked_by_policy);
 
             Snackbar.show(BaseActivity.fromContext(
-                    mTaskContainer.getThumbnailViewDeprecated().getContext()), message, null);
+                    mTaskContainer.getTaskView().getContext()), message, null);
         }
 
         /** Called when the snapshot has updated its full screen drawing parameters. */
@@ -304,8 +299,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
             @Override
             public void onClick(View view) {
-                saveScreenshot(
-                        mTaskContainer.getThumbnailViewDeprecated().getTaskView().getFirstTask());
+                saveScreenshot(mTaskContainer.getTaskView().getFirstTask());
                 dismissTaskMenuView();
             }
         }

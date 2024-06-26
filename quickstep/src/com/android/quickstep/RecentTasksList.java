@@ -44,6 +44,7 @@ import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -324,7 +325,9 @@ public class RecentTasksList {
                 // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
                 if (enableDesktopWindowingMode()) {
                     GroupTask desktopTask = createDesktopTask(rawTask);
-                    allTasks.add(desktopTask);
+                    if (desktopTask != null) {
+                        allTasks.add(desktopTask);
+                    }
                 }
                 continue;
             }
@@ -368,8 +371,13 @@ public class RecentTasksList {
         return allTasks;
     }
 
-    private DesktopTask createDesktopTask(GroupedRecentTaskInfo recentTaskInfo) {
+    private @Nullable DesktopTask createDesktopTask(GroupedRecentTaskInfo recentTaskInfo) {
         ArrayList<Task> tasks = new ArrayList<>(recentTaskInfo.getTaskInfoList().size());
+        int[] minimizedTaskIds = recentTaskInfo.getMinimizedTaskIds();
+        if (minimizedTaskIds.length == recentTaskInfo.getTaskInfoList().size()) {
+            // All Tasks are minimized -> don't create a DesktopTask
+            return null;
+        }
         for (ActivityManager.RecentTaskInfo taskInfo : recentTaskInfo.getTaskInfoList()) {
             Task.TaskKey key = new Task.TaskKey(taskInfo);
             Task task = Task.from(key, taskInfo, false);
@@ -377,6 +385,8 @@ public class RecentTasksList {
             task.positionInParent = taskInfo.positionInParent;
             task.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
             task.isVisible = taskInfo.isVisible;
+            task.isMinimized =
+                    Arrays.stream(minimizedTaskIds).anyMatch(taskId -> taskId == taskInfo.taskId);
             tasks.add(task);
         }
         return new DesktopTask(tasks);

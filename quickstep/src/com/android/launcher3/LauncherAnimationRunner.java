@@ -238,5 +238,12 @@ public class LauncherAnimationRunner extends RemoteAnimationRunnerCompat {
         @Override
         @UiThread
         default void onAnimationCancelled() {}
+
+        /**
+         * Returns whether this animation factory supports a tightly coupled return animation.
+         */
+        default boolean supportsReturnTransition() {
+            return false;
+        }
     }
 }

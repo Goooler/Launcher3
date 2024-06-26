@@ -269,8 +269,8 @@ public class TaskbarUIController {
                                     foundTaskView,
                                     foundTask,
                                     taskContainer.getIconView().getDrawable(),
-                                    taskContainer.getThumbnailViewDeprecated(),
-                                    taskContainer.getThumbnailViewDeprecated().getThumbnail(),
+                                    taskContainer.getSnapshotView(),
+                                    taskContainer.getThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);

@@ -331,8 +331,21 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
      * status bar, into account.
      */
     protected void doMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthUsed = getInsetsWidth();
+
         DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
+        measureChildWithMargins(mContent, widthMeasureSpec,
+                widthUsed, heightMeasureSpec, deviceProfile.bottomSheetTopPadding);
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec),
+                MeasureSpec.getSize(heightMeasureSpec));
+    }
+
+    /**
+     * Returns the width used on left and right by the insets / padding.
+     */
+    protected int getInsetsWidth() {
         int widthUsed;
+        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         if (deviceProfile.isTablet) {
             widthUsed = Math.max(2 * getTabletHorizontalMargin(deviceProfile),
                     2 * (mInsets.left + mInsets.right));
@@ -343,11 +356,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
             widthUsed = Math.max(padding.left + padding.right,
                     2 * (mInsets.left + mInsets.right));
         }
-
-        measureChildWithMargins(mContent, widthMeasureSpec,
-                widthUsed, heightMeasureSpec, deviceProfile.bottomSheetTopPadding);
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec),
-                MeasureSpec.getSize(heightMeasureSpec));
+        return widthUsed;
     }
 
     /** Returns the horizontal margins to be applied to the widget sheet. **/

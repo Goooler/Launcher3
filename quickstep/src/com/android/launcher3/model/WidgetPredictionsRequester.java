@@ -65,6 +65,7 @@ public class WidgetPredictionsRequester {
     private final Context mContext;
     @NonNull
     private final String mUiSurface;
+    private boolean mPredictionsAvailable;
     @NonNull
     private final Map<ComponentKey, WidgetItem> mAllWidgets;
 
@@ -76,8 +77,8 @@ public class WidgetPredictionsRequester {
     }
 
     /**
-     * Requests predictions from the app predictions manager and registers the provided callback to
-     * receive updates when predictions are available.
+     * Requests one time predictions from the app predictions manager and invokes provided callback
+     * once predictions are available.
      *
      * @param existingWidgets widgets that are currently added to the surface;
      * @param callback        consumer of prediction results to be called when predictions are
@@ -159,10 +160,14 @@ public class WidgetPredictionsRequester {
     @WorkerThread
     private void bindPredictions(List<AppTarget> targets, Predicate<WidgetItem> filter,
             Consumer<List<ItemInfo>> callback) {
-        List<WidgetItem> filteredPredictions = filterPredictions(targets, mAllWidgets, filter);
-        List<ItemInfo> mappedPredictions = mapWidgetItemsToItemInfo(filteredPredictions);
+        if (!mPredictionsAvailable) {
+            mPredictionsAvailable = true;
+            List<WidgetItem> filteredPredictions = filterPredictions(targets, mAllWidgets, filter);
+            List<ItemInfo> mappedPredictions = mapWidgetItemsToItemInfo(filteredPredictions);
 
-        MAIN_EXECUTOR.execute(() -> callback.accept(mappedPredictions));
+            MAIN_EXECUTOR.execute(() -> callback.accept(mappedPredictions));
+            MODEL_EXECUTOR.execute(this::clear);
+        }
     }
 
     /**
@@ -214,5 +219,6 @@ public class WidgetPredictionsRequester {
             mAppPredictor.destroy();
             mAppPredictor = null;
         }
+        mPredictionsAvailable = false;
     }
 }

@@ -1200,7 +1200,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
                         : Display.DEFAULT_DISPLAY);
         activityOptions.options.setPendingIntentBackgroundActivityStartMode(
                 ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
-        addLaunchCookie(item, activityOptions.options);
         return activityOptions;
     }
 
@@ -1222,19 +1221,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
     @BinderThread
     public void enterStageSplitFromRunningApp(boolean leftOrTop) {
         mSplitWithKeyboardShortcutController.enterStageSplit(leftOrTop);
-    }
-
-    /**
-     * Adds a new launch cookie for the activity launch if supported.
-     *
-     * @param info the item info for the launch
-     * @param opts the options to set the launchCookie on.
-     */
-    public void addLaunchCookie(ItemInfo info, ActivityOptions opts) {
-        IBinder launchCookie = getLaunchCookie(info);
-        if (launchCookie != null) {
-            opts.setLaunchCookie(launchCookie);
-        }
     }
 
     /**

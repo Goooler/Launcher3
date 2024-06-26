@@ -120,10 +120,6 @@ public class WidgetPickerActivity extends BaseActivity {
         WindowInsetsController wc = mDragLayer.getWindowInsetsController();
         wc.hide(navigationBars() + statusBars());
 
-        BaseWidgetSheet widgetSheet = WidgetsFullSheet.show(this, true);
-        widgetSheet.disableNavBarScrim(true);
-        widgetSheet.addOnCloseListener(this::finish);
-
         parseIntentExtras();
         refreshAndBindWidgets();
     }
@@ -224,9 +220,10 @@ public class WidgetPickerActivity extends BaseActivity {
         };
     }
 
-    /** Updates the model with widgets and provides them after applying the provided filter. */
+    /** Updates the model with widgets, applies filters and launches the widgets sheet once
+     * widgets are available */
     private void refreshAndBindWidgets() {
-        MODEL_EXECUTOR.execute(() -> {
+        MODEL_EXECUTOR.getHandler().postDelayed(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
             mModel.update(app, null);
             final List<WidgetsListBaseEntry> allWidgets =
@@ -240,6 +237,9 @@ public class WidgetPickerActivity extends BaseActivity {
                             }
                     );
             bindWidgets(allWidgets);
+            // Open sheet once widgets are available, so that it doesn't interrupt the open
+            // animation.
+            openWidgetsSheet();
             if (mUiSurface != null) {
                 Map<ComponentKey, WidgetItem> allWidgetItems = allWidgets.stream()
                         .filter(entry -> entry instanceof WidgetsListContentEntry)
@@ -253,15 +253,26 @@ public class WidgetPickerActivity extends BaseActivity {
                         mUiSurface, allWidgetItems);
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
-        });
+        }, mDeviceProfile.bottomSheetOpenDuration);
     }
 
     private void bindWidgets(List<WidgetsListBaseEntry> widgets) {
         MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(widgets));
     }
 
+    private void openWidgetsSheet() {
+        MAIN_EXECUTOR.execute(() -> {
+            BaseWidgetSheet widgetSheet = WidgetsFullSheet.show(this, true);
+            widgetSheet.disableNavBarScrim(true);
+            widgetSheet.addOnCloseListener(this::finish);
+        });
+    }
+
     private void bindRecommendedWidgets(List<ItemInfo> recommendedWidgets) {
-        MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setRecommendedWidgets(recommendedWidgets));
+        // Bind recommendations once picker has finished open animation.
+        MAIN_EXECUTOR.getHandler().postDelayed(
+                () -> mPopupDataProvider.setRecommendedWidgets(recommendedWidgets),
+                mDeviceProfile.bottomSheetOpenDuration);
     }
 
     @Override

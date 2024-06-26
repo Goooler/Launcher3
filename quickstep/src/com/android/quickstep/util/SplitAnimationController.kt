@@ -43,6 +43,7 @@ import androidx.annotation.VisibleForTesting
 import com.android.app.animation.Interpolators
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.Flags.enableOverviewIconMenu
+import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.InsettableFrameLayout
 import com.android.launcher3.QuickstepTransitionManager
 import com.android.launcher3.R
@@ -118,8 +119,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 if (container.task.getKey().getId() == splitSelectStateController.initialTaskId) {
                     val drawable = getDrawable(container.iconView, splitSelectSource)
                     return SplitAnimInitProps(
-                        container.thumbnailViewDeprecated,
-                        container.thumbnailViewDeprecated.thumbnail,
+                        container.snapshotView,
+                        container.thumbnail,
                         drawable!!,
                         fadeWithThumbnail = true,
                         isStagedTask = true,
@@ -137,8 +138,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             taskView.taskContainers.first().let {
                 val drawable = getDrawable(it.iconView, splitSelectSource)
                 return SplitAnimInitProps(
-                    it.thumbnailViewDeprecated,
-                    it.thumbnailViewDeprecated.thumbnail,
+                    it.snapshotView,
+                    it.thumbnail,
                     drawable!!,
                     fadeWithThumbnail = true,
                     isStagedTask = true,
@@ -165,27 +166,37 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
     /**
      * When selecting first app from split pair, second app's thumbnail remains. This animates the
      * second thumbnail by expanding it to take up the full taskViewWidth/Height and overlaying it
-     * with [TaskThumbnailViewDeprecated]'s splashView. Adds animations to the provided builder.
-     * Note: The app that **was not** selected as the first split app should be the container that's
-     * passed through.
+     * with [TaskContainer]'s splashView. Adds animations to the provided builder. Note: The app
+     * that **was not** selected as the first split app should be the container that's passed
+     * through.
      *
      * @param builder Adds animation to this
-     * @param taskIdAttributeContainer container of the app that **was not** selected
+     * @param taskContainer container of the app that **was not** selected
      * @param isPrimaryTaskSplitting if true, task that was split would be top/left in the pair
-     *   (opposite of that representing [taskIdAttributeContainer])
+     *   (opposite of that representing [taskContainer])
      */
     fun addInitialSplitFromPair(
-        taskIdAttributeContainer: TaskContainer,
+        taskContainer: TaskContainer,
         builder: PendingAnimation,
         deviceProfile: DeviceProfile,
         taskViewWidth: Int,
         taskViewHeight: Int,
         isPrimaryTaskSplitting: Boolean
     ) {
-        val thumbnail = taskIdAttributeContainer.thumbnailViewDeprecated
-        val iconView: View = taskIdAttributeContainer.iconView.asView()
-        builder.add(ObjectAnimator.ofFloat(thumbnail, TaskThumbnailViewDeprecated.SPLASH_ALPHA, 1f))
-        thumbnail.setShowSplashForSplitSelection(true)
+        val snapshot = taskContainer.snapshotView
+        val iconView: View = taskContainer.iconView.asView()
+        // TODO(334826842): Switch to splash state in TaskThumbnailView
+        if (!enableRefactorTaskThumbnail()) {
+            val thumbnailViewDeprecated = taskContainer.thumbnailViewDeprecated
+            builder.add(
+                ObjectAnimator.ofFloat(
+                    thumbnailViewDeprecated,
+                    TaskThumbnailViewDeprecated.SPLASH_ALPHA,
+                    1f
+                )
+            )
+            thumbnailViewDeprecated.setShowSplashForSplitSelection(true)
+        }
         // With the new `IconAppChipView`, we always want to keep the chip pinned to the
         // top left of the task / thumbnail.
         if (enableOverviewIconMenu()) {
@@ -202,14 +213,10 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
         }
         if (deviceProfile.isLeftRightSplit) {
             // Center view first so scaling happens uniformly, alternatively we can move pivotX to 0
-            val centerThumbnailTranslationX: Float = (taskViewWidth - thumbnail.width) / 2f
-            val finalScaleX: Float = taskViewWidth.toFloat() / thumbnail.width
+            val centerThumbnailTranslationX: Float = (taskViewWidth - snapshot.width) / 2f
+            val finalScaleX: Float = taskViewWidth.toFloat() / snapshot.width
             builder.add(
-                ObjectAnimator.ofFloat(
-                    thumbnail,
-                    TaskThumbnailViewDeprecated.SPLIT_SELECT_TRANSLATE_X,
-                    centerThumbnailTranslationX
-                )
+                ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_X, centerThumbnailTranslationX)
             )
             if (!enableOverviewIconMenu()) {
                 // icons are anchored from Gravity.END, so need to use negative translation
@@ -218,21 +225,15 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     ObjectAnimator.ofFloat(iconView, View.TRANSLATION_X, -centerIconTranslationX)
                 )
             }
-            builder.add(ObjectAnimator.ofFloat(thumbnail, View.SCALE_X, finalScaleX))
+            builder.add(ObjectAnimator.ofFloat(snapshot, View.SCALE_X, finalScaleX))
 
             // Reset other dimensions
             // TODO(b/271468547), can't set Y translate to 0, need to account for top space
-            thumbnail.scaleY = 1f
+            snapshot.scaleY = 1f
             val translateYResetVal: Float =
                 if (!isPrimaryTaskSplitting) 0f
                 else deviceProfile.overviewTaskThumbnailTopMarginPx.toFloat()
-            builder.add(
-                ObjectAnimator.ofFloat(
-                    thumbnail,
-                    TaskThumbnailViewDeprecated.SPLIT_SELECT_TRANSLATE_Y,
-                    translateYResetVal
-                )
-            )
+            builder.add(ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_Y, translateYResetVal))
         } else {
             val thumbnailSize = taskViewHeight - deviceProfile.overviewTaskThumbnailTopMarginPx
             // Center view first so scaling happens uniformly, alternatively we can move pivotY to 0
@@ -247,36 +248,26 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             //  thumbnail needs to take that into account. We should migrate to only using
             //  translations otherwise this asymmetry causes problems..
             if (isPrimaryTaskSplitting) {
-                centerThumbnailTranslationY = (thumbnailSize - thumbnail.height) / 2f
+                centerThumbnailTranslationY = (thumbnailSize - snapshot.height) / 2f
                 centerThumbnailTranslationY +=
                     deviceProfile.overviewTaskThumbnailTopMarginPx.toFloat()
             } else {
-                centerThumbnailTranslationY = (thumbnailSize - thumbnail.height) / 2f
+                centerThumbnailTranslationY = (thumbnailSize - snapshot.height) / 2f
             }
-            val finalScaleY: Float = thumbnailSize.toFloat() / thumbnail.height
+            val finalScaleY: Float = thumbnailSize.toFloat() / snapshot.height
             builder.add(
-                ObjectAnimator.ofFloat(
-                    thumbnail,
-                    TaskThumbnailViewDeprecated.SPLIT_SELECT_TRANSLATE_Y,
-                    centerThumbnailTranslationY
-                )
+                ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_Y, centerThumbnailTranslationY)
             )
 
             if (!enableOverviewIconMenu()) {
                 // icons are anchored from Gravity.END, so need to use negative translation
                 builder.add(ObjectAnimator.ofFloat(iconView, View.TRANSLATION_X, 0f))
             }
-            builder.add(ObjectAnimator.ofFloat(thumbnail, View.SCALE_Y, finalScaleY))
+            builder.add(ObjectAnimator.ofFloat(snapshot, View.SCALE_Y, finalScaleY))
 
             // Reset other dimensions
-            thumbnail.scaleX = 1f
-            builder.add(
-                ObjectAnimator.ofFloat(
-                    thumbnail,
-                    TaskThumbnailViewDeprecated.SPLIT_SELECT_TRANSLATE_X,
-                    0f
-                )
-            )
+            snapshot.scaleX = 1f
+            builder.add(ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_X, 0f))
         }
     }
 

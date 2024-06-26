@@ -332,12 +332,12 @@ public final class DigitalWellBeingToast {
                 (FrameLayout.LayoutParams) mBanner.getLayoutParams();
         DeviceProfile deviceProfile = mContainer.getDeviceProfile();
         layoutParams.bottomMargin = ((ViewGroup.MarginLayoutParams)
-                mTaskView.getFirstThumbnailViewDeprecated().getLayoutParams()).bottomMargin;
+                mTaskView.getFirstSnapshotView().getLayoutParams()).bottomMargin;
         RecentsPagedOrientationHandler orientationHandler = mTaskView.getPagedOrientationHandler();
         Pair<Float, Float> translations = orientationHandler
                 .getDwbLayoutTranslations(mTaskView.getMeasuredWidth(),
                         mTaskView.getMeasuredHeight(), mSplitBounds, deviceProfile,
-                        mTaskView.getThumbnailViews(), mTask.key.id, mBanner);
+                        mTaskView.getSnapshotViews(), mTask.key.id, mBanner);
         mSplitOffsetTranslationX = translations.first;
         mSplitOffsetTranslationY = translations.second;
         updateTranslationY();

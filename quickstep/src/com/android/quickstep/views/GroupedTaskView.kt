@@ -33,10 +33,8 @@ import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_O
 import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.util.RecentsOrientedState
-import com.android.quickstep.util.SplitScreenUtils.Companion.convertLauncherSplitBoundsToShell
 import com.android.quickstep.util.SplitSelectStateController
 import com.android.systemui.shared.recents.model.Task
-import com.android.systemui.shared.recents.utilities.PreviewPositionHelper
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper
 import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition
 
@@ -70,36 +68,20 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val initSplitTaskId = getThisTaskCurrentlyInSplitSelection()
         if (initSplitTaskId == INVALID_TASK_ID) {
             pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
-                taskContainers[0].thumbnailViewDeprecated,
-                taskContainers[1].thumbnailViewDeprecated,
+                taskContainers[0].snapshotView,
+                taskContainers[1].snapshotView,
                 widthSize,
                 heightSize,
                 splitBoundsConfig,
                 container.deviceProfile,
                 layoutDirection == LAYOUT_DIRECTION_RTL
             )
-            // Should we be having a separate translation step apart from the measuring above?
-            // The following only applies to large screen for now, but for future reference
-            // we'd want to abstract this out in PagedViewHandlers to get the primary/secondary
-            // translation directions
-            taskContainers[0]
-                .thumbnailViewDeprecated
-                .applySplitSelectTranslateX(taskContainers[0].thumbnailViewDeprecated.translationX)
-            taskContainers[0]
-                .thumbnailViewDeprecated
-                .applySplitSelectTranslateY(taskContainers[0].thumbnailViewDeprecated.translationY)
-            taskContainers[1]
-                .thumbnailViewDeprecated
-                .applySplitSelectTranslateX(taskContainers[1].thumbnailViewDeprecated.translationX)
-            taskContainers[1]
-                .thumbnailViewDeprecated
-                .applySplitSelectTranslateY(taskContainers[1].thumbnailViewDeprecated.translationY)
         } else {
             // Currently being split with this taskView, let the non-split selected thumbnail
             // take up full thumbnail area
             taskContainers
                 .firstOrNull { it.task.key.id != initSplitTaskId }
-                ?.thumbnailViewDeprecated
+                ?.snapshotView
                 ?.measure(
                     widthMeasureSpec,
                     MeasureSpec.makeMeasureSpec(
@@ -147,23 +129,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             )
         taskContainers.forEach { it.bind() }
 
-        this.splitBoundsConfig =
-            splitBoundsConfig?.also {
-                taskContainers[0]
-                    .thumbnailViewDeprecated
-                    .previewPositionHelper
-                    .setSplitBounds(
-                        convertLauncherSplitBoundsToShell(it),
-                        PreviewPositionHelper.STAGE_POSITION_TOP_OR_LEFT
-                    )
-                taskContainers[1]
-                    .thumbnailViewDeprecated
-                    .previewPositionHelper
-                    .setSplitBounds(
-                        convertLauncherSplitBoundsToShell(it),
-                        PreviewPositionHelper.STAGE_POSITION_BOTTOM_OR_RIGHT
-                    )
-            }
+        this.splitBoundsConfig = splitBoundsConfig
         taskContainers.forEach { it.digitalWellBeingToast?.setSplitBounds(splitBoundsConfig) }
         setOrientationState(orientedState)
     }
@@ -230,8 +196,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 taskContainers[0].iconView.asView(),
                 taskContainers[1].iconView.asView(),
                 taskIconHeight,
-                taskContainers[0].thumbnailViewDeprecated.measuredWidth,
-                taskContainers[0].thumbnailViewDeprecated.measuredHeight,
+                taskContainers[0].snapshotView.measuredWidth,
+                taskContainers[0].snapshotView.measuredHeight,
                 measuredHeight,
                 measuredWidth,
                 isRtl,
@@ -326,7 +292,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         // Check which of the two apps was selected
         if (
             taskContainers[1].iconView.asView().containsPoint(lastTouchDownPosition) ||
-                taskContainers[1].thumbnailViewDeprecated.containsPoint(lastTouchDownPosition)
+                taskContainers[1].snapshotView.containsPoint(lastTouchDownPosition)
         ) {
             return 1
         }
