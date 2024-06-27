@@ -72,6 +72,7 @@ import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.AssistUtils;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
@@ -519,6 +520,36 @@ public class TaskbarManager {
         }
     }
 
+    public void setWallpaperVisible(boolean isVisible) {
+        mSharedState.wallpaperVisible = isVisible;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.setWallpaperVisible(isVisible);
+        }
+    }
+
+    public void checkNavBarModes() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.checkNavBarModes();
+        }
+    }
+
+    public void finishBarAnimations() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.finishBarAnimations();
+        }
+    }
+
+    public void touchAutoDim(boolean reset) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.touchAutoDim(reset);
+        }
+    }
+
+    public void transitionTo(@BarTransitions.TransitionMode int barMode,
+            boolean animate) {
+        mTaskbarActivityContext.transitionTo(barMode, animate);
+    }
+
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {
         return ENABLE_TASKBAR_NAVBAR_UNIFICATION || deviceProfile.isTaskbarPresent;
     }
@@ -543,6 +574,13 @@ public class TaskbarManager {
         mSharedState.systemBarAttrsBehavior = behavior;
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.onSystemBarAttributesChanged(displayId, behavior);
+        }
+    }
+
+    public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+        mSharedState.barMode = barMode;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.onTransitionModeUpdated(barMode, checkBarModes);
         }
     }
 

@@ -486,7 +486,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
         depthController: DepthController?,
         info: TransitionInfo?,
         t: Transaction?,
-        finishCallback: Runnable
+        finishCallback: Runnable,
+        cornerRadius: Float
     ) {
         if (info == null && t == null) {
             // (Legacy animation) Tapping a split tile in Overview
@@ -550,7 +551,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     "unexpected null"
             }
 
-            composeFadeInSplitLaunchAnimator(initialTaskId, secondTaskId, info, t, finishCallback)
+            composeFadeInSplitLaunchAnimator(initialTaskId, secondTaskId, info, t, finishCallback,
+                    cornerRadius)
         }
     }
 
@@ -1024,11 +1026,12 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
      */
     @VisibleForTesting
     fun composeFadeInSplitLaunchAnimator(
-        initialTaskId: Int,
-        secondTaskId: Int,
-        transitionInfo: TransitionInfo,
-        t: Transaction,
-        finishCallback: Runnable
+            initialTaskId: Int,
+            secondTaskId: Int,
+            transitionInfo: TransitionInfo,
+            t: Transaction,
+            finishCallback: Runnable,
+            cornerRadius: Float
     ) {
         var splitRoot1: Change? = null
         var splitRoot2: Change? = null
@@ -1106,6 +1109,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 override fun onAnimationStart(animation: Animator) {
                     for (leash in openingTargets) {
                         animTransaction.show(leash).setAlpha(leash, 0.0f)
+                        animTransaction.setCornerRadius(leash, cornerRadius);
                     }
                     animTransaction.apply()
                 }

@@ -322,27 +322,45 @@ public class BubbleBarController extends IBubblesListener.Stub {
                         || mImeVisibilityChecker.isImeVisible();
 
         BubbleBarBubble bubbleToSelect = null;
-        if (!update.removedBubbles.isEmpty()) {
-            for (int i = 0; i < update.removedBubbles.size(); i++) {
-                RemovedBubble removedBubble = update.removedBubbles.get(i);
-                BubbleBarBubble bubble = mBubbles.remove(removedBubble.getKey());
-                if (bubble != null) {
-                    mBubbleBarViewController.removeBubble(bubble);
-                } else {
-                    Log.w(TAG, "trying to remove bubble that doesn't exist: "
-                            + removedBubble.getKey());
+
+        if (update.addedBubble != null && update.removedBubbles.size() == 1) {
+            // we're adding and removing a bubble at the same time. handle this as a single update.
+            RemovedBubble removedBubble = update.removedBubbles.get(0);
+            BubbleBarBubble bubbleToRemove = mBubbles.remove(removedBubble.getKey());
+            mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
+            if (bubbleToRemove != null) {
+                mBubbleBarViewController.addBubbleAndRemoveBubble(update.addedBubble,
+                        bubbleToRemove, isExpanding, suppressAnimation);
+            } else {
+                mBubbleBarViewController.addBubble(update.addedBubble, isExpanding,
+                        suppressAnimation);
+                Log.w(TAG, "trying to remove bubble that doesn't exist: " + removedBubble.getKey());
+            }
+        } else {
+            if (!update.removedBubbles.isEmpty()) {
+                for (int i = 0; i < update.removedBubbles.size(); i++) {
+                    RemovedBubble removedBubble = update.removedBubbles.get(i);
+                    BubbleBarBubble bubble = mBubbles.remove(removedBubble.getKey());
+                    if (bubble != null) {
+                        mBubbleBarViewController.removeBubble(bubble);
+                    } else {
+                        Log.w(TAG, "trying to remove bubble that doesn't exist: "
+                                + removedBubble.getKey());
+                    }
                 }
             }
-        }
-        if (update.addedBubble != null) {
-            mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
-            mBubbleBarViewController.addBubble(update.addedBubble, isExpanding, suppressAnimation);
-            if (isCollapsed) {
-                // If we're collapsed, the most recently added bubble will be selected.
-                bubbleToSelect = update.addedBubble;
+            if (update.addedBubble != null) {
+                mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
+                mBubbleBarViewController.addBubble(update.addedBubble, isExpanding,
+                        suppressAnimation);
             }
-
         }
+
+        if (update.addedBubble != null && isCollapsed) {
+            // If we're collapsed, the most recently added bubble will be selected.
+            bubbleToSelect = update.addedBubble;
+        }
+
         if (update.currentBubbles != null && !update.currentBubbles.isEmpty()) {
             // Iterate in reverse because new bubbles are added in front and the list is in order.
             for (int i = update.currentBubbles.size() - 1; i >= 0; i--) {

@@ -56,11 +56,16 @@ public class TaskbarSharedState {
     // TaskbarManager#onNavButtonsDarkIntensityChanged()
     public float navButtonsDarkIntensity;
 
+    // TaskbarManager#onTransitionModeUpdated()
+    public int barMode;
+
     // TaskbarManager#onNavigationBarLumaSamplingEnabled()
     public int mLumaSamplingDisplayId = DEFAULT_DISPLAY;
     public boolean mIsLumaSamplingEnabled = true;
 
     public boolean setupUIVisible = false;
+
+    public boolean wallpaperVisible = false;
 
     public boolean allAppsVisible = false;
 

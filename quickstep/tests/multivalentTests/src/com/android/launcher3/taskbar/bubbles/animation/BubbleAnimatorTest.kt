@@ -80,6 +80,31 @@ class BubbleAnimatorTest {
         assertThat(bubbleAnimator.isRunning).isFalse()
     }
 
+    @Test
+    fun animateNewAndRemoveOld_isRunning() {
+        bubbleAnimator =
+            BubbleAnimator(
+                iconSize = 40f,
+                expandedBarIconSpacing = 10f,
+                bubbleCount = 5,
+                onLeft = false
+            )
+        val listener = TestBubbleAnimatorListener()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleAnimator.animateNewAndRemoveOld(
+                selectedBubbleIndex = 3,
+                removedBubbleIndex = 2,
+                listener
+            )
+        }
+
+        assertThat(bubbleAnimator.isRunning).isTrue()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(250)
+        }
+        assertThat(bubbleAnimator.isRunning).isFalse()
+    }
+
     private class TestBubbleAnimatorListener : BubbleAnimator.Listener {
 
         override fun onAnimationUpdate(animatedFraction: Float) {}

@@ -70,6 +70,7 @@ import android.hardware.input.InputManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArraySet;
@@ -126,6 +127,7 @@ import com.android.quickstep.util.AssistUtils;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
@@ -330,6 +332,49 @@ public class TouchInteractionService extends Service {
             });
         }
 
+        @BinderThread
+        @Override
+        public void updateWallpaperVisibility(int displayId, boolean visible) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.setWallpaperVisible(visible))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void checkNavBarModes() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::checkNavBarModes)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void finishBarAnimations() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::finishBarAnimations)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void touchAutoDim(boolean reset) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(taskbarManager -> taskbarManager.touchAutoDim(reset))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void transitionTo(@BarTransitions.TransitionMode int barMode,
+                boolean animate) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.transitionTo(barMode, animate))
+            ));
+        }
+
         /**
          * Preloads the Overview activity.
          * <p>
@@ -356,6 +401,12 @@ public class TouchInteractionService extends Service {
         public void onSystemBarAttributesChanged(int displayId, int behavior) {
             executeForTaskbarManager(taskbarManager ->
                     taskbarManager.onSystemBarAttributesChanged(displayId, behavior));
+        }
+
+        @Override
+        public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+            executeForTaskbarManager(taskbarManager ->
+                    taskbarManager.onTransitionModeUpdated(barMode, checkBarModes));
         }
 
         @Override

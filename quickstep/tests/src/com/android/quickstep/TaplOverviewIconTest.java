@@ -69,7 +69,6 @@ public class TaplOverviewIconTest extends AbstractLauncherUiTest<QuickstepLaunch
     }
 
     @Test
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/288939273
     public void testSplitTaskTapBothIconMenus() {
         createAndLaunchASplitPair();
 

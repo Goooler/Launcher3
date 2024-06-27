@@ -104,6 +104,7 @@ import com.android.systemui.animation.RemoteAnimationRunnerCompat;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.splitscreen.ISplitSelectListener;
 
@@ -778,7 +779,8 @@ public class SplitSelectStateController {
                         info, t, () -> {
                             finishAdapter.run();
                             cleanup(true /*success*/);
-                        });
+                        },
+                        QuickStepContract.getWindowCornerRadius(mContainer.asContext()));
             });
         }
 
@@ -826,7 +828,8 @@ public class SplitSelectStateController {
                 RemoteAnimationTarget[] wallpapers, RemoteAnimationTarget[] nonApps,
                 Runnable finishedCallback) {
             postAsyncCallback(mHandler,
-                    () -> mSplitAnimationController.playSplitLaunchAnimation(mLaunchingTaskView,
+                    () -> mSplitAnimationController
+                            .playSplitLaunchAnimation(mLaunchingTaskView,
                             mLaunchingIconView, mInitialTaskId, mSecondTaskId, apps, wallpapers,
                             nonApps, mStateManager, mDepthController, null /* info */, null /* t */,
                             () -> {
@@ -835,7 +838,8 @@ public class SplitSelectStateController {
                                     mSuccessCallback.accept(true);
                                 }
                                 resetState();
-                            }));
+                            },
+                            QuickStepContract.getWindowCornerRadius(mContainer.asContext())));
         }
 
         @Override

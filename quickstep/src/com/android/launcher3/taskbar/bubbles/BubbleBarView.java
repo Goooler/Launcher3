@@ -626,6 +626,7 @@ public class BubbleBarView extends FrameLayout {
     /**
      * Set bubble bar relative pivot value for X and Y, applied as a fraction of view width/height
      * respectively. If the value is not in range of 0 to 1 it will be normalized.
+     *
      * @param x relative X pivot value in range 0..1
      * @param y relative Y pivot value in range 0..1
      */
@@ -665,7 +666,9 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /** Add a new bubble to the bubble bar. */
-    public void addBubble(View bubble, FrameLayout.LayoutParams lp) {
+    public void addBubble(View bubble) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
+                Gravity.LEFT);
         if (isExpanded()) {
             // if we're expanded scale the new bubble in
             bubble.setScaleX(0f);
@@ -702,14 +705,58 @@ public class BubbleBarView extends FrameLayout {
         }
     }
 
+    /** Add a new bubble and remove an old bubble from the bubble bar. */
+    public void addBubbleAndRemoveBubble(View addedBubble, View removedBubble) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
+                Gravity.LEFT);
+        if (!isExpanded()) {
+            removeView(removedBubble);
+            addView(addedBubble, 0, lp);
+            return;
+        }
+        addedBubble.setScaleX(0f);
+        addedBubble.setScaleY(0f);
+        addView(addedBubble, 0, lp);
+
+        int indexOfSelectedBubble = indexOfChild(mSelectedBubbleView);
+        int indexOfBubbleToRemove = indexOfChild(removedBubble);
+
+        mBubbleAnimator = new BubbleAnimator(mIconSize, mExpandedBarIconsSpacing,
+                getChildCount(), mBubbleBarLocation.isOnLeft(isLayoutRtl()));
+        BubbleAnimator.Listener listener = new BubbleAnimator.Listener() {
+
+            @Override
+            public void onAnimationEnd() {
+                removeView(removedBubble);
+                updateWidth();
+                mBubbleAnimator = null;
+            }
+
+            @Override
+            public void onAnimationCancel() {
+                addedBubble.setScaleX(1);
+                addedBubble.setScaleY(1);
+                removedBubble.setScaleX(0);
+                removedBubble.setScaleY(0);
+            }
+
+            @Override
+            public void onAnimationUpdate(float animatedFraction) {
+                addedBubble.setScaleX(animatedFraction);
+                addedBubble.setScaleY(animatedFraction);
+                removedBubble.setScaleX(1 - animatedFraction);
+                removedBubble.setScaleY(1 - animatedFraction);
+                updateBubblesLayoutProperties(mBubbleBarLocation);
+                invalidate();
+            }
+        };
+        mBubbleAnimator.animateNewAndRemoveOld(indexOfSelectedBubble, indexOfBubbleToRemove,
+                listener);
+    }
+
     // TODO: (b/280605790) animate it
     @Override
     public void addView(View child, int index, ViewGroup.LayoutParams params) {
-        if (getChildCount() + 1 > MAX_BUBBLES) {
-            // the last child view is the overflow bubble and we shouldn't remove that. remove the
-            // second to last child view.
-            removeViewInLayout(getChildAt(getChildCount() - 2));
-        }
         super.addView(child, index, params);
         updateWidth();
         updateBubbleAccessibilityStates();
@@ -911,7 +958,7 @@ public class BubbleBarView extends FrameLayout {
         final float iconAndSpacing = getScaledIconSize() + mExpandedBarIconsSpacing;
         float translationX;
         if (mBubbleAnimator != null && mBubbleAnimator.isRunning()) {
-            return mBubbleAnimator.getExpandedBubbleTranslationX(bubbleIndex) + mBubbleBarPadding;
+            return mBubbleAnimator.getBubbleTranslationX(bubbleIndex) + mBubbleBarPadding;
         } else if (onLeft) {
             translationX = mBubbleBarPadding + (bubbleCount - bubbleIndex - 1) * iconAndSpacing;
         } else {

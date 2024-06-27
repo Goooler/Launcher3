@@ -25,10 +25,8 @@ import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -386,11 +384,22 @@ public class BubbleBarViewController {
     /**
      * Removes the provided bubble from the bubble bar.
      */
-    public void removeBubble(BubbleBarItem b) {
+    public void removeBubble(BubbleBarBubble b) {
         if (b != null) {
             mBarView.removeBubble(b.getView());
         } else {
             Log.w(TAG, "removeBubble, bubble was null!");
+        }
+    }
+
+    /** Adds a new bubble and removes an old bubble at the same time. */
+    public void addBubbleAndRemoveBubble(BubbleBarBubble addedBubble,
+            BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation) {
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView());
+        addedBubble.getView().setOnClickListener(mBubbleClickListener);
+        mBubbleDragController.setupBubbleView(addedBubble.getView());
+        if (!suppressAnimation) {
+            animateBubbleNotification(addedBubble, isExpanding);
         }
     }
 
@@ -399,8 +408,7 @@ public class BubbleBarViewController {
      */
     public void addBubble(BubbleBarItem b, boolean isExpanding, boolean suppressAnimation) {
         if (b != null) {
-            mBarView.addBubble(
-                    b.getView(), new FrameLayout.LayoutParams(mIconSize, mIconSize, Gravity.LEFT));
+            mBarView.addBubble(b.getView());
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
 

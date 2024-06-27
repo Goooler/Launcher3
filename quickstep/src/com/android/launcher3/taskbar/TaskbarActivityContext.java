@@ -139,6 +139,7 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.rotation.RotationButtonController;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
@@ -275,7 +276,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers = new TaskbarControllers(this,
                 new TaskbarDragController(this),
                 buttonController,
-                new NavbarButtonsViewController(this, mNavigationBarPanelContext, navButtonsView),
+                new NavbarButtonsViewController(this, mNavigationBarPanelContext, navButtonsView,
+                        getMainThreadHandler()),
                 rotationButtonController,
                 new TaskbarDragLayerController(this, mDragLayer),
                 new TaskbarViewController(this, taskbarView),
@@ -799,6 +801,27 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.taskbarStashController.setSetupUIVisible(isVisible);
     }
 
+    public void setWallpaperVisible(boolean isVisible) {
+        mControllers.navbarButtonsViewController.setWallpaperVisible(isVisible);
+    }
+
+    public void checkNavBarModes() {
+        mControllers.navbarButtonsViewController.checkNavBarModes();
+    }
+
+    public void finishBarAnimations() {
+        mControllers.navbarButtonsViewController.finishBarAnimations();
+    }
+
+    public void touchAutoDim(boolean reset) {
+        mControllers.navbarButtonsViewController.touchAutoDim(reset);
+    }
+
+    public void transitionTo(@BarTransitions.TransitionMode int barMode,
+            boolean animate) {
+        mControllers.navbarButtonsViewController.transitionTo(barMode, animate);
+    }
+
     /**
      * Called when this instance of taskbar is no longer needed
      */
@@ -876,6 +899,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.rotationButtonController.onBehaviorChanged(displayId, behavior);
     }
 
+    public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+        mControllers.navbarButtonsViewController.onTransitionModeUpdated(barMode, checkBarModes);
+    }
     public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
         mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity()
                 .updateValue(darkIntensity);

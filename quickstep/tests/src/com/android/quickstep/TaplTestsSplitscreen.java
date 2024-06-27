@@ -72,7 +72,6 @@ public class TaplTestsSplitscreen extends AbstractQuickStepTest {
     }
 
     @Test
-    @TestStabilityRule.Stability(flavors = PLATFORM_POSTSUBMIT | LOCAL) // b/295225524
     public void testSplitAppFromHomeWithItself() throws Exception {
         // Currently only tablets have Taskbar in Overview, so test is only active on tablets
         assumeTrue(mLauncher.isTablet());

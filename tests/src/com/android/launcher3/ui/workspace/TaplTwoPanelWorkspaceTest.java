@@ -247,7 +247,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     @Test
     @PortraitLandscape
     public void testEmptyPageDoesNotGetRemovedIfPagePairIsNotEmpty() {
