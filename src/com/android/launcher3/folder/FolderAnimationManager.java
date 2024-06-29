@@ -60,6 +60,7 @@ import java.util.List;
  */
 public class FolderAnimationManager {
 
+    private static final float EXTRA_FOLDER_REVEAL_RADIUS_PERCENTAGE = 0.125F;
     private static final int FOLDER_NAME_ALPHA_DURATION = 32;
     private static final int LARGE_FOLDER_FOOTER_DURATION = 128;
 
@@ -158,12 +159,9 @@ public class FolderAnimationManager {
         mFolder.mFooter.setPivotX(0);
         mFolder.mFooter.setPivotY(0);
 
-        // We want to create a small X offset for the preview items, so that they follow their
-        // expected path to their final locations. ie. an icon should not move right, if it's final
-        // location is to its left. This value is arbitrarily defined.
-        int previewItemOffsetX = (int) (previewSize / 2);
+        int previewItemOffsetX = 0;
         if (Utilities.isRtl(mContext.getResources())) {
-            previewItemOffsetX = (int) (lp.width * initialScale - initialSize - previewItemOffsetX);
+            previewItemOffsetX = (int) (lp.width * initialScale - initialSize);
         }
 
         final int paddingOffsetX = (int) (mContent.getPaddingLeft() * initialScale);
@@ -239,29 +237,19 @@ public class FolderAnimationManager {
         play(a, shapeDelegate.createRevealAnimator(
                 mFolder, startRect, endRect, finalRadius, !mIsOpening));
 
-        // Create reveal animator for the folder content (capture the top 4 icons 2x2)
-        int width = mDeviceProfile.folderCellLayoutBorderSpacePx.x
-                + mDeviceProfile.folderCellWidthPx * 2;
-        int rtlExtraWidth = 0;
-        int height = mDeviceProfile.folderCellLayoutBorderSpacePx.y
-                + mDeviceProfile.folderCellHeightPx * 2;
         int page = mIsOpening ? mContent.getCurrentPage() : mContent.getDestinationPage();
-        // In RTL we want to move to the last 2 columns of icons in the folder.
         if (Utilities.isRtl(mContext.getResources())) {
             page = (mContent.getPageCount() - 1) - page;
-            CellLayout clAtPage = mContent.getPageAt(page);
-            if (clAtPage != null) {
-                int numExtraRows = clAtPage.getCountX() - 2;
-                rtlExtraWidth = (int) Math.max(numExtraRows * (mDeviceProfile.folderCellWidthPx
-                        + mDeviceProfile.folderCellLayoutBorderSpacePx.x), rtlExtraWidth);
-            }
         }
-        int left = mContent.getPaddingLeft() + page * lp.width;
+        int left = page * lp.width;
+
+        int extraRadius = (int) ((mDeviceProfile.folderIconSizePx / initialScale)
+                * EXTRA_FOLDER_REVEAL_RADIUS_PERCENTAGE);
         Rect contentStart = new Rect(
-                left + rtlExtraWidth,
-                0,
-                left + width + mContent.getPaddingRight() + rtlExtraWidth,
-                height);
+                (int) (left + (startRect.left / initialScale)) - extraRadius,
+                (int) (startRect.top / initialScale) - extraRadius,
+                (int) (left + (startRect.right / initialScale)) + extraRadius,
+                (int) (startRect.bottom / initialScale) + extraRadius);
         Rect contentEnd = new Rect(left, 0, left + lp.width, lp.height);
         play(a, shapeDelegate.createRevealAnimator(
                 mFolder.getContent(), contentStart, contentEnd, finalRadius, !mIsOpening));

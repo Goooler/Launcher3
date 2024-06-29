@@ -55,7 +55,6 @@ import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.TaskCornerRadius;
-import com.android.quickstep.views.TaskView.TaskContainer;
 
 /**
  * Contains options for a recent task when long-pressing its icon.

@@ -895,16 +895,18 @@ public class BubbleBarView extends FrameLayout {
                 // where the bubble will end up when the animation ends
                 final float targetX = expandedX + expandedBarShift;
                 bv.setTranslationX(widthState * (targetX - collapsedX) + collapsedX);
-                // When we're expanded, we're not stacked so we're not behind the stack
-                bv.setBehindStack(false, animate);
+                // When we're expanded, the badge is visible for all bubbles
+                bv.updateBadgeVisibility(/* show= */ true);
+                bv.setDotScale(widthState);
                 bv.setAlpha(1);
             } else {
                 // If bar is on the right, account for bubble bar expanding and shifting left
                 final float collapsedBarShift = onLeft ? 0 : currentWidth - collapsedWidth;
                 final float targetX = collapsedX + collapsedBarShift;
                 bv.setTranslationX(widthState * (expandedX - targetX) + targetX);
-                // If we're not the first bubble we're behind the stack
-                bv.setBehindStack(i > 0, animate);
+                // The badge is always visible for the first bubble
+                bv.updateBadgeVisibility(/* show= */ i == 0);
+                bv.setDotScale(widthState);
                 // If we're fully collapsed, hide all bubbles except for the first 2. If there are
                 // only 2 bubbles, hide the second bubble as well because it's the overflow.
                 if (widthState == 0) {

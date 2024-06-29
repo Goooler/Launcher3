@@ -32,6 +32,7 @@ import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.quickstep.TaskOverlayFactory.TaskOverlay
 import com.android.quickstep.views.LauncherRecentsView
+import com.android.quickstep.views.TaskContainer
 import com.android.quickstep.views.TaskThumbnailViewDeprecated
 import com.android.quickstep.views.TaskView
 import com.android.quickstep.views.TaskViewIcon
@@ -186,8 +187,9 @@ class DesktopSystemShortcutTest {
         }
     }
 
-    private fun createTaskContainer(task: Task): TaskView.TaskContainer {
-        return taskView.TaskContainer(
+    private fun createTaskContainer(task: Task): TaskContainer {
+        return TaskContainer(
+            taskView,
             task,
             thumbnailView = null,
             thumbnailViewDeprecated,

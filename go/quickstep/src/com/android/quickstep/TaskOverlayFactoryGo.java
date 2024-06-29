@@ -56,7 +56,7 @@ import com.android.launcher3.views.ArrowTipView;
 import com.android.quickstep.util.AssistContentRequester;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.views.GoOverviewActionsView;
-import com.android.quickstep.views.TaskView.TaskContainer;
+import com.android.quickstep.views.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 

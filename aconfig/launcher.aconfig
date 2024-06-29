@@ -323,3 +323,11 @@ flag {
     description: "Search bar persists at the bottom of the screen across Launcher states"
     bug: "346408388"
 }
+
+flag {
+    name: "multiline_search_bar"
+    namespace: "launcher"
+    description: "Search bar can wrap to multi-line"
+    bug: "341795751"
+}
+

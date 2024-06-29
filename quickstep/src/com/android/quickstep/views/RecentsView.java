@@ -212,7 +212,6 @@ import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.VibrationConstants;
-import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.plugins.ResourceProvider;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;

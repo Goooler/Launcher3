@@ -22,10 +22,7 @@ import android.animation.ObjectAnimator
 import android.annotation.IdRes
 import android.app.ActivityOptions
 import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Insets
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
@@ -52,16 +49,11 @@ import com.android.launcher3.Flags.enableFocusOutline
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
-import com.android.launcher3.Flags.privateSpaceRestrictAccessibilityDrag
-import com.android.launcher3.LauncherSettings
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.config.FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent
 import com.android.launcher3.model.data.ItemInfo
-import com.android.launcher3.model.data.ItemInfoWithIcon
-import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.pm.UserCache
 import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.util.CancellableTask
@@ -84,13 +76,9 @@ import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.TaskAnimationManager
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.TaskOverlayFactory.TaskOverlay
-import com.android.quickstep.TaskUtils
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
-import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
-import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
@@ -702,6 +690,7 @@ constructor(
         }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
+            this,
             task,
             thumbnailView,
             thumbnailViewDeprecated,
@@ -1604,90 +1593,6 @@ constructor(
         }
 
         override fun close() {}
-    }
-
-    /** Holder for all Task dependent information. */
-    inner class TaskContainer(
-        val task: Task,
-        val thumbnailView: TaskThumbnailView?,
-        val thumbnailViewDeprecated: TaskThumbnailViewDeprecated,
-        val iconView: TaskViewIcon,
-        /**
-         * This technically can be a vanilla [android.view.TouchDelegate] class, however that class
-         * requires setting the touch bounds at construction, so we'd repeatedly be created many
-         * instances unnecessarily as scrolling occurs, whereas [TransformingTouchDelegate] allows
-         * touch delegated bounds only to be updated.
-         */
-        val iconTouchDelegate: TransformingTouchDelegate,
-        /** Defaults to STAGE_POSITION_UNDEFINED if in not a split screen task view */
-        @StagePosition val stagePosition: Int,
-        val digitalWellBeingToast: DigitalWellBeingToast?,
-        val showWindowsView: View?,
-        taskOverlayFactory: TaskOverlayFactory
-    ) {
-        val overlay: TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
-        val taskContainerData = TaskContainerData()
-
-        val snapshotView: View
-            get() = thumbnailView ?: thumbnailViewDeprecated
-
-        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
-        val thumbnail: Bitmap?
-            get() = thumbnailViewDeprecated.thumbnail
-
-        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
-        val isRealSnapshot: Boolean
-            get() = thumbnailViewDeprecated.isRealSnapshot()
-
-        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
-        val scaledInsets: Insets
-            get() = thumbnailViewDeprecated.scaledInsets
-
-        /** Builds proto for logging */
-        val itemInfo: WorkspaceItemInfo
-            get() =
-                WorkspaceItemInfo().apply {
-                    itemType = LauncherSettings.Favorites.ITEM_TYPE_TASK
-                    container = LauncherSettings.Favorites.CONTAINER_TASKSWITCHER
-                    val componentKey = TaskUtils.getLaunchComponentKeyForTask(task.key)
-                    user = componentKey.user
-                    intent = Intent().setComponent(componentKey.componentName)
-                    title = task.title
-                    recentsView?.let { screenId = it.indexOfChild(this@TaskView) }
-                    if (privateSpaceRestrictAccessibilityDrag()) {
-                        if (
-                            UserCache.getInstance(context).getUserInfo(componentKey.user).isPrivate
-                        ) {
-                            runtimeStatusFlags =
-                                runtimeStatusFlags or ItemInfoWithIcon.FLAG_NOT_PINNABLE
-                        }
-                    }
-                }
-
-        val taskView: TaskView
-            get() = this@TaskView
-
-        fun destroy() {
-            digitalWellBeingToast?.destroy()
-            thumbnailView?.let { taskView.removeView(it) }
-        }
-
-        fun bind() {
-            if (enableRefactorTaskThumbnail() && thumbnailView != null) {
-                thumbnailViewDeprecated.setTaskOverlay(overlay)
-                bindThumbnailView()
-            } else {
-                thumbnailViewDeprecated.bind(task, overlay)
-            }
-        }
-
-        // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
-        //  so there will be no need to access TaskThumbnailView's VM through the TaskThumbnailView
-        fun bindThumbnailView() {
-            // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
-            //  this should be decided inside TaskThumbnailViewModel.
-            thumbnailView?.viewModel?.bind(TaskThumbnail(task.key.id, isRunningTask))
-        }
     }
 
     companion object {

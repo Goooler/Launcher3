@@ -35,8 +35,6 @@ import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.wm.shell.animation.Interpolators;
 
-import java.util.EnumSet;
-
 // TODO: (b/276978250) This is will be similar to WMShell's BadgedImageView, it'd be nice to share.
 
 /**
@@ -46,22 +44,6 @@ import java.util.EnumSet;
 public class BubbleView extends ConstraintLayout {
 
     public static final int DEFAULT_PATH_SIZE = 100;
-
-    /**
-     * Flags that suppress the visibility of the 'new' dot or the app badge, for one reason or
-     * another. If any of these flags are set, the dot will not be shown.
-     * If {@link SuppressionFlag#BEHIND_STACK} then the app badge will not be shown.
-     */
-    enum SuppressionFlag {
-        // TODO: (b/277815200) implement flyout
-        // Suppressed because the flyout is visible - it will morph into the dot via animation.
-        FLYOUT_VISIBLE,
-        // Suppressed because this bubble is behind others in the collapsed stack.
-        BEHIND_STACK,
-    }
-
-    private final EnumSet<SuppressionFlag> mSuppressionFlags =
-            EnumSet.noneOf(SuppressionFlag.class);
 
     private final ImageView mBubbleIcon;
     private final ImageView mAppIcon;
@@ -230,7 +212,7 @@ public class BubbleView extends ConstraintLayout {
         }
     }
 
-    void updateBadgeVisibility() {
+    void updateBadgeVisibility(boolean show) {
         if (mBubble instanceof BubbleBarOverflow) {
             // The overflow bubble does not have a badge, so just bail.
             return;
@@ -241,39 +223,24 @@ public class BubbleView extends ConstraintLayout {
                 ? -(bubble.getIcon().getWidth() - appBadgeBitmap.getWidth())
                 : 0;
         mAppIcon.setTranslationX(translationX);
-        mAppIcon.setVisibility(isBehindStack() ? GONE : VISIBLE);
-    }
-
-    /** Sets whether this bubble is in the stack & not the first bubble. **/
-    void setBehindStack(boolean behindStack, boolean animate) {
-        if (behindStack) {
-            mSuppressionFlags.add(SuppressionFlag.BEHIND_STACK);
-        } else {
-            mSuppressionFlags.remove(SuppressionFlag.BEHIND_STACK);
-        }
-        updateDotVisibility(animate);
-        updateBadgeVisibility();
-    }
-
-    /** Whether this bubble is in the stack & not the first bubble. **/
-    boolean isBehindStack() {
-        return mSuppressionFlags.contains(SuppressionFlag.BEHIND_STACK);
+        mAppIcon.setVisibility(show ? VISIBLE : GONE);
     }
 
     /** Whether the dot indicating unseen content in a bubble should be shown. */
     private boolean shouldDrawDot() {
         boolean bubbleHasUnseenContent = mBubble != null
                 && mBubble instanceof BubbleBarBubble
-                && mSuppressionFlags.isEmpty()
                 && !((BubbleBarBubble) mBubble).getInfo().isNotificationSuppressed();
-
         // Always render the dot if it's animating, since it could be animating out. Otherwise, show
         // it if the bubble wants to show it, and we aren't suppressing it.
         return bubbleHasUnseenContent || mDotIsAnimating;
     }
 
     /** How big the dot should be, fraction from 0 to 1. */
-    private void setDotScale(float fraction) {
+    void setDotScale(float fraction) {
+        if (!shouldDrawDot()) {
+            return;
+        }
         mDotScale = fraction;
         invalidate();
     }
@@ -283,14 +250,14 @@ public class BubbleView extends ConstraintLayout {
      */
     private void animateDotScale() {
         float toScale = shouldDrawDot() ? 1f : 0f;
-        mDotIsAnimating = true;
+        boolean isDotScaleChanging = Float.compare(mDotScale, toScale) != 0;
 
-        // Don't restart the animation if we're already animating to the given value.
-        if (mAnimatingToDotScale == toScale || !shouldDrawDot()) {
-            mDotIsAnimating = false;
+        // Don't restart the animation if we're already animating to the given value or if the dot
+        // scale is not changing
+        if ((mDotIsAnimating && mAnimatingToDotScale == toScale) || !isDotScaleChanging) {
             return;
         }
-
+        mDotIsAnimating = true;
         mAnimatingToDotScale = toScale;
 
         final boolean showDot = toScale > 0f;

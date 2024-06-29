@@ -31,6 +31,7 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.launcher3.Launcher;
 import com.android.quickstep.views.DigitalWellBeingToast;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
 
 import org.junit.Test;
@@ -86,7 +87,7 @@ public class TaplDigitalWellBeingToastTest extends AbstractQuickStepTest {
         final TaskView task = getOnceNotNull("No latest task", launcher -> getLatestTask(launcher));
 
         return getFromLauncher(launcher -> {
-            TaskView.TaskContainer taskContainer = task.getTaskContainers().get(0);
+            TaskContainer taskContainer = task.getTaskContainers().get(0);
             assertTrue("Latest task is not Calculator", CALCULATOR_PACKAGE.equals(
                     taskContainer.getTask().getTopComponent().getPackageName()));
             return taskContainer.getDigitalWellBeingToast();

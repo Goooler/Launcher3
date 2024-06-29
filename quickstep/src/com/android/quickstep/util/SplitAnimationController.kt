@@ -68,9 +68,9 @@ import com.android.quickstep.views.IconAppChipView
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
 import com.android.quickstep.views.SplitInstructionsView
+import com.android.quickstep.views.TaskContainer
 import com.android.quickstep.views.TaskThumbnailViewDeprecated
 import com.android.quickstep.views.TaskView
-import com.android.quickstep.views.TaskView.TaskContainer
 import com.android.quickstep.views.TaskViewIcon
 import com.android.wm.shell.shared.TransitionUtil
 import java.util.Optional

@@ -48,6 +48,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -89,6 +90,8 @@ import java.util.function.Predicate;
  * logic in the Personal tab.
  */
 public class PrivateProfileManager extends UserProfileManager {
+
+    private static final String TAG = "PrivateProfileManager";
     private static final int EXPAND_COLLAPSE_DURATION = 800;
     private static final int SETTINGS_OPACITY_DURATION = 400;
     private static final int TEXT_UNLOCK_OPACITY_DURATION = 300;
@@ -362,6 +365,7 @@ public class PrivateProfileManager extends UserProfileManager {
         } else {
             // Ensure any unwanted animations to not happen.
             settingAndLockGroup.setLayoutTransition(null);
+            Log.d(TAG, "bindPrivateSpaceHeaderViewElements: removing transitions ");
         }
         updateView();
     }
@@ -597,6 +601,9 @@ public class PrivateProfileManager extends UserProfileManager {
         }
         attachFloatingMaskView(expand);
         ViewGroup settingsAndLockGroup = mPSHeader.findViewById(R.id.settingsAndLockGroup);
+        TextView lockText = mPSHeader.findViewById(R.id.lock_text);
+        PrivateSpaceSettingsButton privateSpaceSettingsButton =
+                mPSHeader.findViewById(R.id.ps_settings_button);
         if (settingsAndLockGroup.getLayoutTransition() == null) {
             // Set a new transition if the current ViewGroup does not already contain one as each
             // transition should only happen once when applied.
@@ -612,13 +619,15 @@ public class PrivateProfileManager extends UserProfileManager {
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
+                Log.d(TAG, "updatePrivateStateAnimator: Private space animation expanding: "
+                        + expand);
                 mStatsLogManager.logger().sendToInteractionJankMonitor(
                         expand
                                 ? LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_BEGIN
                                 : LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_BEGIN,
                         mAllApps.getActiveRecyclerView());
                 // Animate the collapsing of the text at the same time while updating lock button.
-                mPSHeader.findViewById(R.id.lock_text).setVisibility(expand ? VISIBLE : GONE);
+                lockText.setVisibility(expand ? VISIBLE : GONE);
                 setAnimationRunning(true);
             }
 
@@ -636,6 +645,11 @@ public class PrivateProfileManager extends UserProfileManager {
                             ? LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_END
                             : LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_END,
                     mAllApps.getActiveRecyclerView());
+            Log.d(TAG, "updatePrivateStateAnimator: lockText visibility: "
+                    + lockText.getVisibility() + " lockTextAlpha: " + lockText.getAlpha());
+            Log.d(TAG, "updatePrivateStateAnimator: settingsCog visibility: "
+                    + privateSpaceSettingsButton.getVisibility()
+                    + " settingsCogAlpha: " + privateSpaceSettingsButton.getAlpha());
             if (!expand) {
                 mAllApps.mAH.get(MAIN).mRecyclerView.removeItemDecoration(
                         mPrivateAppsSectionDecorator);
@@ -717,15 +731,19 @@ public class PrivateProfileManager extends UserProfileManager {
             @Override
             public void startTransition(LayoutTransition transition, ViewGroup viewGroup,
                     View view, int i) {
+                Log.d(TAG, "updatePrivateStateAnimator: transition started: " + transition);
             }
             @Override
             public void endTransition(LayoutTransition transition, ViewGroup viewGroup,
                     View view, int i) {
                 settingsAndLockGroup.setLayoutTransition(null);
                 mReadyToAnimate = false;
+                Log.d(TAG, "updatePrivateStateAnimator: transition finished: " + transition);
             }
         });
         settingsAndLockGroup.setLayoutTransition(settingsAndLockTransition);
+        Log.d(TAG, "updatePrivateStateAnimator: setting transition: "
+                + settingsAndLockTransition);
     }
 
     /** Change the settings gear alpha when expanded or collapsed. */

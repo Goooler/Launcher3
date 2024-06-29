@@ -37,7 +37,6 @@ import com.android.launcher3.popup.RoundedArrowDrawable
 import com.android.launcher3.popup.SystemShortcut
 import com.android.launcher3.util.Themes
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.views.TaskView.TaskContainer
 
 class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T : Context {
     companion object {
@@ -58,7 +57,9 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
     }
 
     constructor(context: Context) : super(context)
+
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
     constructor(
         context: Context,
         attrs: AttributeSet,
@@ -80,6 +81,7 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
     private var alignedOptionIndex: Int = 0
     private val extraSpaceForRowAlignment: Int
         get() = optionMeasuredHeight * alignedOptionIndex
+
     private val menuPaddingEnd = context.resources.getDimensionPixelSize(R.dimen.task_card_margin)
 
     private lateinit var taskView: TaskView

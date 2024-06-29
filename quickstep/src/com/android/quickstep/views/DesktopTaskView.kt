@@ -193,6 +193,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             }
             val taskContainer =
                 TaskContainer(
+                    this,
                     task,
                     // TODO(b/338360089): Support new TTV for DesktopTaskView
                     thumbnailView = null,

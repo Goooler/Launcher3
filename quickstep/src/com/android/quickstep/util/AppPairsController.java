@@ -22,7 +22,6 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static com.android.internal.jank.Cuj.CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_TASKBAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_PAIR_LAUNCH;
 import static com.android.launcher3.model.data.AppInfo.PACKAGE_KEY_COMPARATOR;
-import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_SUPPORTS_MULTI_INSTANCE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
@@ -45,8 +44,6 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherSettings;
-import com.android.launcher3.R;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.apppairs.AppPairIcon;
@@ -69,6 +66,7 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.views.GroupedTaskView;
+import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
@@ -135,7 +133,7 @@ public class AppPairsController {
         }
 
         GroupedTaskView gtv = (GroupedTaskView) taskView;
-        List<TaskView.TaskContainer> containers = gtv.getTaskContainers();
+        List<TaskContainer> containers = gtv.getTaskContainers();
         ComponentKey taskKey1 = TaskUtils.getLaunchComponentKeyForTask(
                 containers.get(0).getTask().key);
         ComponentKey taskKey2 = TaskUtils.getLaunchComponentKeyForTask(
@@ -172,7 +170,7 @@ public class AppPairsController {
      */
     public void saveAppPair(GroupedTaskView gtv) {
         InteractionJankMonitorWrapper.begin(gtv, Cuj.CUJ_LAUNCHER_SAVE_APP_PAIR);
-        List<TaskView.TaskContainer> containers = gtv.getTaskContainers();
+        List<TaskContainer> containers = gtv.getTaskContainers();
         WorkspaceItemInfo recentsInfo1 = containers.get(0).getItemInfo();
         WorkspaceItemInfo recentsInfo2 = containers.get(1).getItemInfo();
         WorkspaceItemInfo app1 = resolveAppPairWorkspaceInfo(recentsInfo1);

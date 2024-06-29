@@ -44,8 +44,8 @@ import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
+import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
-import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
