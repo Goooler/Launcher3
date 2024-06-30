@@ -241,11 +241,17 @@ android_robolectric_test {
     java_resource_dirs: ["config"],
     static_libs: [
         "flag-junit-base",
+        "flag-junit",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
+        "androidx.test.espresso.core",
+        "androidx.test.espresso.contrib",
+        "androidx.test.espresso.intents",
+        "androidx.test.rules",
+        "uiautomator-helpers",
         "inline-mockito-robolectric-prebuilt",
         "platform-parametric-runner-lib",
         "testables",
@@ -261,4 +267,5 @@ android_robolectric_test {
     ],
     instrumentation_for: "Launcher3",
     upstream: true,
+    strict_mode: false,
 }
