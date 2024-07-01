@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.taskbar
+package com.android.launcher3.taskbar.rules
 
-import com.android.launcher3.taskbar.TaskbarModeRule.Mode
-import com.android.launcher3.taskbar.TaskbarModeRule.TaskbarMode
+import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode
+import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.MainThreadInitializedObject
-import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
 import com.android.launcher3.util.NavigationMode
 import org.junit.rules.TestRule
 import org.junit.runner.Description
@@ -40,7 +39,7 @@ import org.mockito.kotlin.spy
  * Make sure this rule precedes any rules that depend on [DisplayController], or else the instance
  * might be inconsistent across the test lifecycle.
  */
-class TaskbarModeRule(private val context: SandboxContext) : TestRule {
+class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRule {
     /** The selected Taskbar mode. */
     enum class Mode {
         TRANSIENT,
@@ -60,7 +59,7 @@ class TaskbarModeRule(private val context: SandboxContext) : TestRule {
             override fun evaluate() {
                 val mode = taskbarMode.mode
 
-                context.putObject(
+                context.applicationContext.putObject(
                     DisplayController.INSTANCE,
                     object : DisplayController(context) {
                         override fun getInfo(): Info {

@@ -648,8 +648,7 @@ public class TaskbarManager {
         }
     }
 
-    @VisibleForTesting
-    void addTaskbarRootViewToWindow() {
+    private void addTaskbarRootViewToWindow() {
         if (enableTaskbarNoRecreate() && !mAddedWindow && mTaskbarActivityContext != null) {
             mWindowManager.addView(mTaskbarRootLayout,
                     mTaskbarActivityContext.getWindowLayoutParams());
@@ -657,8 +656,7 @@ public class TaskbarManager {
         }
     }
 
-    @VisibleForTesting
-    void removeTaskbarRootViewFromWindow() {
+    private void removeTaskbarRootViewFromWindow() {
         if (enableTaskbarNoRecreate() && mAddedWindow) {
             mWindowManager.removeViewImmediate(mTaskbarRootLayout);
             mAddedWindow = false;

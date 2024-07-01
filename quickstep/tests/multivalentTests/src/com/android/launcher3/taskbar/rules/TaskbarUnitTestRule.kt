@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.taskbar
+package com.android.launcher3.taskbar.rules
 
 import android.app.Instrumentation
 import android.app.PendingIntent
-import android.content.Context
 import android.content.IIntentSender
 import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.ServiceTestRule
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.taskbar.TaskbarActivityContext
+import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
 import com.android.launcher3.util.LauncherMultivalentJUnit.Companion.isRunningInRobolectric
@@ -62,7 +63,11 @@ import org.junit.runners.model.Statement
  * }
  * ```
  */
-class TaskbarUnitTestRule(private val testInstance: Any, private val context: Context) : TestRule {
+class TaskbarUnitTestRule(
+    private val testInstance: Any,
+    private val context: TaskbarWindowSandboxContext,
+) : TestRule {
+
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val serviceTestRule = ServiceTestRule()
 
@@ -114,18 +119,14 @@ class TaskbarUnitTestRule(private val testInstance: Any, private val context: Co
                 try {
                     // Replace Launcher Taskbar window with test instance.
                     instrumentation.runOnMainSync {
-                        launcherTaskbarManager?.removeTaskbarRootViewFromWindow()
+                        launcherTaskbarManager?.destroy()
                         taskbarManager.onUserUnlocked() // Required to complete initialization.
                     }
 
                     injectControllers()
                     base.evaluate()
                 } finally {
-                    // Revert Taskbar window.
-                    instrumentation.runOnMainSync {
-                        taskbarManager.destroy()
-                        launcherTaskbarManager?.addTaskbarRootViewToWindow()
-                    }
+                    instrumentation.runOnMainSync { taskbarManager.destroy() }
                 }
             }
         }
@@ -133,7 +134,7 @@ class TaskbarUnitTestRule(private val testInstance: Any, private val context: Co
 
     /** Simulates Taskbar recreation lifecycle. */
     fun recreateTaskbar() {
-        taskbarManager.recreateTaskbar()
+        instrumentation.runOnMainSync { taskbarManager.recreateTaskbar() }
         injectControllers()
     }
 

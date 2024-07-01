@@ -27,9 +27,10 @@ import com.android.launcher3.appprediction.PredictionRowView
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.notification.NotificationKeyData
-import com.android.launcher3.taskbar.TaskbarUnitTestRule
-import com.android.launcher3.taskbar.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayController
+import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
+import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
+import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
 import com.android.launcher3.util.LauncherMultivalentJUnit
 import com.android.launcher3.util.LauncherMultivalentJUnit.EmulatedDevices
 import com.android.launcher3.util.PackageUserKey
@@ -43,7 +44,11 @@ import org.junit.runner.RunWith
 class TaskbarAllAppsControllerTest {
 
     @get:Rule
-    val taskbarUnitTestRule = TaskbarUnitTestRule(this, getInstrumentation().targetContext)
+    val taskbarUnitTestRule =
+        TaskbarUnitTestRule(
+            this,
+            TaskbarWindowSandboxContext.create(getInstrumentation().targetContext),
+        )
     @get:Rule val animatorTestRule = AnimatorTestRule(this)
 
     @InjectController lateinit var allAppsController: TaskbarAllAppsController
@@ -65,9 +70,8 @@ class TaskbarAllAppsControllerTest {
     }
 
     @Test
-    @UiThreadTest
     fun testToggle_taskbarRecreated_allAppsReopened() {
-        allAppsController.toggle()
+        getInstrumentation().runOnMainSync { allAppsController.toggle() }
         taskbarUnitTestRule.recreateTaskbar()
         assertThat(allAppsController.isOpen).isTrue()
     }
