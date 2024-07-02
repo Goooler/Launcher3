@@ -44,6 +44,7 @@ import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -56,7 +57,6 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     @Mock private lateinit var mockRecentsModel: RecentsModel
     @Mock private lateinit var mockDesktopVisibilityController: DesktopVisibilityController
 
-    private var nextTaskId: Int = 500
     private var taskListChangeId: Int = 1
 
     private lateinit var recentAppsController: TaskbarRecentAppsController
@@ -478,6 +478,82 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         assertThat(shownPackages).containsExactlyElementsIn(expectedPackages)
     }
 
+    @Test
+    fun onRecentTasksChanged_notInDesktopMode_noActualChangeToRecents_commitRunningAppsToUI_notCalled() {
+        setInDesktopMode(false)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+        // Call onRecentTasksChanged() again with the same tasks, verify it's a no-op.
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+    }
+
+    @Test
+    fun onRecentTasksChanged_inDesktopMode_noActualChangeToRunning_commitRunningAppsToUI_notCalled() {
+        setInDesktopMode(true)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = listOf(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+        // Call onRecentTasksChanged() again with the same tasks, verify it's a no-op.
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = listOf(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+    }
+
+    @Test
+    fun onRecentTasksChanged_onlyMinimizedChanges_commitRunningAppsToUI_isCalled() {
+        setInDesktopMode(true)
+        val runningTasks = listOf(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = runningTasks,
+            minimizedTaskIndices = setOf(0),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+        // Call onRecentTasksChanged() again with a new minimized app, verify we update UI.
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTaskPackages = runningTasks,
+            minimizedTaskIndices = setOf(0, 1),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(2)).commitRunningAppsToUI()
+    }
+
+    @Test
+    fun onRecentTasksChanged_hotseatAppStartsRunning_commitRunningAppsToUI_isCalled() {
+        setInDesktopMode(true)
+        val hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = hotseatPackages,
+            runningTaskPackages = listOf(RUNNING_APP_PACKAGE_1),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
+        // Call onRecentTasksChanged() again with a new running app, verify we update UI.
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = hotseatPackages,
+            runningTaskPackages = listOf(RUNNING_APP_PACKAGE_1, HOTSEAT_PACKAGE_1),
+            recentTaskPackages = emptyList()
+        )
+        verify(taskbarViewController, times(2)).commitRunningAppsToUI()
+    }
+
     private fun prepareHotseatAndRunningAndRecentApps(
         hotseatPackages: List<String>,
         runningTaskPackages: List<String>,
@@ -556,9 +632,11 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     private fun createTask(packageName: String, isVisible: Boolean = true): Task {
+        // Use the number at the end of the test packageName as the id.
+        val id = packageName[packageName.length - 1].code
         return Task(
                 Task.TaskKey(
-                    nextTaskId++,
+                    id,
                     WINDOWING_MODE_FREEFORM,
                     Intent().apply { `package` = packageName },
                     ComponentName(packageName, "TestActivity"),

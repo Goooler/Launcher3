@@ -26,6 +26,7 @@ import com.android.systemui.shared.recents.model.Task;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A {@link Task} container that can contain one or two tasks, depending on if the two tasks
@@ -91,4 +92,17 @@ public class GroupTask {
         return "type=" + taskViewType + " task1=" + task1 + " task2=" + task2;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof GroupTask that)) return false;
+        return taskViewType == that.taskViewType && Objects.equals(task1,
+                that.task1) && Objects.equals(task2, that.task2)
+                && Objects.equals(mSplitBounds, that.mSplitBounds);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(task1, task2, mSplitBounds, taskViewType);
+    }
 }

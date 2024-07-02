@@ -2445,16 +2445,15 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }
-        Optional<RemoteAnimationTarget> taskTargetOptional =
-                Arrays.stream(appearedTaskTargets)
-                        .filter(mGestureState.mLastStartedTaskIdPredicate)
-                        .findFirst();
-        if (!taskTargetOptional.isPresent()) {
+        RemoteAnimationTarget[] taskTargets = Arrays.stream(appearedTaskTargets)
+                .filter(mGestureState.mLastStartedTaskIdPredicate)
+                .toArray(RemoteAnimationTarget[]::new);
+        if (taskTargets.length == 0) {
             ActiveGestureLog.INSTANCE.addLog("No appeared task matching started task id");
             finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }
-        RemoteAnimationTarget taskTarget = taskTargetOptional.get();
+        RemoteAnimationTarget taskTarget = taskTargets[0];
         TaskView taskView = mRecentsView == null
                 ? null : mRecentsView.getTaskViewByTaskId(taskTarget.taskId);
         if (taskView == null
@@ -2468,13 +2467,13 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }
-        animateSplashScreenExit(mContainer, appearedTaskTargets, taskTarget.leash);
+        animateSplashScreenExit(mContainer, appearedTaskTargets, taskTargets);
     }
 
     private void animateSplashScreenExit(
             @NonNull T activity,
             @NonNull RemoteAnimationTarget[] appearedTaskTargets,
-            @NonNull SurfaceControl leash) {
+            @NonNull RemoteAnimationTarget[] animatingTargets) {
         ViewGroup splashView = activity.getDragLayer();
         final QuickstepLauncher quickstepLauncher = activity instanceof QuickstepLauncher
                 ? (QuickstepLauncher) activity : null;
@@ -2492,26 +2491,28 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
         surfaceApplier.scheduleApply(transaction);
 
-        SplashScreenExitAnimationUtils.startAnimations(splashView, leash,
-                mSplashMainWindowShiftLength, new TransactionPool(), new Rect(),
-                SPLASH_ANIMATION_DURATION, SPLASH_FADE_OUT_DURATION,
-                /* iconStartAlpha= */ 0, /* brandingStartAlpha= */ 0,
-                SPLASH_APP_REVEAL_DELAY, SPLASH_APP_REVEAL_DURATION,
-                new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        // Hiding launcher which shows the app surface behind, then
-                        // finishing recents to the app. After transition finish, showing
-                        // the views on launcher again, so it can be visible when next
-                        // animation starts.
-                        splashView.setAlpha(0);
-                        if (quickstepLauncher != null) {
-                            quickstepLauncher.getDepthController()
-                                    .pauseBlursOnWindows(false);
+        for (RemoteAnimationTarget target : animatingTargets) {
+            SplashScreenExitAnimationUtils.startAnimations(splashView, target.leash,
+                    mSplashMainWindowShiftLength, new TransactionPool(), target.screenSpaceBounds,
+                    SPLASH_ANIMATION_DURATION, SPLASH_FADE_OUT_DURATION,
+                    /* iconStartAlpha= */ 0, /* brandingStartAlpha= */ 0,
+                    SPLASH_APP_REVEAL_DELAY, SPLASH_APP_REVEAL_DURATION,
+                    new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            // Hiding launcher which shows the app surface behind, then
+                            // finishing recents to the app. After transition finish, showing
+                            // the views on launcher again, so it can be visible when next
+                            // animation starts.
+                            splashView.setAlpha(0);
+                            if (quickstepLauncher != null) {
+                                quickstepLauncher.getDepthController()
+                                        .pauseBlursOnWindows(false);
+                            }
+                            finishRecentsAnimationOnTasksAppeared(() -> splashView.setAlpha(1));
                         }
-                        finishRecentsAnimationOnTasksAppeared(() -> splashView.setAlpha(1));
-                    }
-                });
+                    });
+        }
     }
 
     private void finishRecentsAnimationOnTasksAppeared(Runnable onFinishComplete) {

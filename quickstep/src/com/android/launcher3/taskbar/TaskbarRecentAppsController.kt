@@ -149,20 +149,39 @@ class TaskbarRecentAppsController(
             taskListChangeId =
                 recentsModel.getTasks { tasks ->
                     allRecentTasks = tasks
+                    val oldRunningPackages = runningAppPackages
+                    val oldMinimizedPackages = minimizedAppPackages
                     desktopTask = allRecentTasks.filterIsInstance<DesktopTask>().firstOrNull()
-                    onRecentsOrHotseatChanged()
-                    controllers.taskbarViewController.commitRunningAppsToUI()
+                    val runningPackagesChanged = oldRunningPackages != runningAppPackages
+                    val minimizedPackagessChanged = oldMinimizedPackages != minimizedAppPackages
+                    if (
+                        onRecentsOrHotseatChanged() ||
+                            runningPackagesChanged ||
+                            minimizedPackagessChanged
+                    ) {
+                        controllers.taskbarViewController.commitRunningAppsToUI()
+                    }
                 }
         }
     }
 
-    private fun onRecentsOrHotseatChanged() {
+    /**
+     * Updates [shownTasks] when Recents or Hotseat changes.
+     *
+     * @return Whether [shownTasks] changed.
+     */
+    private fun onRecentsOrHotseatChanged(): Boolean {
+        val oldShownTasks = shownTasks
         shownTasks =
             if (isInDesktopMode) {
                 computeShownRunningTasks()
             } else {
                 computeShownRecentTasks()
             }
+        val shownTasksChanged = oldShownTasks != shownTasks
+        if (!shownTasksChanged) {
+            return shownTasksChanged
+        }
 
         for (groupTask in shownTasks) {
             for (task in groupTask.tasks) {
@@ -174,6 +193,7 @@ class TaskbarRecentAppsController(
                 }
             }
         }
+        return shownTasksChanged
     }
 
     private fun computeShownRunningTasks(): List<GroupTask> {

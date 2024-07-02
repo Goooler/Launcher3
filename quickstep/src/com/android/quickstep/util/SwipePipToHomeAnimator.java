@@ -453,8 +453,9 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             }
             // adjust the mSourceRectHint / mAppBounds by display cutout if applicable.
             if (mSourceRectHint != null && mDisplayCutoutInsets != null) {
-                if (mFromRotation == Surface.ROTATION_0 && mDisplayCutoutInsets.top >= 0) {
-                    // TODO: this is to special case the issues on Pixel Foldable device(s).
+                if (mFromRotation == Surface.ROTATION_0) {
+                    // TODO: this is to special case the issues on Foldable device
+                    // with display cutout.
                     mSourceRectHint.offset(mDisplayCutoutInsets.left, mDisplayCutoutInsets.top);
                 } else if (mFromRotation == Surface.ROTATION_90) {
                     mSourceRectHint.offset(mDisplayCutoutInsets.left, mDisplayCutoutInsets.top);
