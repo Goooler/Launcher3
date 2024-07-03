@@ -40,6 +40,7 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.views.ArrowTipView;
@@ -73,6 +74,8 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
         } else if (mHoverView instanceof FolderIcon
                 && ((FolderIcon) mHoverView).mInfo.title != null) {
             mToolTipText = ((FolderIcon) mHoverView).mInfo.title.toString();
+        } else if (mHoverView instanceof AppPairIcon) {
+            mToolTipText = ((AppPairIcon) mHoverView).getTitleTextView().getText().toString();
         } else {
             mToolTipText = null;
         }

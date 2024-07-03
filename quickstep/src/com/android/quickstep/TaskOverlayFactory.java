@@ -16,18 +16,22 @@
 
 package com.android.quickstep;
 
+import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.quickstep.views.OverviewActionsView.DISABLED_NO_THUMBNAIL;
 import static com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Build;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.BaseActivity;
@@ -38,6 +42,7 @@ import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.util.ResourceBasedOverride;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.Snackbar;
+import com.android.quickstep.task.util.TaskOverlayHelper;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.GroupedTaskView;
@@ -128,12 +133,43 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
         private T mActionsView;
         protected ImageActionsApi mImageApi;
+        protected TaskOverlayHelper mHelper;
 
         protected TaskOverlay(TaskContainer taskContainer) {
             mApplicationContext = taskContainer.getTaskView().getContext().getApplicationContext();
             mTaskContainer = taskContainer;
-            mImageApi = new ImageActionsApi(
-                    mApplicationContext, mTaskContainer::getThumbnail);
+            if (enableRefactorTaskThumbnail()) {
+                mHelper = new TaskOverlayHelper(mTaskContainer.getTask(), this);
+            }
+            mImageApi = new ImageActionsApi(mApplicationContext, this::getThumbnail);
+        }
+
+        /**
+         * Initialize the overlay when a Task is bound to the TaskView.
+         */
+        public void init() {
+            if (enableRefactorTaskThumbnail()) {
+                mHelper.init();
+            }
+        }
+
+        /**
+         * Destroy the overlay when the TaskView is recycled.
+         */
+        public void destroy() {
+            if (enableRefactorTaskThumbnail()) {
+                mHelper.destroy();
+            }
+        }
+
+        protected @Nullable Bitmap getThumbnail() {
+            return enableRefactorTaskThumbnail() ? mHelper.getEnabledState().getThumbnail()
+                    : mTaskContainer.getThumbnailViewDeprecated().getThumbnail();
+        }
+
+        protected boolean isRealSnapshot() {
+            return enableRefactorTaskThumbnail() ? mHelper.getEnabledState().isRealSnapshot()
+                    : mTaskContainer.getThumbnailViewDeprecated().isRealSnapshot();
         }
 
         protected T getActionsView() {
@@ -151,15 +187,25 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
         /**
          * Called when the current task is interactive for the user
+         *
+         * @deprecated TODO(b/350931107): Remove this interface once TaskOverlayFactoryGo is updated
          */
+        @Deprecated
         public void initOverlay(Task task, ThumbnailData thumbnail, Matrix matrix,
+                boolean rotated) {
+            initOverlay(task, thumbnail.getThumbnail(), matrix, rotated);
+        }
+
+        /**
+         * Called when the current task is interactive for the user
+         */
+        public void initOverlay(Task task, @Nullable Bitmap thumbnail, Matrix matrix,
                 boolean rotated) {
             getActionsView().updateDisabledFlags(DISABLED_NO_THUMBNAIL, thumbnail == null);
 
             if (thumbnail != null) {
                 getActionsView().updateDisabledFlags(DISABLED_ROTATED, rotated);
-                boolean isAllowedByPolicy = mTaskContainer.isRealSnapshot();
-                getActionsView().setCallbacks(new OverlayUICallbacksImpl(isAllowedByPolicy, task));
+                getActionsView().setCallbacks(new OverlayUICallbacksImpl(isRealSnapshot(), task));
             }
         }
 
@@ -183,8 +229,8 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         @SuppressLint("NewApi")
         protected void saveScreenshot(Task task) {
-            if (mTaskContainer.isRealSnapshot()) {
-                mImageApi.saveScreenshot(mTaskContainer.getThumbnail(),
+            if (isRealSnapshot()) {
+                mImageApi.saveScreenshot(getThumbnail(),
                         getTaskSnapshotBounds(), getTaskSnapshotInsets(), task.key);
             } else {
                 showBlockedByPolicyMessage();
@@ -259,7 +305,36 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
          */
         @RequiresApi(api = Build.VERSION_CODES.Q)
         public Insets getTaskSnapshotInsets() {
-            return mTaskContainer.getScaledInsets();
+            Bitmap thumbnail = getThumbnail();
+            if (thumbnail == null) {
+                return Insets.NONE;
+            }
+
+            RectF bitmapRect = new RectF(
+                    0,
+                    0,
+                    thumbnail.getWidth(),
+                    thumbnail.getHeight());
+            View snapshotView = mTaskContainer.getSnapshotView();
+            RectF viewRect = new RectF(0, 0, snapshotView.getMeasuredWidth(),
+                    snapshotView.getMeasuredHeight());
+
+            // The position helper matrix tells us how to transform the bitmap to fit the view, the
+            // inverse tells us where the view would be in the bitmaps coordinates. The insets are
+            // the difference between the bitmap bounds and the projected view bounds.
+            Matrix boundsToBitmapSpace = new Matrix();
+            Matrix thumbnailMatrix = enableRefactorTaskThumbnail()
+                    ? mHelper.getEnabledState().getThumbnailMatrix()
+                    : mTaskContainer.getThumbnailViewDeprecated().getThumbnailMatrix();
+            thumbnailMatrix.invert(boundsToBitmapSpace);
+            RectF boundsInBitmapSpace = new RectF();
+            boundsToBitmapSpace.mapRect(boundsInBitmapSpace, viewRect);
+
+            RecentsViewContainer container = RecentsViewContainer.containerFromContext(
+                    getTaskView().getContext());
+            int bottomInset = container.getDeviceProfile().isTablet
+                    ? Math.round(bitmapRect.bottom - boundsInBitmapSpace.bottom) : 0;
+            return Insets.of(0, 0, 0, bottomInset);
         }
 
         /**

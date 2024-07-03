@@ -926,7 +926,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             TaskView runningTask = mRecentsView.getRunningTaskView();
             TaskView centermostTask = mRecentsView.getTaskViewNearestToCenterOfScreen();
             int centermostTaskFlags = centermostTask == null ? 0
-                    : centermostTask.getFirstThumbnailViewDeprecated().getSysUiStatusNavFlags();
+                    : centermostTask.getTaskContainers().getFirst().getSysUiStatusNavFlags();
             boolean swipeUpThresholdPassed = windowProgress > 1 - UPDATE_SYSUI_FLAGS_THRESHOLD;
             boolean quickswitchThresholdPassed = centermostTask != runningTask;
 
@@ -2456,9 +2456,9 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         RemoteAnimationTarget taskTarget = taskTargets[0];
         TaskView taskView = mRecentsView == null
                 ? null : mRecentsView.getTaskViewByTaskId(taskTarget.taskId);
-        if (taskView == null
-                || !taskView.getFirstThumbnailViewDeprecated().shouldShowSplashView()) {
-            ActiveGestureLog.INSTANCE.addLog("Invalid task view splash state");
+        if (taskView == null || taskView.getTaskContainers().stream().noneMatch(
+                TaskContainer::getShouldShowSplashView)) {
+            ActiveGestureLog.INSTANCE.addLog("Splash not needed");
             finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
             return;
         }

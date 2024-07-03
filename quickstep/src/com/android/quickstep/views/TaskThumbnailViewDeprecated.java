@@ -28,16 +28,13 @@ import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
-import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.Property;
@@ -45,7 +42,6 @@ import android.view.View;
 import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.DeviceProfile;
@@ -266,40 +262,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
         return mDimAlpha;
     }
 
-    /**
-     * Get the scaled insets that are being used to draw the task view. This is a subsection of
-     * the full snapshot.
-     *
-     * @return the insets in snapshot bitmap coordinates.
-     */
-    @RequiresApi(api = Build.VERSION_CODES.Q)
-    public Insets getScaledInsets() {
-        if (mThumbnailData == null) {
-            return Insets.NONE;
-        }
-
-        RectF bitmapRect = new RectF(
-                0,
-                0,
-                mThumbnailData.getThumbnail().getWidth(),
-                mThumbnailData.getThumbnail().getHeight());
-        RectF viewRect = new RectF(0, 0, getMeasuredWidth(), getMeasuredHeight());
-
-        // The position helper matrix tells us how to transform the bitmap to fit the view, the
-        // inverse tells us where the view would be in the bitmaps coordinates. The insets are the
-        // difference between the bitmap bounds and the projected view bounds.
-        Matrix boundsToBitmapSpace = new Matrix();
-        mPreviewPositionHelper.getMatrix().invert(boundsToBitmapSpace);
-        RectF boundsInBitmapSpace = new RectF();
-        boundsToBitmapSpace.mapRect(boundsInBitmapSpace, viewRect);
-
-        DeviceProfile dp = mContainer.getDeviceProfile();
-        int bottomInset = dp.isTablet
-                ? Math.round(bitmapRect.bottom - boundsInBitmapSpace.bottom) : 0;
-        return Insets.of(0, 0, 0, bottomInset);
-    }
-
-
     @SystemUiControllerFlags
     public int getSysUiStatusNavFlags() {
         if (mThumbnailData != null) {
@@ -487,7 +449,9 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
      */
     private void refreshOverlay() {
         if (mOverlayEnabled) {
-            mOverlay.initOverlay(mTask, mThumbnailData, mPreviewPositionHelper.getMatrix(),
+            mOverlay.initOverlay(mTask,
+                    mThumbnailData != null ? mThumbnailData.getThumbnail() : null,
+                    mPreviewPositionHelper.getMatrix(),
                     mPreviewPositionHelper.isOrientationChanged());
         } else {
             mOverlay.reset();
@@ -558,6 +522,10 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
             return false;
         }
         return mThumbnailData.isRealSnapshot && !mTask.isLocked;
+    }
+
+    public Matrix getThumbnailMatrix() {
+        return mPreviewPositionHelper.getMatrix();
     }
 
     @Override

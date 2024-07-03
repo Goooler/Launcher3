@@ -18,9 +18,9 @@ package com.android.quickstep.views
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Insets
 import android.view.View
-import com.android.launcher3.Flags
+import com.android.launcher3.Flags.enableRefactorTaskThumbnail
+import com.android.launcher3.Flags.privateSpaceRestrictAccessibilityDrag
 import com.android.launcher3.LauncherSettings
 import com.android.launcher3.model.data.ItemInfoWithIcon
 import com.android.launcher3.model.data.WorkspaceItemInfo
@@ -64,13 +64,16 @@ class TaskContainer(
     val thumbnail: Bitmap?
         get() = thumbnailViewDeprecated.thumbnail
 
-    // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
-    val isRealSnapshot: Boolean
-        get() = thumbnailViewDeprecated.isRealSnapshot()
+    // TODO(b/334826842): Support shouldShowSplashView for new TTV.
+    val shouldShowSplashView: Boolean
+        get() =
+            if (enableRefactorTaskThumbnail()) false
+            else thumbnailViewDeprecated.shouldShowSplashView()
 
-    // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
-    val scaledInsets: Insets
-        get() = thumbnailViewDeprecated.scaledInsets
+    // TODO(b/350743460) Support sysUiStatusNavFlags for new TTV.
+    val sysUiStatusNavFlags: Int
+        get() =
+            if (enableRefactorTaskThumbnail()) 0 else thumbnailViewDeprecated.sysUiStatusNavFlags
 
     /** Builds proto for logging */
     val itemInfo: WorkspaceItemInfo
@@ -83,7 +86,7 @@ class TaskContainer(
                 intent = Intent().setComponent(componentKey.componentName)
                 title = task.title
                 taskView.recentsView?.let { screenId = it.indexOfChild(taskView) }
-                if (Flags.privateSpaceRestrictAccessibilityDrag()) {
+                if (privateSpaceRestrictAccessibilityDrag()) {
                     if (
                         UserCache.getInstance(taskView.context)
                             .getUserInfo(componentKey.user)
@@ -98,12 +101,14 @@ class TaskContainer(
     fun destroy() {
         digitalWellBeingToast?.destroy()
         thumbnailView?.let { taskView.removeView(it) }
+        overlay.destroy()
     }
 
     fun bind() {
-        if (Flags.enableRefactorTaskThumbnail() && thumbnailView != null) {
+        if (enableRefactorTaskThumbnail() && thumbnailView != null) {
             thumbnailViewDeprecated.setTaskOverlay(overlay)
             bindThumbnailView()
+            overlay.init()
         } else {
             thumbnailViewDeprecated.bind(task, overlay)
         }
@@ -115,5 +120,11 @@ class TaskContainer(
         // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
         //  this should be decided inside TaskThumbnailViewModel.
         thumbnailView?.viewModel?.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
+    }
+
+    fun setOverlayEnabled(enabled: Boolean) {
+        if (!enableRefactorTaskThumbnail()) {
+            thumbnailViewDeprecated.setOverlayEnabled(enabled)
+        }
     }
 }

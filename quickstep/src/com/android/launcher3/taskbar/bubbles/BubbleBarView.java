@@ -182,6 +182,8 @@ public class BubbleBarView extends FrameLayout {
 
     @Nullable
     private BubbleView mDraggedBubbleView;
+    @Nullable
+    private BubbleView mDismissedByDragBubbleView;
     private float mAlphaDuringDrag = 1f;
 
     private Controller mController;
@@ -767,6 +769,10 @@ public class BubbleBarView extends FrameLayout {
     public void removeBubble(View bubble) {
         if (isExpanded()) {
             // TODO b/347062801 - animate the bubble bar if the last bubble is removed
+            final boolean dismissedByDrag = mDraggedBubbleView == bubble;
+            if (dismissedByDrag) {
+                mDismissedByDragBubbleView = mDraggedBubbleView;
+            }
             int bubbleCount = getChildCount();
             mBubbleAnimator = new BubbleAnimator(mIconSize, mExpandedBarIconsSpacing,
                     bubbleCount, mBubbleBarLocation.isOnLeft(isLayoutRtl()));
@@ -786,8 +792,11 @@ public class BubbleBarView extends FrameLayout {
 
                 @Override
                 public void onAnimationUpdate(float animatedFraction) {
-                    bubble.setScaleX(1 - animatedFraction);
-                    bubble.setScaleY(1 - animatedFraction);
+                    // don't update the scale if this bubble was dismissed by drag
+                    if (!dismissedByDrag) {
+                        bubble.setScaleX(1 - animatedFraction);
+                        bubble.setScaleY(1 - animatedFraction);
+                    }
                     updateBubblesLayoutProperties(mBubbleBarLocation);
                     invalidate();
                 }
@@ -818,6 +827,7 @@ public class BubbleBarView extends FrameLayout {
         updateWidth();
         updateBubbleAccessibilityStates();
         updateContentDescription();
+        mDismissedByDragBubbleView = null;
     }
 
     private void updateWidth() {
@@ -864,7 +874,7 @@ public class BubbleBarView extends FrameLayout {
         float elevationState = (1 - widthState);
         for (int i = 0; i < bubbleCount; i++) {
             BubbleView bv = (BubbleView) getChildAt(i);
-            if (bv == mDraggedBubbleView) {
+            if (bv == mDraggedBubbleView || bv == mDismissedByDragBubbleView) {
                 // Skip the dragged bubble. Its translation is managed by the drag controller.
                 continue;
             }
@@ -1048,6 +1058,8 @@ public class BubbleBarView extends FrameLayout {
         mDraggedBubbleView = view;
         if (view != null) {
             view.setZ(mDragElevation);
+            // we started dragging a bubble. reset the bubble that was previously dismissed by drag
+            mDismissedByDragBubbleView = null;
         }
         setIsDragging(view != null);
     }

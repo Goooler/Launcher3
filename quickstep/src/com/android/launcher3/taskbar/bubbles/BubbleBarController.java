@@ -445,6 +445,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
         }
     }
 
+    /**
+     * Removes the given bubble from the backing list of bubbles after it was dismissed by the user.
+     */
+    public void onBubbleDismissed(BubbleView bubble) {
+        mBubbles.remove(bubble.getBubble().getKey());
+    }
+
     /** Tells WMShell to show the currently selected bubble. */
     public void showSelectedBubble() {
         if (getSelectedBubbleKey() != null) {

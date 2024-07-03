@@ -156,11 +156,6 @@ constructor(
         get() = taskContainers[0].task
 
     @get:Deprecated("Use [taskContainers] instead.")
-    val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
-        /** Returns the first thumbnailView of the TaskView. */
-        get() = taskContainers[0].thumbnailViewDeprecated
-
-    @get:Deprecated("Use [taskContainers] instead.")
     val firstSnapshotView: View
         /** Returns the first snapshotView of the TaskView. */
         get() = taskContainers[0].snapshotView
@@ -1394,10 +1389,8 @@ constructor(
     }
 
     open fun setOverlayEnabled(overlayEnabled: Boolean) {
-        // TODO(b/335606129) Investigate the usage of [TaskOverlay] in the new TaskThumbnailView.
-        //  and if it's still necessary we should support that in the new TTV class.
         if (!enableRefactorTaskThumbnail()) {
-            taskContainers.forEach { it.thumbnailViewDeprecated.setOverlayEnabled(overlayEnabled) }
+            taskContainers.forEach { it.setOverlayEnabled(overlayEnabled) }
         }
     }
 
@@ -1472,7 +1465,9 @@ constructor(
     protected open fun updateSnapshotRadius() {
         updateCurrentFullscreenParams()
         taskContainers.forEach {
-            it.thumbnailViewDeprecated.setFullscreenParams(getThumbnailFullscreenParams())
+            if (!enableRefactorTaskThumbnail()) {
+                it.thumbnailViewDeprecated.setFullscreenParams(getThumbnailFullscreenParams())
+            }
             it.overlay.setFullscreenParams(getThumbnailFullscreenParams())
         }
     }

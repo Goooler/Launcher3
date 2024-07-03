@@ -135,7 +135,6 @@ import com.android.internal.jank.Cuj;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseActivity.MultiWindowModeChangedListener;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.PagedView;
@@ -229,10 +228,12 @@ import kotlin.Unit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -1015,14 +1016,17 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     @Nullable
     public Task onTaskThumbnailChanged(int taskId, ThumbnailData thumbnailData) {
         if (mHandleTaskStackChanges) {
-            TaskView taskView = getTaskViewByTaskId(taskId);
-            if (taskView != null) {
-                for (TaskContainer container : taskView.getTaskContainers()) {
-                    if (container == null || taskId != container.getTask().key.id) {
-                        continue;
+            // TODO(b/342560598): Handle onTaskThumbnailChanged for new TTV.
+            if (!enableRefactorTaskThumbnail()) {
+                TaskView taskView = getTaskViewByTaskId(taskId);
+                if (taskView != null) {
+                    for (TaskContainer container : taskView.getTaskContainers()) {
+                        if (container == null || taskId != container.getTask().key.id) {
+                            continue;
+                        }
+                        container.getThumbnailViewDeprecated().setThumbnail(container.getTask(),
+                                thumbnailData);
                     }
-                    container.getThumbnailViewDeprecated().setThumbnail(container.getTask(),
-                            thumbnailData);
                 }
             }
         }
@@ -1059,6 +1063,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     @Nullable
     public TaskView updateThumbnail(
             HashMap<Integer, ThumbnailData> thumbnailData, boolean refreshNow) {
+        if (enableRefactorTaskThumbnail()) {
+            // TODO(b/342560598): Handle updateThumbnail for new TTV.
+            return null;
+        }
         TaskView updatedTaskView = null;
         for (Map.Entry<Integer, ThumbnailData> entry : thumbnailData.entrySet()) {
             Integer id = entry.getKey();
@@ -2390,12 +2398,11 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             if (containers.isEmpty()) {
                 continue;
             }
-            int index = indexOfChild(taskView);
             boolean visible;
             if (showAsGrid()) {
                 visible = isTaskViewWithinBounds(taskView, visibleStart, visibleEnd);
             } else {
-                visible = lower <= index && index <= upper;
+                visible = lower <= i && i <= upper;
             }
             if (visible) {
                 // Default update all non-null tasks, then remove running ones
@@ -2426,7 +2433,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                         }
                         taskView.onTaskListVisibilityChanged(true /* visible */, changes);
                     }
-                    mHasVisibleTaskData.put(task.key.id, visible);
+                    mHasVisibleTaskData.put(task.key.id, true);
                 }
             } else {
                 for (TaskContainer container : containers) {
@@ -2914,7 +2921,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         int prevRunningTaskViewId = mRunningTaskViewId;
         mRunningTaskViewId = runningTaskViewId;
 
-        if (Flags.enableRefactorTaskThumbnail()) {
+        if (enableRefactorTaskThumbnail()) {
             TaskView previousRunningTaskView = getTaskViewFromTaskViewId(prevRunningTaskViewId);
             if (previousRunningTaskView != null) {
                 previousRunningTaskView.notifyIsRunningTaskUpdated();
@@ -4860,14 +4867,16 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     == mSplitSelectStateController.getInitialTaskId();
             TaskContainer taskContainer = mSplitHiddenTaskView
                     .getTaskContainers().get(primaryTaskSelected ? 1 : 0);
-            TaskThumbnailViewDeprecated thumbnail = taskContainer.getThumbnailViewDeprecated();
             mSplitSelectStateController.getSplitAnimationController()
                     .addInitialSplitFromPair(taskContainer, builder,
                             mContainer.getDeviceProfile(),
                             mSplitHiddenTaskView.getWidth(), mSplitHiddenTaskView.getHeight(),
                             primaryTaskSelected);
             builder.addOnFrameCallback(() ->{
-                thumbnail.refreshSplashView();
+                // TODO(b/334826842): Handle splash icon for new TTV.
+                if (!enableRefactorTaskThumbnail()) {
+                    taskContainer.getThumbnailViewDeprecated().refreshSplashView();
+                }
                 mSplitHiddenTaskView.updateSnapshotRadius();
             });
         } else if (isInitiatingSplitFromTaskView) {
@@ -5259,7 +5268,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         updateGridProperties();
         updateScrollSynchronously();
 
-        int targetSysUiFlags = tv.getFirstThumbnailViewDeprecated().getSysUiStatusNavFlags();
+        int targetSysUiFlags = tv.getTaskContainers().getFirst().getSysUiStatusNavFlags();
         final boolean[] passedOverviewThreshold = new boolean[] {false};
         ValueAnimator progressAnim = ValueAnimator.ofFloat(0, 1);
         progressAnim.addUpdateListener(animator -> {
@@ -5346,6 +5355,43 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         updateCurrentTaskActionsVisibility();
         loadVisibleTaskData(TaskView.FLAG_UPDATE_ALL);
         updateEnabledOverlays();
+
+        if (enableRefactorTaskThumbnail()) {
+            int screenStart = 0;
+            int screenEnd = 0;
+            int centerPageIndex = 0;
+            if (showAsGrid()) {
+                screenStart = getPagedOrientationHandler().getPrimaryScroll(this);
+                int pageOrientedSize = getPagedOrientationHandler().getMeasuredSize(this);
+                screenEnd = screenStart + pageOrientedSize;
+            } else {
+                centerPageIndex = getPageNearestToCenterOfScreen();
+            }
+
+            Set<Integer> fullyVisibleTaskIds = new HashSet<>();
+
+            // Update the task data for the in/visible children
+            for (int i = 0; i < getTaskViewCount(); i++) {
+                TaskView taskView = requireTaskViewAt(i);
+                List<TaskContainer> containers = taskView.getTaskContainers();
+                if (containers.isEmpty()) {
+                    continue;
+                }
+                boolean isFullyVisible;
+                if (showAsGrid()) {
+                    isFullyVisible = isTaskViewFullyWithinBounds(taskView, screenStart,
+                            screenEnd);
+                } else {
+                    isFullyVisible = i == centerPageIndex;
+                }
+                if (isFullyVisible) {
+                    List<Integer> taskIds = containers.stream().map(
+                            taskContainer -> taskContainer.getTask().key.id).toList();
+                    fullyVisibleTaskIds.addAll(taskIds);
+                }
+            }
+            mRecentsViewData.getSettledFullyVisibleTaskIds().setValue(fullyVisibleTaskIds);
+        }
     }
 
     @Override
@@ -5896,6 +5942,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         if (mOverlayEnabled != overlayEnabled) {
             mOverlayEnabled = overlayEnabled;
             updateEnabledOverlays();
+            mRecentsViewData.getOverlayEnabled().setValue(overlayEnabled);
         }
     }
 
@@ -5947,6 +5994,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     }
 
     private void switchToScreenshotInternal(Runnable onFinishRunnable) {
+        // TODO(b/342560598): Handle switchToScreenshot for new TTV.
+        if (enableRefactorTaskThumbnail()) {
+            onFinishRunnable.run();
+            return;
+        }
+
         TaskView taskView = getRunningTaskView();
         if (taskView == null) {
             onFinishRunnable.run();
@@ -6034,7 +6087,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * tasks to be dimmed while other elements in the recents view are left alone.
      */
     public void showForegroundScrim(boolean show) {
-        // TODO(b/335606129) Add scrim response into new TTV - this is called from overlay
+        // TODO(b/349601769) Add scrim response into new TTV - this is called from overlay
         if (!show && mColorTint == 0) {
             if (mTintingAnimator != null) {
                 mTintingAnimator.cancel();

@@ -526,6 +526,12 @@ public class BubbleBarViewController {
         mSystemUiProxy.stopBubbleDrag(location, mBarView.getRestingTopPositionOnScreen());
     }
 
+    /** Notifies {@link BubbleBarView} that the dragged bubble was dismissed. */
+    public void onBubbleDragDismissed(BubbleView bubble) {
+        mBubbleBarController.onBubbleDismissed(bubble);
+        mBarView.removeBubble(bubble);
+    }
+
     /**
      * Notifies {@link BubbleBarView} that drag and all animations are finished.
      */
