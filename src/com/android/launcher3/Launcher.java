@@ -771,6 +771,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             // initialized properly.
             onSaveInstanceState(new Bundle());
             mModel.rebindCallbacks();
+            updateDisallowBack();
         } finally {
             Trace.endSection();
         }

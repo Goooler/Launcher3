@@ -159,6 +159,10 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
         if (mHoverView == null || mToolTipText == null) {
             return;
         }
+        // Do not show tooltip if taskbar icons are transitioning to hotseat.
+        if (mActivity.isIconAlignedWithHotseat()) {
+            return;
+        }
         if (mHoverView instanceof FolderIcon && !((FolderIcon) mHoverView).getIconVisible()) {
             return;
         }

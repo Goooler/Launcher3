@@ -55,7 +55,6 @@ import com.android.systemui.shared.recents.model.Task.TaskKey;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
 /**
  * Manages the caching of task icons and related data.
@@ -103,21 +102,21 @@ public class TaskIconCache implements DisplayInfoChangeListener {
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
-    public CancellableTask updateIconInBackground(Task task, Consumer<Task> callback) {
+    public CancellableTask getIconInBackground(Task task, GetTaskIconCallback callback) {
         Preconditions.assertUIThread();
         if (task.icon != null) {
             // Nothing to load, the icon is already loaded
-            callback.accept(task);
+            callback.onTaskIconReceived(task.icon, task.titleDescription, task.title);
             return null;
         }
         CancellableTask<TaskCacheEntry> request = new CancellableTask<>(
                 () -> getCacheEntry(task),
                 MAIN_EXECUTOR,
                 result -> {
-                    task.icon = result.icon;
-                    task.titleDescription = result.contentDescription;
-                    task.title = result.title;
-                    callback.accept(task);
+                    callback.onTaskIconReceived(
+                            result.icon,
+                            result.contentDescription,
+                            result.title);
                     dispatchIconUpdate(task.key.id);
                 }
         );
@@ -278,6 +277,12 @@ public class TaskIconCache implements DisplayInfoChangeListener {
         public Drawable icon;
         public String contentDescription = "";
         public String title = "";
+    }
+
+    /** Callback used when retrieving app icons from cache. */
+    public interface GetTaskIconCallback {
+        /** Called when task icon is retrieved. */
+        void onTaskIconReceived(Drawable icon, String contentDescription, String title);
     }
 
     void registerTaskVisualsChangeListener(TaskVisualsChangeListener newListener) {

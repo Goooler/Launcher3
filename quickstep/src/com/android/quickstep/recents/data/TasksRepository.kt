@@ -67,14 +67,15 @@ class TasksRepository(
         this.visibleTaskIds.value = visibleTaskIdList.toSet()
     }
 
-    /** Flow wrapper for [TaskThumbnailDataSource.updateThumbnailInBackground] api */
+    /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
     private fun getThumbnailDataRequest(task: Task): ThumbnailDataRequest =
         flow {
                 emit(task.key.id to task.thumbnail)
                 val thumbnailDataResult: ThumbnailData? =
                     suspendCancellableCoroutine { continuation ->
                         val cancellableTask =
-                            taskThumbnailDataSource.updateThumbnailInBackground(task) {
+                            taskThumbnailDataSource.getThumbnailInBackground(task) {
+                                task.thumbnail = it
                                 continuation.resume(it)
                             }
                         continuation.invokeOnCancellation { cancellableTask?.cancel() }
@@ -94,12 +95,7 @@ class TasksRepository(
                 tasks.filter { it.key.id in visibleIds }
             }
         val visibleThumbnailDataRequests: Flow<List<ThumbnailDataRequest>> =
-            visibleTasks.map {
-                it.map { visibleTask ->
-                    val taskCopy = Task(visibleTask).apply { thumbnail = visibleTask.thumbnail }
-                    getThumbnailDataRequest(taskCopy)
-                }
-            }
+            visibleTasks.map { visibleTasksList -> visibleTasksList.map(::getThumbnailDataRequest) }
         return visibleThumbnailDataRequests.flatMapLatest {
             thumbnailRequestFlows: List<ThumbnailDataRequest> ->
             if (thumbnailRequestFlows.isEmpty()) {

@@ -87,6 +87,7 @@ public class TaskbarHoverToolTipControllerTest extends TaskbarBaseTestCase {
         when(taskbarActivityContext.getDragLayer()).thenReturn(mTaskbarDragLayer);
         when(taskbarActivityContext.getMainLooper()).thenReturn(context.getMainLooper());
         when(taskbarActivityContext.getDisplay()).thenReturn(mDisplay);
+        when(taskbarActivityContext.isIconAlignedWithHotseat()).thenReturn(false);
 
         when(mTaskbarDragLayer.getChildCount()).thenReturn(1);
         mSpyFolderView = spy(new Folder(new ActivityContextWrapper(context), null));
@@ -241,6 +242,21 @@ public class TaskbarHoverToolTipControllerTest extends TaskbarBaseTestCase {
         assertThat(hoverHandled).isTrue();
         verify(taskbarActivityContext).setAutohideSuspendFlag(FLAG_AUTOHIDE_SUSPEND_HOVERING_ICONS,
                 false);
+    }
+
+    @Test
+    public void onHover_hoverEnterIconAlignedWithHotseat_noReveal() {
+        when(mMotionEvent.getAction()).thenReturn(MotionEvent.ACTION_HOVER_ENTER);
+        when(mMotionEvent.getActionMasked()).thenReturn(MotionEvent.ACTION_HOVER_ENTER);
+        when(taskbarActivityContext.isIconAlignedWithHotseat()).thenReturn(true);
+
+        boolean hoverHandled =
+                mTaskbarHoverToolTipController.onHover(mHoverBubbleTextView, mMotionEvent);
+        waitForIdleSync();
+
+        assertThat(hoverHandled).isTrue();
+        verify(taskbarActivityContext).setAutohideSuspendFlag(FLAG_AUTOHIDE_SUSPEND_HOVERING_ICONS,
+                true);
     }
 
     private void waitForIdleSync() {

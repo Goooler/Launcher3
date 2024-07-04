@@ -381,6 +381,28 @@ public final class Utilities {
     }
 
     /**
+     * Scales a {@code RectF} in place about a specified pivot point.
+     *
+     * <p>This method modifies the given {@code RectF} directly to scale it proportionally
+     * by the given {@code scale}, while preserving its center at the specified
+     * {@code (pivotX, pivotY)} coordinates.
+     *
+     * @param rectF the {@code RectF} to scale, modified directly.
+     * @param pivotX the x-coordinate of the pivot point about which to scale.
+     * @param pivotY the y-coordinate of the pivot point about which to scale.
+     * @param scale the factor by which to scale the rectangle. Values less than 1 will
+     *                    shrink the rectangle, while values greater than 1 will enlarge it.
+     */
+    public static void scaleRectFAboutPivot(RectF rectF, float pivotX, float pivotY, float scale) {
+        rectF.offset(-pivotX, -pivotY);
+        rectF.left *= scale;
+        rectF.top *= scale;
+        rectF.right *= scale;
+        rectF.bottom *= scale;
+        rectF.offset(pivotX, pivotY);
+    }
+
+    /**
      * Maps t from one range to another range.
      * @param t The value to map.
      * @param fromMin The lower bound of the range that t is being mapped from.

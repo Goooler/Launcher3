@@ -131,8 +131,7 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
         Preconditions.assertUIThread();
         // Fetch the thumbnail for this task and put it in the cache
         if (task.thumbnail == null) {
-            updateThumbnailInBackground(task.key, lowResolution,
-                    t -> task.thumbnail = t);
+            getThumbnailInBackground(task.key, lowResolution, t -> task.thumbnail = t);
         }
     }
 
@@ -145,13 +144,13 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
     }
 
     /**
-     * Asynchronously fetches the icon and other task data for the given {@param task}.
+     * Asynchronously fetches the thumbnail for the given {@code task}.
      *
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
     @Override
-    public CancellableTask<ThumbnailData> updateThumbnailInBackground(
+    public CancellableTask<ThumbnailData> getThumbnailInBackground(
             Task task, @NonNull Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 
@@ -164,10 +163,7 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
             return null;
         }
 
-        return updateThumbnailInBackground(task.key, !mHighResLoadingState.isEnabled(), t -> {
-            task.thumbnail = t;
-            callback.accept(t);
-        });
+        return getThumbnailInBackground(task.key, !mHighResLoadingState.isEnabled(), callback);
     }
 
     /**
@@ -187,7 +183,7 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
         return newSize > oldSize;
     }
 
-    private CancellableTask<ThumbnailData> updateThumbnailInBackground(TaskKey key,
+    private CancellableTask<ThumbnailData> getThumbnailInBackground(TaskKey key,
             boolean lowResolution, Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 

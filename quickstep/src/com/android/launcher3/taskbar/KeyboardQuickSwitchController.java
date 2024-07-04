@@ -245,11 +245,20 @@ public final class KeyboardQuickSwitchController implements
         }
 
         void updateThumbnailInBackground(Task task, Consumer<ThumbnailData> callback) {
-            mModel.getThumbnailCache().updateThumbnailInBackground(task, callback);
+            mModel.getThumbnailCache().getThumbnailInBackground(task,
+                    thumbnailData -> {
+                        task.thumbnail = thumbnailData;
+                        callback.accept(thumbnailData);
+                    });
         }
 
         void updateIconInBackground(Task task, Consumer<Task> callback) {
-            mModel.getIconCache().updateIconInBackground(task, callback);
+            mModel.getIconCache().getIconInBackground(task, (icon, contentDescription, title) -> {
+                task.icon = icon;
+                task.titleDescription = contentDescription;
+                task.title = title;
+                callback.accept(task);
+            });
         }
 
         void onCloseComplete() {

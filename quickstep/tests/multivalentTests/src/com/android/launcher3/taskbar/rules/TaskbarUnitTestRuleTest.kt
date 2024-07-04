@@ -22,6 +22,8 @@ import com.android.launcher3.taskbar.TaskbarKeyguardController
 import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.taskbar.TaskbarStashController
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
+import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.NavBarKidsMode
+import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.UserSetupMode
 import com.android.launcher3.util.LauncherMultivalentJUnit
 import com.android.launcher3.util.LauncherMultivalentJUnit.EmulatedDevices
 import com.google.common.truth.Truth.assertThat
@@ -125,9 +127,40 @@ class TaskbarUnitTestRuleTest {
         }
     }
 
-    /** Executes [runTest] after the [testRule] setup phase completes. */
+    @Test
+    fun testUserSetupMode_default_isComplete() {
+        onSetup { assertThat(activityContext.isUserSetupComplete).isTrue() }
+    }
+
+    @Test
+    fun testUserSetupMode_withAnnotation_isIncomplete() {
+        @UserSetupMode class Mode
+        onSetup(description = Description.createSuiteDescription(Mode::class.java)) {
+            assertThat(activityContext.isUserSetupComplete).isFalse()
+        }
+    }
+
+    @Test
+    fun testNavBarKidsMode_default_navBarNotForcedVisible() {
+        onSetup { assertThat(activityContext.isNavBarForceVisible).isFalse() }
+    }
+
+    @Test
+    fun testNavBarKidsMode_withAnnotation_navBarForcedVisible() {
+        @NavBarKidsMode class Mode
+        onSetup(description = Description.createSuiteDescription(Mode::class.java)) {
+            assertThat(activityContext.isNavBarForceVisible).isTrue()
+        }
+    }
+
+    /**
+     * Executes [runTest] after the [testRule] setup phase completes.
+     *
+     * A [description] can also be provided to mimic annotating a test or test class.
+     */
     private fun onSetup(
         testRule: TaskbarUnitTestRule = TaskbarUnitTestRule(this, context),
+        description: Description = DESCRIPTION,
         runTest: TaskbarUnitTestRule.() -> Unit,
     ) {
         testRule
@@ -135,7 +168,7 @@ class TaskbarUnitTestRuleTest {
                 object : Statement() {
                     override fun evaluate() = runTest(testRule)
                 },
-                DESCRIPTION,
+                description,
             )
             .evaluate()
     }

@@ -846,7 +846,8 @@ constructor(
             taskContainers.forEach {
                 if (visible) {
                     recentsModel.thumbnailCache
-                        .updateThumbnailInBackground(it.task) { thumbnailData ->
+                        .getThumbnailInBackground(it.task) { thumbnailData ->
+                            it.task.thumbnail = thumbnailData
                             it.thumbnailViewDeprecated.setThumbnail(it.task, thumbnailData)
                         }
                         ?.also { request -> pendingThumbnailLoadRequests.add(request) }
@@ -862,12 +863,15 @@ constructor(
             taskContainers.forEach {
                 if (visible) {
                     recentsModel.iconCache
-                        .updateIconInBackground(it.task) { task ->
-                            setIcon(it.iconView, task.icon)
+                        .getIconInBackground(it.task) { icon, contentDescription, title ->
+                            it.task.icon = icon
+                            it.task.titleDescription = contentDescription
+                            it.task.title = title
+                            setIcon(it.iconView, icon)
                             if (enableOverviewIconMenu()) {
-                                setText(it.iconView, task.title)
+                                setText(it.iconView, title)
                             }
-                            it.digitalWellBeingToast?.initialize(task)
+                            it.digitalWellBeingToast?.initialize(it.task)
                         }
                         ?.also { request -> pendingIconLoadRequests.add(request) }
                 } else {

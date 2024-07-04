@@ -52,7 +52,6 @@ import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.systemui.shared.recents.model.ThumbnailData;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -183,17 +182,6 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
         public TaskView getTaskView() {
             return mTaskContainer.getTaskView();
-        }
-
-        /**
-         * Called when the current task is interactive for the user
-         *
-         * @deprecated TODO(b/350931107): Remove this interface once TaskOverlayFactoryGo is updated
-         */
-        @Deprecated
-        public void initOverlay(Task task, ThumbnailData thumbnail, Matrix matrix,
-                boolean rotated) {
-            initOverlay(task, thumbnail.getThumbnail(), matrix, rotated);
         }
 
         /**

@@ -24,11 +24,9 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.systemui.shared.recents.model.Task
 import com.android.window.flags.Flags.enableDesktopWindowingMode
 import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
 import java.io.PrintWriter
-import java.util.function.Consumer
 
 /**
  * Provides recent apps functionality, when the Taskbar Recent Apps section is enabled. Behavior:
@@ -185,9 +183,16 @@ class TaskbarRecentAppsController(
 
         for (groupTask in shownTasks) {
             for (task in groupTask.tasks) {
-                val callback =
-                    Consumer<Task> { controllers.taskbarViewController.onTaskUpdated(it) }
-                val cancellableTask = recentsModel.iconCache.updateIconInBackground(task, callback)
+                val cancellableTask =
+                    recentsModel.iconCache.getIconInBackground(task) {
+                        icon,
+                        contentDescription,
+                        title ->
+                        task.icon = icon
+                        task.titleDescription = contentDescription
+                        task.title = title
+                        controllers.taskbarViewController.onTaskUpdated(task)
+                    }
                 if (cancellableTask != null) {
                     iconLoadRequests.add(cancellableTask)
                 }

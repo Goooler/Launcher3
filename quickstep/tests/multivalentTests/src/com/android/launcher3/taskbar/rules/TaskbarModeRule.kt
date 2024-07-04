@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar.rules
 
+import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
 import com.android.launcher3.util.DisplayController
@@ -59,23 +60,25 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
             override fun evaluate() {
                 val mode = taskbarMode.mode
 
-                context.applicationContext.putObject(
-                    DisplayController.INSTANCE,
-                    object : DisplayController(context) {
-                        override fun getInfo(): Info {
-                            return spy(super.getInfo()) {
-                                on { isTransientTaskbar } doReturn (mode == Mode.TRANSIENT)
-                                on { isPinnedTaskbar } doReturn (mode == Mode.PINNED)
-                                on { navigationMode } doReturn
-                                    when (mode) {
-                                        Mode.TRANSIENT,
-                                        Mode.PINNED -> NavigationMode.NO_BUTTON
-                                        Mode.THREE_BUTTONS -> NavigationMode.THREE_BUTTONS
-                                    }
+                getInstrumentation().runOnMainSync {
+                    context.applicationContext.putObject(
+                        DisplayController.INSTANCE,
+                        object : DisplayController(context) {
+                            override fun getInfo(): Info {
+                                return spy(super.getInfo()) {
+                                    on { isTransientTaskbar } doReturn (mode == Mode.TRANSIENT)
+                                    on { isPinnedTaskbar } doReturn (mode == Mode.PINNED)
+                                    on { navigationMode } doReturn
+                                        when (mode) {
+                                            Mode.TRANSIENT,
+                                            Mode.PINNED -> NavigationMode.NO_BUTTON
+                                            Mode.THREE_BUTTONS -> NavigationMode.THREE_BUTTONS
+                                        }
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
 
                 base.evaluate()
             }

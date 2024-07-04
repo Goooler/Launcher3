@@ -138,12 +138,13 @@ public class SplitWithKeyboardShortcutController {
                     mLauncher, mLauncher.getDragLayer(),
                     controller.screenshotTask(runningTaskInfo.taskId).getThumbnail(),
                     null /* icon */, startingTaskRect);
+            Task task = Task.from(new Task.TaskKey(runningTaskInfo), runningTaskInfo,
+                    false /* isLocked */);
             RecentsModel.INSTANCE.get(mLauncher.getApplicationContext())
                     .getIconCache()
-                    .updateIconInBackground(
-                            Task.from(new Task.TaskKey(runningTaskInfo), runningTaskInfo,
-                                    false /* isLocked */),
-                            (task) -> floatingTaskView.setIcon(task.icon));
+                    .getIconInBackground(
+                            task,
+                            (icon, contentDescription, title) -> floatingTaskView.setIcon(icon));
             floatingTaskView.setAlpha(1);
             floatingTaskView.addStagingAnimation(anim, startingTaskRect, mTempRect,
                     false /* fadeWithThumbnail */, true /* isStagedTask */);
