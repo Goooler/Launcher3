@@ -36,15 +36,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!--
-         TODO(b249371338): DesktopTaskView extends from TaskView. TaskView expects TaskThumbnailView
-         and IconView with these ids to be present. Need to refactor RecentsView to accept child
-         views that do not inherint from TaskView only or create a generic TaskView that have
-         N number of tasks.
-     -->
-    <include layout="@layout/task_thumbnail"
-        android:visibility="gone" />
-
     <ViewStub
         android:id="@+id/icon"
         android:inflatedId="@id/icon"

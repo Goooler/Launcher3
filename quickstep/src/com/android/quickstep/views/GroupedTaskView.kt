@@ -49,7 +49,7 @@ import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosi
  * (Icon loading sold separately, fees may apply. Shipping & Handling for Overlays not included).
  */
 class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    TaskView(context, attrs) {
+    TaskView(context, attrs, type = TaskViewType.GROUPED) {
     // TODO(b/336612373): Support new TTV for GroupedTaskView
     var splitBoundsConfig: SplitConfigurationOptions.SplitBounds? = null
         private set

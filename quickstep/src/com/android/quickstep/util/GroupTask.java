@@ -20,7 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
-import com.android.quickstep.views.TaskView;
+import com.android.quickstep.views.TaskViewType;
 import com.android.systemui.shared.recents.model.Task;
 
 import java.util.Arrays;
@@ -39,19 +39,18 @@ public class GroupTask {
     public final Task task2;
     @Nullable
     public final SplitBounds mSplitBounds;
-    @TaskView.Type
-    public final int taskViewType;
+    public final TaskViewType taskViewType;
 
     public GroupTask(@NonNull Task task) {
         this(task, null, null);
     }
 
     public GroupTask(@NonNull Task t1, @Nullable Task t2, @Nullable SplitBounds splitBounds) {
-        this(t1, t2, splitBounds, t2 != null ? TaskView.Type.GROUPED : TaskView.Type.SINGLE);
+        this(t1, t2, splitBounds, t2 != null ? TaskViewType.GROUPED : TaskViewType.SINGLE);
     }
 
     protected GroupTask(@NonNull Task t1, @Nullable Task t2, @Nullable SplitBounds splitBounds,
-            @TaskView.Type int taskViewType) {
+            TaskViewType taskViewType) {
         task1 = t1;
         task2 = t2;
         mSplitBounds = splitBounds;

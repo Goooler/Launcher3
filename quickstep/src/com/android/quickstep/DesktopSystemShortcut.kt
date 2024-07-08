@@ -25,7 +25,7 @@ import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
 import com.android.quickstep.views.TaskContainer
 import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource
-import com.android.wm.shell.shared.DesktopModeStatus
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 
 /** A menu item, "Desktop", that allows the user to bring the current app into Desktop Windowing. */
 class DesktopSystemShortcut(

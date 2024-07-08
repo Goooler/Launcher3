@@ -30,6 +30,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
+import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
@@ -42,12 +43,14 @@ import org.mockito.kotlin.whenever
 
 @RunWith(AndroidJUnit4::class)
 class TaskThumbnailViewModelTest {
+    private var taskViewType = TaskViewType.SINGLE
     private val recentsViewData = RecentsViewData()
-    private val taskViewData = TaskViewData()
+    private val taskViewData by lazy { TaskViewData(taskViewType) }
     private val taskContainerData = TaskContainerData()
     private val tasksRepository = FakeTasksRepository()
-    private val systemUnderTest =
+    private val systemUnderTest by lazy {
         TaskThumbnailViewModel(recentsViewData, taskViewData, taskContainerData, tasksRepository)
+    }
 
     private val tasks = (0..5).map(::createTaskWithId)
 
@@ -66,14 +69,26 @@ class TaskThumbnailViewModelTest {
     }
 
     @Test
-    fun setRecentsFullscreenProgress_thenProgressIsPassedThrough() = runTest {
+    fun setRecentsFullscreenProgress_thenCornerRadiusProgressIsPassedThrough() = runTest {
         recentsViewData.fullscreenProgress.value = 0.5f
 
-        assertThat(systemUnderTest.recentsFullscreenProgress.first()).isEqualTo(0.5f)
+        assertThat(systemUnderTest.cornerRadiusProgress.first()).isEqualTo(0.5f)
 
         recentsViewData.fullscreenProgress.value = 0.6f
 
-        assertThat(systemUnderTest.recentsFullscreenProgress.first()).isEqualTo(0.6f)
+        assertThat(systemUnderTest.cornerRadiusProgress.first()).isEqualTo(0.6f)
+    }
+
+    @Test
+    fun setRecentsFullscreenProgress_thenCornerRadiusProgressIsConstantForDesktop() = runTest {
+        taskViewType = TaskViewType.DESKTOP
+        recentsViewData.fullscreenProgress.value = 0.5f
+
+        assertThat(systemUnderTest.cornerRadiusProgress.first()).isEqualTo(1f)
+
+        recentsViewData.fullscreenProgress.value = 0.6f
+
+        assertThat(systemUnderTest.cornerRadiusProgress.first()).isEqualTo(1f)
     }
 
     @Test

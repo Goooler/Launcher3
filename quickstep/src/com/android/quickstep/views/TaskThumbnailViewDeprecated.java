@@ -165,17 +165,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
     }
 
     /**
-     * Sets TaskOverlay without binding a task.
-     *
-     * @deprecated Should only be used when using new
-     * {@link com.android.quickstep.task.thumbnail.TaskThumbnailView}.
-     */
-    @Deprecated
-    public void setTaskOverlay(TaskOverlay<?> overlay) {
-        mOverlay = overlay;
-    }
-
-    /**
      * Updates the thumbnail.
      *
      * @param refreshNow whether the {@code thumbnailData} will be used to redraw immediately.

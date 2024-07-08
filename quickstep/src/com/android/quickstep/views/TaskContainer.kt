@@ -38,8 +38,7 @@ import com.android.systemui.shared.recents.model.Task
 class TaskContainer(
     val taskView: TaskView,
     val task: Task,
-    val thumbnailView: TaskThumbnailView?,
-    val thumbnailViewDeprecated: TaskThumbnailViewDeprecated,
+    val snapshotView: View,
     val iconView: TaskViewIcon,
     /**
      * This technically can be a vanilla [android.view.TouchDelegate] class, however that class
@@ -57,12 +56,29 @@ class TaskContainer(
     val overlay: TaskOverlayFactory.TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
     val taskContainerData = TaskContainerData()
 
-    val snapshotView: View
-        get() = thumbnailView ?: thumbnailViewDeprecated
+    init {
+        if (enableRefactorTaskThumbnail()) {
+            require(snapshotView is TaskThumbnailView)
+        } else {
+            require(snapshotView is TaskThumbnailViewDeprecated)
+        }
+    }
+
+    val thumbnailView: TaskThumbnailView
+        get() {
+            require(enableRefactorTaskThumbnail())
+            return snapshotView as TaskThumbnailView
+        }
+
+    val thumbnailViewDeprecated: TaskThumbnailViewDeprecated
+        get() {
+            require(!enableRefactorTaskThumbnail())
+            return snapshotView as TaskThumbnailViewDeprecated
+        }
 
     // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
     val thumbnail: Bitmap?
-        get() = thumbnailViewDeprecated.thumbnail
+        get() = if (enableRefactorTaskThumbnail()) null else thumbnailViewDeprecated.thumbnail
 
     // TODO(b/334826842): Support shouldShowSplashView for new TTV.
     val shouldShowSplashView: Boolean
@@ -100,13 +116,14 @@ class TaskContainer(
 
     fun destroy() {
         digitalWellBeingToast?.destroy()
-        thumbnailView?.let { taskView.removeView(it) }
+        if (enableRefactorTaskThumbnail()) {
+            taskView.removeView(thumbnailView)
+        }
         overlay.destroy()
     }
 
     fun bind() {
-        if (enableRefactorTaskThumbnail() && thumbnailView != null) {
-            thumbnailViewDeprecated.setTaskOverlay(overlay)
+        if (enableRefactorTaskThumbnail()) {
             bindThumbnailView()
             overlay.init()
         } else {
@@ -119,7 +136,7 @@ class TaskContainer(
     fun bindThumbnailView() {
         // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
         //  this should be decided inside TaskThumbnailViewModel.
-        thumbnailView?.viewModel?.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
+        thumbnailView.viewModel.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
     }
 
     fun setOverlayEnabled(enabled: Boolean) {

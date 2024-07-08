@@ -30,6 +30,7 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import androidx.annotation.ColorInt
 import com.android.launcher3.Utilities
+import com.android.launcher3.util.ViewPool
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
@@ -42,7 +43,7 @@ import com.android.systemui.shared.system.QuickStepContract
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
-class TaskThumbnailView : View {
+class TaskThumbnailView : View, ViewPool.Reusable {
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
     //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
     //  This is using a lazy for now because the dependencies cannot be obtained without DI.
@@ -71,7 +72,7 @@ class TaskThumbnailView : View {
             return _measuredBounds
         }
 
-    private var cornerRadius: Float = TaskCornerRadius.get(context)
+    private var overviewCornerRadius: Float = TaskCornerRadius.get(context)
     private var fullscreenCornerRadius: Float = QuickStepContract.getWindowCornerRadius(context)
 
     constructor(context: Context?) : super(context)
@@ -100,7 +101,7 @@ class TaskThumbnailView : View {
                 invalidate()
             }
         }
-        MainScope().launch { viewModel.recentsFullscreenProgress.collect { invalidateOutline() } }
+        MainScope().launch { viewModel.cornerRadiusProgress.collect { invalidateOutline() } }
         MainScope().launch {
             viewModel.inheritedScale.collect { viewModelInheritedScale ->
                 inheritedScale = viewModelInheritedScale
@@ -115,6 +116,11 @@ class TaskThumbnailView : View {
                     outline.setRoundRect(measuredBounds, getCurrentCornerRadius())
                 }
             }
+    }
+
+    override fun onRecycle() {
+        // Do nothing
+        uiState = Uninitialized
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -138,7 +144,7 @@ class TaskThumbnailView : View {
     override fun onConfigurationChanged(newConfig: Configuration?) {
         super.onConfigurationChanged(newConfig)
 
-        cornerRadius = TaskCornerRadius.get(context)
+        overviewCornerRadius = TaskCornerRadius.get(context)
         fullscreenCornerRadius = QuickStepContract.getWindowCornerRadius(context)
         invalidateOutline()
     }
@@ -159,8 +165,8 @@ class TaskThumbnailView : View {
 
     private fun getCurrentCornerRadius() =
         Utilities.mapRange(
-            viewModel.recentsFullscreenProgress.value,
-            cornerRadius,
+            viewModel.cornerRadiusProgress.value,
+            overviewCornerRadius,
             fullscreenCornerRadius
         ) / inheritedScale
 

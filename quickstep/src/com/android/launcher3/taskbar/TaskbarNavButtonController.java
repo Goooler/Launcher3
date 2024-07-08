@@ -166,8 +166,12 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         if (buttonType == BUTTON_SPACE) {
             return false;
         }
-        // Provide the same haptic feedback that the system offers for virtual keys.
-        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+
+        // Provide the same haptic feedback that the system offers for long press.
+        // The haptic feedback from long pressing on the home button is handled by circle to search.
+        if (buttonType != BUTTON_HOME) {
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        }
         switch (buttonType) {
             case BUTTON_HOME:
                 logEvent(LAUNCHER_TASKBAR_HOME_BUTTON_LONGPRESS);
@@ -179,10 +183,12 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
                 return true;
             case BUTTON_BACK:
                 logEvent(LAUNCHER_TASKBAR_BACK_BUTTON_LONGPRESS);
-                return backRecentsLongpress(buttonType);
+                backRecentsLongpress(buttonType);
+                return true;
             case BUTTON_RECENTS:
                 logEvent(LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS);
-                return backRecentsLongpress(buttonType);
+                backRecentsLongpress(buttonType);
+                return true;
             case BUTTON_IME_SWITCH:
             default:
                 return false;

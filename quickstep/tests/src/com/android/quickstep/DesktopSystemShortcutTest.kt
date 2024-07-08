@@ -40,7 +40,7 @@ import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.Task.TaskKey
 import com.android.window.flags.Flags
 import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource
-import com.android.wm.shell.shared.DesktopModeStatus
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -191,7 +191,6 @@ class DesktopSystemShortcutTest {
         return TaskContainer(
             taskView,
             task,
-            thumbnailView = null,
             thumbnailViewDeprecated,
             iconView,
             transformingTouchDelegate,

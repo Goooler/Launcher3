@@ -32,7 +32,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.util.LooperExecutor;
 import com.android.quickstep.util.GroupTask;
-import com.android.quickstep.views.TaskView;
+import com.android.quickstep.views.TaskViewType;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
@@ -125,7 +125,7 @@ public class RecentTasksListTest {
                 Integer.MAX_VALUE /* numTasks */, -1 /* requestId */, false /* loadKeysOnly */);
 
         assertEquals(1, taskList.size());
-        assertEquals(TaskView.Type.DESKTOP, taskList.get(0).taskViewType);
+        assertEquals(TaskViewType.DESKTOP, taskList.get(0).taskViewType);
         List<Task> actualFreeformTasks = taskList.get(0).getTasks();
         assertEquals(3, actualFreeformTasks.size());
         assertEquals(1, actualFreeformTasks.get(0).key.id);

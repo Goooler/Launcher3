@@ -102,7 +102,8 @@ constructor(
     defStyleAttr: Int = 0,
     defStyleRes: Int = 0,
     focusBorderAnimator: BorderAnimator? = null,
-    hoverBorderAnimator: BorderAnimator? = null
+    hoverBorderAnimator: BorderAnimator? = null,
+    type: TaskViewType = TaskViewType.SINGLE
 ) : FrameLayout(context, attrs), ViewPool.Reusable {
     /**
      * Used in conjunction with [onTaskListVisibilityChanged], providing more granularity on which
@@ -112,18 +113,7 @@ constructor(
     @IntDef(FLAG_UPDATE_ALL, FLAG_UPDATE_ICON, FLAG_UPDATE_THUMBNAIL, FLAG_UPDATE_CORNER_RADIUS)
     annotation class TaskDataChanges
 
-    /** Type of task view */
-    @Retention(AnnotationRetention.SOURCE)
-    @IntDef(Type.SINGLE, Type.GROUPED, Type.DESKTOP)
-    annotation class Type {
-        companion object {
-            const val SINGLE = 1
-            const val GROUPED = 2
-            const val DESKTOP = 3
-        }
-    }
-
-    val taskViewData = TaskViewData()
+    val taskViewData = TaskViewData(type)
     val taskIds: IntArray
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
@@ -671,24 +661,22 @@ constructor(
         taskOverlayFactory: TaskOverlayFactory
     ): TaskContainer {
         val thumbnailViewDeprecated: TaskThumbnailViewDeprecated = findViewById(thumbnailViewId)!!
-        val thumbnailView: TaskThumbnailView?
-        if (enableRefactorTaskThumbnail()) {
-            val indexOfSnapshotView = indexOfChild(thumbnailViewDeprecated)
-            thumbnailView =
+        val snapshotView =
+            if (enableRefactorTaskThumbnail()) {
+                thumbnailViewDeprecated.visibility = GONE
+                val indexOfSnapshotView = indexOfChild(thumbnailViewDeprecated)
                 TaskThumbnailView(context).apply {
                     layoutParams = thumbnailViewDeprecated.layoutParams
                     addView(this, indexOfSnapshotView)
                 }
-            thumbnailViewDeprecated.visibility = GONE
-        } else {
-            thumbnailView = null
-        }
+            } else {
+                thumbnailViewDeprecated
+            }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
             this,
             task,
-            thumbnailView,
-            thumbnailViewDeprecated,
+            snapshotView,
             iconView,
             TransformingTouchDelegate(iconView.asView()),
             stagePosition,
@@ -709,8 +697,6 @@ constructor(
                 }
                 .inflate() as TaskViewIcon
     }
-
-    protected fun isTaskContainersInitialized() = this::taskContainers.isInitialized
 
     fun containsMultipleTasks() = taskContainers.size > 1
 

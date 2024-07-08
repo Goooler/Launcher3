@@ -31,6 +31,7 @@ import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -47,7 +48,13 @@ class TaskThumbnailViewModel(
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
     private var boundTaskIsRunning = false
 
-    val recentsFullscreenProgress = recentsViewData.fullscreenProgress
+    /**
+     * Progress for changes in corner radius. progress: 0 = overview corner radius; 1 = fullscreen
+     * corner radius.
+     */
+    val cornerRadiusProgress =
+        if (taskViewData.isOutlineFormedByThumbnailView) recentsViewData.fullscreenProgress
+        else MutableStateFlow(1f).asStateFlow()
     val inheritedScale =
         combine(recentsViewData.scale, taskViewData.scale) { recentsScale, taskScale ->
             recentsScale * taskScale
