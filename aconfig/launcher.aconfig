@@ -310,3 +310,9 @@ flag {
     bug: "341795751"
 }
 
+flag {
+    name: "enable_new_archiving_icon"
+    namespace: "launcher"
+    description: "Archived apps will use new icon in app title"
+    bug: "350758155"
+}

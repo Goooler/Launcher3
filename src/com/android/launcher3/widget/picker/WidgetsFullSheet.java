@@ -679,6 +679,18 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         return sheet;
     }
 
+    /**
+     * Updates the widget picker's title and description in the header to the provided values (if
+     * present).
+     */
+    public void mayUpdateTitleAndDescription(@Nullable String title,
+            @Nullable String descriptionRes) {
+        if (title != null) {
+            mHeaderTitle.setText(title);
+        }
+        // Full sheet doesn't support a description.
+    }
+
     @Override
     public void saveHierarchyState(SparseArray<Parcelable> sparseArray) {
         Bundle bundle = new Bundle();

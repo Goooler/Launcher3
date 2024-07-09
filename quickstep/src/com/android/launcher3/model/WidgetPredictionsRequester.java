@@ -59,6 +59,11 @@ import java.util.stream.Collectors;
 public class WidgetPredictionsRequester {
     private static final int NUM_OF_RECOMMENDED_WIDGETS_PREDICATION = 20;
     private static final String BUNDLE_KEY_ADDED_APP_WIDGETS = "added_app_widgets";
+    // container/screenid/[positionx,positiony]/[spanx,spany]
+    // Matches the format passed used by PredictionHelper; But, position and size values aren't
+    // used, so, we pass default values.
+    @VisibleForTesting
+    static final String LAUNCH_LOCATION = "workspace/1/[0,0]/[2,2]";
 
     @Nullable
     private AppPredictor mAppPredictor;
@@ -86,7 +91,7 @@ public class WidgetPredictionsRequester {
      */
     public void request(List<AppWidgetProviderInfo> existingWidgets,
             Consumer<List<ItemInfo>> callback) {
-        Bundle bundle = buildBundleForPredictionSession(existingWidgets, mUiSurface);
+        Bundle bundle = buildBundleForPredictionSession(existingWidgets);
         Predicate<WidgetItem> filter = notOnUiSurfaceFilter(existingWidgets);
 
         MODEL_EXECUTOR.execute(() -> {
@@ -112,17 +117,14 @@ public class WidgetPredictionsRequester {
      * Returns a bundle that can be passed in a prediction session
      *
      * @param addedWidgets widgets that are already added by the user in the ui surface
-     * @param uiSurface    a unique identifier of the surface hosting widgets; format
-     *                     "widgets_xx"; note - "widgets" is reserved for home screen surface.
      */
     @VisibleForTesting
-    static Bundle buildBundleForPredictionSession(List<AppWidgetProviderInfo> addedWidgets,
-            String uiSurface) {
+    static Bundle buildBundleForPredictionSession(List<AppWidgetProviderInfo> addedWidgets) {
         Bundle bundle = new Bundle();
         ArrayList<AppTargetEvent> addedAppTargetEvents = new ArrayList<>();
         for (AppWidgetProviderInfo info : addedWidgets) {
             ComponentName componentName = info.provider;
-            AppTargetEvent appTargetEvent = buildAppTargetEvent(uiSurface, info, componentName);
+            AppTargetEvent appTargetEvent = buildAppTargetEvent(info, componentName);
             addedAppTargetEvents.add(appTargetEvent);
         }
         bundle.putParcelableArrayList(BUNDLE_KEY_ADDED_APP_WIDGETS, addedAppTargetEvents);
@@ -134,13 +136,13 @@ public class WidgetPredictionsRequester {
      * predictor.
      * Also see {@link PredictionHelper}
      */
-    private static AppTargetEvent buildAppTargetEvent(String uiSurface, AppWidgetProviderInfo info,
+    private static AppTargetEvent buildAppTargetEvent(AppWidgetProviderInfo info,
             ComponentName componentName) {
         AppTargetId appTargetId = new AppTargetId("widget:" + componentName.getPackageName());
         AppTarget appTarget = new AppTarget.Builder(appTargetId, componentName.getPackageName(),
                 /*user=*/ info.getProfile()).setClassName(componentName.getClassName()).build();
-        return new AppTargetEvent.Builder(appTarget, AppTargetEvent.ACTION_PIN)
-                .setLaunchLocation(uiSurface).build();
+        return new AppTargetEvent.Builder(appTarget, AppTargetEvent.ACTION_PIN).setLaunchLocation(
+                LAUNCH_LOCATION).build();
     }
 
     /**

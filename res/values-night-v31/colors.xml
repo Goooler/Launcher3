@@ -26,6 +26,8 @@
     <color name="home_settings_track_off_color">@android:color/system_neutral1_700</color>
 
     <color name="widget_picker_title_color_dark">@android:color/system_neutral1_100</color>
+    <color name="widget_picker_description_color_dark">
+        @android:color/system_neutral2_200</color>
     <color name="widget_picker_header_app_title_color_dark">
         @android:color/system_neutral1_100</color>
     <color name="widget_picker_header_app_subtitle_color_dark">

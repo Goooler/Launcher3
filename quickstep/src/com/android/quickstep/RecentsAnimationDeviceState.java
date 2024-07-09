@@ -302,6 +302,10 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         return mNavBarPosition;
     }
 
+    public NavigationMode getMode() {
+        return mMode;
+    }
+
     /**
      * @return whether the current nav mode is fully gestural.
      */

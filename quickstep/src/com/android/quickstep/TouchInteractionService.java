@@ -42,6 +42,7 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_MOVE;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.NAVIGATION_MODE_SWITCHED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENTS_ANIMATION_START_PENDING;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
@@ -70,7 +71,6 @@ import android.hardware.input.InputManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArraySet;
@@ -102,6 +102,7 @@ import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LockedUserState;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
@@ -622,6 +623,8 @@ public class TouchInteractionService extends Service {
     private InputManager mInputManager;
     private final Set<Integer> mTrackpadsConnected = new ArraySet<>();
 
+    private NavigationMode mGestureStartNavMode = null;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -836,14 +839,26 @@ public class TouchInteractionService extends Service {
         TestLogging.recordMotionEvent(
                 TestProtocol.SEQUENCE_TIS, "TouchInteractionService.onInputEvent", event);
 
-        boolean isUserUnlocked = LockedUserState.get(this).isUserUnlocked();
-        if (!isUserUnlocked || (mDeviceState.isButtonNavMode()
-                && !isTrackpadMotionEvent(event))) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
+            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
+                    .append("Cannot process input event: user is locked"));
+            return;
+        }
+
+        NavigationMode currentNavMode = mDeviceState.getMode();
+        if (mGestureStartNavMode != null && mGestureStartNavMode != currentNavMode) {
+            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
+                            .append("Navigation mode switched mid-gesture (")
+                            .append(mGestureStartNavMode.name())
+                            .append(" -> ")
+                            .append(currentNavMode.name())
+                            .append("); cancelling gesture."),
+                    NAVIGATION_MODE_SWITCHED);
+            event.setAction(ACTION_CANCEL);
+        } else if (mDeviceState.isButtonNavMode() && !isTrackpadMotionEvent(event)) {
             ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
                     .append("Cannot process input event: ")
-                    .append(!isUserUnlocked
-                            ? "user is locked"
-                            : "using 3-button nav and event is not a trackpad event"));
+                    .append("using 3-button nav and event is not a trackpad event"));
             return;
         }
 
@@ -868,6 +883,12 @@ public class TouchInteractionService extends Service {
                 }
                 return;
             }
+        }
+
+        if (action == ACTION_DOWN || isHoverActionWithoutConsumer) {
+            mGestureStartNavMode = currentNavMode;
+        } else if (action == ACTION_UP || action == ACTION_CANCEL) {
+            mGestureStartNavMode = null;
         }
 
         SafeCloseable traceToken = TraceHelper.INSTANCE.allowIpcs("TIS.onInputEvent");

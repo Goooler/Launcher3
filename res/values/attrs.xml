@@ -61,6 +61,7 @@
     <attr name="preloadIconAccentColor" format="color" />
     <attr name="preloadIconBackgroundColor" format="color" />
     <attr name="widgetPickerTitleColor" format="color"/>
+    <attr name="widgetPickerDescriptionColor" format="color"/>
     <attr name="widgetPickerPrimarySurfaceColor" format="color"/>
     <attr name="widgetPickerSecondarySurfaceColor" format="color"/>
     <attr name="widgetPickerHeaderAppTitleColor" format="color"/>

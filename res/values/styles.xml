@@ -243,6 +243,7 @@
         <item name="widgetPickerSecondarySurfaceColor">
             @color/widget_picker_secondary_surface_color_light</item>
         <item name="widgetPickerTitleColor">@color/widget_picker_title_color_light</item>
+        <item name="widgetPickerDescriptionColor">@color/widget_picker_description_color_light</item>
         <item name="widgetPickerHeaderAppTitleColor">
             @color/widget_picker_header_app_title_color_light</item>
         <item name="widgetPickerHeaderAppSubtitleColor">
@@ -282,6 +283,7 @@
             @color/widget_picker_secondary_surface_color_dark</item>
         <item name="widgetPickerTitleColor">
             @color/widget_picker_title_color_dark</item>
+        <item name="widgetPickerDescriptionColor">@color/widget_picker_description_color_dark</item>
         <item name="widgetPickerHeaderAppTitleColor">
             @color/widget_picker_header_app_title_color_dark</item>
         <item name="widgetPickerHeaderAppSubtitleColor">

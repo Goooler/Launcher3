@@ -26,6 +26,7 @@ import static com.android.launcher3.allapps.UserProfileManager.STATE_DISABLED;
 import static com.android.launcher3.allapps.UserProfileManager.STATE_ENABLED;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -278,6 +279,13 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                                     privateProfileManager.getReadyToAnimate())
                                 && privateProfileManager.getCurrentState() == STATE_ENABLED
                                 ? 0 : 1);
+                        Log.d(TAG, "onBindViewHolder: "
+                                + "isPrivateSpaceItem: " + isPrivateSpaceItem
+                        + " isStateTransitioning: " + privateProfileManager.isStateTransitioning()
+                        + " isScrolling: " + privateProfileManager.isScrolling()
+                        + " readyToAnimate: " + privateProfileManager.getReadyToAnimate()
+                        + " currentState: " + privateProfileManager.getCurrentState()
+                        + " currentAlpha: " + icon.getAlpha());
                     }
                     // Views can still be bounded before the app list is updated hence showing icons
                     // after collapsing.

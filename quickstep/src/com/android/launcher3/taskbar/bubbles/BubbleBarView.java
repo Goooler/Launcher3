@@ -979,8 +979,7 @@ public class BubbleBarView extends FrameLayout {
         return translationX - getScaleIconShift();
     }
 
-    private float getCollapsedBubbleTranslationX(int bubbleIndex, int bubbleCount,
-            boolean onLeft) {
+    private float getCollapsedBubbleTranslationX(int bubbleIndex, int bubbleCount, boolean onLeft) {
         if (bubbleIndex < 0 || bubbleIndex >= bubbleCount) {
             return 0;
         }
@@ -991,7 +990,9 @@ public class BubbleBarView extends FrameLayout {
                     bubbleIndex == 0 && bubbleCount > MAX_VISIBLE_BUBBLES_COLLAPSED
                             ? mIconOverlapAmount : 0);
         } else {
-            translationX = mBubbleBarPadding + (bubbleIndex == 0 ? 0 : mIconOverlapAmount);
+            translationX = mBubbleBarPadding + (
+                    bubbleIndex == 0 || bubbleCount <= MAX_VISIBLE_BUBBLES_COLLAPSED
+                            ? 0 : mIconOverlapAmount);
         }
         return translationX - getScaleIconShift();
     }

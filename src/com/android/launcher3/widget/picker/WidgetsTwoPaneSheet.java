@@ -36,6 +36,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -60,9 +61,6 @@ import java.util.List;
  * Popup for showing the full list of available widgets with a two-pane layout.
  */
 public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
-
-    private static final int PERSONAL_TAB = 0;
-    private static final int WORK_TAB = 1;
     private static final int MINIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP = 268;
     private static final int MAXIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP = 395;
     private static final String SUGGESTIONS_PACKAGE_NAME = "widgets_list_suggestions_entry";
@@ -83,6 +81,7 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     private int mActivePage = -1;
     @Nullable
     private PackageUserKey mSelectedHeader;
+    private TextView mHeaderDescription;
 
     public WidgetsTwoPaneSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -120,12 +119,17 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         mWidgetRecommendationsView.initParentViews(mWidgetRecommendationsContainer);
         mWidgetRecommendationsView.setWidgetCellLongClickListener(this);
         mWidgetRecommendationsView.setWidgetCellOnClickListener(this);
+        if (!mDeviceProfile.isTwoPanels) {
+            mWidgetRecommendationsView.enableFullPageViewIfLowDensity();
+        }
         // To save the currently displayed page, so that, it can be requested when rebinding
         // recommendations with different size constraints.
         mWidgetRecommendationsView.addPageSwitchListener(
                 newPage -> mRecommendationsCurrentPage = newPage);
 
         mHeaderTitle = mContent.findViewById(R.id.title);
+        mHeaderDescription = mContent.findViewById(R.id.widget_picker_description);
+
         mRightPane = mContent.findViewById(R.id.right_pane);
         mRightPaneScrollView = mContent.findViewById(R.id.right_pane_scroll_view);
         mRightPaneScrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -138,6 +142,17 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
         // Set the fast scroller as not visible for two pane layout.
         mFastScroller.setVisibility(GONE);
+    }
+
+    @Override
+    public void mayUpdateTitleAndDescription(@Nullable String title, @Nullable String description) {
+        if (title != null) {
+            mHeaderTitle.setText(title);
+        }
+        if (description != null) {
+            mHeaderDescription.setText(description);
+            mHeaderDescription.setVisibility(VISIBLE);
+        }
     }
 
     @Override
@@ -371,9 +386,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     protected void updateRecyclerViewVisibility(AdapterHolder adapterHolder) {
         // The first item is always an empty space entry. Look for any more items.
         boolean isWidgetAvailable = adapterHolder.mWidgetsListAdapter.hasVisibleEntries();
-
-        mRightPane.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
-
+        if (!isWidgetAvailable) {
+            mRightPane.removeAllViews();
+            mRightPane.addView(mNoWidgetsView);
+        }
         super.updateRecyclerViewVisibility(adapterHolder);
     }
 

@@ -276,7 +276,7 @@ class SplitAnimationControllerTest {
         whenever(mockAppPairIcon.context).thenReturn(mockContextThemeWrapper)
         doNothing()
             .whenever(spySplitAnimationController)
-            .composeIconSplitLaunchAnimator(any(), any(), any(), any())
+            .composeIconSplitLaunchAnimator(any(), any(), any(), any(), any())
         doReturn(-1).whenever(spySplitAnimationController).hasChangesForBothAppPairs(any(), any())
 
         spySplitAnimationController.playSplitLaunchAnimation(
@@ -296,7 +296,7 @@ class SplitAnimationControllerTest {
         )
 
         verify(spySplitAnimationController)
-            .composeIconSplitLaunchAnimator(any(), any(), any(), any())
+            .composeIconSplitLaunchAnimator(any(), any(), any(), any(), any())
     }
 
     @Test

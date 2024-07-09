@@ -30,6 +30,7 @@ import com.android.launcher3.DeviceProfile
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.IconCache
+import com.android.launcher3.model.WidgetPredictionsRequester.LAUNCH_LOCATION
 import com.android.launcher3.model.WidgetPredictionsRequester.buildBundleForPredictionSession
 import com.android.launcher3.model.WidgetPredictionsRequester.filterPredictions
 import com.android.launcher3.model.WidgetPredictionsRequester.notOnUiSurfaceFilter
@@ -103,7 +104,7 @@ class WidgetsPredictionsRequesterTest {
     fun buildBundleForPredictionSession_includesAddedAppWidgets() {
         val existingWidgets = arrayListOf(widget1aInfo, widget1bInfo, widget2Info)
 
-        val bundle = buildBundleForPredictionSession(existingWidgets, TEST_UI_SURFACE)
+        val bundle = buildBundleForPredictionSession(existingWidgets)
         val addedWidgetsBundleExtra =
             bundle.getParcelableArrayList(BUNDLE_KEY_ADDED_APP_WIDGETS, AppTarget::class.java)
 
@@ -213,7 +214,7 @@ class WidgetsPredictionsRequesterTest {
                     .setClassName(providerClassName)
                     .build()
             return AppTargetEvent.Builder(appTarget, AppTargetEvent.ACTION_PIN)
-                .setLaunchLocation(TEST_UI_SURFACE)
+                .setLaunchLocation(LAUNCH_LOCATION)
                 .build()
         }
     }

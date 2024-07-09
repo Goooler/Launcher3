@@ -63,6 +63,7 @@ import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.TaskItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
@@ -515,35 +516,38 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.getTaskbarDividerView();
     }
 
-    /** Updates which icons are marked as running given the Set of currently running packages. */
-    public void updateIconViewsRunningStates(Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+    /**
+     * Updates which icons are marked as running or minimized given the Sets of currently running
+     * and minimized tasks.
+     */
+    public void updateIconViewsRunningStates(Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         for (View iconView : getIconViews()) {
             if (iconView instanceof BubbleTextView btv) {
                 btv.updateRunningState(
-                        getRunningAppState(btv, runningPackages, minimizedPackages));
+                        getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
             }
         }
     }
 
     private BubbleTextView.RunningAppState getRunningAppState(
             BubbleTextView btv,
-            Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+            Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         Object tag = btv.getTag();
-        if (tag instanceof ItemInfo itemInfo) {
-            if (minimizedPackages.contains(itemInfo.getTargetPackage())) {
+        if (tag instanceof TaskItemInfo itemInfo) {
+            if (minimizedTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(itemInfo.getTargetPackage())) {
+            if (runningTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }
         if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
-            if (minimizedPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (minimizedTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (runningTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }

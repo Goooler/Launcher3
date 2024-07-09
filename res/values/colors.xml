@@ -104,6 +104,7 @@
     <color name="widget_picker_primary_surface_color_light">#EFEDED</color>
     <color name="widget_picker_secondary_surface_color_light">#FAF9F8</color>
     <color name="widget_picker_title_color_light">#1F1F1F</color>
+    <color name="widget_picker_description_color_light">#4C4D50</color>
     <color name="widget_picker_header_app_title_color_light">#1F1F1F</color>
     <color name="widget_picker_header_app_subtitle_color_light">#444746</color>
     <color name="widget_picker_header_background_color_light">#C2E7FF</color>
@@ -123,6 +124,7 @@
     <color name="widget_picker_primary_surface_color_dark">#1F2020</color>
     <color name="widget_picker_secondary_surface_color_dark">#393939</color>
     <color name="widget_picker_title_color_dark">#E3E3E3</color>
+    <color name="widget_picker_description_color_dark">#CCCDCF</color>
     <color name="widget_picker_header_app_title_color_dark">#E3E3E3</color>
     <color name="widget_picker_header_app_subtitle_color_dark">#C4C7C5</color>
     <color name="widget_picker_header_background_color_dark">#004A77</color>

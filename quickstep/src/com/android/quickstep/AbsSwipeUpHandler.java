@@ -152,8 +152,6 @@ import com.android.window.flags.Flags;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
 
-import kotlin.Unit;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -162,6 +160,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
+
+import kotlin.Unit;
 
 /**
  * Handles the navigation gestures when Launcher is the default home activity.
@@ -2423,34 +2423,42 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         if (mRecentsAnimationController == null) {
             return;
         }
+        final Runnable onFinishComplete = () -> {
+            ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                    "AbsSwipeUpHandler.onTasksAppeared: ")
+                    .append("force finish recents animation complete; clearing state callback."));
+            mStateCallback.setStateOnUiThread(STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED);
+        };
+        ActiveGestureLog.CompoundString forceFinishReason = new ActiveGestureLog.CompoundString(
+                "Forcefully finishing recents animation: ");
         if (!mStateCallback.hasStates(STATE_GESTURE_COMPLETED)
                 && !hasStartedTaskBefore(appearedTaskTargets)) {
             // This is a special case, if a task is started mid-gesture that wasn't a part of a
             // previous quickswitch task launch, then cancel the animation back to the app
             RemoteAnimationTarget appearedTaskTarget = appearedTaskTargets[0];
             TaskInfo taskInfo = appearedTaskTarget.taskInfo;
-            ActiveGestureLog.INSTANCE.addLog(
-                    new ActiveGestureLog.CompoundString("Unexpected task appeared")
-                            .append(" id=")
+            ActiveGestureLog.INSTANCE.addLog(forceFinishReason
+                            .append("Unexpected task appeared id=")
                             .append(taskInfo.taskId)
                             .append(" pkg=")
                             .append(taskInfo.baseIntent.getComponent().getPackageName()));
-            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
+            finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         ActiveGestureLog.CompoundString handleTaskFailureReason =
                 new ActiveGestureLog.CompoundString("handleTaskAppeared check failed: ");
         if (!handleTaskAppeared(appearedTaskTargets, handleTaskFailureReason)) {
-            ActiveGestureLog.INSTANCE.addLog(handleTaskFailureReason);
-            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
+            ActiveGestureLog.INSTANCE.addLog(forceFinishReason.append(handleTaskFailureReason));
+            finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         RemoteAnimationTarget[] taskTargets = Arrays.stream(appearedTaskTargets)
                 .filter(mGestureState.mLastStartedTaskIdPredicate)
                 .toArray(RemoteAnimationTarget[]::new);
         if (taskTargets.length == 0) {
-            ActiveGestureLog.INSTANCE.addLog("No appeared task matching started task id");
-            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
+            ActiveGestureLog.INSTANCE.addLog(
+                    forceFinishReason.append("No appeared task matching started task id"));
+            finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         RemoteAnimationTarget taskTarget = taskTargets[0];
@@ -2458,13 +2466,13 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 ? null : mRecentsView.getTaskViewByTaskId(taskTarget.taskId);
         if (taskView == null || taskView.getTaskContainers().stream().noneMatch(
                 TaskContainer::getShouldShowSplashView)) {
-            ActiveGestureLog.INSTANCE.addLog("Splash not needed");
-            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
+            ActiveGestureLog.INSTANCE.addLog(forceFinishReason.append("Splash not needed"));
+            finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         if (mContainer == null) {
-            ActiveGestureLog.INSTANCE.addLog("Activity destroyed");
-            finishRecentsAnimationOnTasksAppeared(null /* onFinishComplete */);
+            ActiveGestureLog.INSTANCE.addLog(forceFinishReason.append("Activity destroyed"));
+            finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         animateSplashScreenExit(mContainer, appearedTaskTargets, taskTargets);

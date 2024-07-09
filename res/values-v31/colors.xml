@@ -75,6 +75,8 @@
 
     <color name="widget_picker_title_color_light">
         @android:color/system_neutral1_900</color>
+    <color name="widget_picker_description_color_light">
+        @android:color/system_neutral2_700</color>
     <color name="widget_picker_header_app_title_color_light">
         @android:color/system_neutral1_900</color>
     <color name="widget_picker_header_app_subtitle_color_light">

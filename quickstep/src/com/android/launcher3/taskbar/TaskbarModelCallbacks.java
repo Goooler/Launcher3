@@ -196,26 +196,26 @@ public class TaskbarModelCallbacks implements
         final TaskbarRecentAppsController recentAppsController =
                 mControllers.taskbarRecentAppsController;
         hotseatItemInfos = recentAppsController.updateHotseatItemInfos(hotseatItemInfos);
-        Set<String> runningPackages = recentAppsController.getRunningAppPackages();
-        Set<String> minimizedPackages = recentAppsController.getMinimizedAppPackages();
+        Set<Integer> runningTaskIds = recentAppsController.getRunningTaskIds();
+        Set<Integer> minimizedTaskIds = recentAppsController.getMinimizedTaskIds();
 
         if (mDeferUpdatesForSUW) {
             ItemInfo[] finalHotseatItemInfos = hotseatItemInfos;
             mDeferredUpdates = () ->
                     commitHotseatItemUpdates(finalHotseatItemInfos,
-                            recentAppsController.getShownTasks(), runningPackages,
-                            minimizedPackages);
+                            recentAppsController.getShownTasks(), runningTaskIds,
+                            minimizedTaskIds);
         } else {
             commitHotseatItemUpdates(hotseatItemInfos,
-                    recentAppsController.getShownTasks(), runningPackages, minimizedPackages);
+                    recentAppsController.getShownTasks(), runningTaskIds, minimizedTaskIds);
         }
     }
 
     private void commitHotseatItemUpdates(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks,
-            Set<String> runningPackages, Set<String> minimizedPackages) {
+            Set<Integer> runningTaskIds, Set<Integer> minimizedTaskIds) {
         mContainer.updateHotseatItems(hotseatItemInfos, recentTasks);
         mControllers.taskbarViewController.updateIconViewsRunningStates(
-                runningPackages, minimizedPackages);
+                runningTaskIds, minimizedTaskIds);
     }
 
     /**
