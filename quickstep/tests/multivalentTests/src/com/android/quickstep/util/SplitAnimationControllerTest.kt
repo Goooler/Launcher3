@@ -87,7 +87,7 @@ class SplitAnimationControllerTest {
     @Before
     fun setup() {
         whenever(mockTaskContainer.snapshotView).thenReturn(mockSnapshotView)
-        whenever(mockTaskContainer.thumbnail).thenReturn(mockBitmap)
+        whenever(mockTaskContainer.splitAnimationThumbnail).thenReturn(mockBitmap)
         whenever(mockTaskContainer.iconView).thenReturn(mockIconView)
         whenever(mockIconView.drawable).thenReturn(mockTaskViewDrawable)
         whenever(mockTaskView.taskContainers).thenReturn(List(1) { mockTaskContainer })

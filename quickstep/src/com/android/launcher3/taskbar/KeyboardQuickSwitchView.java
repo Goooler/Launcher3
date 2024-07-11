@@ -46,7 +46,6 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.res.ResourcesCompat;
 
 import com.android.app.animation.Interpolators;
-import com.android.internal.jank.Cuj;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -54,7 +53,6 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
-import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 import java.util.HashMap;
 import java.util.List;
@@ -333,8 +331,6 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
             @Override
             public void onAnimationStart(Animator animation) {
                 super.onAnimationStart(animation);
-                InteractionJankMonitorWrapper.begin(
-                        KeyboardQuickSwitchView.this, Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_OPEN);
                 setClipToPadding(false);
                 setOutlineProvider(new ViewOutlineProvider() {
                     @Override
@@ -370,19 +366,12 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
             }
 
             @Override
-            public void onAnimationCancel(Animator animation) {
-                super.onAnimationCancel(animation);
-                InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_OPEN);
-            }
-
-            @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
                 setClipToPadding(true);
                 setOutlineProvider(outlineProvider);
                 invalidateOutline();
                 mOpenAnimation = null;
-                InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_OPEN);
             }
         });
 

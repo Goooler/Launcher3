@@ -20,6 +20,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Outline;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -47,7 +48,7 @@ public class BubbleView extends ConstraintLayout {
 
     private final ImageView mBubbleIcon;
     private final ImageView mAppIcon;
-    private final int mBubbleSize;
+    private int mBubbleSize;
 
     private float mDragTranslationX;
     private float mOffsetX;
@@ -89,8 +90,6 @@ public class BubbleView extends ConstraintLayout {
         setLayoutDirection(LAYOUT_DIRECTION_LTR);
 
         LayoutInflater.from(context).inflate(R.layout.bubble_view, this);
-
-        mBubbleSize = getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_size);
         mBubbleIcon = findViewById(R.id.icon_view);
         mAppIcon = findViewById(R.id.app_icon_view);
 
@@ -107,9 +106,19 @@ public class BubbleView extends ConstraintLayout {
     }
 
     private void getOutline(Outline outline) {
+        updateBubbleSizeAndDotRender();
         final int normalizedSize = IconNormalizer.getNormalizedCircleSize(mBubbleSize);
         final int inset = (mBubbleSize - normalizedSize) / 2;
         outline.setOval(inset, inset, inset + normalizedSize, inset + normalizedSize);
+    }
+
+    private void updateBubbleSizeAndDotRender() {
+        int updatedBubbleSize = Math.min(getWidth(), getHeight());
+        if (updatedBubbleSize == mBubbleSize) return;
+        mBubbleSize = updatedBubbleSize;
+        if (mBubble == null || mBubble instanceof BubbleBarOverflow) return;
+        Path dotPath = ((BubbleBarBubble) mBubble).getDotPath();
+        mDotRenderer = new DotRenderer(mBubbleSize, dotPath, DEFAULT_PATH_SIZE);
     }
 
     /**
@@ -139,6 +148,12 @@ public class BubbleView extends ConstraintLayout {
     public void setOffsetX(float offsetX) {
         mOffsetX = offsetX;
         applyDragTranslation();
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        updateBubbleSizeAndDotRender();
     }
 
     private void applyDragTranslation() {

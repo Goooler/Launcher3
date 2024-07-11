@@ -122,7 +122,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     val drawable = getDrawable(container.iconView, splitSelectSource)
                     return SplitAnimInitProps(
                         container.snapshotView,
-                        container.thumbnail,
+                        container.splitAnimationThumbnail,
                         drawable,
                         fadeWithThumbnail = true,
                         isStagedTask = true,
@@ -141,7 +141,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 val drawable = getDrawable(it.iconView, splitSelectSource)
                 return SplitAnimInitProps(
                     it.snapshotView,
-                    it.thumbnail,
+                    it.splitAnimationThumbnail,
                     drawable,
                     fadeWithThumbnail = true,
                     isStagedTask = true,
@@ -536,8 +536,13 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             val appPairLaunchingAppIndex = hasChangesForBothAppPairs(launchingIconView, info)
             if (appPairLaunchingAppIndex == -1) {
                 // Launch split app pair animation
-                composeIconSplitLaunchAnimator(launchingIconView, info, t, finishCallback,
-                        cornerRadius)
+                composeIconSplitLaunchAnimator(
+                    launchingIconView,
+                    info,
+                    t,
+                    finishCallback,
+                    cornerRadius
+                )
             } else {
                 composeFullscreenIconSplitLaunchAnimator(
                     launchingIconView,
@@ -554,8 +559,14 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     "unexpected null"
             }
 
-            composeFadeInSplitLaunchAnimator(initialTaskId, secondTaskId, info, t, finishCallback,
-                    cornerRadius)
+            composeFadeInSplitLaunchAnimator(
+                initialTaskId,
+                secondTaskId,
+                info,
+                t,
+                finishCallback,
+                cornerRadius
+            )
         }
     }
 
@@ -701,7 +712,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
         val launchAnimation = AnimatorSet()
 
         val splitRoots: Pair<Change, List<Change>>? =
-                SplitScreenUtils.extractTopParentAndChildren(transitionInfo)
+            SplitScreenUtils.extractTopParentAndChildren(transitionInfo)
         check(splitRoots != null) { "Could not find split roots" }
 
         // Will point to change (0) in diagram above
@@ -711,10 +722,11 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
 
         // Find the place where our left/top app window meets the divider (used for the
         // launcher side animation)
-        val leftTopApp = leafRoots.single { change ->
-            (dp.isLeftRightSplit && change.endAbsBounds.left == 0) ||
+        val leftTopApp =
+            leafRoots.single { change ->
+                (dp.isLeftRightSplit && change.endAbsBounds.left == 0) ||
                     (!dp.isLeftRightSplit && change.endAbsBounds.top == 0)
-        }
+            }
         val dividerPos =
             if (dp.isLeftRightSplit) leftTopApp.endAbsBounds.right
             else leftTopApp.endAbsBounds.bottom
@@ -736,17 +748,24 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             )
         floatingView.bringToFront()
 
-        val iconLaunchValueAnimator = getIconLaunchValueAnimator(t, dp, finishCallback, launcher,
-                floatingView, mainRootCandidate)
+        val iconLaunchValueAnimator =
+            getIconLaunchValueAnimator(
+                t,
+                dp,
+                finishCallback,
+                launcher,
+                floatingView,
+                mainRootCandidate
+            )
         iconLaunchValueAnimator.addListener(
-                object : AnimatorListenerAdapter() {
-                    override fun onAnimationStart(animation: Animator, isReverse: Boolean) {
-                        for (c in leafRoots) {
-                            t.setCornerRadius(c.leash, windowRadius)
-                            t.apply()
-                        }
+            object : AnimatorListenerAdapter() {
+                override fun onAnimationStart(animation: Animator, isReverse: Boolean) {
+                    for (c in leafRoots) {
+                        t.setCornerRadius(c.leash, windowRadius)
+                        t.apply()
                     }
                 }
+            }
         )
         launchAnimation.play(iconLaunchValueAnimator)
         launchAnimation.start()
@@ -1017,12 +1036,12 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
      */
     @VisibleForTesting
     fun composeFadeInSplitLaunchAnimator(
-            initialTaskId: Int,
-            secondTaskId: Int,
-            transitionInfo: TransitionInfo,
-            t: Transaction,
-            finishCallback: Runnable,
-            cornerRadius: Float
+        initialTaskId: Int,
+        secondTaskId: Int,
+        transitionInfo: TransitionInfo,
+        t: Transaction,
+        finishCallback: Runnable,
+        cornerRadius: Float
     ) {
         var splitRoot1: Change? = null
         var splitRoot2: Change? = null
@@ -1100,7 +1119,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 override fun onAnimationStart(animation: Animator) {
                     for (leash in openingTargets) {
                         animTransaction.show(leash).setAlpha(leash, 0.0f)
-                        animTransaction.setCornerRadius(leash, cornerRadius);
+                        animTransaction.setCornerRadius(leash, cornerRadius)
                     }
                     animTransaction.apply()
                 }

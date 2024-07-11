@@ -24,7 +24,6 @@ import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Enabled
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 
 /** View model for TaskOverlay */
@@ -37,10 +36,7 @@ class TaskOverlayViewModel(
         combine(
                 recentsViewData.overlayEnabled,
                 recentsViewData.settledFullyVisibleTaskIds.map { it.contains(task.key.id) },
-                tasksRepository
-                    .getTaskDataById(task.key.id)
-                    .map { it?.thumbnail }
-                    .distinctUntilChangedBy { it?.snapshotId }
+                tasksRepository.getThumbnailById(task.key.id)
             ) { isOverlayEnabled, isFullyVisible, thumbnailData ->
                 if (isOverlayEnabled && isFullyVisible) {
                     Enabled(

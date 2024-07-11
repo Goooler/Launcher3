@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -62,6 +63,9 @@ class TasksRepository(
 
     override fun getTaskDataById(taskId: Int): Flow<Task?> =
         taskData.map { taskList -> taskList.firstOrNull { it.key.id == taskId } }
+
+    override fun getThumbnailById(taskId: Int): Flow<ThumbnailData?> =
+        getTaskDataById(taskId).map { it?.thumbnail }.distinctUntilChangedBy { it?.snapshotId }
 
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         this.visibleTaskIds.value = visibleTaskIdList.toSet()

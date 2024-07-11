@@ -18,6 +18,8 @@ package com.android.launcher3.taskbar.bubbles;
 import com.android.launcher3.taskbar.TaskbarControllers;
 import com.android.launcher3.util.RunnableList;
 
+import java.io.PrintWriter;
+
 /**
  * Hosts various bubble controllers to facilitate passing between one another.
  */
@@ -93,5 +95,10 @@ public class BubbleControllers {
     public void onDestroy() {
         bubbleStashedHandleViewController.onDestroy();
         bubbleBarController.onDestroy();
+    }
+
+    /** Dumps bubble controllers state. */
+    public void dump(PrintWriter pw) {
+        bubbleBarViewController.dump(pw);
     }
 }

@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -260,8 +261,12 @@ public class AllAppsStore<T extends Context & ActivityContext> {
     public void dump(String prefix, PrintWriter writer) {
         writer.println(prefix + "\tAllAppsStore Apps[] size: " + mApps.length);
         for (int i = 0; i < mApps.length; i++) {
-            writer.println(String.format("%s\tPackage index and name: %d/%s", prefix, i,
-                    mApps[i].componentName.getPackageName()));
+            writer.println(String.format(Locale.getDefault(),
+                    "%s\tPackage index, name, and class: " + "%d/%s:%s",
+                    prefix,
+                    i,
+                    mApps[i].componentName.getPackageName(),
+                    mApps[i].componentName.getClassName()));
         }
     }
 }

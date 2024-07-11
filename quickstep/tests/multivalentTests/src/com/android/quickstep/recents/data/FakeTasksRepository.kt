@@ -32,6 +32,9 @@ class FakeTasksRepository : RecentTasksRepository {
     override fun getTaskDataById(taskId: Int): Flow<Task?> =
         getAllTaskData().map { taskList -> taskList.firstOrNull { it.key.id == taskId } }
 
+    override fun getThumbnailById(taskId: Int): Flow<ThumbnailData?> =
+        getTaskDataById(taskId).map { it?.thumbnail }
+
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         visibleTasks.value = visibleTaskIdList
         tasks.value = tasks.value.map { it.apply { thumbnail = thumbnailDataMap[it.key.id] } }

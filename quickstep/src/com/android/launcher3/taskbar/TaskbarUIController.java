@@ -270,7 +270,7 @@ public class TaskbarUIController {
                                     foundTask,
                                     taskContainer.getIconView().getDrawable(),
                                     taskContainer.getSnapshotView(),
-                                    taskContainer.getThumbnail(),
+                                    taskContainer.getSplitAnimationThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);

@@ -36,6 +36,8 @@ import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.animation.PhysicsAnimator;
 
+import java.io.PrintWriter;
+
 /**
  * Coordinates between controllers such as BubbleBarView and BubbleHandleViewController to
  * create a cohesive animation between stashed/unstashed states.
@@ -455,5 +457,14 @@ public class BubbleStashController {
     /** Set the translation Y for the stashed handle. */
     public void setHandleTranslationY(float ty) {
         mHandleViewController.setTranslationYForSwipe(ty);
+    }
+
+    /** Dumps the state of BubbleStashController. */
+    public void dump(PrintWriter pw) {
+        pw.println("Bubble stash controller state:");
+        pw.println("  mIsStashed: " + mIsStashed);
+        pw.println("  mBubblesShowingOnOverview: " + mBubblesShowingOnOverview);
+        pw.println("  mBubblesShowingOnHome: " + mBubblesShowingOnHome);
+        pw.println("  mIsSysuiLocked: " + mIsSysuiLocked);
     }
 }

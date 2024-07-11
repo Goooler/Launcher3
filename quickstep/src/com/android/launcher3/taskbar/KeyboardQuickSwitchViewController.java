@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar;
 
 import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.view.KeyEvent;
 import android.view.animation.AnimationUtils;
 import android.window.RemoteTransition;
@@ -24,7 +23,6 @@ import android.window.RemoteTransition;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.internal.jank.Cuj;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
@@ -32,7 +30,6 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.SlideInRemoteTransition;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import java.io.PrintWriter;
@@ -96,28 +93,18 @@ public class KeyboardQuickSwitchViewController {
 
     protected void closeQuickSwitchView(boolean animate) {
         if (isCloseAnimationRunning()) {
+            // Let currently-running animation finish.
             if (!animate) {
                 mCloseAnimation.end();
             }
-            // Let currently-running animation finish.
             return;
         }
         if (!animate) {
-            InteractionJankMonitorWrapper.begin(
-                    mKeyboardQuickSwitchView, Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
             onCloseComplete();
             return;
         }
         mCloseAnimation = mKeyboardQuickSwitchView.getCloseAnimation();
 
-        mCloseAnimation.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                super.onAnimationStart(animation);
-                InteractionJankMonitorWrapper.begin(
-                        mKeyboardQuickSwitchView, Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
-            }
-        });
         mCloseAnimation.addListener(AnimatorListeners.forEndCallback(this::onCloseComplete));
         mCloseAnimation.start();
     }
@@ -155,26 +142,16 @@ public class KeyboardQuickSwitchViewController {
             return -1;
         }
 
-        Runnable onStartCallback = () -> InteractionJankMonitorWrapper.begin(
-                mKeyboardQuickSwitchView, Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_APP_LAUNCH);
-        Runnable onFinishCallback = () -> InteractionJankMonitorWrapper.end(
-                Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_APP_LAUNCH);
         TaskbarActivityContext context = mControllers.taskbarActivityContext;
         RemoteTransition remoteTransition = new RemoteTransition(new SlideInRemoteTransition(
                 Utilities.isRtl(mControllers.taskbarActivityContext.getResources()),
                 context.getDeviceProfile().overviewPageSpacing,
                 QuickStepContract.getWindowCornerRadius(context),
                 AnimationUtils.loadInterpolator(
-                        context, android.R.interpolator.fast_out_extra_slow_in),
-                onStartCallback,
-                onFinishCallback),
+                        context, android.R.interpolator.fast_out_extra_slow_in)),
                 "SlideInTransition");
         mControllers.taskbarActivityContext.handleGroupTaskLaunch(
-                task,
-                remoteTransition,
-                mOnDesktop,
-                onStartCallback,
-                onFinishCallback);
+                task, remoteTransition, mOnDesktop);
         return -1;
     }
 
@@ -182,7 +159,6 @@ public class KeyboardQuickSwitchViewController {
         mCloseAnimation = null;
         mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
         mControllerCallbacks.onCloseComplete();
-        InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
     }
 
     protected void onDestroy() {

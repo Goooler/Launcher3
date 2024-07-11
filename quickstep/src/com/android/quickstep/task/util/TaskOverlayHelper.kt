@@ -46,7 +46,7 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
                     overlay.taskView.context
                 )
                 .getOverviewPanel<RecentsView<*, *>>()
-        TaskOverlayViewModel(task, recentsView.mRecentsViewData, recentsView.mTasksRepository)
+        TaskOverlayViewModel(task, recentsView.mRecentsViewData!!, recentsView.mTasksRepository!!)
     }
 
     // TODO(b/331753115): TaskOverlay should listen for state changes and react.

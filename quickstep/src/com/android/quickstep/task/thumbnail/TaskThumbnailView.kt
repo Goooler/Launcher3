@@ -52,10 +52,10 @@ class TaskThumbnailView : View, ViewPool.Reusable {
             RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
                 .getOverviewPanel<RecentsView<*, *>>()
         TaskThumbnailViewModel(
-            recentsView.mRecentsViewData,
+            recentsView.mRecentsViewData!!,
             (parent as TaskView).taskViewData,
             (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
-            recentsView.mTasksRepository,
+            recentsView.mTasksRepository!!,
         )
     }
 

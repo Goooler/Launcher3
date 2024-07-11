@@ -394,7 +394,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
             BubbleBarBubble bb = mBubbles.get(update.updatedBubble.getKey());
             // If we're not stashed, we're visible so animate
             bb.getView().updateDotVisibility(!mBubbleStashController.isStashed() /* animate */);
-            mBubbleBarViewController.animateBubbleNotification(bb, /* isExpanding= */ false);
+            mBubbleBarViewController.animateBubbleNotification(
+                    bb, /* isExpanding= */ false, /* isUpdate= */ true);
         }
         if (update.bubbleKeysInOrder != null && !update.bubbleKeysInOrder.isEmpty()) {
             // Create the new list

@@ -37,6 +37,8 @@ import com.android.launcher3.accessibility.DragViewStateAnnouncer;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.celllayout.CellPosMapper.CellPos;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.debug.TestEvent;
+import com.android.launcher3.debug.TestEventEmitter;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.logging.InstanceId;
@@ -221,6 +223,9 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         dl.addView(frame);
         frame.mIsOpen = true;
         frame.post(() -> frame.snapToWidget(false));
+        TestEventEmitter.INSTANCE.get(widget.getContext()).sendEvent(
+                TestEvent.RESIZE_FRAME_SHOWING
+        );
     }
 
     private void setCornerRadiusFromWidget() {

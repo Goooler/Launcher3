@@ -38,7 +38,7 @@
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"برای استفاده از این جفت برنامه، دستگاه را باز کنید"</string>
     <string name="app_pair_not_available" msgid="3556767440808032031">"جفت برنامه دردسترس نیست"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"برای جابه‌جا کردن ابزارک، لمس کنید و نگه دارید."</string>
-    <string name="long_accessible_way_to_add" msgid="2733588281439571974">"برای جابه‌جا کردن ابزارک یا استفاده از کنش‌های سفارشی، دوضربه بزنید و نگه دارید."</string>
+    <string name="long_accessible_way_to_add" msgid="2733588281439571974">"برای جابه‌جا کردن ابزارک یا استفاده از کنش‌های سفارشی، دو تک‌ضرب بزنید و نگه دارید."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"‏%1$d عرض در %2$d طول"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"ابزارک <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
@@ -76,7 +76,7 @@
     <string name="all_apps_label" msgid="5015784846527570951">"همه برنامه‌ها"</string>
     <string name="notifications_header" msgid="1404149926117359025">"اعلان‌ها"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"برای جابه‌جا کردن میان‌بر، لمس کنید و نگه دارید."</string>
-    <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"برای جابه‌جا کردن میان‌بر یا استفاده از کنش‌های سفارشی، دوضربه بزنید و نگه دارید."</string>
+    <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"برای جابه‌جا کردن میان‌بر یا استفاده از کنش‌های سفارشی، دو تک‌ضرب بزنید و نگه دارید."</string>
     <string name="out_of_space" msgid="6455557115204099579">"فضای خالی در این صفحه اصلی وجود ندارد"</string>
     <string name="hotseat_out_of_space" msgid="7448809638125333693">"فضای بیشتری در سینی موارد دلخواه وجود ندارد"</string>
     <string name="all_apps_button_label" msgid="8130441508702294465">"فهرست برنامه‌ها"</string>

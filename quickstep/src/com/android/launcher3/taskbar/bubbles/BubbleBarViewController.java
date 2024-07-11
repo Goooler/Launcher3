@@ -43,6 +43,7 @@ import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
+import java.io.PrintWriter;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -399,7 +400,7 @@ public class BubbleBarViewController {
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         mBubbleDragController.setupBubbleView(addedBubble.getView());
         if (!suppressAnimation) {
-            animateBubbleNotification(addedBubble, isExpanding);
+            animateBubbleNotification(addedBubble, isExpanding, /* isUpdate= */ true);
         }
     }
 
@@ -427,18 +428,19 @@ public class BubbleBarViewController {
                 }
                 return;
             }
-            animateBubbleNotification(bubble, isExpanding);
+            animateBubbleNotification(bubble, isExpanding, /* isUpdate= */ true);
         } else {
             Log.w(TAG, "addBubble, bubble was null!");
         }
     }
 
     /** Animates the bubble bar to notify the user about a bubble change. */
-    public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding) {
+    public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
+            boolean isUpdate) {
         boolean isInApp = mTaskbarStashController.isInApp();
         // if this is the first bubble, animate to the initial state. one bubble is the overflow
         // so check for at most 2 children.
-        if (mBarView.getChildCount() <= 2) {
+        if (mBarView.getChildCount() <= 2 && !isUpdate) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
@@ -597,5 +599,20 @@ public class BubbleBarViewController {
     public interface BubbleBarBoundsChangeListener {
         /** Called when bounds have changed */
         void onBoundsChanged();
+    }
+
+    /** Dumps the state of BubbleBarViewController. */
+    public void dump(PrintWriter pw) {
+        pw.println("Bubble bar view controller state:");
+        pw.println("  mHiddenForSysui: " + mHiddenForSysui);
+        pw.println("  mHiddenForNoBubbles: " + mHiddenForNoBubbles);
+        pw.println("  mShouldShowEducation: " + mShouldShowEducation);
+        pw.println("  mBubbleBarTranslationY.value: " + mBubbleBarTranslationY.value);
+        pw.println("  mBubbleBarSwipeUpTranslationY: " + mBubbleBarSwipeUpTranslationY);
+        if (mBarView != null) {
+            mBarView.dump(pw);
+        } else {
+            pw.println("  Bubble bar view is null!");
+        }
     }
 }
