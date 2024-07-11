@@ -16,7 +16,8 @@
 
 package com.android.quickstep.recents.data
 
-import com.android.quickstep.TaskIconCache
+import android.graphics.drawable.Drawable
+import com.android.quickstep.task.thumbnail.data.TaskIconDataSource
 import com.android.quickstep.task.thumbnail.data.TaskThumbnailDataSource
 import com.android.quickstep.util.GroupTask
 import com.android.systemui.shared.recents.model.Task
@@ -38,7 +39,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class TasksRepository(
     private val recentsModel: RecentTasksDataSource,
     private val taskThumbnailDataSource: TaskThumbnailDataSource,
-    private val taskIconCache: TaskIconCache,
+    private val taskIconDataSource: TaskIconDataSource,
 ) : RecentTasksRepository {
     private val groupedTaskData = MutableStateFlow(emptyList<GroupTask>())
     private val _taskData =
@@ -46,10 +47,19 @@ class TasksRepository(
     private val visibleTaskIds = MutableStateFlow(emptySet<Int>())
 
     private val taskData: Flow<List<Task>> =
-        combine(_taskData, getThumbnailQueryResults()) { tasks, results ->
+        combine(_taskData, getThumbnailQueryResults(), getIconQueryResults()) {
+            tasks,
+            thumbnailQueryResults,
+            iconQueryResults ->
             tasks.forEach { task ->
                 // Add retrieved thumbnails + remove unnecessary thumbnails
-                task.thumbnail = results[task.key.id]
+                task.thumbnail = thumbnailQueryResults[task.key.id]
+
+                // TODO(b/352331675) don't load icons for DesktopTaskView
+                // Add retrieved icons + remove unnecessary icons
+                task.icon = iconQueryResults[task.key.id]?.icon
+                task.titleDescription = iconQueryResults[task.key.id]?.contentDescription
+                task.title = iconQueryResults[task.key.id]?.title
             }
             tasks
         }
@@ -79,7 +89,6 @@ class TasksRepository(
                     suspendCancellableCoroutine { continuation ->
                         val cancellableTask =
                             taskThumbnailDataSource.getThumbnailInBackground(task) {
-                                task.thumbnail = it
                                 continuation.resume(it)
                             }
                         continuation.invokeOnCancellation { cancellableTask?.cancel() }
@@ -109,6 +118,59 @@ class TasksRepository(
             }
         }
     }
+
+    /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
+    private fun getIconDataRequest(task: Task): IconDataRequest =
+        flow {
+                emit(task.key.id to task.getTaskIconQueryResponse())
+                val iconDataResponse: TaskIconQueryResponse? =
+                    suspendCancellableCoroutine { continuation ->
+                        val cancellableTask =
+                            taskIconDataSource.getIconInBackground(task) {
+                                icon,
+                                contentDescription,
+                                title ->
+                                continuation.resume(
+                                    TaskIconQueryResponse(icon, contentDescription, title)
+                                )
+                            }
+                        continuation.invokeOnCancellation { cancellableTask?.cancel() }
+                    }
+                emit(task.key.id to iconDataResponse)
+            }
+            .distinctUntilChanged()
+
+    private fun getIconQueryResults(): Flow<Map<Int, TaskIconQueryResponse?>> {
+        val visibleTasks =
+            combine(_taskData, visibleTaskIds) { tasks, visibleIds ->
+                tasks.filter { it.key.id in visibleIds }
+            }
+        val visibleIconDataRequests: Flow<List<IconDataRequest>> =
+            visibleTasks.map { visibleTasksList -> visibleTasksList.map(::getIconDataRequest) }
+        return visibleIconDataRequests.flatMapLatest { iconRequestFlows: List<IconDataRequest> ->
+            if (iconRequestFlows.isEmpty()) {
+                flowOf(emptyMap())
+            } else {
+                combine(iconRequestFlows) { it.toMap() }
+            }
+        }
+    }
 }
 
-typealias ThumbnailDataRequest = Flow<Pair<Int, ThumbnailData?>>
+private data class TaskIconQueryResponse(
+    val icon: Drawable,
+    val contentDescription: String,
+    val title: String
+)
+
+private fun Task.getTaskIconQueryResponse(): TaskIconQueryResponse? {
+    val iconVal = icon ?: return null
+    val titleDescriptionVal = titleDescription ?: return null
+    val titleVal = title ?: return null
+
+    return TaskIconQueryResponse(iconVal, titleDescriptionVal, titleVal)
+}
+
+private typealias ThumbnailDataRequest = Flow<Pair<Int, ThumbnailData?>>
+
+private typealias IconDataRequest = Flow<Pair<Int, TaskIconQueryResponse?>>

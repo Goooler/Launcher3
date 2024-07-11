@@ -190,7 +190,7 @@ android_app {
     ],
 
     optimize: {
-        proguard_flags_files: ["proguard.flags"],
+        proguard_flags_files: [":launcher-proguard-rules"],
         // Proguard is disable for testing. Derivarive prjects to keep proguard enabled
         enabled: false,
     },
@@ -302,7 +302,9 @@ android_app {
 
     static_libs: ["Launcher3QuickStepLib"],
     optimize: {
-        enabled: false,
+        proguard_flags_files: [":launcher-proguard-rules"],
+        enabled: true,
+        shrink_resources: true,
     },
 
     platform_apis: true,
@@ -349,6 +351,7 @@ android_app {
     optimize: {
         proguard_flags_files: ["proguard.flags"],
         enabled: true,
+        shrink_resources: true,
     },
 
     privileged: true,
@@ -385,6 +388,7 @@ android_app {
     optimize: {
         proguard_flags_files: ["proguard.flags"],
         enabled: true,
+        shrink_resources: true,
     },
 
     privileged: true,

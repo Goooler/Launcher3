@@ -33,6 +33,7 @@ import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.SparseArray;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.R;
@@ -48,6 +49,7 @@ import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.FlagOp;
 import com.android.launcher3.util.Preconditions;
+import com.android.quickstep.task.thumbnail.data.TaskIconDataSource;
 import com.android.quickstep.util.TaskKeyLruCache;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.systemui.shared.recents.model.Task;
@@ -59,7 +61,7 @@ import java.util.concurrent.Executor;
 /**
  * Manages the caching of task icons and related data.
  */
-public class TaskIconCache implements DisplayInfoChangeListener {
+public class TaskIconCache implements TaskIconDataSource, DisplayInfoChangeListener {
 
     private final Executor mBgExecutor;
 
@@ -102,7 +104,8 @@ public class TaskIconCache implements DisplayInfoChangeListener {
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
-    public CancellableTask getIconInBackground(Task task, GetTaskIconCallback callback) {
+    @Override
+    public CancellableTask getIconInBackground(Task task, @NonNull GetTaskIconCallback callback) {
         Preconditions.assertUIThread();
         if (task.icon != null) {
             // Nothing to load, the icon is already loaded

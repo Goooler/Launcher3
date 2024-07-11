@@ -18,17 +18,17 @@ package com.android.quickstep.task.thumbnail
 
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Outline
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.annotation.ColorInt
+import androidx.core.view.isVisible
+import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
@@ -43,7 +43,7 @@ import com.android.systemui.shared.system.QuickStepContract
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
-class TaskThumbnailView : View, ViewPool.Reusable {
+class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
     //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
     //  This is using a lazy for now because the dependencies cannot be obtained without DI.
@@ -59,12 +59,12 @@ class TaskThumbnailView : View, ViewPool.Reusable {
         )
     }
 
-    private var uiState: TaskThumbnailUiState = Uninitialized
-    private var inheritedScale: Float = 1f
-    private var dimProgress: Float = 0f
+    private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
+    private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
+    private val thumbnail: ImageView by lazy { findViewById(R.id.task_thumbnail) }
 
-    private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val scrimPaint = Paint().apply { color = Color.BLACK }
+    private var inheritedScale: Float = 1f
+
     private val _measuredBounds = Rect()
     private val measuredBounds: Rect
         get() {
@@ -75,12 +75,12 @@ class TaskThumbnailView : View, ViewPool.Reusable {
     private var overviewCornerRadius: Float = TaskCornerRadius.get(context)
     private var fullscreenCornerRadius: Float = QuickStepContract.getWindowCornerRadius(context)
 
-    constructor(context: Context?) : super(context)
+    constructor(context: Context) : super(context)
 
-    constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
+    constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)
 
     constructor(
-        context: Context?,
+        context: Context,
         attrs: AttributeSet?,
         defStyleAttr: Int,
     ) : super(context, attrs, defStyleAttr)
@@ -90,15 +90,19 @@ class TaskThumbnailView : View, ViewPool.Reusable {
         // TODO(b/335396935) replace MainScope with shorter lifecycle.
         MainScope().launch {
             viewModel.uiState.collect { viewModelUiState ->
-                uiState = viewModelUiState
-                invalidate()
+                resetViews()
+                when (viewModelUiState) {
+                    is Uninitialized -> {}
+                    is LiveTile -> drawLiveWindow()
+                    is Snapshot -> drawSnapshot(viewModelUiState)
+                    is BackgroundOnly -> drawBackground(viewModelUiState.backgroundColor)
+                }
             }
         }
         MainScope().launch {
             viewModel.dimProgress.collect { dimProgress ->
                 // TODO(b/348195366) Add fade in/out for scrim
-                this@TaskThumbnailView.dimProgress = dimProgress
-                invalidate()
+                scrimView.alpha = dimProgress * MAX_SCRIM_ALPHA
             }
         }
         MainScope().launch { viewModel.cornerRadiusProgress.collect { invalidateOutline() } }
@@ -120,25 +124,6 @@ class TaskThumbnailView : View, ViewPool.Reusable {
 
     override fun onRecycle() {
         // Do nothing
-        uiState = Uninitialized
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        when (val uiStateVal = uiState) {
-            is Uninitialized -> drawBackgroundOnly(canvas, Color.BLACK)
-            is LiveTile -> drawTransparentUiState(canvas)
-            is Snapshot -> drawSnapshotState(canvas, uiStateVal)
-            is BackgroundOnly -> drawBackgroundOnly(canvas, uiStateVal.backgroundColor)
-        }
-
-        if (dimProgress > 0) {
-            drawScrim(canvas)
-        }
-    }
-
-    private fun drawBackgroundOnly(canvas: Canvas, @ColorInt backgroundColor: Int) {
-        backgroundPaint.color = backgroundColor
-        canvas.drawRect(measuredBounds, backgroundPaint)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -149,18 +134,25 @@ class TaskThumbnailView : View, ViewPool.Reusable {
         invalidateOutline()
     }
 
-    private fun drawTransparentUiState(canvas: Canvas) {
-        canvas.drawRect(measuredBounds, CLEAR_PAINT)
+    private fun resetViews() {
+        liveTileView.isVisible = false
+        thumbnail.isVisible = false
+        scrimView.alpha = 0f
+        setBackgroundColor(Color.BLACK)
     }
 
-    private fun drawSnapshotState(canvas: Canvas, snapshot: Snapshot) {
-        drawBackgroundOnly(canvas, snapshot.backgroundColor)
-        canvas.drawBitmap(snapshot.bitmap, snapshot.drawnRect, measuredBounds, null)
+    private fun drawBackground(@ColorInt background: Int) {
+        setBackgroundColor(background)
     }
 
-    private fun drawScrim(canvas: Canvas) {
-        scrimPaint.alpha = (dimProgress * MAX_SCRIM_ALPHA).toInt()
-        canvas.drawRect(measuredBounds, scrimPaint)
+    private fun drawLiveWindow() {
+        liveTileView.isVisible = true
+    }
+
+    private fun drawSnapshot(snapshot: Snapshot) {
+        drawBackground(snapshot.backgroundColor)
+        thumbnail.setImageBitmap(snapshot.bitmap)
+        thumbnail.isVisible = true
     }
 
     private fun getCurrentCornerRadius() =
@@ -170,9 +162,7 @@ class TaskThumbnailView : View, ViewPool.Reusable {
             fullscreenCornerRadius
         ) / inheritedScale
 
-    companion object {
-        private val CLEAR_PAINT =
-            Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
-        private const val MAX_SCRIM_ALPHA = (0.4f * 255).toInt()
+    private companion object {
+        const val MAX_SCRIM_ALPHA = 0.4f
     }
 }

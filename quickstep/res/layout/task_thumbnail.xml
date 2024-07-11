@@ -13,8 +13,29 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<com.android.quickstep.views.TaskThumbnailViewDeprecated
+<com.android.quickstep.task.thumbnail.TaskThumbnailView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/snapshot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/task_thumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:visibility="gone"/>
+
+    <com.android.quickstep.task.thumbnail.LiveTileView
+        android:id="@+id/task_thumbnail_live_tile"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+
+    <View
+        android:id="@+id/task_thumbnail_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/overview_foreground_scrim_color"
+        android:alpha="0" />
+
+</com.android.quickstep.task.thumbnail.TaskThumbnailView>

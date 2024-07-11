@@ -24,6 +24,7 @@ import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.updateLayoutParams
@@ -36,7 +37,6 @@ import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
 import com.android.quickstep.BaseContainerInterface
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.util.RecentsOrientedState
 import com.android.systemui.shared.recents.model.Task
 
@@ -54,7 +54,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         ViewPool<TaskThumbnailViewDeprecated>(
             context,
             this,
-            R.layout.task_thumbnail,
+            R.layout.task_thumbnail_deprecated,
             VIEW_POOL_MAX_SIZE,
             VIEW_POOL_INITIAL_SIZE
         )
@@ -108,22 +108,21 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             tasks.map { task ->
                 val snapshotView =
                     if (enableRefactorTaskThumbnail()) {
-                            TaskThumbnailView(context)
-                        } else {
-                            taskThumbnailViewDeprecatedPool.view
-                        }
-                        .also { snapshotView ->
-                            addView(
-                                snapshotView,
-                                // Add snapshotView to the front after initial views e.g. icon and
-                                // background.
-                                childCountAtInflation,
-                                LayoutParams(
-                                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    ViewGroup.LayoutParams.WRAP_CONTENT
-                                )
-                            )
-                        }
+                        LayoutInflater.from(context).inflate(R.layout.task_thumbnail, this, false)
+                    } else {
+                        taskThumbnailViewDeprecatedPool.view
+                    }
+
+                addView(
+                    snapshotView,
+                    // Add snapshotView to the front after initial views e.g. icon and
+                    // background.
+                    childCountAtInflation,
+                    LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                )
                 TaskContainer(
                     this,
                     task,

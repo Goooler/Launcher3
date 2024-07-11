@@ -49,6 +49,7 @@ import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.AnyThread;
+import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
@@ -513,9 +514,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             return Collections.unmodifiableSet(mPerDisplayBounds.keySet());
         }
 
-        /**
-         * Returns all {@link WindowBounds}s for the current display.
-         */
+        /** Returns all {@link WindowBounds}s for the current display. */
+        @Nullable
         public List<WindowBounds> getCurrentBounds() {
             return mPerDisplayBounds.get(normalizedDisplayInfo);
         }

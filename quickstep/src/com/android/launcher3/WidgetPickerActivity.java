@@ -20,6 +20,7 @@ import static android.content.ClipDescription.MIMETYPE_TEXT_INTENT;
 import static android.view.WindowInsets.Type.navigationBars;
 import static android.view.WindowInsets.Type.statusBars;
 
+import static com.android.launcher3.Flags.enablePredictiveBackGesture;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -33,6 +34,9 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.window.BackEvent;
+import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -124,6 +128,8 @@ public class WidgetPickerActivity extends BaseActivity {
     /** A set of user ids that should be filtered out from the selected widgets. */
     @NonNull
     Set<Integer> mFilteredUserIds = new HashSet<>();
+    @Nullable
+    private WidgetsFullSheet mWidgetSheet;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +152,18 @@ public class WidgetPickerActivity extends BaseActivity {
 
         parseIntentExtras();
         refreshAndBindWidgets();
+    }
+
+    @Override
+    protected void registerBackDispatcher() {
+        if (!enablePredictiveBackGesture()) {
+            super.registerBackDispatcher();
+            return;
+        }
+
+        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                new BackAnimationCallback());
     }
 
     private void parseIntentExtras() {
@@ -293,12 +311,12 @@ public class WidgetPickerActivity extends BaseActivity {
         MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(widgets));
     }
 
-    private void openWidgetsSheet() {
+   private void openWidgetsSheet() {
         MAIN_EXECUTOR.execute(() -> {
-            WidgetsFullSheet widgetSheet = WidgetsFullSheet.show(this, true);
-            widgetSheet.mayUpdateTitleAndDescription(mTitle, mDescription);
-            widgetSheet.disableNavBarScrim(true);
-            widgetSheet.addOnCloseListener(this::finish);
+            mWidgetSheet = WidgetsFullSheet.show(this, true);
+            mWidgetSheet.mayUpdateTitleAndDescription(mTitle, mDescription);
+            mWidgetSheet.disableNavBarScrim(true);
+            mWidgetSheet.addOnCloseListener(this::finish);
         });
     }
 
@@ -316,6 +334,51 @@ public class WidgetPickerActivity extends BaseActivity {
             mWidgetPredictionsRequester.clear();
         }
     }
+
+    /**
+     * Animation callback for different predictive back animation states for the widget picker.
+     */
+    private class BackAnimationCallback implements OnBackAnimationCallback {
+        @Nullable
+        OnBackAnimationCallback mActiveOnBackAnimationCallback;
+
+        @Override
+        public void onBackStarted(@NonNull BackEvent backEvent) {
+            if (mActiveOnBackAnimationCallback != null) {
+                mActiveOnBackAnimationCallback.onBackCancelled();
+            }
+            if (mWidgetSheet != null) {
+                mActiveOnBackAnimationCallback = mWidgetSheet;
+                mActiveOnBackAnimationCallback.onBackStarted(backEvent);
+            }
+        }
+
+        @Override
+        public void onBackInvoked() {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackInvoked();
+            mActiveOnBackAnimationCallback = null;
+        }
+
+        @Override
+        public void onBackProgressed(@NonNull BackEvent backEvent) {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackProgressed(backEvent);
+        }
+
+        @Override
+        public void onBackCancelled() {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackCancelled();
+            mActiveOnBackAnimationCallback = null;
+        }
+    };
 
     private WidgetAcceptabilityVerdict isWidgetAcceptable(WidgetItem widget) {
         final AppWidgetProviderInfo info = widget.widgetInfo;

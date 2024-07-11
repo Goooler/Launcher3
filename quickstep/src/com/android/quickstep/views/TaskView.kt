@@ -31,6 +31,7 @@ import android.util.AttributeSet
 import android.util.FloatProperty
 import android.util.Log
 import android.view.Display
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnClickListener
@@ -666,9 +667,8 @@ constructor(
             if (enableRefactorTaskThumbnail()) {
                 thumbnailViewDeprecated.visibility = GONE
                 val indexOfSnapshotView = indexOfChild(thumbnailViewDeprecated)
-                TaskThumbnailView(context).apply {
-                    layoutParams = thumbnailViewDeprecated.layoutParams
-                    addView(this, indexOfSnapshotView)
+                LayoutInflater.from(context).inflate(R.layout.task_thumbnail, this, false).also {
+                    addView(it, indexOfSnapshotView, thumbnailViewDeprecated.layoutParams)
                 }
             } else {
                 thumbnailViewDeprecated
