@@ -1226,22 +1226,44 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         }
     }
 
+    public void handleGroupTaskLaunch(
+            GroupTask task,
+            @Nullable RemoteTransition remoteTransition,
+            boolean onDesktop) {
+        handleGroupTaskLaunch(task, remoteTransition, onDesktop, null, null);
+    }
+
     /**
      * Launches the given GroupTask with the following behavior:
      * - If the GroupTask is a DesktopTask, launch the tasks in that Desktop.
      * - If {@code onDesktop}, bring the given GroupTask to the front.
      * - If the GroupTask is a single task, launch it via startActivityFromRecents.
      * - Otherwise, we assume the GroupTask is a Split pair and launch them together.
+     * <p>
+     * Given start and/or finish callbacks, they will be run before an after the app launch
+     * respectively in cases where we can't use the remote transition, otherwise we will assume that
+     * these callbacks are included in the remote transition.
      */
-    public void handleGroupTaskLaunch(GroupTask task, @Nullable RemoteTransition remoteTransition,
-            boolean onDesktop) {
+    public void handleGroupTaskLaunch(
+            GroupTask task,
+            @Nullable RemoteTransition remoteTransition,
+            boolean onDesktop,
+            @Nullable Runnable onStartCallback,
+            @Nullable Runnable onFinishCallback) {
         if (task instanceof DesktopTask) {
             UI_HELPER_EXECUTOR.execute(() ->
                     SystemUiProxy.INSTANCE.get(this).showDesktopApps(getDisplay().getDisplayId(),
                             remoteTransition));
         } else if (onDesktop) {
-            UI_HELPER_EXECUTOR.execute(() ->
-                    SystemUiProxy.INSTANCE.get(this).showDesktopApp(task.task1.key.id));
+            UI_HELPER_EXECUTOR.execute(() -> {
+                if (onStartCallback != null) {
+                    onStartCallback.run();
+                }
+                SystemUiProxy.INSTANCE.get(this).showDesktopApp(task.task1.key.id);
+                if (onFinishCallback != null) {
+                    onFinishCallback.run();
+                }
+            });
         } else if (task.task2 == null) {
             UI_HELPER_EXECUTOR.execute(() -> {
                 ActivityOptions activityOptions =

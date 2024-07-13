@@ -20,6 +20,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.SCROLL_FINISHED_
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -27,8 +28,8 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.app.animation.Interpolators;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 
@@ -188,6 +189,10 @@ public abstract class FastScrollRecyclerView extends RecyclerView  {
      * Scrolls this recycler view to the top.
      */
     public void scrollToTop() {
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.PRIVATE_SPACE_SCROLL_FAILURE, "FastScrollRecyclerView#scrollToTop",
+                    new Exception());
+        }
         if (mScrollbar != null) {
             mScrollbar.reattachThumbToScroll();
         }

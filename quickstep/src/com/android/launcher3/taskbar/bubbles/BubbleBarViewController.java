@@ -400,7 +400,7 @@ public class BubbleBarViewController {
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         mBubbleDragController.setupBubbleView(addedBubble.getView());
         if (!suppressAnimation) {
-            animateBubbleNotification(addedBubble, isExpanding, /* isUpdate= */ true);
+            animateBubbleNotification(addedBubble, isExpanding, /* isUpdate= */ false);
         }
     }
 
@@ -428,7 +428,7 @@ public class BubbleBarViewController {
                 }
                 return;
             }
-            animateBubbleNotification(bubble, isExpanding, /* isUpdate= */ true);
+            animateBubbleNotification(bubble, isExpanding, /* isUpdate= */ false);
         } else {
             Log.w(TAG, "addBubble, bubble was null!");
         }

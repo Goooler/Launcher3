@@ -75,7 +75,7 @@ public class UserCache implements SafeCloseable {
 
     private final List<BiConsumer<UserHandle, String>> mUserEventListeners = new ArrayList<>();
     private final SimpleBroadcastReceiver mUserChangeReceiver =
-            new SimpleBroadcastReceiver(this::onUsersChanged);
+            new SimpleBroadcastReceiver(MODEL_EXECUTOR, this::onUsersChanged);
 
     private final Context mContext;
 
@@ -93,12 +93,12 @@ public class UserCache implements SafeCloseable {
 
     @Override
     public void close() {
-        MODEL_EXECUTOR.execute(() -> mUserChangeReceiver.unregisterReceiverSafelySync(mContext));
+        MODEL_EXECUTOR.execute(() -> mUserChangeReceiver.unregisterReceiverSafely(mContext));
     }
 
     @WorkerThread
     private void initAsync() {
-        mUserChangeReceiver.registerSync(mContext,
+        mUserChangeReceiver.register(mContext,
                 Intent.ACTION_MANAGED_PROFILE_AVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_REMOVED,

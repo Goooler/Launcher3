@@ -139,6 +139,10 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
         final float aspectRatio = destinationBounds.width() / (float) destinationBounds.height();
         String reasonForCreateOverlay = null; // For debugging purpose.
+
+        // Slightly larger app bounds to allow for off by 1 pixel source-rect-hint errors.
+        Rect overflowAppBounds = new Rect(appBounds.left - 1, appBounds.top - 1,
+                        appBounds.right + 1, appBounds.bottom + 1);
         if (sourceRectHint.isEmpty()) {
             reasonForCreateOverlay = "Source rect hint is empty";
         } else if (sourceRectHint.width() < destinationBounds.width()
@@ -149,7 +153,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             // animation in this case.
             reasonForCreateOverlay = "Source rect hint is too small " + sourceRectHint;
             sourceRectHint.setEmpty();
-        } else if (!appBounds.contains(sourceRectHint)) {
+        } else if (!overflowAppBounds.contains(sourceRectHint)) {
             // This is a situation in which the source hint rect is outside the app bounds, so it is
             // not a valid rectangle to use for cropping app surface
             reasonForCreateOverlay = "Source rect hint exceeds display bounds " + sourceRectHint;

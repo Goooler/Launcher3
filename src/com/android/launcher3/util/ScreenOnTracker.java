@@ -19,6 +19,8 @@ import static android.content.Intent.ACTION_SCREEN_OFF;
 import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.content.Intent.ACTION_USER_PRESENT;
 
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
 import android.content.Context;
 import android.content.Intent;
 
@@ -32,7 +34,8 @@ public class ScreenOnTracker implements SafeCloseable {
     public static final MainThreadInitializedObject<ScreenOnTracker> INSTANCE =
             new MainThreadInitializedObject<>(ScreenOnTracker::new);
 
-    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onReceive);
+    private final SimpleBroadcastReceiver mReceiver =
+            new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, this::onReceive);
     private final CopyOnWriteArrayList<ScreenOnListener> mListeners = new CopyOnWriteArrayList<>();
 
     private final Context mContext;
@@ -42,12 +45,12 @@ public class ScreenOnTracker implements SafeCloseable {
         // Assume that the screen is on to begin with
         mContext = context;
         mIsScreenOn = true;
-        mReceiver.registerAsync(context, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
+        mReceiver.register(context, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
     }
 
     @Override
     public void close() {
-        mReceiver.unregisterReceiverSafelyAsync(mContext);
+        mReceiver.unregisterReceiverSafely(mContext);
     }
 
     private void onReceive(Intent intent) {

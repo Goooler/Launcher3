@@ -19,6 +19,17 @@ package {
 
 min_launcher3_sdk_version = "30"
 
+// Targets that don't inherit framework aconfig libs (i.e., those that don't set
+// `platform_apis: true`) must manually link them.
+java_defaults {
+    name: "launcher-non-platform-apis-defaults",
+    static_libs: [
+        "android.os.flags-aconfig-java",
+        "android.appwidget.flags-aconfig-java",
+        "com.android.window.flags.window-aconfig-java",
+    ]
+}
+
 // Common source files used to build launcher (java and kotlin)
 // All sources are split so they can be reused in many other libraries/apps in other folders
 
@@ -141,7 +152,6 @@ android_library {
     static_libs: [
         "LauncherPluginLib",
         "launcher_quickstep_log_protos_lite",
-        "android.os.flags-aconfig-java",
         "androidx-constraintlayout_constraintlayout",
         "androidx.recyclerview_recyclerview",
         "androidx.dynamicanimation_dynamicanimation",
@@ -163,8 +173,6 @@ android_library {
         "kotlinx_coroutines",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
-        "android.appwidget.flags-aconfig-java",
-        "com.android.window.flags.window-aconfig-java",
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",
@@ -179,6 +187,7 @@ android_library {
 //
 android_app {
     name: "Launcher3",
+    defaults: ["launcher-non-platform-apis-defaults"],
 
     static_libs: [
         "Launcher3ResLib",

@@ -21,6 +21,7 @@ import static android.content.Intent.ACTION_PACKAGE_CHANGED;
 import static android.content.Intent.ACTION_PACKAGE_REMOVED;
 
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.systemui.shared.system.PackageManagerWrapper.ACTION_PREFERRED_ACTIVITY_CHANGED;
 
 import android.content.ActivityNotFoundException;
@@ -55,10 +56,11 @@ import java.util.function.Consumer;
 public final class OverviewComponentObserver {
     private static final String TAG = "OverviewComponentObserver";
 
+    // We register broadcast receivers on main thread to avoid missing updates.
     private final SimpleBroadcastReceiver mUserPreferenceChangeReceiver =
-            new SimpleBroadcastReceiver(this::updateOverviewTargets);
+            new SimpleBroadcastReceiver(MAIN_EXECUTOR, this::updateOverviewTargets);
     private final SimpleBroadcastReceiver mOtherHomeAppUpdateReceiver =
-            new SimpleBroadcastReceiver(this::updateOverviewTargets);
+            new SimpleBroadcastReceiver(MAIN_EXECUTOR, this::updateOverviewTargets);
 
     private final Context mContext;
     private final RecentsAnimationDeviceState mDeviceState;
@@ -102,7 +104,7 @@ public final class OverviewComponentObserver {
             mConfigChangesMap.append(fallbackComponent.hashCode(), fallbackInfo.configChanges);
         } catch (PackageManager.NameNotFoundException ignored) { /* Impossible */ }
 
-        mUserPreferenceChangeReceiver.registerAsync(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
+        mUserPreferenceChangeReceiver.register(mContext, ACTION_PREFERRED_ACTIVITY_CHANGED);
         updateOverviewTargets();
     }
 
@@ -191,7 +193,7 @@ public final class OverviewComponentObserver {
                 unregisterOtherHomeAppUpdateReceiver();
 
                 mUpdateRegisteredPackage = defaultHome.getPackageName();
-                mOtherHomeAppUpdateReceiver.registerPkgActionsAsync(
+                mOtherHomeAppUpdateReceiver.registerPkgActions(
                         mContext, mUpdateRegisteredPackage, ACTION_PACKAGE_ADDED,
                         ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED);
             }
@@ -203,13 +205,13 @@ public final class OverviewComponentObserver {
      * Clean up any registered receivers.
      */
     public void onDestroy() {
-        mUserPreferenceChangeReceiver.unregisterReceiverSafelyAsync(mContext);
+        mUserPreferenceChangeReceiver.unregisterReceiverSafely(mContext);
         unregisterOtherHomeAppUpdateReceiver();
     }
 
     private void unregisterOtherHomeAppUpdateReceiver() {
         if (mUpdateRegisteredPackage != null) {
-            mOtherHomeAppUpdateReceiver.unregisterReceiverSafelyAsync(mContext);
+            mOtherHomeAppUpdateReceiver.unregisterReceiverSafely(mContext);
             mUpdateRegisteredPackage = null;
         }
     }

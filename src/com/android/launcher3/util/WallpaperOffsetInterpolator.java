@@ -32,7 +32,7 @@ public class WallpaperOffsetInterpolator {
     private static final int MIN_PARALLAX_PAGE_SPAN = 4;
 
     private final SimpleBroadcastReceiver mWallpaperChangeReceiver =
-            new SimpleBroadcastReceiver(i -> onWallpaperChanged());
+            new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, i -> onWallpaperChanged());
     private final Workspace<?> mWorkspace;
     private final boolean mIsRtl;
     private final Handler mHandler;
@@ -198,10 +198,10 @@ public class WallpaperOffsetInterpolator {
     public void setWindowToken(IBinder token) {
         mWindowToken = token;
         if (mWindowToken == null && mRegistered) {
-            mWallpaperChangeReceiver.unregisterReceiverSafelyAsync(mWorkspace.getContext());
+            mWallpaperChangeReceiver.unregisterReceiverSafely(mWorkspace.getContext());
             mRegistered = false;
         } else if (mWindowToken != null && !mRegistered) {
-            mWallpaperChangeReceiver.registerAsync(
+            mWallpaperChangeReceiver.register(
                     mWorkspace.getContext(), ACTION_WALLPAPER_CHANGED);
             onWallpaperChanged();
             mRegistered = true;

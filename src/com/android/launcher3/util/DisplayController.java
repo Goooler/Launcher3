@@ -110,7 +110,10 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private DisplayInfoChangeListener mPriorityListener;
     private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
 
-    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onIntent);
+    // We will register broadcast receiver on main thread to ensure not missing changes on
+    // TARGET_OVERLAY_PACKAGE and ACTION_OVERLAY_CHANGED.
+    private final SimpleBroadcastReceiver mReceiver =
+            new SimpleBroadcastReceiver(MAIN_EXECUTOR, this::onIntent);
 
     private Info mInfo;
     private boolean mDestroyed = false;
@@ -133,11 +136,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mWindowContext.registerComponentCallbacks(this);
         } else {
             mWindowContext = null;
-            mReceiver.registerAsync(mContext, ACTION_CONFIGURATION_CHANGED);
+            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
         }
 
         // Initialize navigation mode change listener
-        mReceiver.registerPkgActionsAsync(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
+        mReceiver.registerPkgActions(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
 
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
         Context displayInfoContext = getDisplayInfoContext(display);
@@ -224,7 +227,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         } else {
             // TODO: unregister broadcast receiver
         }
-        mReceiver.unregisterReceiverSafelyAsync(mContext);
+        mReceiver.unregisterReceiverSafely(mContext);
     }
 
     /**

@@ -15,21 +15,17 @@
  */
 package com.android.launcher3.util;
 
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.PatternMatcher;
 import android.text.TextUtils;
 
+import androidx.annotation.AnyThread;
 import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
-import androidx.annotation.WorkerThread;
-
-import com.android.launcher3.BuildConfig;
 
 import java.util.function.Consumer;
 
@@ -37,8 +33,16 @@ public class SimpleBroadcastReceiver extends BroadcastReceiver {
 
     private final Consumer<Intent> mIntentConsumer;
 
-    public SimpleBroadcastReceiver(Consumer<Intent> intentConsumer) {
+    // Handler to register/unregister broadcast receiver
+    private final Handler mHandler;
+
+    public SimpleBroadcastReceiver(LooperExecutor looperExecutor, Consumer<Intent> intentConsumer) {
+        this(looperExecutor.getHandler(), intentConsumer);
+    }
+
+    public SimpleBroadcastReceiver(Handler handler, Consumer<Intent> intentConsumer) {
         mIntentConsumer = intentConsumer;
+        mHandler = handler;
     }
 
     @Override
@@ -46,55 +50,104 @@ public class SimpleBroadcastReceiver extends BroadcastReceiver {
         mIntentConsumer.accept(intent);
     }
 
-    /** Helper method to register multiple actions. Caller should be on main thread. */
-    @UiThread
-    public void registerAsync(Context context, String... actions) {
-        assertOnMainThread();
-        UI_HELPER_EXECUTOR.execute(() -> registerSync(context, actions));
+    /** Calls {@link #register(Context, Runnable, String...)} with null completionCallback. */
+    @AnyThread
+    public void register(Context context, String... actions) {
+        register(context, null, actions);
     }
 
-    /** Helper method to register multiple actions. Caller should be on main thread. */
-    @WorkerThread
-    public void registerSync(Context context, String... actions) {
-        assertOnBgThread();
+    /**
+     * Calls {@link #register(Context, Runnable, int, String...)} with null completionCallback.
+     */
+    @AnyThread
+    public void register(Context context, int flags, String... actions) {
+        register(context, null, flags, actions);
+    }
+
+    /**
+     * Register broadcast receiver. If this method is called on the same looper with mHandler's
+     * looper, then register will be called synchronously. Otherwise asynchronously. This ensures
+     * register happens on {@link #mHandler}'s looper.
+     *
+     * @param completionCallback callback that will be triggered after registration is completed,
+     *                           caller usually pass this callback to check if states has changed
+     *                           while registerReceiver() is executed on a binder call.
+     */
+    @AnyThread
+    public void register(
+            Context context, @Nullable Runnable completionCallback, String... actions) {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            registerInternal(context, completionCallback, actions);
+        } else {
+            mHandler.post(() -> registerInternal(context, completionCallback, actions));
+        }
+    }
+
+    /** Register broadcast receiver and run completion callback if passed. */
+    @AnyThread
+    private void registerInternal(
+            Context context, @Nullable Runnable completionCallback, String... actions) {
         context.registerReceiver(this, getFilter(actions));
+        if (completionCallback != null) {
+            completionCallback.run();
+        }
     }
 
     /**
-     * Helper method to register multiple actions associated with a action. Caller should be from
-     * main thread.
+     * Same as {@link #register(Context, Runnable, String...)} above but with additional flags
+     * params.
      */
-    @UiThread
-    public void registerPkgActionsAsync(Context context, @Nullable String pkg, String... actions) {
-        assertOnMainThread();
-        UI_HELPER_EXECUTOR.execute(() -> registerPkgActionsSync(context, pkg, actions));
+    @AnyThread
+    public void register(
+            Context context, @Nullable Runnable completionCallback, int flags, String... actions) {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            registerInternal(context, completionCallback, flags, actions);
+        } else {
+            mHandler.post(() -> registerInternal(context, completionCallback, flags, actions));
+        }
+    }
+
+    /** Register broadcast receiver and run completion callback if passed. */
+    @AnyThread
+    private void registerInternal(
+            Context context, @Nullable Runnable completionCallback, int flags, String... actions) {
+        context.registerReceiver(this, getFilter(actions), flags);
+        if (completionCallback != null) {
+            completionCallback.run();
+        }
+    }
+
+    /** Same as {@link #register(Context, Runnable, String...)} above but with pkg name. */
+    @AnyThread
+    public void registerPkgActions(Context context, @Nullable String pkg, String... actions) {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            context.registerReceiver(this, getPackageFilter(pkg, actions));
+        } else {
+            mHandler.post(() -> {
+                context.registerReceiver(this, getPackageFilter(pkg, actions));
+            });
+        }
     }
 
     /**
-     * Helper method to register multiple actions associated with a action. Caller should be from
-     * bg thread.
+     * Unregister broadcast receiver. If this method is called on the same looper with mHandler's
+     * looper, then unregister will be called synchronously. Otherwise asynchronously. This ensures
+     * unregister happens on {@link #mHandler}'s looper.
      */
-    @WorkerThread
-    public void registerPkgActionsSync(Context context, @Nullable String pkg, String... actions) {
-        assertOnBgThread();
-        context.registerReceiver(this, getPackageFilter(pkg, actions));
+    @AnyThread
+    public void unregisterReceiverSafely(Context context) {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            unregisterReceiverSafelyInternal(context);
+        } else {
+            mHandler.post(() -> {
+                unregisterReceiverSafelyInternal(context);
+            });
+        }
     }
 
-    /**
-     * Unregisters the receiver ignoring any errors on bg thread. Caller should be on main thread.
-     */
-    @UiThread
-    public void unregisterReceiverSafelyAsync(Context context) {
-        assertOnMainThread();
-        UI_HELPER_EXECUTOR.execute(() -> unregisterReceiverSafelySync(context));
-    }
-
-    /**
-     * Unregisters the receiver ignoring any errors on bg thread. Caller should be on bg thread.
-     */
-    @WorkerThread
-    public void unregisterReceiverSafelySync(Context context) {
-        assertOnBgThread();
+    /** Unregister broadcast receiver ignoring any errors. */
+    @AnyThread
+    private void unregisterReceiverSafelyInternal(Context context) {
         try {
             context.unregisterReceiver(this);
         } catch (IllegalArgumentException e) {
@@ -120,21 +173,5 @@ public class SimpleBroadcastReceiver extends BroadcastReceiver {
             filter.addAction(action);
         }
         return filter;
-    }
-
-    private static void assertOnBgThread() {
-        if (BuildConfig.IS_STUDIO_BUILD && isMainThread()) {
-            throw new IllegalStateException("Should not be called from main thread!");
-        }
-    }
-
-    private static void assertOnMainThread() {
-        if (BuildConfig.IS_STUDIO_BUILD && !isMainThread()) {
-            throw new IllegalStateException("Should not be called from bg thread!");
-        }
-    }
-
-    private static boolean isMainThread() {
-        return Thread.currentThread() == Looper.getMainLooper().getThread();
     }
 }
