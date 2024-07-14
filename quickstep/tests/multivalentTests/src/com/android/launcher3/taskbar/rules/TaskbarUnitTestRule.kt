@@ -136,13 +136,19 @@ class TaskbarUnitTestRule(
 
                 taskbarManager =
                     TestUtil.getOnUiThread {
-                        TaskbarManager(
-                            context,
-                            AllAppsActionManager(context, UI_HELPER_EXECUTOR) {
-                                PendingIntent(IIntentSender.Default())
-                            },
-                            object : TaskbarNavButtonCallbacks {},
-                        )
+                        object :
+                            TaskbarManager(
+                                context,
+                                AllAppsActionManager(context, UI_HELPER_EXECUTOR) {
+                                    PendingIntent(IIntentSender.Default())
+                                },
+                                object : TaskbarNavButtonCallbacks {},
+                            ) {
+                            override fun recreateTaskbar() {
+                                super.recreateTaskbar()
+                                if (currentActivityContext != null) injectControllers()
+                            }
+                        }
                     }
 
                 try {
@@ -154,7 +160,6 @@ class TaskbarUnitTestRule(
                         taskbarManager.onUserUnlocked() // Required to complete initialization.
                     }
 
-                    injectControllers()
                     base.evaluate()
                 } finally {
                     // Revert Taskbar window.
@@ -168,10 +173,7 @@ class TaskbarUnitTestRule(
     }
 
     /** Simulates Taskbar recreation lifecycle. */
-    fun recreateTaskbar() {
-        instrumentation.runOnMainSync { taskbarManager.recreateTaskbar() }
-        injectControllers()
-    }
+    fun recreateTaskbar() = instrumentation.runOnMainSync { taskbarManager.recreateTaskbar() }
 
     private fun injectControllers() {
         val controllers = activityContext.controllers

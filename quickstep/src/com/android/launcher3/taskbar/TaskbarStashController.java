@@ -286,18 +286,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     /**
-     * Show Taskbar upon receiving broadcast
-     */
-    public void showTaskbarFromBroadcast() {
-        // If user is in middle of taskbar education handle go to next step of education
-        if (mControllers.taskbarEduTooltipController.isBeforeTooltipFeaturesStep()) {
-            mControllers.taskbarEduTooltipController.hide();
-            mControllers.taskbarEduTooltipController.maybeShowFeaturesEdu();
-        }
-        updateAndAnimateTransientTaskbar(false);
-    }
-
-    /**
      * Initializes the controller
      */
     public void init(
