@@ -4,6 +4,8 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_BACK_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_HOME_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_HOME_BUTTON_TAP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_TAP;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import android.os.Handler;
 import android.view.View;
+import android.view.inputmethod.Flags;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
@@ -109,8 +112,27 @@ public class TaskbarNavButtonControllerTest {
 
     @Test
     public void testPressImeSwitcher() {
+        mNavButtonController.init(mockTaskbarControllers);
         mNavButtonController.onButtonClick(BUTTON_IME_SWITCH, mockView);
+        verify(mockStatsLogger, times(1)).log(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP);
+        verify(mockStatsLogger, never()).log(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS);
         verify(mockSystemUiProxy, times(1)).onImeSwitcherPressed();
+        verify(mockSystemUiProxy, never()).onImeSwitcherLongPress();
+    }
+
+    @Test
+    public void testLongPressImeSwitcher() {
+        mNavButtonController.init(mockTaskbarControllers);
+        mNavButtonController.onButtonLongClick(BUTTON_IME_SWITCH, mockView);
+        verify(mockStatsLogger, never()).log(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP);
+        verify(mockSystemUiProxy, never()).onImeSwitcherPressed();
+        if (Flags.imeSwitcherRevamp()) {
+            verify(mockStatsLogger, times(1)).log(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS);
+            verify(mockSystemUiProxy, times(1)).onImeSwitcherLongPress();
+        } else {
+            verify(mockStatsLogger, never()).log(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS);
+            verify(mockSystemUiProxy, never()).onImeSwitcherLongPress();
+        }
     }
 
     @Test

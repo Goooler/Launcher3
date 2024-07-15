@@ -229,6 +229,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     @Override
+    public void onImeSwitcherLongPress() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.onImeSwitcherLongPress();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onImeSwitcherLongPress");
+            }
+        }
+    }
+
+    @Override
     public void setHomeRotationEnabled(boolean enabled) {
         if (mSystemUiProxy != null) {
             try {

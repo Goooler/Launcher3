@@ -40,8 +40,13 @@ import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
 import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.system.QuickStepContract
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
@@ -58,6 +63,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             recentsView.mTasksRepository!!,
         )
     }
+    private lateinit var viewAttachedScope: CoroutineScope
 
     private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
     private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
@@ -87,9 +93,10 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        // TODO(b/335396935) replace MainScope with shorter lifecycle.
-        MainScope().launch {
-            viewModel.uiState.collect { viewModelUiState ->
+        viewAttachedScope =
+            CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskThumbnailView"))
+        viewModel.uiState
+            .onEach { viewModelUiState ->
                 resetViews()
                 when (viewModelUiState) {
                     is Uninitialized -> {}
@@ -98,20 +105,20 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
                     is BackgroundOnly -> drawBackground(viewModelUiState.backgroundColor)
                 }
             }
-        }
-        MainScope().launch {
-            viewModel.dimProgress.collect { dimProgress ->
+            .launchIn(viewAttachedScope)
+        viewModel.dimProgress
+            .onEach { dimProgress ->
                 // TODO(b/348195366) Add fade in/out for scrim
                 scrimView.alpha = dimProgress * MAX_SCRIM_ALPHA
             }
-        }
-        MainScope().launch { viewModel.cornerRadiusProgress.collect { invalidateOutline() } }
-        MainScope().launch {
-            viewModel.inheritedScale.collect { viewModelInheritedScale ->
+            .launchIn(viewAttachedScope)
+        viewModel.cornerRadiusProgress.onEach { invalidateOutline() }.launchIn(viewAttachedScope)
+        viewModel.inheritedScale
+            .onEach { viewModelInheritedScale ->
                 inheritedScale = viewModelInheritedScale
                 invalidateOutline()
             }
-        }
+            .launchIn(viewAttachedScope)
 
         clipToOutline = true
         outlineProvider =
@@ -120,6 +127,11 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
                     outline.setRoundRect(measuredBounds, getCurrentCornerRadius())
                 }
             }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        viewAttachedScope.cancel("TaskThumbnailView detaching from window")
     }
 
     override fun onRecycle() {

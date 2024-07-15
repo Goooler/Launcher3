@@ -795,6 +795,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     private int mOffsetMidpointIndexOverride = INVALID_PAGE;
 
+    /**
+     * Whether or not any task has been dismissed i.e. swiped away by the user, in the lifetime of
+     * RecentsView being open and displayed to the user. It is reset in the {@link #reset()} method
+     * i.e. when RecentsView closes.
+     */
+    private boolean mAnyTaskHasBeenDismissed;
+
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             BaseContainerInterface sizeStrategy) {
         super(context, attrs, defStyleAttr);
@@ -2181,15 +2188,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * Updates TaskView scaling and translation required to support variable width.
      */
     private void updateTaskSize() {
-        updateTaskSize(false);
-    }
-
-    /**
-     * Updates TaskView scaling and translation required to support variable width.
-     *
-     * @param isTaskDismissal indicates if update was called due to task dismissal
-     */
-    private void updateTaskSize(boolean isTaskDismissal) {
         final int taskCount = getTaskViewCount();
         if (taskCount == 0) {
             return;
@@ -2216,7 +2214,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
         mClearAllButton.setFullscreenTranslationPrimary(accumulatedTranslationX);
 
-        updateGridProperties(isTaskDismissal);
+        updateGridProperties();
     }
 
     public void getTaskSize(Rect outRect) {
@@ -2516,6 +2514,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         mIgnoreResetTaskId = -1;
         mTaskListChangeId = -1;
         mFocusedTaskViewId = -1;
+        mAnyTaskHasBeenDismissed = false;
 
         Log.d(TAG, "reset - mEnableDrawingLiveTile: " + mEnableDrawingLiveTile
                 + ", mRecentsAnimationController: " + mRecentsAnimationController);
@@ -2991,22 +2990,11 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     /**
      * Updates TaskView and ClearAllButtion scaling and translation required to turn into grid
      * layout.
-     * This method is used when no task dismissal has occurred.
+     *
+     * Skips rebalance.
      */
     private void updateGridProperties() {
-        updateGridProperties(false, Integer.MAX_VALUE);
-    }
-
-    /**
-     * Updates TaskView and ClearAllButtion scaling and translation required to turn into grid
-     * layout.
-     *
-     * This method is used when task dismissal has occurred, but rebalance is not needed.
-     *
-     * @param isTaskDismissal indicates if update was called due to task dismissal
-     */
-    private void updateGridProperties(boolean isTaskDismissal) {
-        updateGridProperties(isTaskDismissal, Integer.MAX_VALUE);
+        updateGridProperties(Integer.MAX_VALUE);
     }
 
     /**
@@ -3016,11 +3004,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * This method only calculates the potential position and depends on {@link #setGridProgress} to
      * apply the actual scaling and translation.
      *
-     * @param isTaskDismissal    indicates if update was called due to task dismissal
      * @param startRebalanceAfter which view index to start rebalancing from. Use Integer.MAX_VALUE
-     *                           to skip rebalance
+     *                            to skip rebalance
      */
-    private void updateGridProperties(boolean isTaskDismissal, int startRebalanceAfter) {
+    private void updateGridProperties(int startRebalanceAfter) {
         int taskCount = getTaskViewCount();
         if (taskCount == 0) {
             return;
@@ -3051,7 +3038,8 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         TaskView homeTaskView = getHomeTaskView();
         TaskView nextFocusedTaskView = null;
 
-        if (!isTaskDismissal) {
+        // Don't clear the top row, if the user has dismissed a task, to maintain the task order.
+        if (!mAnyTaskHasBeenDismissed) {
             mTopRowIdSet.clear();
         }
         for (int i = 0; i < taskCount; i++) {
@@ -3091,7 +3079,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
                 // Rebalance the grid starting after a certain index
                 boolean isTopRow;
-                if (isTaskDismissal) {
+                if (mAnyTaskHasBeenDismissed) {
                     if (i > startRebalanceAfter) {
                         mTopRowIdSet.remove(taskViewId);
                         isTopRow = topRowWidth <= bottomRowWidth;
@@ -3872,6 +3860,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 resetTaskVisuals();
 
                 if (success) {
+                    mAnyTaskHasBeenDismissed = true;
                     if (shouldRemoveTask) {
                         if (dismissedTaskView.isRunningTask()) {
                             finishRecentsAnimation(true /* toRecents */, false /* shouldPip */,
@@ -3980,7 +3969,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                             mTopRowIdSet.remove(mFocusedTaskViewId);
                             finalNextFocusedTaskView.animateIconScaleAndDimIntoView();
                         }
-                        updateTaskSize(/*isTaskDismissal=*/ true);
+                        updateTaskSize();
                         updateChildTaskOrientations();
                         // Update scroll and snap to page.
                         updateScrollSynchronously();
@@ -4016,8 +4005,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                                 }
 
                                 if (shouldRebalance) {
-                                    updateGridProperties(/*isTaskDismissal=*/ true,
-                                            highestVisibleTaskIndex);
+                                    updateGridProperties(highestVisibleTaskIndex);
                                     updateScrollSynchronously();
                                 }
                             }
