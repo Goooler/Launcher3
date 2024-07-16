@@ -21,22 +21,16 @@ import static com.android.launcher3.widget.LauncherWidgetHolder.APPWIDGET_HOST_I
 import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
-import android.view.accessibility.AccessibilityNodeInfo;
-import android.widget.RemoteViews;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.widget.LauncherWidgetHolder.ProviderChangedListener;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.function.IntConsumer;
 
 /**
@@ -128,38 +122,5 @@ class LauncherAppWidgetHost extends AppWidgetHost {
     @Override
     public void clearViews() {
         super.clearViews();
-    }
-
-    public static class ListenableHostView extends LauncherAppWidgetHostView {
-
-        private Set<Runnable> mUpdateListeners = Collections.EMPTY_SET;
-
-        ListenableHostView(Context context) {
-            super(context);
-        }
-
-        @Override
-        public void updateAppWidget(RemoteViews remoteViews) {
-            super.updateAppWidget(remoteViews);
-            mUpdateListeners.forEach(Runnable::run);
-        }
-
-        @Override
-        public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
-            super.onInitializeAccessibilityNodeInfo(info);
-            info.setClassName(LauncherAppWidgetHostView.class.getName());
-        }
-
-        /**
-         * Adds a callback to be run everytime the provided app widget updates.
-         * @return a closable to remove this callback
-         */
-        public SafeCloseable addUpdateListener(Runnable callback) {
-            if (mUpdateListeners == Collections.EMPTY_SET) {
-                mUpdateListeners = Collections.newSetFromMap(new WeakHashMap<>());
-            }
-            mUpdateListeners.add(callback);
-            return () -> mUpdateListeners.remove(callback);
-        }
     }
 }

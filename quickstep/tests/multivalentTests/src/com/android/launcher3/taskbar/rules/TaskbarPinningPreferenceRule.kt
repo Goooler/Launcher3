@@ -16,12 +16,13 @@
 
 package com.android.launcher3.taskbar.rules
 
-import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
-import com.android.launcher3.ConstantItem
-import com.android.launcher3.LauncherPrefs
+import android.platform.test.flag.junit.FlagsParameterization
+import android.platform.test.flag.junit.SetFlagsRule
+import com.android.launcher3.Flags.FLAG_ENABLE_TASKBAR_PINNING
 import com.android.launcher3.LauncherPrefs.Companion.TASKBAR_PINNING
 import com.android.launcher3.LauncherPrefs.Companion.TASKBAR_PINNING_IN_DESKTOP_MODE
-import kotlin.reflect.KProperty
+import com.android.launcher3.util.DisplayController
+import org.junit.rules.RuleChain
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
@@ -39,33 +40,26 @@ import org.junit.runners.model.Statement
  */
 class TaskbarPinningPreferenceRule(context: TaskbarWindowSandboxContext) : TestRule {
 
-    private val prefs = LauncherPrefs.get(context)
+    private val setFlagsRule =
+        SetFlagsRule(FlagsParameterization(mapOf(FLAG_ENABLE_TASKBAR_PINNING to true)))
+    private val pinningRule = TaskbarPreferenceRule(context, TASKBAR_PINNING)
+    private val desktopPinningRule = TaskbarPreferenceRule(context, TASKBAR_PINNING_IN_DESKTOP_MODE)
+    private val ruleChain =
+        RuleChain.outerRule(setFlagsRule).around(pinningRule).around(desktopPinningRule)
 
-    var isPinned by PinningPreference(TASKBAR_PINNING)
-    var isPinnedInDesktopMode by PinningPreference(TASKBAR_PINNING_IN_DESKTOP_MODE)
+    var isPinned by pinningRule::value
+    var isPinnedInDesktopMode by desktopPinningRule::value
 
     override fun apply(base: Statement, description: Description): Statement {
         return object : Statement() {
             override fun evaluate() {
-                val wasPinned = isPinned
-                val wasPinnedInDesktopMode = isPinnedInDesktopMode
+                DisplayController.enableTaskbarModePreferenceForTests(true)
                 try {
-                    base.evaluate()
+                    ruleChain.apply(base, description).evaluate()
                 } finally {
-                    isPinned = wasPinned
-                    isPinnedInDesktopMode = wasPinnedInDesktopMode
+                    DisplayController.enableTaskbarModePreferenceForTests(false)
                 }
             }
-        }
-    }
-
-    private inner class PinningPreference(private val constantItem: ConstantItem<Boolean>) {
-        operator fun getValue(thisRef: Any?, property: KProperty<*>): Boolean {
-            return prefs.get(constantItem)
-        }
-
-        operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Boolean) {
-            getInstrumentation().runOnMainSync { prefs.put(constantItem, value) }
         }
     }
 }

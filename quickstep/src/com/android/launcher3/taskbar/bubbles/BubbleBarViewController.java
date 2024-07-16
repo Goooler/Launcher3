@@ -89,6 +89,8 @@ public class BubbleBarViewController {
 
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
 
+    private TimeSource mTimeSource = System::currentTimeMillis;
+
     @Nullable
     private BubbleBarBoundsChangeListener mBoundsChangeListener;
 
@@ -576,7 +578,7 @@ public class BubbleBarViewController {
      * @param bubble dismissed bubble item
      */
     public void onDismissBubbleWhileDragging(@NonNull BubbleBarItem bubble) {
-        mSystemUiProxy.dragBubbleToDismiss(bubble.getKey());
+        mSystemUiProxy.dragBubbleToDismiss(bubble.getKey(), mTimeSource.currentTimeMillis());
     }
 
     /**
@@ -599,6 +601,11 @@ public class BubbleBarViewController {
     public interface BubbleBarBoundsChangeListener {
         /** Called when bounds have changed */
         void onBoundsChanged();
+    }
+
+    /** Interface for getting the current timestamp. */
+    interface TimeSource {
+        long currentTimeMillis();
     }
 
     /** Dumps the state of BubbleBarViewController. */

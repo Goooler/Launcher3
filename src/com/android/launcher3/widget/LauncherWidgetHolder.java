@@ -37,6 +37,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.BaseActivity;
@@ -49,7 +50,6 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.util.ResourceBasedOverride;
 import com.android.launcher3.util.SafeCloseable;
-import com.android.launcher3.widget.LauncherAppWidgetHost.ListenableHostView;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 import java.util.ArrayList;
@@ -484,7 +484,8 @@ public class LauncherWidgetHolder {
      * Sets or unsets a flag the can change whether the widget host should be in the listening
      * state.
      */
-    private void setShouldListenFlag(int flag, boolean on) {
+    @VisibleForTesting
+    void setShouldListenFlag(int flag, boolean on) {
         if (on) {
             mFlags.updateAndGet(old -> old | flag);
         } else {

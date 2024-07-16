@@ -356,6 +356,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
             }
         }
 
+        // if a bubble was updated upstream, but removed before the update was received, add it back
+        if (update.updatedBubble != null && !mBubbles.containsKey(update.updatedBubble.getKey())) {
+            mBubbles.put(update.updatedBubble.getKey(), update.updatedBubble);
+            mBubbleBarViewController.addBubble(
+                    update.updatedBubble, isExpanding, suppressAnimation);
+        }
+
         if (update.addedBubble != null && isCollapsed) {
             // If we're collapsed, the most recently added bubble will be selected.
             bubbleToSelect = update.addedBubble;

@@ -16,27 +16,43 @@
 
 package com.android.launcher3.taskbar.customization
 
+import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
 import com.android.launcher3.taskbar.TaskbarActivityContext
-import com.android.launcher3.taskbar.TaskbarControllers
 import com.android.launcher3.util.DisplayController
 
 /** Evaluates all the features taskbar can have. */
-class TaskbarFeatureEvaluator(
+class TaskbarFeatureEvaluator
+private constructor(
     private val taskbarActivityContext: TaskbarActivityContext,
-    private val taskbarControllers: TaskbarControllers,
 ) {
+
+    companion object {
+        @Volatile private lateinit var taskbarFeatureEvaluator: TaskbarFeatureEvaluator
+
+        @JvmStatic
+        fun getInstance(
+            taskbarActivityContext: TaskbarActivityContext,
+        ): TaskbarFeatureEvaluator {
+            synchronized(this) {
+                if (!::taskbarFeatureEvaluator.isInitialized) {
+                    taskbarFeatureEvaluator = TaskbarFeatureEvaluator(taskbarActivityContext)
+                }
+                return taskbarFeatureEvaluator
+            }
+        }
+    }
 
     val hasAllApps = true
     val hasAppIcons = true
     val hasBubbles = false
     val hasNavButtons = taskbarActivityContext.isThreeButtonNav
 
-    val hasRecents: Boolean
-        get() = taskbarControllers.taskbarRecentAppsController.shownTasks.isNotEmpty()
+    val isRecentsEnabled: Boolean
+        get() = enableRecentsInTaskbar()
 
     val hasDivider: Boolean
-        get() = enableTaskbarPinning() || hasRecents
+        get() = enableTaskbarPinning() || isRecentsEnabled
 
     val isTransient: Boolean
         get() = DisplayController.isTransientTaskbar(taskbarActivityContext)

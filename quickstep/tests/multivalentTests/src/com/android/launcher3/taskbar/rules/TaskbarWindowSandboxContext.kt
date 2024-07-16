@@ -50,7 +50,7 @@ private constructor(private val application: SandboxContext, base: Context) : Co
         )
     }
 
-    override fun getApplicationContext() = application
+    override fun getApplicationContext(): SandboxContext = application
 
     companion object {
         /** Creates a [TaskbarWindowSandboxContext] to sandbox [base] for Taskbar tests. */

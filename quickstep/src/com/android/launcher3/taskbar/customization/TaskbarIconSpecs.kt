@@ -29,6 +29,13 @@ object TaskbarIconSpecs {
     val defaultPersistentIconSize = iconSize40dp
     val defaultTransientIconSize = iconSize44dp
 
+    val minimumIconSize = iconSize40dp
+
+    val defaultPersistentIconMargin = TaskbarIconMarginSize(6)
+    val defaultTransientIconMargin = TaskbarIconMarginSize(12)
+
+    val minimumTaskbarIconTouchSize = TaskbarIconSize(48)
+
     val transientTaskbarIconSizeByGridSize =
         mapOf(
             TransientTaskbarIconSizeKey(6, 5, false) to iconSize52dp,

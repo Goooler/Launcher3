@@ -16,6 +16,7 @@
 
 package com.android.quickstep.taskbar.customization
 
+import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.customization.TaskbarFeatureEvaluator
 import com.android.launcher3.taskbar.customization.TaskbarIconSpecs
 import com.android.launcher3.taskbar.customization.TaskbarSpecsEvaluator
@@ -32,7 +33,9 @@ import org.mockito.kotlin.whenever
 class TaskbarSpecsEvaluatorTest {
 
     private val taskbarFeatureEvaluator = mock<TaskbarFeatureEvaluator>()
-    private val taskbarSpecsEvaluator = spy(TaskbarSpecsEvaluator(taskbarFeatureEvaluator))
+    private val taskbarActivityContext = mock<TaskbarActivityContext>()
+    private var taskbarSpecsEvaluator =
+        spy(TaskbarSpecsEvaluator(taskbarActivityContext, taskbarFeatureEvaluator, 0, 0))
 
     @Test
     fun testGetIconSizeByGrid_whenTaskbarIsTransient_withValidRowAndColumnInLandscape() {

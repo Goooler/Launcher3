@@ -19,6 +19,8 @@ package com.android.launcher3.taskbar.rules
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.LauncherMultivalentJUnit
+import com.android.launcher3.util.window.WindowManagerProxy
+import com.google.android.apps.nexuslauncher.deviceemulator.TestWindowManagerProxy
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.Description
@@ -51,6 +53,11 @@ class TaskbarPinningPreferenceRuleTest {
 
     @Test
     fun testEnableDesktopPinning_verifyDisplayController() {
+        context.applicationContext.putObject(
+            WindowManagerProxy.INSTANCE,
+            TestWindowManagerProxy(context).apply { isInDesktopMode = true },
+        )
+
         onSetup {
             preferenceRule.isPinned = false
             preferenceRule.isPinnedInDesktopMode = true
@@ -60,6 +67,11 @@ class TaskbarPinningPreferenceRuleTest {
 
     @Test
     fun testDisableDesktopPinning_verifyDisplayController() {
+        context.applicationContext.putObject(
+            WindowManagerProxy.INSTANCE,
+            TestWindowManagerProxy(context).apply { isInDesktopMode = true },
+        )
+
         onSetup {
             preferenceRule.isPinned = false
             preferenceRule.isPinnedInDesktopMode = false
@@ -83,12 +95,14 @@ class TaskbarPinningPreferenceRuleTest {
 
     /** Executes [runTest] after the [preferenceRule] setup phase completes. */
     private fun onSetup(runTest: () -> Unit) {
-        preferenceRule.apply(
-            object : Statement() {
-                override fun evaluate() = runTest()
-            },
-            DESCRIPTION,
-        )
+        preferenceRule
+            .apply(
+                object : Statement() {
+                    override fun evaluate() = runTest()
+                },
+                DESCRIPTION,
+            )
+            .evaluate()
     }
 
     private companion object {
