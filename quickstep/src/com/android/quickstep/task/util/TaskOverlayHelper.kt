@@ -25,16 +25,20 @@ import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
 import com.android.systemui.shared.recents.model.Task
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 /**
  * Helper for [TaskOverlayFactory.TaskOverlay] to interact with [TaskOverlayViewModel], this helper
  * should merge with [TaskOverlayFactory.TaskOverlay] when it's migrated to MVVM.
  */
 class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOverlay<*>) {
-    private lateinit var job: Job
+    private lateinit var overlayInitializedScope: CoroutineScope
     private var uiState: TaskOverlayUiState = Disabled
 
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
@@ -54,32 +58,29 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
         get() = uiState as Enabled
 
     fun init() {
-        // TODO(b/335396935): This should be changed to TaskView's scope.
-        job =
-            MainScope().launch {
-                taskOverlayViewModel.overlayState.collect {
-                    uiState = it
-                    if (it is Enabled) {
-                        Log.d(
-                            TAG,
-                            "initOverlay - taskId: ${task.key.id}, thumbnail: ${it.thumbnail}"
-                        )
-                        overlay.initOverlay(
-                            task,
-                            it.thumbnail,
-                            it.thumbnailMatrix,
-                            /* rotated= */ false
-                        )
-                    } else {
-                        Log.d(TAG, "reset - taskId: ${task.key.id}")
-                        overlay.reset()
-                    }
+        overlayInitializedScope =
+            CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskOverlayHelper"))
+        taskOverlayViewModel.overlayState
+            .onEach {
+                uiState = it
+                if (it is Enabled) {
+                    Log.d(TAG, "initOverlay - taskId: ${task.key.id}, thumbnail: ${it.thumbnail}")
+                    overlay.initOverlay(
+                        task,
+                        it.thumbnail,
+                        it.thumbnailMatrix,
+                        /* rotated= */ false
+                    )
+                } else {
+                    Log.d(TAG, "reset - taskId: ${task.key.id}")
+                    overlay.reset()
                 }
             }
+            .launchIn(overlayInitializedScope)
     }
 
     fun destroy() {
-        job.cancel()
+        overlayInitializedScope.cancel()
         uiState = Disabled
         overlay.reset()
     }

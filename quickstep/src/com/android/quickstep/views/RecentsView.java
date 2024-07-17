@@ -191,6 +191,8 @@ import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.ViewUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
+import com.android.quickstep.recents.data.RecentsDeviceProfileRepository;
+import com.android.quickstep.recents.data.RecentsRotationStateRepository;
 import com.android.quickstep.recents.data.TasksRepository;
 import com.android.quickstep.recents.viewmodel.RecentsViewData;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
@@ -465,6 +467,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     public final RecentsViewData mRecentsViewData = new RecentsViewData();
     @Nullable
     public final TasksRepository mTasksRepository;
+    @Nullable
+    public final RecentsRotationStateRepository mOrientedStateRepository;
+    @Nullable
+    public final RecentsDeviceProfileRepository mDeviceProfileRepository;
 
     protected final RecentsOrientedState mOrientationState;
     protected final BaseContainerInterface<STATE_TYPE, CONTAINER_TYPE> mSizeStrategy;
@@ -822,8 +828,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         if (enableRefactorTaskThumbnail()) {
             mTasksRepository = new TasksRepository(
                     mModel, mModel.getThumbnailCache(), mModel.getIconCache());
+            mOrientedStateRepository = new RecentsRotationStateRepository(mOrientationState);
+            mDeviceProfileRepository = new RecentsDeviceProfileRepository(mContainer);
         } else {
             mTasksRepository = null;
+            mOrientedStateRepository = null;
+            mDeviceProfileRepository = null;
         }
 
         mClearAllButton = (ClearAllButton) LayoutInflater.from(context)

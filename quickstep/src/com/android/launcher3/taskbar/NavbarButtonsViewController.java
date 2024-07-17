@@ -80,6 +80,7 @@ import android.view.View.OnHoverListener;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.view.inputmethod.Flags;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -274,7 +275,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 InputMethodService.canImeRenderGesturalNavButtons() && mContext.imeDrawsImeNavBar();
         if (!mIsImeRenderingNavButtons) {
             // IME switcher
-            mImeSwitcherButton = addButton(R.drawable.ic_ime_switcher, BUTTON_IME_SWITCH,
+            final int switcherResId = Flags.imeSwitcherRevamp()
+                    ? com.android.internal.R.drawable.ic_ime_switcher_new
+                    : R.drawable.ic_ime_switcher;
+            mImeSwitcherButton = addButton(switcherResId, BUTTON_IME_SWITCH,
                     isThreeButtonNav ? mStartContextualContainer : mEndContextualContainer,
                     mControllers.navButtonController, R.id.ime_switcher);
             mPropertyHolders.add(new StatePropertyHolder(mImeSwitcherButton,

@@ -1,0 +1,36 @@
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.android.quickstep.recents.data
+
+import com.android.quickstep.views.RecentsViewContainer
+
+/**
+ * Repository for shrink down version of [com.android.launcher3.DeviceProfile] that only contains
+ * data related to Recents.
+ */
+class RecentsDeviceProfileRepository(private val container: RecentsViewContainer) {
+
+    fun getRecentsDeviceProfile() =
+        with(container.deviceProfile) { RecentsDeviceProfile(isLargeScreen = isTablet) }
+
+    /**
+     * Container to hold [com.android.launcher3.DeviceProfile] related to Recents.
+     *
+     * @property isLargeScreen whether the current device posture has a large screen
+     */
+    data class RecentsDeviceProfile(val isLargeScreen: Boolean)
+}

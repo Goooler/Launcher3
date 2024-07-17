@@ -40,11 +40,15 @@ import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.icu.text.MessageFormat;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.TextUtils.TruncateAt;
+import android.text.style.ImageSpan;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Property;
 import android.util.Size;
 import android.util.TypedValue;
@@ -54,6 +58,7 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
@@ -95,6 +100,8 @@ import java.util.Locale;
  */
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         IconLabelDotView, DraggableView, Reorderable {
+
+    public static final String TAG = "BubbleTextView";
 
     public static final int DISPLAY_WORKSPACE = 0;
     public static final int DISPLAY_ALL_APPS = 1;
@@ -494,7 +501,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
             mBreakPointsIntArray = StringMatcherUtility.getListOfBreakpoints(label, MATCHER);
-            setText(label);
+            if (Flags.enableNewArchivingIcon()
+                    && info instanceof ItemInfoWithIcon infoWithIcon
+                    && infoWithIcon.isInactiveArchive()) {
+                setTextWithStartIcon(label, R.drawable.cloud_download_24px);
+            } else {
+                setText(label);
+            }
         }
         if (info.contentDescription != null) {
             setContentDescription(info.isDisabled()
@@ -804,7 +817,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getLineSpacingExtra());
             if (!TextUtils.equals(modifiedString, mLastModifiedText)) {
                 mLastModifiedText = modifiedString;
-                setText(modifiedString);
+                if (Flags.enableNewArchivingIcon()
+                        && getTag() instanceof ItemInfoWithIcon infoWithIcon
+                        && infoWithIcon.isInactiveArchive()) {
+                    setTextWithStartIcon(modifiedString, R.drawable.cloud_download_24px);
+                } else {
+                    setText(modifiedString);
+                }
                 // if text contains NEW_LINE, set max lines to 2
                 if (TextUtils.indexOf(modifiedString, NEW_LINE) != -1) {
                     setSingleLine(false);
@@ -823,6 +842,28 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mTextColor = color;
         mTextColorStateList = null;
         super.setTextColor(getModifiedColor());
+    }
+
+    /**
+     * Uses a SpannableString to set text with a Drawable at the start of the TextView
+     * @param text text to use for TextView
+     * @param drawableRes Drawable Resource to use for drawing image at start of text
+     */
+    private void setTextWithStartIcon(CharSequence text, @DrawableRes int drawableRes) {
+        Drawable drawable = getContext().getDrawable(drawableRes);
+        if (drawable == null) {
+            setText(text);
+            Log.w(TAG, "setTextWithStartIcon: start icon Drawable not found from resources"
+                    + ", will just set text instead. text=" + text);
+            return;
+        }
+        drawable.setTint(getCurrentTextColor());
+        drawable.setBounds(0, 0, Math.round(getTextSize()), Math.round(getTextSize()));
+        ImageSpan imageSpan = new ImageSpan(drawable, ImageSpan.ALIGN_CENTER);
+        // First space will be replaced with Drawable, second space is for space before text.
+        SpannableString spannable = new SpannableString("  " + text);
+        spannable.setSpan(imageSpan, 0, 1, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+        setText(spannable);
     }
 
     @Override

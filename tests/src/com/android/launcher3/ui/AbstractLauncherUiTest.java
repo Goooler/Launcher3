@@ -245,7 +245,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
                 Intent.ACTION_PACKAGE_RESTARTED, Intent.ACTION_PACKAGE_DATA_CLEARED);
 
         mDevice.executeShellCommand("pm clear " + pkg);
-        assertTrue(pkg + " didn't restart", count.await(10, TimeUnit.SECONDS));
+        assertTrue(pkg + " didn't restart", count.await(20, TimeUnit.SECONDS));
         mTargetContext.unregisterReceiver(broadcastReceiver);
     }
 
