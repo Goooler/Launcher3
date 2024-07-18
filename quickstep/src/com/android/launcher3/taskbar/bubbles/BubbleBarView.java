@@ -240,6 +240,10 @@ public class BubbleBarView extends FrameLayout {
                         BubbleView firstBubble = (BubbleView) getChildAt(0);
                         mUpdateSelectedBubbleAfterCollapse.accept(firstBubble.getBubble().getKey());
                     }
+                    // If the bar was just expanded, remove the dot from the selected bubble.
+                    if (mIsBarExpanded && mSelectedBubbleView != null) {
+                        mSelectedBubbleView.markSeen();
+                    }
                     updateWidth();
                 },
                 /* onUpdate= */ animator -> {
@@ -665,7 +669,7 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /** Add a new bubble to the bubble bar. */
-    public void addBubble(View bubble) {
+    public void addBubble(BubbleView bubble) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
                 Gravity.LEFT);
         if (isExpanded()) {
@@ -673,6 +677,7 @@ public class BubbleBarView extends FrameLayout {
             bubble.setScaleX(0f);
             bubble.setScaleY(0f);
             addView(bubble, 0, lp);
+            bubble.showDotIfNeeded(/* animate= */ false);
 
             mBubbleAnimator = new BubbleAnimator(mIconSize, mExpandedBarIconsSpacing,
                     getChildCount(), mBubbleBarLocation.isOnLeft(isLayoutRtl()));
@@ -825,6 +830,23 @@ public class BubbleBarView extends FrameLayout {
         updateBubbleAccessibilityStates();
         updateContentDescription();
         mDismissedByDragBubbleView = null;
+        updateNotificationDotsIfCollapsed();
+    }
+
+    private void updateNotificationDotsIfCollapsed() {
+        if (isExpanded()) {
+            return;
+        }
+        for (int i = 0; i < getChildCount(); i++) {
+            BubbleView bubbleView = (BubbleView) getChildAt(i);
+            // when we're collapsed, the first bubble should show the dot if it has it. the rest of
+            // the bubbles should hide their dots.
+            if (i == 0 && bubbleView.hasUnseenContent()) {
+                bubbleView.showDotIfNeeded(/* animate= */ true);
+            } else {
+                bubbleView.hideDot();
+            }
+        }
     }
 
     private void updateWidth() {
@@ -865,7 +887,6 @@ public class BubbleBarView extends FrameLayout {
         float bubbleBarAnimatedTop = viewBottom - getBubbleBarHeight();
         // When translating X & Y the scale is ignored, so need to deduct it from the translations
         final float ty = bubbleBarAnimatedTop + mBubbleBarPadding - getScaleIconShift();
-        final boolean animate = getVisibility() == VISIBLE;
         final boolean onLeft = bubbleBarLocation.isOnLeft(isLayoutRtl());
         // elevation state is opposite to widthState - when expanded all icons are flat
         float elevationState = (1 - widthState);
@@ -897,10 +918,10 @@ public class BubbleBarView extends FrameLayout {
             bv.setZ(fullElevationForChild * elevationState);
 
             // only update the dot scale if we're expanding or collapsing
-            // TODO b/351904597: update the dot for the first bubble after removal and reorder
-            // since those might happen when the bar is collapsed and will need their dot back
             if (mWidthAnimator.isRunning()) {
-                bv.setDotScale(widthState);
+                // The dot for the selected bubble scales in the opposite direction of the expansion
+                // animation.
+                bv.showDotIfNeeded(bv == mSelectedBubbleView ? 1 - widthState : widthState);
             }
 
             if (mIsBarExpanded) {
@@ -1025,6 +1046,7 @@ public class BubbleBarView extends FrameLayout {
             }
             updateBubblesLayoutProperties(mBubbleBarLocation);
             updateContentDescription();
+            updateNotificationDotsIfCollapsed();
         }
     }
 
@@ -1048,6 +1070,14 @@ public class BubbleBarView extends FrameLayout {
         // if bubbles are being animated, the arrow position will be set as part of the animation
         if (mBubbleAnimator == null) {
             updateArrowForSelected(previouslySelectedBubble != null);
+        }
+        if (view != null) {
+            if (isExpanded()) {
+                view.markSeen();
+            } else {
+                // when collapsed, the selected bubble should show the dot if it has it
+                view.showDotIfNeeded(/* animate= */ true);
+            }
         }
     }
 
@@ -1316,6 +1346,7 @@ public class BubbleBarView extends FrameLayout {
     public void dump(PrintWriter pw) {
         pw.println("BubbleBarView state:");
         pw.println("  visibility: " + getVisibility());
+        pw.println("  alpha: " + getAlpha());
         pw.println("  translation Y: " + getTranslationY());
         pw.println("  bubbles in bar (childCount = " + getChildCount() + ")");
         for (BubbleView bubbleView: getBubbles()) {

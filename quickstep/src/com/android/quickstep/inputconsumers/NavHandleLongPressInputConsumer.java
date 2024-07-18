@@ -73,17 +73,32 @@ public class NavHandleLongPressInputConsumer extends DelegateInputConsumer {
         super(delegate, inputMonitor);
         mScreenWidth = DisplayController.INSTANCE.get(context).getInfo().currentSize.x;
         mDeepPressEnabled = DeviceConfigWrapper.get().getEnableLpnhDeepPress();
-        int twoStageMultiplier = DeviceConfigWrapper.get().getTwoStageMultiplier();
         AssistStateManager assistStateManager = AssistStateManager.INSTANCE.get(context);
         if (assistStateManager.getLPNHDurationMillis().isPresent()) {
             mLongPressTimeout = assistStateManager.getLPNHDurationMillis().get().intValue();
         } else {
             mLongPressTimeout = ViewConfiguration.getLongPressTimeout();
         }
-        mOuterLongPressTimeout = mLongPressTimeout * twoStageMultiplier;
-        mTouchSlopSquaredOriginal = deviceState.getSquaredTouchSlop();
-        mTouchSlopSquared = mTouchSlopSquaredOriginal;
-        mOuterTouchSlopSquared = mTouchSlopSquared * (twoStageMultiplier * twoStageMultiplier);
+        float twoStageDurationMultiplier =
+                (DeviceConfigWrapper.get().getTwoStageDurationPercentage() / 100f);
+        mOuterLongPressTimeout = (int) (mLongPressTimeout * twoStageDurationMultiplier);
+
+        float gestureNavTouchSlopSquared = deviceState.getSquaredTouchSlop();
+        float twoStageSlopMultiplier =
+                (DeviceConfigWrapper.get().getTwoStageSlopPercentage() / 100f);
+        float twoStageSlopMultiplierSquared = twoStageSlopMultiplier * twoStageSlopMultiplier;
+        if (DeviceConfigWrapper.get().getEnableLpnhTwoStages()) {
+            // For 2 stages, the outer touch slop should match gesture nav.
+            mTouchSlopSquared = gestureNavTouchSlopSquared * twoStageSlopMultiplierSquared;
+            mOuterTouchSlopSquared = gestureNavTouchSlopSquared;
+        } else {
+            // For single stage, the touch slop should match gesture nav.
+            mTouchSlopSquared = gestureNavTouchSlopSquared;
+            // Note: This outer slop is not actually used for single-stage (flag disabled).
+            mOuterTouchSlopSquared = gestureNavTouchSlopSquared;
+        }
+        mTouchSlopSquaredOriginal = mTouchSlopSquared;
+
         mGestureState = gestureState;
         mGestureState.setIsInExtendedSlopRegion(false);
         if (DEBUG_NAV_HANDLE) {

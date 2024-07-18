@@ -184,6 +184,10 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             return mTaskContainer.getTaskView();
         }
 
+        public View getSnapshotView() {
+            return mTaskContainer.getSnapshotView();
+        }
+
         /**
          * Called when the current task is interactive for the user
          */
@@ -312,7 +316,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             // the difference between the bitmap bounds and the projected view bounds.
             Matrix boundsToBitmapSpace = new Matrix();
             Matrix thumbnailMatrix = enableRefactorTaskThumbnail()
-                    ? mHelper.getEnabledState().getThumbnailMatrix()
+                    ? mHelper.getThumbnailMatrix()
                     : mTaskContainer.getThumbnailViewDeprecated().getThumbnailMatrix();
             thumbnailMatrix.invert(boundsToBitmapSpace);
             RectF boundsInBitmapSpace = new RectF();

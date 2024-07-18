@@ -78,8 +78,6 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
-import com.android.launcher3.model.WidgetItem;
-import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.FolderInfo;
@@ -106,6 +104,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Utility class for generating the preview of Launcher for a given InvariantDeviceProfile.
@@ -376,15 +375,6 @@ public class LauncherPreviewRenderer extends ContextWrapper
                 getApplicationContext(), providerInfo));
     }
 
-    private void inflateAndAddWidgets(LauncherAppWidgetInfo info, WidgetsModel widgetsModel) {
-        WidgetItem widgetItem = widgetsModel.getWidgetProviderInfoByProviderName(
-                info.providerName, info.user, mContext);
-        if (widgetItem == null) {
-            return;
-        }
-        inflateAndAddWidgets(info, widgetItem.widgetInfo);
-    }
-
     private void inflateAndAddWidgets(
             LauncherAppWidgetInfo info, LauncherAppWidgetProviderInfo providerInfo) {
         AppWidgetHostView view = mAppWidgetHost.createView(
@@ -468,17 +458,22 @@ public class LauncherPreviewRenderer extends ContextWrapper
                     break;
             }
         }
+        Map<ComponentKey, AppWidgetProviderInfo> widgetsMap = widgetProviderInfoMap;
         for (ItemInfo itemInfo : currentAppWidgets) {
             switch (itemInfo.itemType) {
                 case Favorites.ITEM_TYPE_APPWIDGET:
                 case Favorites.ITEM_TYPE_CUSTOM_APPWIDGET:
-                    if (widgetProviderInfoMap != null) {
-                        inflateAndAddWidgets(
-                                (LauncherAppWidgetInfo) itemInfo, widgetProviderInfoMap);
-                    } else {
-                        inflateAndAddWidgets((LauncherAppWidgetInfo) itemInfo,
-                                dataModel.widgetsModel);
+                    if (widgetsMap == null) {
+                        widgetsMap = dataModel.widgetsModel.getWidgetsByComponentKey()
+                                .entrySet()
+                                .stream()
+                                .filter(entry -> entry.getValue().widgetInfo != null)
+                                .collect(Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        entry -> entry.getValue().widgetInfo
+                                ));
                     }
+                    inflateAndAddWidgets((LauncherAppWidgetInfo) itemInfo, widgetsMap);
                     break;
                 default:
                     break;

@@ -47,10 +47,17 @@ public class FolderGridOrganizer {
     /**
      * Note: must call {@link #setFolderInfo(FolderInfo)} manually for verifier to work.
      */
-    public FolderGridOrganizer(DeviceProfile profile) {
-        mMaxCountX = profile.numFolderColumns;
-        mMaxCountY = profile.numFolderRows;
+    public FolderGridOrganizer(int maxCountX, int maxCountY) {
+        mMaxCountX = maxCountX;
+        mMaxCountY = maxCountY;
         mMaxItemsPerPage = mMaxCountX * mMaxCountY;
+    }
+
+    /**
+     * Creates a FolderGridOrganizer for the given DeviceProfile
+     */
+    public static FolderGridOrganizer createFolderGridOrganizer(DeviceProfile profile) {
+        return new FolderGridOrganizer(profile.numFolderColumns, profile.numFolderRows);
     }
 
     /**

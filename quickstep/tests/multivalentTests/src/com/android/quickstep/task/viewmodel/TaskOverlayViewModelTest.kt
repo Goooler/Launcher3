@@ -23,9 +23,13 @@ import android.graphics.Color
 import android.graphics.Matrix
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.quickstep.recents.data.FakeTasksRepository
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MatrixScaling
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MissingThumbnail
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Disabled
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Enabled
+import com.android.quickstep.task.viewmodel.TaskOverlayViewModel.ThumbnailPositionState
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
@@ -53,7 +57,9 @@ class TaskOverlayViewModelTest {
         )
     private val recentsViewData = RecentsViewData()
     private val tasksRepository = FakeTasksRepository()
-    private val systemUnderTest = TaskOverlayViewModel(task, recentsViewData, tasksRepository)
+    private val mGetThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
+    private val systemUnderTest =
+        TaskOverlayViewModel(task, recentsViewData, tasksRepository, mGetThumbnailPositionUseCase)
 
     @Test
     fun initialStateIsDisabled() = runTest {
@@ -87,7 +93,6 @@ class TaskOverlayViewModelTest {
                 Enabled(
                     isRealSnapshot = false,
                     thumbnail = null,
-                    thumbnailMatrix = Matrix.IDENTITY_MATRIX
                 )
             )
     }
@@ -107,7 +112,6 @@ class TaskOverlayViewModelTest {
                 Enabled(
                     isRealSnapshot = true,
                     thumbnail = thumbnailData.thumbnail,
-                    thumbnailMatrix = Matrix.IDENTITY_MATRIX
                 )
             )
     }
@@ -127,7 +131,6 @@ class TaskOverlayViewModelTest {
                 Enabled(
                     isRealSnapshot = false,
                     thumbnail = thumbnailData.thumbnail,
-                    thumbnailMatrix = Matrix.IDENTITY_MATRIX
                 )
             )
     }
@@ -147,14 +150,42 @@ class TaskOverlayViewModelTest {
                 Enabled(
                     isRealSnapshot = false,
                     thumbnail = thumbnailData.thumbnail,
-                    thumbnailMatrix = Matrix.IDENTITY_MATRIX
                 )
             )
+    }
+
+    @Test
+    fun getThumbnailMatrix_MissingThumbnail() = runTest {
+        val isRtl = true
+
+        whenever(mGetThumbnailPositionUseCase.run(TASK_ID, CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .thenReturn(MissingThumbnail)
+
+        assertThat(systemUnderTest.getThumbnailPositionState(CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .isEqualTo(ThumbnailPositionState(Matrix.IDENTITY_MATRIX, isRotated = false))
+    }
+
+    @Test
+    fun getThumbnailMatrix_MatrixScaling() = runTest {
+        val isRtl = true
+        val isRotated = true
+
+        whenever(mGetThumbnailPositionUseCase.run(TASK_ID, CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .thenReturn(MatrixScaling(MATRIX, isRotated))
+
+        assertThat(systemUnderTest.getThumbnailPositionState(CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .isEqualTo(ThumbnailPositionState(MATRIX, isRotated))
     }
 
     companion object {
         const val TASK_ID = 0
         const val THUMBNAIL_WIDTH = 100
         const val THUMBNAIL_HEIGHT = 200
+        const val CANVAS_WIDTH = 300
+        const val CANVAS_HEIGHT = 600
+        val MATRIX =
+            Matrix().apply {
+                setValues(floatArrayOf(2.3f, 4.5f, 2.6f, 7.4f, 3.4f, 2.3f, 2.5f, 6.0f, 3.4f))
+            }
     }
 }

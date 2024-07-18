@@ -64,11 +64,19 @@ class DeviceConfigWrapper private constructor(propReader: PropReader) {
             "Enable two stage for LPNH duration and touch slop"
         )
 
-    val twoStageMultiplier =
+    val twoStageDurationPercentage =
         propReader.get(
-            "TWO_STAGE_MULTIPLIER",
-            2,
-            "Extends the duration and touch slop if the initial slop is passed"
+            "TWO_STAGE_DURATION_PERCENTAGE",
+            200,
+            "Extends the duration to trigger a long press after a fraction of the gesture " +
+                "slop is passed, expressed as a percentage (i.e. 200 = 2x)."
+        )
+
+    val twoStageSlopPercentage =
+        propReader.get(
+            "TWO_STAGE_SLOP_PERCENTAGE",
+            50,
+            "Percentage of gesture slop region to trigger the extended long press duration."
         )
 
     val animateLpnh = propReader.get("ANIMATE_LPNH", false, "Animates navbar when long pressing")

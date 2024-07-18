@@ -144,8 +144,8 @@ public class ReorderAlgorithmUnitTest {
 
     public ItemConfiguration solve(CellLayoutBoard board, int x, int y, int spanX,
             int spanY, int minSpanX, int minSpanY, boolean isMulti) {
-        CellLayout cl = mCellLayoutBuilder.createCellLayout(board.getWidth(), board.getHeight(),
-                isMulti);
+        CellLayout cl = mCellLayoutBuilder.createCellLayoutDefaultSize(board.getWidth(),
+                board.getHeight(), isMulti);
 
         // The views have to be sorted or the result can vary
         board.getIcons()

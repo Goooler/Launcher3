@@ -20,9 +20,12 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Rect
+import android.graphics.Matrix
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.quickstep.recents.data.FakeTasksRepository
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MatrixScaling
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MissingThumbnail
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
@@ -48,8 +51,15 @@ class TaskThumbnailViewModelTest {
     private val taskViewData by lazy { TaskViewData(taskViewType) }
     private val taskContainerData = TaskContainerData()
     private val tasksRepository = FakeTasksRepository()
+    private val mGetThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
     private val systemUnderTest by lazy {
-        TaskThumbnailViewModel(recentsViewData, taskViewData, taskContainerData, tasksRepository)
+        TaskThumbnailViewModel(
+            recentsViewData,
+            taskViewData,
+            taskContainerData,
+            tasksRepository,
+            mGetThumbnailPositionUseCase
+        )
     }
 
     private val tasks = (0..5).map(::createTaskWithId)
@@ -149,7 +159,6 @@ class TaskThumbnailViewModelTest {
                 Snapshot(
                     backgroundColor = Color.rgb(2, 2, 2),
                     bitmap = expectedThumbnailData.thumbnail!!,
-                    drawnRect = Rect(0, 0, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
                 )
             )
     }
@@ -170,9 +179,36 @@ class TaskThumbnailViewModelTest {
                 Snapshot(
                     backgroundColor = Color.rgb(2, 2, 2),
                     bitmap = expectedThumbnailData.thumbnail!!,
-                    drawnRect = Rect(0, 0, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
                 )
             )
+    }
+
+    @Test
+    fun getSnapshotMatrix_MissingThumbnail() = runTest {
+        val taskId = 2
+        val recentTask = TaskThumbnail(taskId = taskId, isRunning = false)
+        val isRtl = true
+
+        whenever(mGetThumbnailPositionUseCase.run(taskId, CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .thenReturn(MissingThumbnail)
+
+        systemUnderTest.bind(recentTask)
+        assertThat(systemUnderTest.getThumbnailPositionState(CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .isEqualTo(Matrix.IDENTITY_MATRIX)
+    }
+
+    @Test
+    fun getSnapshotMatrix_MatrixScaling() = runTest {
+        val taskId = 2
+        val recentTask = TaskThumbnail(taskId = taskId, isRunning = false)
+        val isRtl = true
+
+        whenever(mGetThumbnailPositionUseCase.run(taskId, CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .thenReturn(MatrixScaling(MATRIX, isRotated = false))
+
+        systemUnderTest.bind(recentTask)
+        assertThat(systemUnderTest.getThumbnailPositionState(CANVAS_WIDTH, CANVAS_HEIGHT, isRtl))
+            .isEqualTo(MATRIX)
     }
 
     private fun createTaskWithId(taskId: Int) =
@@ -191,5 +227,11 @@ class TaskThumbnailViewModelTest {
     companion object {
         const val THUMBNAIL_WIDTH = 100
         const val THUMBNAIL_HEIGHT = 200
+        const val CANVAS_WIDTH = 300
+        const val CANVAS_HEIGHT = 600
+        val MATRIX =
+            Matrix().apply {
+                setValues(floatArrayOf(2.3f, 4.5f, 2.6f, 7.4f, 3.4f, 2.3f, 2.5f, 6.0f, 3.4f))
+            }
     }
 }

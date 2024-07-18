@@ -157,7 +157,6 @@ public final class TestProtocol {
             "get-overview-current-page-index";
     public static final String REQUEST_GET_SPLIT_SELECTION_ACTIVE = "get-split-selection-active";
     public static final String REQUEST_ENABLE_ROTATION = "enable_rotation";
-    public static final String REQUEST_ENABLE_SUGGESTION = "enable-suggestion";
     public static final String REQUEST_MODEL_QUEUE_CLEARED = "model-queue-cleared";
 
     public static boolean sDebugTracing = false;

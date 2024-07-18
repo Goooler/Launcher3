@@ -23,7 +23,6 @@ import static android.view.Surface.ROTATION_0;
 import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_FREE_FORM_TAP;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.app.ActivityOptions;
 import android.graphics.Bitmap;
@@ -63,6 +62,7 @@ import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecCompat
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecsFuture;
 import com.android.systemui.shared.recents.view.RecentsTransition;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.util.Collections;
 import java.util.List;
@@ -394,7 +394,7 @@ public interface TaskShortcutFactory {
             return Settings.Global.getInt(
                     container.asContext().getContentResolver(),
                     Settings.Global.DEVELOPMENT_ENABLE_FREEFORM_WINDOWS_SUPPORT, 0) != 0
-                    && !enableDesktopWindowingMode();
+                    && !DesktopModeStatus.canEnterDesktopMode(container.asContext());
         }
     };
 

@@ -27,4 +27,7 @@
         @android:color/system_on_surface_light</color>
     <color name="widget_cell_subtitle_color_light">
         @android:color/system_on_surface_variant_light</color>
+    <color name="widget_picker_menu_options_color_light">
+        @android:color/system_on_surface_variant_light
+    </color>
 </resources>

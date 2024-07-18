@@ -48,7 +48,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
-import static com.android.wm.shell.Flags.enableTaskbarOnPhones;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -248,7 +247,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 ? context.getColor(R.color.taskbar_nav_icon_light_color)
                 : context.getColor(R.color.taskbar_nav_icon_dark_color);
 
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions = new TaskbarTransitions(mContext, mNavButtonsView);
         }
     }
@@ -365,7 +364,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 R.bool.floating_rotation_button_position_left);
         mControllers.rotationButtonController.setRotationButton(mFloatingRotationButton,
                 mRotationButtonListener);
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.init();
         }
 
@@ -373,7 +372,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         mPropertyHolders.forEach(StatePropertyHolder::endAnimation);
 
         // Initialize things needed to move nav buttons to separate window.
-        mSeparateWindowParent = new BaseDragLayer<TaskbarActivityContext>(mContext, null, 0) {
+        mSeparateWindowParent = new BaseDragLayer<>(mContext, null, 0) {
             @Override
             public void recreateControllers() {
                 mControllers = new TouchController[0];
@@ -629,7 +628,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     public void setWallpaperVisible(boolean isVisible) {
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.setWallpaperVisibility(isVisible);
         }
     }
@@ -642,20 +641,20 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     public void checkNavBarModes() {
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             boolean isBarHidden = (mSysuiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) != 0;
             mTaskbarTransitions.transitionTo(mTransitionMode, !isBarHidden);
         }
     }
 
     public void finishBarAnimations() {
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.finishAnimations();
         }
     }
 
     public void touchAutoDim(boolean reset) {
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.setAutoDim(false);
             mHandler.removeCallbacks(mAutoDim);
             if (reset) {
@@ -665,7 +664,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     public void transitionTo(@BarTransitions.TransitionMode int barMode, boolean animate) {
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.transitionTo(barMode, animate);
         }
     }
@@ -769,7 +768,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
     private void onDarkIntensityChanged() {
         updateNavButtonColor();
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.onDarkIntensityChanged(mTaskbarNavButtonDarkIntensity.value);
         }
     }
@@ -1119,7 +1118,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 + mOnBackgroundNavButtonColorOverrideMultiplier.value);
 
         mNavButtonsView.dumpLogs(prefix + "\t", pw);
-        if (enableTaskbarOnPhones() && mContext.isPhoneButtonNavMode()) {
+        if (mContext.isPhoneMode()) {
             mTaskbarTransitions.dumpLogs(prefix + "\t", pw);
         }
     }

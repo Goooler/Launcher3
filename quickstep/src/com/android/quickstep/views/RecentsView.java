@@ -2820,7 +2820,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         int[] runningTaskIds = Arrays.stream(runningTasks).mapToInt(task -> task.key.id).toArray();
         TaskView matchingTaskView = null;
         if (hasDesktopTask(runningTasks) && runningTaskIds.length == 1) {
-            // TODO(b/249371338): Unsure if it's expected, desktop runningTasks only have a single
+            // TODO(b/342635213): Unsure if it's expected, desktop runningTasks only have a single
             // taskId, therefore we match any DesktopTaskView that contains the runningTaskId.
             TaskView taskview = getTaskViewByTaskId(runningTaskIds[0]);
             if (taskview instanceof DesktopTaskView) {

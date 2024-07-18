@@ -21,6 +21,7 @@ import static android.view.View.ALPHA;
 import static com.android.launcher3.BubbleTextView.TEXT_ALPHA_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
+import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -99,7 +100,7 @@ public class FolderAnimationManager {
 
         mContext = folder.getContext();
         mDeviceProfile = folder.mActivityContext.getDeviceProfile();
-        mPreviewVerifier = new FolderGridOrganizer(mDeviceProfile);
+        mPreviewVerifier = createFolderGridOrganizer(mDeviceProfile);
 
         mIsOpening = isOpening;
 

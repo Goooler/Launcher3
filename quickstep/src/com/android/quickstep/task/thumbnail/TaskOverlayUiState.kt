@@ -17,15 +17,10 @@
 package com.android.quickstep.task.thumbnail
 
 import android.graphics.Bitmap
-import android.graphics.Matrix
 
 /** Ui state for [com.android.quickstep.TaskOverlayFactory.TaskOverlay] */
 sealed class TaskOverlayUiState {
     data object Disabled : TaskOverlayUiState()
 
-    data class Enabled(
-        val isRealSnapshot: Boolean,
-        val thumbnail: Bitmap?,
-        val thumbnailMatrix: Matrix
-    ) : TaskOverlayUiState()
+    data class Enabled(val isRealSnapshot: Boolean, val thumbnail: Bitmap?) : TaskOverlayUiState()
 }

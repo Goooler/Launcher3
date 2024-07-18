@@ -27,7 +27,9 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.os.Process;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,6 +37,7 @@ import android.view.ViewParent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -83,6 +86,17 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     private PackageUserKey mSelectedHeader;
     private TextView mHeaderDescription;
 
+    /**
+     * A menu displayed for options (e.g. "show all widgets" filter) around widget lists in the
+     * picker.
+     */
+    protected View mWidgetOptionsMenu;
+    /**
+     * State of the options in the menu (if displayed to the user).
+     */
+    @Nullable
+    protected WidgetOptionsMenuState mWidgetOptionsMenuState = null;
+
     public WidgetsTwoPaneSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
@@ -130,6 +144,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         mHeaderTitle = mContent.findViewById(R.id.title);
         mHeaderDescription = mContent.findViewById(R.id.widget_picker_description);
 
+        mWidgetOptionsMenu = mContent.findViewById(R.id.widget_picker_widget_options_menu);
+        setupWidgetOptionsMenu();
+
         mRightPane = mContent.findViewById(R.id.right_pane);
         mRightPaneScrollView = mContent.findViewById(R.id.right_pane_scroll_view);
         mRightPaneScrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -153,6 +170,40 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mHeaderDescription.setText(description);
             mHeaderDescription.setVisibility(VISIBLE);
         }
+    }
+
+    protected void setupWidgetOptionsMenu() {
+        mWidgetOptionsMenu.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mWidgetOptionsMenuState != null) {
+                    PopupMenu popupMenu = new PopupMenu(mActivityContext, /*anchor=*/ v,
+                            Gravity.END);
+                    MenuItem menuItem = popupMenu.getMenu().add(
+                            R.string.widget_picker_show_all_widgets_menu_item_title);
+                    menuItem.setCheckable(true);
+                    menuItem.setChecked(mWidgetOptionsMenuState.showAllWidgets);
+                    menuItem.setOnMenuItemClickListener(
+                            item -> onShowAllWidgetsMenuItemClick(item));
+                    popupMenu.show();
+                }
+            }
+        });
+    }
+
+    private boolean onShowAllWidgetsMenuItemClick(MenuItem menuItem) {
+        mWidgetOptionsMenuState.showAllWidgets = !mWidgetOptionsMenuState.showAllWidgets;
+        menuItem.setChecked(mWidgetOptionsMenuState.showAllWidgets);
+
+        // Refresh widgets
+        onWidgetsBound();
+        if (mIsInSearchMode) {
+            mSearchBar.reset();
+        } else if (!mSuggestedWidgetsPackageUserKey.equals(mSelectedHeader)) {
+            mAdapters.get(mActivePage).mWidgetsListAdapter.selectFirstHeaderEntry();
+            mAdapters.get(mActivePage).mWidgetsRecyclerView.scrollToTop();
+        }
+        return true;
     }
 
     @Override
@@ -231,6 +282,29 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 }
             });
         }
+    }
+
+    @Override
+    protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
+        List<WidgetsListBaseEntry> allWidgets =
+                mActivityContext.getPopupDataProvider().getAllWidgets();
+        List<WidgetsListBaseEntry> defaultWidgets =
+                mActivityContext.getPopupDataProvider().getDefaultWidgets();
+
+        if (allWidgets.isEmpty() || defaultWidgets.isEmpty()) {
+            // no menu if there are no default widgets to show
+            mWidgetOptionsMenuState = null;
+            mWidgetOptionsMenu.setVisibility(GONE);
+        } else {
+            if (mWidgetOptionsMenuState == null) {
+                mWidgetOptionsMenuState = new WidgetOptionsMenuState();
+            }
+
+            mWidgetOptionsMenu.setVisibility(VISIBLE);
+            return mWidgetOptionsMenuState.showAllWidgets ? allWidgets : defaultWidgets;
+        }
+
+        return allWidgets;
     }
 
     @Override
@@ -435,8 +509,11 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 final boolean isUserClick = mSelectedHeader != null
                         && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
-                WidgetsListContentEntry contentEntry = mActivityContext.getPopupDataProvider()
-                        .getSelectedAppWidgets(selectedHeader);
+                WidgetsListContentEntry contentEntry =
+                        mActivityContext.getPopupDataProvider().getSelectedAppWidgets(
+                                selectedHeader, /*useDefault=*/
+                                (mWidgetOptionsMenuState != null
+                                        && !mWidgetOptionsMenuState.showAllWidgets));
 
                 if (contentEntry == null || mRightPane == null) {
                     return;
@@ -569,5 +646,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
          * the left pane.
          */
         void onHeaderChanged(@NonNull PackageUserKey selectedHeader);
+    }
+
+    /**
+     * Holds the selection state of the options menu (if presented to the user).
+     */
+    protected static class WidgetOptionsMenuState {
+        /**
+         * UI state indicating whether to show default or all widgets.
+         * <p>If true, shows all widgets; else shows the default widgets.</p>
+         */
+        public boolean showAllWidgets = false;
     }
 }

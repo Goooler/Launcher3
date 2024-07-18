@@ -54,7 +54,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Widgets data model that is used by the adapters of the widget views and controllers.
@@ -67,7 +69,26 @@ public class WidgetsModel {
     private static final boolean DEBUG = false;
 
     /* Map of widgets and shortcuts that are tracked per package. */
-    private final Map<PackageItemInfo, List<WidgetItem>> mWidgetsList = new HashMap<>();
+    private final Map<PackageItemInfo, List<WidgetItem>> mWidgetsByPackageItem = new HashMap<>();
+
+    /**
+     * Returns all widgets keyed by their component key.
+     */
+    public synchronized Map<ComponentKey, WidgetItem> getWidgetsByComponentKey() {
+        return mWidgetsByPackageItem.values().stream()
+                .flatMap(Collection::stream).distinct()
+                .collect(Collectors.toMap(
+                        widget -> new ComponentKey(widget.componentName, widget.user),
+                        Function.identity()
+                ));
+    }
+
+    /**
+     * Returns widgets grouped by the package item that they should belong to.
+     */
+    public synchronized Map<PackageItemInfo, List<WidgetItem>> getWidgetsByPackageItem() {
+        return mWidgetsByPackageItem;
+    }
 
     /**
      * Returns a list of {@link WidgetsListBaseEntry} filtered using given widget item filter. All
@@ -85,7 +106,8 @@ public class WidgetsModel {
         ArrayList<WidgetsListBaseEntry> result = new ArrayList<>();
         AlphabeticIndexCompat indexer = new AlphabeticIndexCompat(context);
 
-        for (Map.Entry<PackageItemInfo, List<WidgetItem>> entry : mWidgetsList.entrySet()) {
+        for (Map.Entry<PackageItemInfo, List<WidgetItem>> entry :
+                mWidgetsByPackageItem.entrySet()) {
             PackageItemInfo pkgItem = entry.getKey();
             List<WidgetItem> widgetItems = entry.getValue()
                     .stream()
@@ -110,41 +132,6 @@ public class WidgetsModel {
     public synchronized ArrayList<WidgetsListBaseEntry> getWidgetsListForPicker(Context context) {
         // return all items
         return getFilteredWidgetsListForPicker(context, /*widgetItemFilter=*/ item -> true);
-    }
-
-    /** Returns a mapping of packages to their widgets without static shortcuts. */
-    public synchronized Map<PackageUserKey, List<WidgetItem>> getAllWidgetsWithoutShortcuts() {
-        if (!WIDGETS_ENABLED) {
-            return Collections.emptyMap();
-        }
-        Map<PackageUserKey, List<WidgetItem>> packagesToWidgets = new HashMap<>();
-        mWidgetsList.forEach((packageItemInfo, widgetsAndShortcuts) -> {
-            List<WidgetItem> widgets = widgetsAndShortcuts.stream()
-                    .filter(item -> item.widgetInfo != null)
-                    .collect(toList());
-            if (widgets.size() > 0) {
-                packagesToWidgets.put(
-                        new PackageUserKey(packageItemInfo.packageName, packageItemInfo.user),
-                        widgets);
-            }
-        });
-        return packagesToWidgets;
-    }
-
-    /**
-     * Returns a map of widget component keys to corresponding widget items. Excludes the
-     * shortcuts.
-     */
-    public synchronized Map<ComponentKey, WidgetItem> getAllWidgetComponentsWithoutShortcuts() {
-        if (!WIDGETS_ENABLED) {
-            return Collections.emptyMap();
-        }
-        Map<ComponentKey, WidgetItem> widgetsMap = new HashMap<>();
-        mWidgetsList.forEach((packageItemInfo, widgetsAndShortcuts) ->
-                widgetsAndShortcuts.stream().filter(item -> item.widgetInfo != null).forEach(
-                        item -> widgetsMap.put(new ComponentKey(item.componentName, item.user),
-                                item)));
-        return widgetsMap;
     }
 
     /**
@@ -210,14 +197,14 @@ public class WidgetsModel {
 
         if (packageUser == null) {
             // Clear the list if this is an update on all widgets and shortcuts.
-            mWidgetsList.clear();
+            mWidgetsByPackageItem.clear();
         } else {
             // Otherwise, only clear the widgets and shortcuts for the changed package.
-            mWidgetsList.remove(packageItemInfoCache.getOrCreate(packageUser));
+            mWidgetsByPackageItem.remove(packageItemInfoCache.getOrCreate(packageUser));
         }
 
         // add and update.
-        mWidgetsList.putAll(rawWidgetsShortcuts.stream()
+        mWidgetsByPackageItem.putAll(rawWidgetsShortcuts.stream()
                 .filter(new WidgetValidityCheck(app))
                 .filter(new WidgetFlagCheck())
                 .flatMap(widgetItem -> getPackageUserKeys(app.getContext(), widgetItem).stream()
@@ -237,7 +224,7 @@ public class WidgetsModel {
             return;
         }
         WidgetManagerHelper widgetManager = new WidgetManagerHelper(app.getContext());
-        for (Entry<PackageItemInfo, List<WidgetItem>> entry : mWidgetsList.entrySet()) {
+        for (Entry<PackageItemInfo, List<WidgetItem>> entry : mWidgetsByPackageItem.entrySet()) {
             if (packageNames.contains(entry.getKey().packageName)) {
                 List<WidgetItem> items = entry.getValue();
                 int count = items.size();
@@ -256,50 +243,6 @@ public class WidgetsModel {
                 }
             }
         }
-    }
-
-    private PackageItemInfo createPackageItemInfo(
-            ComponentName providerName,
-            UserHandle user,
-            int category
-    ) {
-        if (category == NO_CATEGORY) {
-            return new PackageItemInfo(providerName.getPackageName(), user);
-        } else {
-            return new PackageItemInfo("" , category, user);
-        }
-    }
-
-    private IntSet getCategories(ComponentName providerName, Context context) {
-        IntSet categories = WidgetSections.getWidgetsToCategory(context).get(providerName);
-        if (categories != null) {
-            return categories;
-        }
-        categories = new IntSet();
-        categories.add(NO_CATEGORY);
-        return categories;
-    }
-
-    public WidgetItem getWidgetProviderInfoByProviderName(
-            ComponentName providerName, UserHandle user, Context context) {
-        if (!WIDGETS_ENABLED) {
-            return null;
-        }
-        IntSet categories = getCategories(providerName, context);
-
-        // Checking if we have a provider in any of the categories.
-        for (Integer category: categories) {
-            PackageItemInfo key = createPackageItemInfo(providerName, user, category);
-            List<WidgetItem> widgets = mWidgetsList.get(key);
-            if (widgets != null) {
-                return widgets.stream().filter(
-                                item -> item.componentName.equals(providerName)
-                        )
-                        .findFirst()
-                        .orElse(null);
-            }
-        }
-        return null;
     }
 
     /** Returns {@link PackageItemInfo} of a pending widget. */

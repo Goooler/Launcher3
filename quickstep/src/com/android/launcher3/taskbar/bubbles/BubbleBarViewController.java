@@ -115,7 +115,7 @@ public class BubbleBarViewController {
                 dp -> updateBubbleBarIconSize(dp.taskbarIconSize, /* animate= */ true));
         updateBubbleBarIconSize(mActivity.getDeviceProfile().taskbarIconSize, /* animate= */ false);
         mBubbleBarScale.updateValue(1f);
-        mBubbleClickListener = v -> onBubbleClicked(v);
+        mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> onBubbleBarClicked();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
@@ -139,8 +139,9 @@ public class BubbleBarViewController {
         });
     }
 
-    private void onBubbleClicked(View v) {
-        BubbleBarItem bubble = ((BubbleView) v).getBubble();
+    private void onBubbleClicked(BubbleView bubbleView) {
+        bubbleView.markSeen();
+        BubbleBarItem bubble = bubbleView.getBubble();
         if (bubble == null) {
             Log.e(TAG, "bubble click listener, bubble was null");
         }

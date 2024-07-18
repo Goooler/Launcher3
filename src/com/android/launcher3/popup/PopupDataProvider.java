@@ -64,6 +64,11 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
 
     /** All installed widgets. */
     private List<WidgetsListBaseEntry> mAllWidgets = List.of();
+    /**
+     * Selectively chosen installed widgets which may be preferred for default display over the list
+     * of all widgets.
+     */
+    private List<WidgetsListBaseEntry> mDefaultWidgets = List.of();
     /** Widgets that can be recommended to the users. */
     private List<ItemInfo> mRecommendedWidgets = List.of();
 
@@ -194,6 +199,18 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
 
     public void setAllWidgets(List<WidgetsListBaseEntry> allWidgets) {
         mAllWidgets = allWidgets;
+        mDefaultWidgets = List.of();
+        mChangeListener.onWidgetsBound();
+    }
+
+    /**
+     * Sets the list of widgets to be displayed by default and a complete list that can be displayed
+     * when user chooses to show all widgets.
+     */
+    public void setAllWidgets(List<WidgetsListBaseEntry> allWidgets,
+            List<WidgetsListBaseEntry> defaultWidgets) {
+        mAllWidgets = allWidgets;
+        mDefaultWidgets = defaultWidgets;
         mChangeListener.onWidgetsBound();
     }
 
@@ -203,6 +220,14 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
 
     public List<WidgetsListBaseEntry> getAllWidgets() {
         return mAllWidgets;
+    }
+
+    /**
+     * Returns a "selectively" chosen list of widgets that may be preferred to be shown by default
+     * instead of a complete list.
+     */
+    public List<WidgetsListBaseEntry> getDefaultWidgets() {
+        return mDefaultWidgets;
     }
 
     /** Returns a list of recommended widgets. */
@@ -259,8 +284,10 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
     }
 
     /** Gets the WidgetsListContentEntry for the currently selected header. */
-    public WidgetsListContentEntry getSelectedAppWidgets(PackageUserKey packageUserKey) {
-        return (WidgetsListContentEntry) mAllWidgets.stream()
+    public WidgetsListContentEntry getSelectedAppWidgets(PackageUserKey packageUserKey,
+            boolean useDefault) {
+        List<WidgetsListBaseEntry> widgets = useDefault ? mDefaultWidgets : mAllWidgets;
+        return (WidgetsListContentEntry) widgets.stream()
                 .filter(row -> row instanceof WidgetsListContentEntry
                         && PackageUserKey.fromPackageItemInfo(row.mPkgItem).equals(packageUserKey))
                 .findAny()

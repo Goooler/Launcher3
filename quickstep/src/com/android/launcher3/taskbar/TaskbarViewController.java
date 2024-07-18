@@ -46,6 +46,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.app.animation.Interpolators;
@@ -95,6 +96,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
     public static final int ALPHA_INDEX_SMALL_SCREEN = 6;
     private static final int NUM_ALPHA_CHANNELS = 7;
+
+    private static boolean sEnableModelLoadingForTests = true;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -192,7 +195,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarIconTranslationXForPinning.updateValue(pinningValue);
 
         mModelCallbacks.init(controllers);
-        if (mActivity.isUserSetupComplete()) {
+        if (mActivity.isUserSetupComplete() && sEnableModelLoadingForTests) {
             // Only load the callbacks if user setup is completed
             LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
         }
@@ -923,5 +926,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 "ALPHA_INDEX_SMALL_SCREEN");
 
         mModelCallbacks.dumpLogs(prefix + "\t", pw);
+    }
+
+    /** Enables model loading for tests. */
+    @VisibleForTesting
+    public static void enableModelLoadingForTests(boolean enable) {
+        sEnableModelLoadingForTests = enable;
     }
 }

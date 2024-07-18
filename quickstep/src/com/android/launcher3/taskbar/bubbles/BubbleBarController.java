@@ -33,7 +33,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_S
 
 import android.annotation.BinderThread;
 import android.annotation.Nullable;
-import android.app.Notification;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherApps;
@@ -463,15 +462,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
     /** Tells WMShell to show the currently selected bubble. */
     public void showSelectedBubble() {
         if (getSelectedBubbleKey() != null) {
-            if (mSelectedBubble instanceof BubbleBarBubble) {
-                // Because we've visited this bubble, we should suppress the notification.
-                // This is updated on WMShell side when we show the bubble, but that update isn't
-                // passed to launcher, instead we apply it directly here.
-                BubbleInfo info = ((BubbleBarBubble) mSelectedBubble).getInfo();
-                info.setFlags(
-                        info.getFlags() | Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION);
-                mSelectedBubble.getView().updateDotVisibility(true /* animate */);
-            }
             mLastSentBubbleBarTop = mBarView.getRestingTopPositionOnScreen();
             mSystemUiProxy.showBubble(getSelectedBubbleKey(), mLastSentBubbleBarTop);
         } else {

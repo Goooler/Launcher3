@@ -29,9 +29,9 @@ import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.TaskUtils
+import com.android.quickstep.recents.usecase.GetThumbnailUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
-import com.android.quickstep.task.util.GetThumbnailUseCase
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.systemui.shared.recents.model.Task
 

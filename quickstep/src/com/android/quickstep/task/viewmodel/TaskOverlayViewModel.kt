@@ -18,6 +18,9 @@ package com.android.quickstep.task.viewmodel
 
 import android.graphics.Matrix
 import com.android.quickstep.recents.data.RecentTasksRepository
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MatrixScaling
+import com.android.quickstep.recents.usecase.ThumbnailPositionState.MissingThumbnail
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Disabled
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Enabled
@@ -25,12 +28,14 @@ import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
 /** View model for TaskOverlay */
 class TaskOverlayViewModel(
-    task: Task,
+    private val task: Task,
     recentsViewData: RecentsViewData,
     tasksRepository: RecentTasksRepository,
+    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase
 ) {
     val overlayState =
         combine(
@@ -42,14 +47,33 @@ class TaskOverlayViewModel(
                     Enabled(
                         isRealSnapshot = (thumbnailData?.isRealSnapshot ?: false) && !task.isLocked,
                         thumbnailData?.thumbnail,
-                        // TODO(b/343101424): Use PreviewPositionHelper, listen from a common source
-                        // with
-                        //  TaskThumbnailView.
-                        Matrix.IDENTITY_MATRIX
                     )
                 } else {
                     Disabled
                 }
             }
             .distinctUntilChanged()
+
+    fun getThumbnailPositionState(width: Int, height: Int, isRtl: Boolean): ThumbnailPositionState {
+        return runBlocking {
+            val matrix: Matrix
+            val isRotated: Boolean
+            when (
+                val thumbnailPositionState =
+                    getThumbnailPositionUseCase.run(task.key.id, width, height, isRtl)
+            ) {
+                is MatrixScaling -> {
+                    matrix = thumbnailPositionState.matrix
+                    isRotated = thumbnailPositionState.isRotated
+                }
+                is MissingThumbnail -> {
+                    matrix = Matrix.IDENTITY_MATRIX
+                    isRotated = false
+                }
+            }
+            ThumbnailPositionState(matrix, isRotated)
+        }
+    }
+
+    data class ThumbnailPositionState(val matrix: Matrix, val isRotated: Boolean)
 }

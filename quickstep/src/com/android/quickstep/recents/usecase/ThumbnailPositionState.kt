@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.util
+package com.android.quickstep.recents.usecase
 
-import android.graphics.Bitmap
-import com.android.quickstep.recents.data.RecentTasksRepository
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
+import android.graphics.Matrix
 
-/** Use case for retrieving thumbnail. */
-class GetThumbnailUseCase(private val taskRepository: RecentTasksRepository) {
-    /** Returns the latest thumbnail associated with [taskId] if loaded, or null otherwise */
-    fun run(taskId: Int): Bitmap? = runBlocking {
-        taskRepository.getThumbnailById(taskId).firstOrNull()?.thumbnail
-    }
+/** State on how a task Thumbnail can fit on given canvas */
+sealed class ThumbnailPositionState {
+    data object MissingThumbnail : ThumbnailPositionState()
+
+    data class MatrixScaling(val matrix: Matrix, val isRotated: Boolean) : ThumbnailPositionState()
 }

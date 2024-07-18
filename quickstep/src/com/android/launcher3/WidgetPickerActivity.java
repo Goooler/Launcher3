@@ -28,6 +28,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ClipData;
 import android.content.ClipDescription;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -60,6 +61,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -128,8 +130,22 @@ public class WidgetPickerActivity extends BaseActivity {
     /** A set of user ids that should be filtered out from the selected widgets. */
     @NonNull
     Set<Integer> mFilteredUserIds = new HashSet<>();
+
     @Nullable
     private WidgetsFullSheet mWidgetSheet;
+
+    private final Predicate<WidgetItem> mWidgetsFilter = widget -> {
+        final WidgetAcceptabilityVerdict verdict =
+                isWidgetAcceptable(widget, /* applySizeFilter=*/ false);
+        verdict.maybeLogVerdict();
+        return verdict.isAcceptable;
+    };
+    private final Predicate<WidgetItem> mDefaultWidgetsFilter = widget -> {
+        final WidgetAcceptabilityVerdict verdict =
+                isWidgetAcceptable(widget, /* applySizeFilter=*/ true);
+        verdict.maybeLogVerdict();
+        return verdict.isAcceptable;
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -276,18 +292,15 @@ public class WidgetPickerActivity extends BaseActivity {
     private void refreshAndBindWidgets() {
         MODEL_EXECUTOR.execute(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
+            Context context = app.getContext();
+
             mModel.update(app, null);
             final List<WidgetsListBaseEntry> allWidgets =
-                    mModel.getFilteredWidgetsListForPicker(
-                            app.getContext(),
-                            /*widgetItemFilter=*/ widget -> {
-                                final WidgetAcceptabilityVerdict verdict =
-                                        isWidgetAcceptable(widget);
-                                verdict.maybeLogVerdict();
-                                return verdict.isAcceptable;
-                            }
-                    );
-            bindWidgets(allWidgets);
+                    mModel.getFilteredWidgetsListForPicker(context, mWidgetsFilter);
+            final List<WidgetsListBaseEntry> defaultWidgets =
+                    shouldShowDefaultWidgets() ? mModel.getFilteredWidgetsListForPicker(context,
+                            mDefaultWidgetsFilter) : List.of();
+            bindWidgets(allWidgets, defaultWidgets);
             // Open sheet once widgets are available, so that it doesn't interrupt the open
             // animation.
             openWidgetsSheet();
@@ -307,8 +320,9 @@ public class WidgetPickerActivity extends BaseActivity {
         });
     }
 
-    private void bindWidgets(List<WidgetsListBaseEntry> widgets) {
-        MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(widgets));
+    private void bindWidgets(List<WidgetsListBaseEntry> allWidgets,
+            List<WidgetsListBaseEntry> defaultWidgets) {
+        MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(allWidgets, defaultWidgets));
     }
 
    private void openWidgetsSheet() {
@@ -380,7 +394,13 @@ public class WidgetPickerActivity extends BaseActivity {
         }
     };
 
-    private WidgetAcceptabilityVerdict isWidgetAcceptable(WidgetItem widget) {
+    private boolean shouldShowDefaultWidgets() {
+        // If optional filters such as size filter are present, we display them as default widgets.
+        return mDesiredWidgetWidth != 0 || mDesiredWidgetHeight != 0;
+    }
+
+    private WidgetAcceptabilityVerdict isWidgetAcceptable(WidgetItem widget,
+            boolean applySizeFilter) {
         final AppWidgetProviderInfo info = widget.widgetInfo;
         if (info == null) {
             return rejectWidget(widget, "shortcut");
@@ -401,61 +421,63 @@ public class WidgetPickerActivity extends BaseActivity {
                     info.widgetCategory);
         }
 
-        if (mDesiredWidgetWidth == 0 && mDesiredWidgetHeight == 0) {
-            // Accept the widget if the desired dimensions are unspecified.
-            return acceptWidget(widget);
-        }
-
-        final boolean isHorizontallyResizable =
-                (info.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0;
-        if (mDesiredWidgetWidth > 0 && isHorizontallyResizable) {
-            if (info.maxResizeWidth > 0
-                    && info.maxResizeWidth >= info.minWidth
-                    && info.maxResizeWidth < mDesiredWidgetWidth) {
-                return rejectWidget(
-                        widget,
-                        "maxResizeWidth[%d] < mDesiredWidgetWidth[%d]",
-                        info.maxResizeWidth,
-                        mDesiredWidgetWidth);
+        if (applySizeFilter) {
+            if (mDesiredWidgetWidth == 0 && mDesiredWidgetHeight == 0) {
+                // Accept the widget if the desired dimensions are unspecified.
+                return acceptWidget(widget);
             }
 
-            final int minWidth = Math.min(info.minResizeWidth, info.minWidth);
-            if (minWidth > mDesiredWidgetWidth) {
-                return rejectWidget(
-                        widget,
-                        "min(minWidth[%d], minResizeWidth[%d]) > mDesiredWidgetWidth[%d]",
-                        info.minWidth,
-                        info.minResizeWidth,
-                        mDesiredWidgetWidth);
-            }
-        }
+            final boolean isHorizontallyResizable =
+                    (info.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0;
+            if (mDesiredWidgetWidth > 0 && isHorizontallyResizable) {
+                if (info.maxResizeWidth > 0
+                        && info.maxResizeWidth >= info.minWidth
+                        && info.maxResizeWidth < mDesiredWidgetWidth) {
+                    return rejectWidget(
+                            widget,
+                            "maxResizeWidth[%d] < mDesiredWidgetWidth[%d]",
+                            info.maxResizeWidth,
+                            mDesiredWidgetWidth);
+                }
 
-        final boolean isVerticallyResizable =
-                (info.resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0;
-        if (mDesiredWidgetHeight > 0 && isVerticallyResizable) {
-            if (info.maxResizeHeight > 0
-                    && info.maxResizeHeight >= info.minHeight
-                    && info.maxResizeHeight < mDesiredWidgetHeight) {
-                return rejectWidget(
-                        widget,
-                        "maxResizeHeight[%d] < mDesiredWidgetHeight[%d]",
-                        info.maxResizeHeight,
-                        mDesiredWidgetHeight);
+                final int minWidth = Math.min(info.minResizeWidth, info.minWidth);
+                if (minWidth > mDesiredWidgetWidth) {
+                    return rejectWidget(
+                            widget,
+                            "min(minWidth[%d], minResizeWidth[%d]) > mDesiredWidgetWidth[%d]",
+                            info.minWidth,
+                            info.minResizeWidth,
+                            mDesiredWidgetWidth);
+                }
             }
 
-            final int minHeight = Math.min(info.minResizeHeight, info.minHeight);
-            if (minHeight > mDesiredWidgetHeight) {
-                return rejectWidget(
-                        widget,
-                        "min(minHeight[%d], minResizeHeight[%d]) > mDesiredWidgetHeight[%d]",
-                        info.minHeight,
-                        info.minResizeHeight,
-                        mDesiredWidgetHeight);
-            }
-        }
+            final boolean isVerticallyResizable =
+                    (info.resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0;
+            if (mDesiredWidgetHeight > 0 && isVerticallyResizable) {
+                if (info.maxResizeHeight > 0
+                        && info.maxResizeHeight >= info.minHeight
+                        && info.maxResizeHeight < mDesiredWidgetHeight) {
+                    return rejectWidget(
+                            widget,
+                            "maxResizeHeight[%d] < mDesiredWidgetHeight[%d]",
+                            info.maxResizeHeight,
+                            mDesiredWidgetHeight);
+                }
 
-        if (!isHorizontallyResizable || !isVerticallyResizable) {
-            return rejectWidget(widget, "not resizeable");
+                final int minHeight = Math.min(info.minResizeHeight, info.minHeight);
+                if (minHeight > mDesiredWidgetHeight) {
+                    return rejectWidget(
+                            widget,
+                            "min(minHeight[%d], minResizeHeight[%d]) > mDesiredWidgetHeight[%d]",
+                            info.minHeight,
+                            info.minResizeHeight,
+                            mDesiredWidgetHeight);
+                }
+            }
+
+            if (!isHorizontallyResizable || !isVerticallyResizable) {
+                return rejectWidget(widget, "not resizeable");
+            }
         }
 
         return acceptWidget(widget);

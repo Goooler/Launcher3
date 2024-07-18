@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar.bubbles;
 
 import android.annotation.Nullable;
+import android.app.Notification;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -35,6 +36,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.wm.shell.animation.Interpolators;
+import com.android.wm.shell.common.bubbles.BubbleInfo;
 
 // TODO: (b/276978250) This is will be similar to WMShell's BadgedImageView, it'd be nice to share.
 
@@ -217,9 +219,9 @@ public class BubbleView extends ConstraintLayout {
     }
 
     void updateDotVisibility(boolean animate) {
-        final float targetScale = shouldDrawDot() ? 1f : 0f;
+        final float targetScale = hasUnseenContent() ? 1f : 0f;
         if (animate) {
-            animateDotScale();
+            animateDotScale(targetScale);
         } else {
             mDotScale = targetScale;
             mAnimatingToDotScale = targetScale;
@@ -241,18 +243,27 @@ public class BubbleView extends ConstraintLayout {
         mAppIcon.setVisibility(show ? VISIBLE : GONE);
     }
 
-    /** Whether the dot indicating unseen content in a bubble should be shown. */
-    private boolean shouldDrawDot() {
-        boolean bubbleHasUnseenContent = mBubble != null
+    boolean hasUnseenContent() {
+        return mBubble != null
                 && mBubble instanceof BubbleBarBubble
                 && !((BubbleBarBubble) mBubble).getInfo().isNotificationSuppressed();
-        // Always render the dot if it's animating, since it could be animating out. Otherwise, show
-        // it if the bubble wants to show it, and we aren't suppressing it.
-        return bubbleHasUnseenContent || mDotIsAnimating;
     }
 
-    /** How big the dot should be, fraction from 0 to 1. */
-    void setDotScale(float fraction) {
+    /**
+     * Used to determine if we can skip drawing frames.
+     *
+     * <p>Generally we should draw the dot when it is requested to be shown and there is unseen
+     * content. But when the dot is removed, we still want to draw frames so that it can be scaled
+     * out.
+     */
+    private boolean shouldDrawDot() {
+        // if there's no dot there's nothing to draw, unless the dot was removed and we're in the
+        // middle of removing it
+        return hasUnseenContent() || mDotIsAnimating;
+    }
+
+    /** Updates the dot scale to the specified fraction from 0 to 1. */
+    private void setDotScale(float fraction) {
         if (!shouldDrawDot()) {
             return;
         }
@@ -260,11 +271,41 @@ public class BubbleView extends ConstraintLayout {
         invalidate();
     }
 
-    /**
-     * Animates the dot to the given scale.
-     */
-    private void animateDotScale() {
-        float toScale = shouldDrawDot() ? 1f : 0f;
+    void showDotIfNeeded(float fraction) {
+        if (!hasUnseenContent()) {
+            return;
+        }
+        setDotScale(fraction);
+    }
+
+    void showDotIfNeeded(boolean animate) {
+        // only show the dot if we have unseen content
+        if (!hasUnseenContent()) {
+            return;
+        }
+        if (animate) {
+            animateDotScale(1f);
+        } else {
+            setDotScale(1f);
+        }
+    }
+
+    void hideDot() {
+        animateDotScale(0f);
+    }
+
+    /** Marks this bubble such that it no longer has unseen content, and hides the dot. */
+    void markSeen() {
+        if (mBubble instanceof BubbleBarBubble bubble) {
+            BubbleInfo info = bubble.getInfo();
+            info.setFlags(
+                    info.getFlags() | Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION);
+            hideDot();
+        }
+    }
+
+    /** Animates the dot to the given scale. */
+    private void animateDotScale(float toScale) {
         boolean isDotScaleChanging = Float.compare(mDotScale, toScale) != 0;
 
         // Don't restart the animation if we're already animating to the given value or if the dot
@@ -277,8 +318,6 @@ public class BubbleView extends ConstraintLayout {
 
         final boolean showDot = toScale > 0f;
 
-        // Do NOT wait until after animation ends to setShowDot
-        // to avoid overriding more recent showDot states.
         clearAnimation();
         animate()
                 .setDuration(200)
@@ -292,7 +331,6 @@ public class BubbleView extends ConstraintLayout {
                     mDotIsAnimating = false;
                 }).start();
     }
-
 
     @Override
     public String toString() {

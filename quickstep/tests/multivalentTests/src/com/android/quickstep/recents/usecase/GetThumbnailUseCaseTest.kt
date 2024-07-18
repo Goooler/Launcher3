@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.util
+package com.android.quickstep.recents.usecase
 
 import android.content.ComponentName
 import android.content.Intent

@@ -26,6 +26,7 @@ import static com.android.launcher3.LauncherState.EDIT_MODE;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.config.FeatureFlags.ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS;
+import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_LABEL_UPDATED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ITEM_DROP_COMPLETED;
 import static com.android.launcher3.testing.shared.TestProtocol.FOLDER_OPENED_MESSAGE;
@@ -1106,7 +1107,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     }
 
     private void updateItemLocationsInDatabaseBatch(boolean isBind) {
-        FolderGridOrganizer verifier = new FolderGridOrganizer(
+        FolderGridOrganizer verifier = createFolderGridOrganizer(
                 mActivityContext.getDeviceProfile()).setFolderInfo(mInfo);
 
         ArrayList<ItemInfo> items = new ArrayList<>();
@@ -1404,7 +1405,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     @Override
     public void onAdd(ItemInfo item, int rank) {
-        FolderGridOrganizer verifier = new FolderGridOrganizer(
+        FolderGridOrganizer verifier = createFolderGridOrganizer(
                 mActivityContext.getDeviceProfile()).setFolderInfo(mInfo);
         verifier.updateRankAndPos(item, rank);
         mLauncherDelegate.getModelWriter().addOrMoveItemInDatabase(item, mInfo.id, 0, item.cellX,

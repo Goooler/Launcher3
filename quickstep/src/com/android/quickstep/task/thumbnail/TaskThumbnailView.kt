@@ -31,6 +31,7 @@ import androidx.core.view.isVisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
@@ -61,14 +62,21 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             (parent as TaskView).taskViewData,
             (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
             recentsView.mTasksRepository!!,
+            GetThumbnailPositionUseCase(
+                recentsView.mDeviceProfileRepository!!,
+                recentsView.mOrientedStateRepository!!,
+                recentsView.mTasksRepository!!
+            )
         )
     }
+
     private lateinit var viewAttachedScope: CoroutineScope
 
     private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
     private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
-    private val thumbnail: ImageView by lazy { findViewById(R.id.task_thumbnail) }
+    private val thumbnailView: ImageView by lazy { findViewById(R.id.task_thumbnail) }
 
+    private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
 
     private val _measuredBounds = Rect()
@@ -97,6 +105,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskThumbnailView"))
         viewModel.uiState
             .onEach { viewModelUiState ->
+                uiState = viewModelUiState
                 resetViews()
                 when (viewModelUiState) {
                     is Uninitialized -> {}
@@ -135,7 +144,14 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     override fun onRecycle() {
-        // Do nothing
+        uiState = Uninitialized
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (uiState is Snapshot) {
+            setImageMatrix()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -148,7 +164,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     private fun resetViews() {
         liveTileView.isVisible = false
-        thumbnail.isVisible = false
+        thumbnailView.isVisible = false
         scrimView.alpha = 0f
         setBackgroundColor(Color.BLACK)
     }
@@ -163,8 +179,13 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     private fun drawSnapshot(snapshot: Snapshot) {
         drawBackground(snapshot.backgroundColor)
-        thumbnail.setImageBitmap(snapshot.bitmap)
-        thumbnail.isVisible = true
+        thumbnailView.setImageBitmap(snapshot.bitmap)
+        thumbnailView.isVisible = true
+        setImageMatrix()
+    }
+
+    private fun setImageMatrix() {
+        thumbnailView.imageMatrix = viewModel.getThumbnailPositionState(width, height, isLayoutRtl)
     }
 
     private fun getCurrentCornerRadius() =

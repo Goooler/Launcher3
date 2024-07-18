@@ -568,7 +568,7 @@ public class LoaderTask implements Runnable {
     private void processFolderItems() {
         // Sort the folder items, update ranks, and make sure all preview items are high res.
         List<FolderGridOrganizer> verifiers = mApp.getInvariantDeviceProfile().supportedProfiles
-                .stream().map(FolderGridOrganizer::new).toList();
+                .stream().map(FolderGridOrganizer::createFolderGridOrganizer).toList();
         for (CollectionInfo collection : mBgDataModel.collections) {
             if (!(collection instanceof FolderInfo folder)) {
                 continue;

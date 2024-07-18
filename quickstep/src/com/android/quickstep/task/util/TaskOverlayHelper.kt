@@ -18,6 +18,7 @@ package com.android.quickstep.task.util
 
 import android.util.Log
 import com.android.quickstep.TaskOverlayFactory
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Disabled
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Enabled
@@ -44,45 +45,71 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
     //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
     //  This is using a lazy for now because the dependencies cannot be obtained without DI.
-    private val taskOverlayViewModel by lazy {
+    private val viewModel by lazy {
         val recentsView =
             RecentsViewContainer.containerFromContext<RecentsViewContainer>(
                     overlay.taskView.context
                 )
                 .getOverviewPanel<RecentsView<*, *>>()
-        TaskOverlayViewModel(task, recentsView.mRecentsViewData!!, recentsView.mTasksRepository!!)
+        TaskOverlayViewModel(
+            task,
+            recentsView.mRecentsViewData!!,
+            recentsView.mTasksRepository!!,
+            GetThumbnailPositionUseCase(
+                recentsView.mDeviceProfileRepository!!,
+                recentsView.mOrientedStateRepository!!,
+                recentsView.mTasksRepository
+            )
+        )
     }
 
     // TODO(b/331753115): TaskOverlay should listen for state changes and react.
     val enabledState: Enabled
         get() = uiState as Enabled
 
+    fun getThumbnailMatrix() = getThumbnailPositionState().matrix
+
+    private fun getThumbnailPositionState() =
+        viewModel.getThumbnailPositionState(
+            overlay.snapshotView.width,
+            overlay.snapshotView.height,
+            overlay.snapshotView.isLayoutRtl
+        )
+
     fun init() {
         overlayInitializedScope =
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskOverlayHelper"))
-        taskOverlayViewModel.overlayState
+        viewModel.overlayState
             .onEach {
                 uiState = it
                 if (it is Enabled) {
-                    Log.d(TAG, "initOverlay - taskId: ${task.key.id}, thumbnail: ${it.thumbnail}")
-                    overlay.initOverlay(
-                        task,
-                        it.thumbnail,
-                        it.thumbnailMatrix,
-                        /* rotated= */ false
-                    )
+                    initOverlay(it)
                 } else {
-                    Log.d(TAG, "reset - taskId: ${task.key.id}")
-                    overlay.reset()
+                    reset()
                 }
             }
             .launchIn(overlayInitializedScope)
+        overlay.snapshotView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            (uiState as? Enabled)?.let { initOverlay(it) }
+        }
+    }
+
+    private fun initOverlay(enabledState: Enabled) {
+        Log.d(TAG, "initOverlay - taskId: ${task.key.id}, thumbnail: ${enabledState.thumbnail}")
+        with(getThumbnailPositionState()) {
+            overlay.initOverlay(task, enabledState.thumbnail, matrix, isRotated)
+        }
+    }
+
+    private fun reset() {
+        Log.d(TAG, "reset - taskId: ${task.key.id}")
+        overlay.reset()
     }
 
     fun destroy() {
         overlayInitializedScope.cancel()
         uiState = Disabled
-        overlay.reset()
+        reset()
     }
 
     companion object {

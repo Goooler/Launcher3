@@ -331,9 +331,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         applyState(/* duration = */ 0);
 
         // Hide the background while stashed so it doesn't show on fast swipes home
-        boolean shouldHideTaskbarBackground = enableScalingRevealHomeAnimation()
-                && DisplayController.isTransientTaskbar(mActivity)
-                && isStashed();
+        boolean shouldHideTaskbarBackground = mActivity.isPhoneMode() ||
+                (enableScalingRevealHomeAnimation()
+                        && DisplayController.isTransientTaskbar(mActivity)
+                        && isStashed());
 
         mTaskbarBackgroundAlphaForStash.setValue(shouldHideTaskbarBackground ? 0 : 1);
 

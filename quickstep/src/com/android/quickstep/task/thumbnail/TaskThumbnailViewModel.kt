@@ -17,9 +17,11 @@
 package com.android.quickstep.task.thumbnail
 
 import android.annotation.ColorInt
-import android.graphics.Rect
+import android.graphics.Matrix
 import androidx.core.graphics.ColorUtils
 import com.android.quickstep.recents.data.RecentTasksRepository
+import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.usecase.ThumbnailPositionState
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskThumbnailViewModel(
@@ -44,9 +47,10 @@ class TaskThumbnailViewModel(
     taskViewData: TaskViewData,
     taskContainerData: TaskContainerData,
     private val tasksRepository: RecentTasksRepository,
+    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase
 ) {
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
-    private var boundTaskIsRunning = false
+    private lateinit var taskThumbnail: TaskThumbnail
 
     /**
      * Progress for changes in corner radius. progress: 0 = overview corner radius; 1 = fullscreen
@@ -66,16 +70,12 @@ class TaskThumbnailViewModel(
                 taskFlow.map { taskVal ->
                     when {
                         taskVal == null -> Uninitialized
-                        boundTaskIsRunning -> LiveTile
+                        taskThumbnail.isRunning -> LiveTile
                         isBackgroundOnly(taskVal) ->
                             BackgroundOnly(taskVal.colorBackground.removeAlpha())
                         isSnapshotState(taskVal) -> {
                             val bitmap = taskVal.thumbnail?.thumbnail!!
-                            Snapshot(
-                                bitmap,
-                                Rect(0, 0, bitmap.width, bitmap.height),
-                                taskVal.colorBackground.removeAlpha()
-                            )
+                            Snapshot(bitmap, taskVal.colorBackground.removeAlpha())
                         }
                         else -> Uninitialized
                     }
@@ -84,8 +84,20 @@ class TaskThumbnailViewModel(
             .distinctUntilChanged()
 
     fun bind(taskThumbnail: TaskThumbnail) {
-        boundTaskIsRunning = taskThumbnail.isRunning
+        this.taskThumbnail = taskThumbnail
         task.value = tasksRepository.getTaskDataById(taskThumbnail.taskId)
+    }
+
+    fun getThumbnailPositionState(width: Int, height: Int, isRtl: Boolean): Matrix {
+        return runBlocking {
+            when (
+                val thumbnailPositionState =
+                    getThumbnailPositionUseCase.run(taskThumbnail.taskId, width, height, isRtl)
+            ) {
+                is ThumbnailPositionState.MatrixScaling -> thumbnailPositionState.matrix
+                is ThumbnailPositionState.MissingThumbnail -> Matrix.IDENTITY_MATRIX
+            }
+        }
     }
 
     private fun isBackgroundOnly(task: Task): Boolean = task.isLocked || task.thumbnail == null

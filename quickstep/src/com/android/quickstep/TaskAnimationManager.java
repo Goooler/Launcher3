@@ -332,7 +332,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         if (ENABLE_SHELL_TRANSITIONS) {
             final ActivityOptions options = ActivityOptions.makeBasic();
-            options.setPendingIntentBackgroundActivityLaunchAllowedByPermission(true);
+            options.setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
             // Use regular (non-transient) launch for all apps page to control IME.
             if (!containerInterface.allowAllAppsFromOverview()) {
                 options.setTransientLaunch();
