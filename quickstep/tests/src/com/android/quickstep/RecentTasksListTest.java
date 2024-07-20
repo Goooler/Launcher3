@@ -16,6 +16,8 @@
 
 package com.android.quickstep;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import static junit.framework.TestCase.assertNull;
 
 import static org.junit.Assert.assertEquals;
@@ -69,14 +71,14 @@ public class RecentTasksListTest {
     }
 
     @Test
-    public void onRecentTasksChanged_doesNotFetchTasks() {
+    public void onRecentTasksChanged_doesNotFetchTasks() throws Exception {
         mRecentTasksList.onRecentTasksChanged();
         verify(mockSystemUiProxy, times(0))
                 .getRecentTasks(anyInt(), anyInt());
     }
 
     @Test
-    public void loadTasksInBackground_onlyKeys_noValidTaskDescription() {
+    public void loadTasksInBackground_onlyKeys_noValidTaskDescription() throws Exception  {
         GroupedRecentTaskInfo recentTaskInfos = GroupedRecentTaskInfo.forSplitTasks(
                 new ActivityManager.RecentTaskInfo(), new ActivityManager.RecentTaskInfo(), null);
         when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
@@ -91,7 +93,19 @@ public class RecentTasksListTest {
     }
 
     @Test
-    public void loadTasksInBackground_moreThanKeys_hasValidTaskDescription() {
+    public void loadTasksInBackground_GetRecentTasksException() throws Exception  {
+        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+                .thenThrow(new SystemUiProxy.GetRecentTasksException("task load failed"));
+
+        RecentTasksList.TaskLoadResult taskList = mRecentTasksList.loadTasksInBackground(
+                Integer.MAX_VALUE, -1, false);
+
+        assertThat(taskList.mRequestId).isEqualTo(-1);
+        assertThat(taskList).isEmpty();
+    }
+
+    @Test
+    public void loadTasksInBackground_moreThanKeys_hasValidTaskDescription() throws Exception  {
         String taskDescription = "Wheeee!";
         ActivityManager.RecentTaskInfo task1 = new ActivityManager.RecentTaskInfo();
         task1.taskDescription = new ActivityManager.TaskDescription(taskDescription);
@@ -111,7 +125,7 @@ public class RecentTasksListTest {
     }
 
     @Test
-    public void loadTasksInBackground_freeformTask_createsDesktopTask() {
+    public void loadTasksInBackground_freeformTask_createsDesktopTask() throws Exception  {
         ActivityManager.RecentTaskInfo[] tasks = {
                 createRecentTaskInfo(1 /* taskId */),
                 createRecentTaskInfo(4 /* taskId */),
@@ -134,7 +148,8 @@ public class RecentTasksListTest {
     }
 
     @Test
-    public void loadTasksInBackground_freeformTask_onlyMinimizedTasks_doesNotCreateDesktopTask() {
+    public void loadTasksInBackground_freeformTask_onlyMinimizedTasks_doesNotCreateDesktopTask()
+            throws Exception {
         ActivityManager.RecentTaskInfo[] tasks = {
                 createRecentTaskInfo(1 /* taskId */),
                 createRecentTaskInfo(4 /* taskId */),

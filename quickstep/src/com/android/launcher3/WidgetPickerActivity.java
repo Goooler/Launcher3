@@ -47,11 +47,11 @@ import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.WidgetPredictionsRequester;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
-import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.widget.WidgetCell;
+import com.android.launcher3.widget.model.WidgetsListBaseEntriesBuilder;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
-import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
 import java.util.ArrayList;
@@ -60,10 +60,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /** An Activity that can host Launcher's widget picker. */
 public class WidgetPickerActivity extends BaseActivity {
@@ -112,7 +110,8 @@ public class WidgetPickerActivity extends BaseActivity {
     private WidgetsModel mModel;
     private LauncherAppState mApp;
     private WidgetPredictionsRequester mWidgetPredictionsRequester;
-    private final PopupDataProvider mPopupDataProvider = new PopupDataProvider(i -> {});
+    private final PopupDataProvider mPopupDataProvider = new PopupDataProvider(i -> {
+    });
 
     private int mDesiredWidgetWidth;
     private int mDesiredWidgetHeight;
@@ -287,45 +286,41 @@ public class WidgetPickerActivity extends BaseActivity {
         };
     }
 
-    /** Updates the model with widgets, applies filters and launches the widgets sheet once
-     * widgets are available */
+    /**
+     * Updates the model with widgets, applies filters and launches the widgets sheet once
+     * widgets are available
+     */
     private void refreshAndBindWidgets() {
         MODEL_EXECUTOR.execute(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
             Context context = app.getContext();
 
             mModel.update(app, null);
-            final List<WidgetsListBaseEntry> allWidgets =
-                    mModel.getFilteredWidgetsListForPicker(context, mWidgetsFilter);
-            final List<WidgetsListBaseEntry> defaultWidgets =
-                    shouldShowDefaultWidgets() ? mModel.getFilteredWidgetsListForPicker(context,
-                            mDefaultWidgetsFilter) : List.of();
-            bindWidgets(allWidgets, defaultWidgets);
+            bindWidgets(mModel.getWidgetsByPackageItem());
             // Open sheet once widgets are available, so that it doesn't interrupt the open
             // animation.
             openWidgetsSheet();
             if (mUiSurface != null) {
-                Map<ComponentKey, WidgetItem> allWidgetItems = allWidgets.stream()
-                        .filter(entry -> entry instanceof WidgetsListContentEntry)
-                        .flatMap(entry -> entry.mWidgets.stream())
-                        .distinct()
-                        .collect(Collectors.toMap(
-                                widget -> new ComponentKey(widget.componentName, widget.user),
-                                Function.identity()
-                        ));
                 mWidgetPredictionsRequester = new WidgetPredictionsRequester(app.getContext(),
-                        mUiSurface, allWidgetItems);
+                        mUiSurface, mModel.getWidgetsByComponentKey());
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
         });
     }
 
-    private void bindWidgets(List<WidgetsListBaseEntry> allWidgets,
-            List<WidgetsListBaseEntry> defaultWidgets) {
+    private void bindWidgets(Map<PackageItemInfo, List<WidgetItem>> widgets) {
+        WidgetsListBaseEntriesBuilder builder = new WidgetsListBaseEntriesBuilder(
+                mApp.getContext());
+
+        final List<WidgetsListBaseEntry> allWidgets = builder.build(widgets, mWidgetsFilter);
+        final List<WidgetsListBaseEntry> defaultWidgets =
+                shouldShowDefaultWidgets() ? builder.build(widgets,
+                        mDefaultWidgetsFilter) : List.of();
+
         MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(allWidgets, defaultWidgets));
     }
 
-   private void openWidgetsSheet() {
+    private void openWidgetsSheet() {
         MAIN_EXECUTOR.execute(() -> {
             mWidgetSheet = WidgetsFullSheet.show(this, true);
             mWidgetSheet.mayUpdateTitleAndDescription(mTitle, mDescription);
@@ -392,7 +387,7 @@ public class WidgetPickerActivity extends BaseActivity {
             mActiveOnBackAnimationCallback.onBackCancelled();
             mActiveOnBackAnimationCallback = null;
         }
-    };
+    }
 
     private boolean shouldShowDefaultWidgets() {
         // If optional filters such as size filter are present, we display them as default widgets.

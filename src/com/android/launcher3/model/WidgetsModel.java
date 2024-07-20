@@ -26,7 +26,6 @@ import com.android.launcher3.AppFilter;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.ComponentWithLabelAndIcon;
 import com.android.launcher3.icons.IconCache;
@@ -39,9 +38,6 @@ import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.WidgetSections;
-import com.android.launcher3.widget.model.WidgetsListBaseEntry;
-import com.android.launcher3.widget.model.WidgetsListContentEntry;
-import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
 import com.android.wm.shell.Flags;
 
 import java.util.ArrayList;
@@ -75,6 +71,9 @@ public class WidgetsModel {
      * Returns all widgets keyed by their component key.
      */
     public synchronized Map<ComponentKey, WidgetItem> getWidgetsByComponentKey() {
+        if (!WIDGETS_ENABLED) {
+            return Collections.emptyMap();
+        }
         return mWidgetsByPackageItem.values().stream()
                 .flatMap(Collection::stream).distinct()
                 .collect(Collectors.toMap(
@@ -87,51 +86,10 @@ public class WidgetsModel {
      * Returns widgets grouped by the package item that they should belong to.
      */
     public synchronized Map<PackageItemInfo, List<WidgetItem>> getWidgetsByPackageItem() {
-        return mWidgetsByPackageItem;
-    }
-
-    /**
-     * Returns a list of {@link WidgetsListBaseEntry} filtered using given widget item filter. All
-     * {@link WidgetItem}s in a single row are sorted (based on label and user), but the overall
-     * list of {@link WidgetsListBaseEntry}s is not sorted.
-     *
-     * @see com.android.launcher3.widget.picker.WidgetsListAdapter#setWidgets(List)
-     */
-    public synchronized ArrayList<WidgetsListBaseEntry> getFilteredWidgetsListForPicker(
-            Context context,
-            Predicate<WidgetItem> widgetItemFilter) {
         if (!WIDGETS_ENABLED) {
-            return new ArrayList<>();
+            return Collections.emptyMap();
         }
-        ArrayList<WidgetsListBaseEntry> result = new ArrayList<>();
-        AlphabeticIndexCompat indexer = new AlphabeticIndexCompat(context);
-
-        for (Map.Entry<PackageItemInfo, List<WidgetItem>> entry :
-                mWidgetsByPackageItem.entrySet()) {
-            PackageItemInfo pkgItem = entry.getKey();
-            List<WidgetItem> widgetItems = entry.getValue()
-                    .stream()
-                    .filter(widgetItemFilter).toList();
-            if (!widgetItems.isEmpty()) {
-                String sectionName = (pkgItem.title == null) ? "" :
-                        indexer.computeSectionName(pkgItem.title);
-                result.add(WidgetsListHeaderEntry.create(pkgItem, sectionName, widgetItems));
-                result.add(new WidgetsListContentEntry(pkgItem, sectionName, widgetItems));
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Returns a list of {@link WidgetsListBaseEntry}. All {@link WidgetItem} in a single row
-     * are sorted (based on label and user), but the overall list of
-     * {@link WidgetsListBaseEntry}s is not sorted.
-     *
-     * @see com.android.launcher3.widget.picker.WidgetsListAdapter#setWidgets(List)
-     */
-    public synchronized ArrayList<WidgetsListBaseEntry> getWidgetsListForPicker(Context context) {
-        // return all items
-        return getFilteredWidgetsListForPicker(context, /*widgetItemFilter=*/ item -> true);
+        return mWidgetsByPackageItem;
     }
 
     /**

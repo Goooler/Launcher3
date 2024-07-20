@@ -1631,14 +1631,17 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                             mRecentsAnimationController.screenshotTask(taskId));
                 });
 
-                // let SystemUi reparent the overlay leash as soon as possible
+                // let SystemUi reparent the overlay leash as soon as possible;
+                // make sure to pass in an empty src-rect-hint if overlay is present, since we
+                // use our own calculated source-rect-hint for the animation.
                 SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
                         mSwipePipToHomeAnimator.getTaskId(),
                         mSwipePipToHomeAnimator.getComponentName(),
                         mSwipePipToHomeAnimator.getDestinationBounds(),
                         mSwipePipToHomeAnimator.getContentOverlay(),
                         mSwipePipToHomeAnimator.getAppBounds(),
-                        mSwipePipToHomeAnimator.getSourceRectHint());
+                        mSwipePipToHomeAnimator.getContentOverlay() != null ? new Rect()
+                                : mSwipePipToHomeAnimator.getSourceRectHint());
 
                 windowAnim = mSwipePipToHomeAnimators;
             } else {

@@ -635,8 +635,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         final TypedArray ta = mContext.obtainStyledAttributes(
                 new int[]{
-                        com.android.internal.R.attr.materialColorOnPrimaryFixed,
-                        com.android.internal.R.attr.materialColorPrimaryFixed
+                        R.attr.materialColorOnPrimaryFixed,
+                        R.attr.materialColorPrimaryFixed
                 });
         int overflowIconColor = ta.getColor(0, Color.WHITE);
         int overflowBackgroundColor = ta.getColor(1, Color.BLACK);

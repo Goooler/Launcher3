@@ -98,6 +98,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -2398,6 +2399,16 @@ public final class LauncherInstrumentation {
         disableSensorRotation();
         final Integer initialPid = getPid();
         final LogEventChecker eventChecker = new LogEventChecker(this);
+        eventChecker.setLogExclusionRule(event -> {
+            Matcher matcher = Pattern.compile("KeyEvent.*flags=0x([0-9a-fA-F]+)").matcher(event);
+            if (matcher.find()) {
+                int keyEventFlags = Integer.parseInt(matcher.group(1), 16);
+                // ignore KeyEvents with FLAG_CANCELED
+                return (keyEventFlags & KeyEvent.FLAG_CANCELED) != 0;
+            }
+            return false;
+        });
+
         if (eventChecker.start()) mEventChecker = eventChecker;
 
         return () -> {

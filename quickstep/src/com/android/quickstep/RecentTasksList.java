@@ -300,8 +300,12 @@ public class RecentTasksList {
     @VisibleForTesting
     TaskLoadResult loadTasksInBackground(int numTasks, int requestId, boolean loadKeysOnly) {
         int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(numTasks, currentUserId);
+        ArrayList<GroupedRecentTaskInfo> rawTasks;
+        try {
+            rawTasks = mSysUiProxy.getRecentTasks(numTasks, currentUserId);
+        } catch (SystemUiProxy.GetRecentTasksException e) {
+            return INVALID_RESULT;
+        }
         // The raw tasks are given in most-recent to least-recent order, we need to reverse it
         Collections.reverse(rawTasks);
 
@@ -416,8 +420,12 @@ public class RecentTasksList {
         }
         writer.println(prefix + "  ]");
         int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(Integer.MAX_VALUE, currentUserId);
+        ArrayList<GroupedRecentTaskInfo> rawTasks;
+        try {
+            rawTasks = mSysUiProxy.getRecentTasks(Integer.MAX_VALUE, currentUserId);
+        } catch (SystemUiProxy.GetRecentTasksException e) {
+            rawTasks = new ArrayList<>();
+        }
         writer.println(prefix + "  rawTasks=[");
         for (GroupedRecentTaskInfo task : rawTasks) {
             TaskInfo taskInfo1 = task.getTaskInfo1();

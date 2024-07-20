@@ -34,14 +34,14 @@ import kotlinx.coroutines.runBlocking
 class TaskOverlayViewModel(
     private val task: Task,
     recentsViewData: RecentsViewData,
-    tasksRepository: RecentTasksRepository,
-    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase
+    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase,
+    recentTasksRepository: RecentTasksRepository,
 ) {
     val overlayState =
         combine(
                 recentsViewData.overlayEnabled,
                 recentsViewData.settledFullyVisibleTaskIds.map { it.contains(task.key.id) },
-                tasksRepository.getThumbnailById(task.key.id)
+                recentTasksRepository.getThumbnailById(task.key.id)
             ) { isOverlayEnabled, isFullyVisible, thumbnailData ->
                 if (isOverlayEnabled && isFullyVisible) {
                     Enabled(

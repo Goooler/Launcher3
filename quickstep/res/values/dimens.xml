@@ -449,11 +449,13 @@
 
     <dimen name="bubblebar_icon_size_small">32dp</dimen>
     <dimen name="bubblebar_icon_size">36dp</dimen>
+    <dimen name="bubblebar_icon_size_persistent_taskbar">28dp</dimen>
     <dimen name="bubblebar_badge_size">24dp</dimen>
     <dimen name="bubblebar_icon_overlap">12dp</dimen>
     <dimen name="bubblebar_overflow_inset">16dp</dimen>
     <dimen name="bubblebar_icon_spacing">6dp</dimen>
     <dimen name="bubblebar_icon_spacing_large">8dp</dimen>
+    <dimen name="bubblebar_icon_spacing_persistent_taskbar">@dimen/bubblebar_icon_spacing</dimen>
     <dimen name="bubblebar_expanded_icon_spacing">12dp</dimen>
     <dimen name="bubblebar_icon_elevation">1dp</dimen>
 

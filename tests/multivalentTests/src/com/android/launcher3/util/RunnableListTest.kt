@@ -16,17 +16,20 @@
 
 package com.android.launcher3.util
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyZeroInteractions
+import org.mockito.kotlin.verifyNoMoreInteractions
 
 @SmallTest
+@RunWith(AndroidJUnit4::class)
 class RunnableListTest {
 
     @Mock private lateinit var runnable1: Runnable
@@ -73,7 +76,7 @@ class RunnableListTest {
 
         underTest.executeAllAndDestroy()
 
-        verifyZeroInteractions(runnable1)
+        verifyNoMoreInteractions(runnable1)
     }
 
     @Test
@@ -107,7 +110,7 @@ class RunnableListTest {
         underTest.remove(runnable1)
         underTest.executeAllAndClear()
 
-        verifyZeroInteractions(runnable1)
+        verifyNoMoreInteractions(runnable1)
         verify(runnable2).run()
     }
 }

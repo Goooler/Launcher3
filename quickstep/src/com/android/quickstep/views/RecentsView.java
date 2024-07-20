@@ -191,10 +191,12 @@ import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.ViewUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
+import com.android.quickstep.recents.data.RecentTasksRepository;
 import com.android.quickstep.recents.data.RecentsDeviceProfileRepository;
 import com.android.quickstep.recents.data.RecentsRotationStateRepository;
-import com.android.quickstep.recents.data.TasksRepository;
+import com.android.quickstep.recents.di.RecentsDependencies;
 import com.android.quickstep.recents.viewmodel.RecentsViewData;
+import com.android.quickstep.recents.viewmodel.RecentsViewModel;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.AnimUtils;
@@ -241,8 +243,9 @@ import java.util.stream.Collectors;
 
 /**
  * A list of recent tasks.
+ *
  * @param <CONTAINER_TYPE> : the container that should host recents view
- * @param <STATE_TYPE> : the type of base state that will be used
+ * @param <STATE_TYPE>     : the type of base state that will be used
  */
 
 public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewContainer,
@@ -391,7 +394,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     view.setScaleX(scale);
                     view.setScaleY(scale);
                     if (enableRefactorTaskThumbnail()) {
-                        view.mRecentsViewData.getScale().setValue(scale);
+                        view.mRecentsViewModel.updateScale(scale);
                     }
                     view.mLastComputedTaskStartPushOutDistance = null;
                     view.mLastComputedTaskEndPushOutDistance = null;
@@ -462,15 +465,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     private static final float SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE = 0.15f;
 
     private static final float FOREGROUND_SCRIM_TINT = 0.32f;
-
-    @Nullable
-    public final RecentsViewData mRecentsViewData = new RecentsViewData();
-    @Nullable
-    public final TasksRepository mTasksRepository;
-    @Nullable
-    public final RecentsRotationStateRepository mOrientedStateRepository;
-    @Nullable
-    public final RecentsDeviceProfileRepository mDeviceProfileRepository;
 
     protected final RecentsOrientedState mOrientationState;
     protected final BaseContainerInterface<STATE_TYPE, CONTAINER_TYPE> mSizeStrategy;
@@ -726,10 +720,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     private final SplitSelectionListener mSplitSelectionListener = new SplitSelectionListener() {
         @Override
-        public void onSplitSelectionConfirmed() { }
+        public void onSplitSelectionConfirmed() {
+        }
 
         @Override
-        public void onSplitSelectionActive() { }
+        public void onSplitSelectionActive() {
+        }
 
         @Override
         public void onSplitSelectionExit(boolean launchedSplit) {
@@ -808,10 +804,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      */
     private boolean mAnyTaskHasBeenDismissed;
 
+    private final RecentsViewModel mRecentsViewModel;
+
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             BaseContainerInterface sizeStrategy) {
         super(context, attrs, defStyleAttr);
         setEnableFreeScroll(true);
+
         mSizeStrategy = sizeStrategy;
         mContainer = RecentsViewContainer.containerFromContext(context);
         mOrientationState = new RecentsOrientedState(
@@ -819,22 +818,30 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         final int rotation = mContainer.getDisplay().getRotation();
         mOrientationState.setRecentsRotation(rotation);
 
+        // Start Recents Dependency graph
+        if (enableRefactorTaskThumbnail()) {
+            RecentsDependencies recentsDependencies = RecentsDependencies.Companion.initialize(
+                    this);
+            mRecentsViewModel = new RecentsViewModel(
+                    recentsDependencies.inject(RecentTasksRepository.class),
+                    recentsDependencies.inject(RecentsViewData.class)
+            );
+
+            recentsDependencies.provide(RecentsRotationStateRepository.class,
+                    () -> new RecentsRotationStateRepository(mOrientationState));
+
+            recentsDependencies.provide(RecentsDeviceProfileRepository.class,
+                    () -> new RecentsDeviceProfileRepository(mContainer));
+        } else {
+            mRecentsViewModel = null;
+        }
+
         mScrollHapticMinGapMillis = getResources()
                 .getInteger(R.integer.recentsScrollHapticMinGapMillis);
         mFastFlingVelocity = getResources()
                 .getDimensionPixelSize(R.dimen.recents_fast_fling_velocity);
         mModel = RecentsModel.INSTANCE.get(context);
         mIdp = InvariantDeviceProfile.INSTANCE.get(context);
-        if (enableRefactorTaskThumbnail()) {
-            mTasksRepository = new TasksRepository(
-                    mModel, mModel.getThumbnailCache(), mModel.getIconCache());
-            mOrientedStateRepository = new RecentsRotationStateRepository(mOrientationState);
-            mDeviceProfileRepository = new RecentsDeviceProfileRepository(mContainer);
-        } else {
-            mTasksRepository = null;
-            mOrientedStateRepository = null;
-            mDeviceProfileRepository = null;
-        }
 
         mClearAllButton = (ClearAllButton) LayoutInflater.from(context)
                 .inflate(R.layout.overview_clear_all_button, this, false);
@@ -1077,6 +1084,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * Update the thumbnail(s) of the relevant TaskView.
+     *
      * @param refreshNow Refresh immediately if it's true.
      */
     @Nullable
@@ -1137,6 +1145,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * See overridden implementations
+     *
      * @return {@code true} if child TaskViews can be launched when user taps on them
      */
     protected boolean canLaunchFullscreenTask() {
@@ -2061,7 +2070,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     public void setFullscreenProgress(float fullscreenProgress) {
         mFullscreenProgress = fullscreenProgress;
         if (enableRefactorTaskThumbnail()) {
-            mRecentsViewData.getFullscreenProgress().setValue(mFullscreenProgress);
+            mRecentsViewModel.updateFullscreenProgress(mFullscreenProgress);
         }
         int taskCount = getTaskViewCount();
         for (int i = 0; i < taskCount; i++) {
@@ -2459,7 +2468,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             }
         }
         if (enableRefactorTaskThumbnail()) {
-            mTasksRepository.setVisibleTasks(visibleTaskIds);
+            mRecentsViewModel.updateVisibleTasks(visibleTaskIds);
         }
     }
 
@@ -2525,6 +2534,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         mTaskListChangeId = -1;
         mFocusedTaskViewId = -1;
         mAnyTaskHasBeenDismissed = false;
+
+
+        if (enableRefactorTaskThumbnail()) {
+            // TODO(b/353917593): RecentsView is never destroyed, so its dependencies need to
+            //  be cleaned up during the reset, but re-created when RecentsView is "resumed".
+            // RecentsDependencies.Companion.destroy();
+        }
 
         Log.d(TAG, "reset - mEnableDrawingLiveTile: " + mEnableDrawingLiveTile
                 + ", mRecentsAnimationController: " + mRecentsAnimationController);
@@ -2636,6 +2652,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * Get the index of the task view whose id matches {@param taskId}.
+     *
      * @return -1 if there is no task view for the task id, else the index of the task view.
      */
     public int getTaskIndexForId(int taskId) {
@@ -2651,7 +2668,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             mTaskListChangeId = mModel.getTasks(this::applyLoadPlan, RecentsFilterState
                     .getFilter(mFilterState.getPackageNameToFilter()));
             if (enableRefactorTaskThumbnail()) {
-                mTasksRepository.getAllTaskData(/* forceRefresh = */ true);
+                mRecentsViewModel.refreshAllTaskData();
             }
         }
     }
@@ -2861,7 +2878,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 // When we create a placeholder task view mSplitBoundsConfig will be null, but with
                 // the actual app running we won't need to show the thumbnail until all the tasks
                 // load later anyways
-                ((GroupedTaskView)taskView).bind(mTmpRunningTasks[0], mTmpRunningTasks[1],
+                ((GroupedTaskView) taskView).bind(mTmpRunningTasks[0], mTmpRunningTasks[1],
                         mOrientationState, mTaskOverlayFactory, mSplitBoundsConfig);
             } else {
                 taskView = getTaskViewFromPool(TaskViewType.SINGLE);
@@ -3189,7 +3206,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     (mIsRtl
                             ? mLastComputedTaskSize.right
                             : deviceProfile.widthPx - mLastComputedTaskSize.left)
-                    - longRowWidth - deviceProfile.overviewGridSideMargin;
+                            - longRowWidth - deviceProfile.overviewGridSideMargin;
             clearAllShortTotalWidthTranslation = mIsRtl
                     ? -mClearAllShortTotalWidthTranslation : mClearAllShortTotalWidthTranslation;
             if (snappedTaskRowWidth == longRowWidth) {
@@ -3219,9 +3236,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     (mIsRtl
                             ? mLastComputedTaskSize.left
                             : deviceProfile.widthPx - mLastComputedTaskSize.right)
-                    - deviceProfile.overviewGridSideMargin - mPageSpacing
-                    + (mTaskWidth - snappedTaskView.getLayoutParams().width)
-                    - mClearAllShortTotalWidthTranslation;
+                            - deviceProfile.overviewGridSideMargin - mPageSpacing
+                            + (mTaskWidth - snappedTaskView.getLayoutParams().width)
+                            - mClearAllShortTotalWidthTranslation;
             if (distanceFromClearAll < minimumDistance) {
                 int distanceDifference = minimumDistance - distanceFromClearAll;
                 snappedTaskGridTranslationX += mIsRtl ? distanceDifference : -distanceDifference;
@@ -3301,12 +3318,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             mLayoutTransition.addTransitionListener(new TransitionListener() {
                 @Override
                 public void startTransition(LayoutTransition transition, ViewGroup viewGroup,
-                    View view, int i) {
+                        View view, int i) {
                 }
 
                 @Override
                 public void endTransition(LayoutTransition transition, ViewGroup viewGroup,
-                    View view, int i) {
+                        View view, int i) {
                     // When the unpinned task is added, snap to first page and disable transitions
                     if (view instanceof TaskView) {
                         snapToPage(0);
@@ -3458,11 +3475,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * Creates a {@link PendingAnimation} for dismissing the specified {@link TaskView}.
-     * @param dismissedTaskView the {@link TaskView} to be dismissed
-     * @param animateTaskView whether the {@link TaskView} to be dismissed should be animated
-     * @param shouldRemoveTask whether the associated {@link Task} should be removed from
-     *                         ActivityManager after dismissal
-     * @param duration duration of the animation
+     *
+     * @param dismissedTaskView           the {@link TaskView} to be dismissed
+     * @param animateTaskView             whether the {@link TaskView} to be dismissed should be
+     *                                    animated
+     * @param shouldRemoveTask            whether the associated {@link Task} should be removed from
+     *                                    ActivityManager after dismissal
+     * @param duration                    duration of the animation
      * @param dismissingForSplitSelection task dismiss animation is used for entering split
      *                                    selection state from app icon
      */
@@ -3727,7 +3746,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
                     float animationEndProgress = isSplitSelectionActive()
                             ? Utilities.boundToRange(splitTimings.getGridSlideStartOffset()
-                                            + splitTimings.getGridSlideDurationOffset(), 0f, 1f)
+                            + splitTimings.getGridSlideDurationOffset(), 0f, 1f)
                             : 1f;
 
                     // Slide tiles in horizontally to fill dismissed area
@@ -3771,16 +3790,16 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 // dismissed index or next focused index. Offset successive task dismissal
                 // durations for a staggered effect.
                 distanceFromDismissedTask++;
-                int staggerColumn =  isStagingFocusedTask
+                int staggerColumn = isStagingFocusedTask
                         ? (int) Math.ceil(distanceFromDismissedTask / 2f)
                         : distanceFromDismissedTask;
                 // Set timings based on if user is initiating splitscreen on the focused task,
                 // or splitting/dismissing some other task.
                 float animationStartProgress = isStagingFocusedTask
                         ? Utilities.boundToRange(
-                                splitTimings.getGridSlideStartOffset()
-                                        + (splitTimings.getGridSlideStaggerOffset()
-                                        * staggerColumn),
+                        splitTimings.getGridSlideStartOffset()
+                                + (splitTimings.getGridSlideStaggerOffset()
+                                * staggerColumn),
                         0f,
                         dismissTranslationInterpolationEnd)
                         : Utilities.boundToRange(
@@ -3789,9 +3808,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                                         * staggerColumn, 0f, dismissTranslationInterpolationEnd);
                 float animationEndProgress = isStagingFocusedTask
                         ? Utilities.boundToRange(
-                                splitTimings.getGridSlideStartOffset()
-                                        + (splitTimings.getGridSlideStaggerOffset() * staggerColumn)
-                                        + splitTimings.getGridSlideDurationOffset(),
+                        splitTimings.getGridSlideStartOffset()
+                                + (splitTimings.getGridSlideStaggerOffset() * staggerColumn)
+                                + splitTimings.getGridSlideDurationOffset(),
                         0f,
                         dismissTranslationInterpolationEnd)
                         : dismissTranslationInterpolationEnd;
@@ -4007,8 +4026,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                                             RecentsView.this);
                                     int taskSize = (int) (
                                             getPagedOrientationHandler().getMeasuredSize(
-                                            taskView) * taskView
-                                            .getSizeAdjustment(/*fullscreenEnabled=*/false));
+                                                    taskView) * taskView
+                                                    .getSizeAdjustment(/*fullscreenEnabled=*/
+                                                            false));
                                     int taskEnd = taskStart + taskSize;
 
                                     shouldRebalance = taskEnd >= screenEnd - mPageSpacing;
@@ -4651,6 +4671,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     /**
      * Computes the distance to offset the given child such that it is completely offscreen when
      * translating away from the given midpoint.
+     *
      * @param offsetProgress From 0 to 1 where 0 means no offset and 1 means offset offscreen.
      */
     private float getHorizontalOffsetSize(int childIndex, int midpointIndex, float offsetProgress) {
@@ -4872,7 +4893,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                             mContainer.getDeviceProfile(),
                             mSplitHiddenTaskView.getWidth(), mSplitHiddenTaskView.getHeight(),
                             primaryTaskSelected);
-            builder.addOnFrameCallback(() ->{
+            builder.addOnFrameCallback(() -> {
                 // TODO(b/334826842): Handle splash icon for new TTV.
                 if (!enableRefactorTaskThumbnail()) {
                     taskContainer.getThumbnailViewDeprecated().refreshSplashView();
@@ -4896,17 +4917,21 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * @param containerTaskView If our second selected app is currently running in Recents, this is
      *                          the "container" TaskView from Recents. If we are starting a fresh
      *                          instance of the app from an Intent, this will be null.
-     * @param task The Task corresponding to our second selected app. If we are starting a fresh
-     *             instance of the app from an Intent, this will be null.
-     * @param drawable The Drawable corresponding to our second selected app's icon.
-     * @param secondView The View representing the current space on the screen where the second app
-     *                   is (either the ThumbnailView or the tapped icon).
-     * @param intent If we are launching a fresh instance of the app, this is the Intent for it. If
-     *               the second app is already running in Recents, this will be null.
-     * @param user If we are launching a fresh instance of the app, this is the UserHandle for it.
-     *             If the second app is already running in Recents, this will be null.
+     * @param task              The Task corresponding to our second selected app. If we are
+     *                          starting a fresh
+     *                          instance of the app from an Intent, this will be null.
+     * @param drawable          The Drawable corresponding to our second selected app's icon.
+     * @param secondView        The View representing the current space on the screen where the
+     *                          second app
+     *                          is (either the ThumbnailView or the tapped icon).
+     * @param intent            If we are launching a fresh instance of the app, this is the Intent
+     *                          for it. If
+     *                          the second app is already running in Recents, this will be null.
+     * @param user              If we are launching a fresh instance of the app, this is the
+     *                          UserHandle for it.
+     *                          If the second app is already running in Recents, this will be null.
      * @return true if waiting for confirmation of second app or if split animations are running,
-     *          false otherwise
+     * false otherwise
      */
     public boolean confirmSplitSelect(TaskView containerTaskView, Task task, Drawable drawable,
             View secondView, @Nullable Bitmap thumbnail, Intent intent, UserHandle user,
@@ -4994,7 +5019,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 "Second tile selected");
 
         // Fade out all other views underneath placeholders
-        ObjectAnimator tvFade = ObjectAnimator.ofFloat(this, RecentsView.CONTENT_ALPHA,1, 0);
+        ObjectAnimator tvFade = ObjectAnimator.ofFloat(this, RecentsView.CONTENT_ALPHA, 1, 0);
         pendingAnimation.add(tvFade, DECELERATE_2, SpringProperty.DEFAULT);
         pendingAnimation.buildAnim().start();
         return true;
@@ -5142,7 +5167,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         if (mShowEmptyMessage && hasValidSize && mEmptyTextLayout == null) {
             int availableWidth = mLastMeasureSize.x - mEmptyMessagePadding - mEmptyMessagePadding;
             mEmptyTextLayout = StaticLayout.Builder.obtain(mEmptyMessage, 0, mEmptyMessage.length(),
-                    mEmptyMessagePaint, availableWidth)
+                            mEmptyMessagePaint, availableWidth)
                     .setAlignment(Layout.Alignment.ALIGN_CENTER)
                     .build();
             int totalHeight = mEmptyTextLayout.getHeight()
@@ -5269,7 +5294,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         updateScrollSynchronously();
 
         int targetSysUiFlags = tv.getTaskContainers().getFirst().getSysUiStatusNavFlags();
-        final boolean[] passedOverviewThreshold = new boolean[] {false};
+        final boolean[] passedOverviewThreshold = new boolean[]{false};
         ValueAnimator progressAnim = ValueAnimator.ofFloat(0, 1);
         progressAnim.addUpdateListener(animator -> {
             // Once we pass a certain threshold, update the sysui flags to match the target
@@ -5390,7 +5415,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     fullyVisibleTaskIds.addAll(taskIds);
                 }
             }
-            mRecentsViewData.getSettledFullyVisibleTaskIds().setValue(fullyVisibleTaskIds);
+            mRecentsViewModel.updateTasksFullyVisible(fullyVisibleTaskIds);
         }
     }
 
@@ -5789,6 +5814,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * Sets whether or not we should clamp the scroll offset.
      * This is used to avoid x-axis movement when swiping up transient taskbar.
      * Should only be set at the beginning and end of the gesture, otherwise a jump may occur.
+     *
      * @param clampScrollOffset When true, we clamp the scroll to 0 before the clamp threshold is
      *                          met.
      */
@@ -5821,11 +5847,11 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         // Don't dampen the scroll (due to overscroll) if the adjacent tasks are offscreen, so that
         // the page can move freely given there's no visual indication why it shouldn't.
         int overScrollShift = mAdjacentPageHorizontalOffset > 0
-                        ? (int) Utilities.mapRange(
-                                mAdjacentPageHorizontalOffset,
-                                getOverScrollShift(),
-                                getUndampedOverScrollShift())
-                        : getOverScrollShift();
+                ? (int) Utilities.mapRange(
+                mAdjacentPageHorizontalOffset,
+                getOverScrollShift(),
+                getUndampedOverScrollShift())
+                : getOverScrollShift();
         return getScrollForPage(pageIndex) - getPagedOrientationHandler().getPrimaryScroll(this)
                 + overScrollShift + getOffsetFromScrollPosition(pageIndex);
     }
@@ -5942,7 +5968,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         if (mOverlayEnabled != overlayEnabled) {
             mOverlayEnabled = overlayEnabled;
             updateEnabledOverlays();
-            mRecentsViewData.getOverlayEnabled().setValue(overlayEnabled);
+
+            if (enableRefactorTaskThumbnail()) {
+                mRecentsViewModel.setOverlayEnabled(overlayEnabled);
+            }
         }
     }
 
@@ -6130,7 +6159,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     public boolean showAsGrid() {
         return mOverviewGridEnabled || (mCurrentGestureEndTarget != null
                 && mSizeStrategy.stateFromGestureEndTarget(mCurrentGestureEndTarget)
-                    .displayOverviewTasksAsGrid(mContainer.getDeviceProfile()));
+                .displayOverviewTasksAsGrid(mContainer.getDeviceProfile()));
     }
 
     private boolean showAsFullscreen() {
@@ -6171,7 +6200,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * @return Corner radius in pixel value for PiP window, which is updated via
-     *         {@link #mIPipAnimationListener}
+     * {@link #mIPipAnimationListener}
      */
     public int getPipCornerRadius() {
         return mPipCornerRadius;
@@ -6179,7 +6208,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /**
      * @return Shadow radius in pixel value for PiP window, which is updated via
-     *         {@link #mIPipAnimationListener}
+     * {@link #mIPipAnimationListener}
      */
     public int getPipShadowRadius() {
         return mPipShadowRadius;

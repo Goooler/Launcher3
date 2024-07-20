@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.thumbnail
+package com.android.quickstep.task.viewmodel
 
 import android.annotation.ColorInt
 import android.graphics.Matrix
@@ -23,12 +23,12 @@ import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState
 import com.android.quickstep.recents.viewmodel.RecentsViewData
+import com.android.quickstep.task.thumbnail.TaskThumbnail
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
-import com.android.quickstep.task.viewmodel.TaskContainerData
-import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

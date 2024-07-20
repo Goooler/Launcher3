@@ -25,8 +25,8 @@
     android:clipChildren="true"
     android:defaultFocusHighlightEnabled="false"
     android:focusable="true"
-    launcher:focusBorderColor="?androidprv:attr/materialColorOutline"
-    launcher:hoverBorderColor="?androidprv:attr/materialColorPrimary"
+    launcher:focusBorderColor="?attr/materialColorOutline"
+    launcher:hoverBorderColor="?attr/materialColorPrimary"
     android:clipToPadding="true"
     android:padding="0.1dp">
     <!-- Setting a padding of 0.1 dp since android:clipToPadding needs a non-zero value for

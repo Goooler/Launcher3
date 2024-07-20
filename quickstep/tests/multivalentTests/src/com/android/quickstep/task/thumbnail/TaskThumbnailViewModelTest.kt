@@ -32,6 +32,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.quickstep.task.viewmodel.TaskContainerData
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task

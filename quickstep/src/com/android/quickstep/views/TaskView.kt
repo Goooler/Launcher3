@@ -80,8 +80,10 @@ import com.android.quickstep.TaskAnimationManager
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.get
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
-import com.android.quickstep.task.viewmodel.TaskViewData
+import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
 import com.android.quickstep.util.BorderAnimator
@@ -115,7 +117,8 @@ constructor(
     @IntDef(FLAG_UPDATE_ALL, FLAG_UPDATE_ICON, FLAG_UPDATE_THUMBNAIL, FLAG_UPDATE_CORNER_RADIUS)
     annotation class TaskDataChanges
 
-    val taskViewData = TaskViewData(type)
+    private lateinit var taskViewModel: TaskViewModel
+
     val taskIds: IntArray
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
@@ -441,6 +444,11 @@ constructor(
 
     init {
         setOnClickListener { _ -> onClick() }
+
+        if (enableRefactorTaskThumbnail()) {
+            taskViewModel = RecentsDependencies.get(this, "TaskViewType" to type)
+        }
+
         val keyboardFocusHighlightEnabled =
             (ENABLE_KEYBOARD_QUICK_SWITCH.get() || enableFocusOutline())
         val cursorHoverStatesEnabled = enableCursorHoverStates()
@@ -638,6 +646,7 @@ constructor(
         orientedState: RecentsOrientedState,
         taskOverlayFactory: TaskOverlayFactory
     ) {
+
         cancelPendingLoadTasks()
         taskContainers =
             listOf(
@@ -1404,7 +1413,7 @@ constructor(
         scaleX = scale
         scaleY = scale
         if (enableRefactorTaskThumbnail()) {
-            taskViewData.scale.value = scale
+            taskViewModel.updateScale(scale)
         }
         updateSnapshotRadius()
     }
@@ -1483,8 +1492,6 @@ constructor(
 
     /** Updates [TaskThumbnailView] to reflect the latest [Task] state (i.e., task isRunning). */
     fun notifyIsRunningTaskUpdated() {
-        // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
-        //  so there will be no need to access TaskThumbnailView's VM through the TaskThumbnailView
         taskContainers.forEach { it.bindThumbnailView() }
     }
 

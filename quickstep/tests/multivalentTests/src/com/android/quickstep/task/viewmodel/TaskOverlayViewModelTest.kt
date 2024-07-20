@@ -59,7 +59,7 @@ class TaskOverlayViewModelTest {
     private val tasksRepository = FakeTasksRepository()
     private val mGetThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
     private val systemUnderTest =
-        TaskOverlayViewModel(task, recentsViewData, tasksRepository, mGetThumbnailPositionUseCase)
+        TaskOverlayViewModel(task, recentsViewData, mGetThumbnailPositionUseCase, tasksRepository)
 
     @Test
     fun initialStateIsDisabled() = runTest {

@@ -364,6 +364,7 @@ public class PrivateProfileManager extends UserProfileManager {
     /** Add Private Space Header view elements based upon {@link UserProfileState} */
     public void bindPrivateSpaceHeaderViewElements(RelativeLayout parent) {
         mPSHeader = parent;
+        Log.d(TAG, "bindPrivateSpaceHeaderViewElements: " + "Binding private space.");
         updateView();
         if (mOnPSHeaderAdded != null) {
             MAIN_EXECUTOR.execute(mOnPSHeaderAdded);
@@ -376,6 +377,8 @@ public class PrivateProfileManager extends UserProfileManager {
         if (mPSHeader == null) {
             return;
         }
+        Log.d(TAG, "bindPrivateSpaceHeaderViewElements: " + "Updating view with state: "
+                + getCurrentState());
         mPSHeader.setAlpha(1);
         ViewGroup lockPill = mPSHeader.findViewById(R.id.ps_lock_unlock_button);
         assert lockPill != null;
@@ -761,6 +764,9 @@ public class PrivateProfileManager extends UserProfileManager {
         alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                if (mFloatingMaskView == null) {
+                    return;
+                }
                 mFloatingMaskView.setTranslationY((float) valueAnimator.getAnimatedValue());
             }
         });
@@ -844,8 +850,22 @@ public class PrivateProfileManager extends UserProfileManager {
         if (!Flags.privateSpaceAddFloatingMaskView()) {
             return;
         }
+        // Use getLocationOnScreen() as simply checking for mPSHeader.getBottom() is only relative
+        // to its parent.
+        int[] psHeaderLocation = new int[2];
+        mPSHeader.getLocationOnScreen(psHeaderLocation);
+        int psHeaderBottomY = psHeaderLocation[1] + mPsHeaderHeight;
+        // Calculate the topY of the floatingMaskView as if it was added.
+        int floatingMaskViewBottomBoxTopY =
+                (int) (mAllApps.getBottom() - getMainRecyclerView().getPaddingBottom());
+        // Don't attach if the header will be clipped by the floating mask view.
+        if (psHeaderBottomY > floatingMaskViewBottomBoxTopY) {
+            mFloatingMaskView = null;
+            return;
+        }
         mFloatingMaskView = (FloatingMaskView) mAllApps.getLayoutInflater().inflate(
                 R.layout.private_space_mask_view, mAllApps, false);
+        assert mFloatingMaskView != null;
         mAllApps.addView(mFloatingMaskView);
         // Translate off the screen first if its collapsing so this header view isn't visible to
         // user when animation starts.

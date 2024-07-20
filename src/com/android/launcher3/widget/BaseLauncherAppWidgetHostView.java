@@ -110,7 +110,7 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
         }
         View background = RoundedCornerEnforcement.findBackground(this);
         if (background == null
-                || RoundedCornerEnforcement.hasAppWidgetOptedOut(this, background)) {
+                || RoundedCornerEnforcement.hasAppWidgetOptedOut(background)) {
             resetRoundedCorners();
             return;
         }

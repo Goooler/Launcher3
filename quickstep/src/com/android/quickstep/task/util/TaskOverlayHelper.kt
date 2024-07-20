@@ -18,13 +18,12 @@ package com.android.quickstep.task.util
 
 import android.util.Log
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.get
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Disabled
 import com.android.quickstep.task.thumbnail.TaskOverlayUiState.Enabled
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
-import com.android.quickstep.views.RecentsView
-import com.android.quickstep.views.RecentsViewContainer
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -42,24 +41,12 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     private lateinit var overlayInitializedScope: CoroutineScope
     private var uiState: TaskOverlayUiState = Disabled
 
-    // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
-    //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
-    //  This is using a lazy for now because the dependencies cannot be obtained without DI.
-    private val viewModel by lazy {
-        val recentsView =
-            RecentsViewContainer.containerFromContext<RecentsViewContainer>(
-                    overlay.taskView.context
-                )
-                .getOverviewPanel<RecentsView<*, *>>()
+    private val viewModel: TaskOverlayViewModel by lazy {
         TaskOverlayViewModel(
-            task,
-            recentsView.mRecentsViewData!!,
-            recentsView.mTasksRepository!!,
-            GetThumbnailPositionUseCase(
-                recentsView.mDeviceProfileRepository!!,
-                recentsView.mOrientedStateRepository!!,
-                recentsView.mTasksRepository
-            )
+            task = task,
+            recentsViewData = RecentsDependencies.get(),
+            getThumbnailPositionUseCase = RecentsDependencies.get(),
+            recentTasksRepository = RecentsDependencies.get()
         )
     }
 

@@ -201,6 +201,7 @@ public class FolderGridOrganizer {
             int row = rank / mCountX;
             return col < PREVIEW_MAX_COLUMNS && row < PREVIEW_MAX_ROWS;
         }
+        // If we have less than 4 items do this
         return rank < MAX_NUM_ITEMS_IN_PREVIEW;
     }
 }

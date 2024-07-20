@@ -18,6 +18,7 @@ package com.android.launcher3.util
 
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.R
 import com.android.launcher3.util.ViewCache.CacheEntry
@@ -26,6 +27,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@SmallTest
 @RunWith(AndroidJUnit4::class)
 class ViewCacheTest {
 

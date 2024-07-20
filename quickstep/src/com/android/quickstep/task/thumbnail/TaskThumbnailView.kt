@@ -31,15 +31,14 @@ import androidx.core.view.isVisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
-import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.inject
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.util.TaskCornerRadius
-import com.android.quickstep.views.RecentsView
-import com.android.quickstep.views.RecentsViewContainer
-import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.system.QuickStepContract
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -50,25 +49,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
-    // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
-    //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
-    //  This is using a lazy for now because the dependencies cannot be obtained without DI.
-    val viewModel by lazy {
-        val recentsView =
-            RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
-                .getOverviewPanel<RecentsView<*, *>>()
-        TaskThumbnailViewModel(
-            recentsView.mRecentsViewData!!,
-            (parent as TaskView).taskViewData,
-            (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
-            recentsView.mTasksRepository!!,
-            GetThumbnailPositionUseCase(
-                recentsView.mDeviceProfileRepository!!,
-                recentsView.mOrientedStateRepository!!,
-                recentsView.mTasksRepository!!
-            )
-        )
-    }
+
+    private val viewModel: TaskThumbnailViewModel by RecentsDependencies.inject(this)
 
     private lateinit var viewAttachedScope: CoroutineScope
 

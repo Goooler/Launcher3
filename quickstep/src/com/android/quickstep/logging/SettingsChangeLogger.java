@@ -39,7 +39,8 @@ import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Xml;
 
-import com.android.launcher3.AutoInstallsLayout;
+import androidx.annotation.VisibleForTesting;
+
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.InstanceId;
@@ -73,7 +74,6 @@ public class SettingsChangeLogger implements
             new MainThreadInitializedObject<>(SettingsChangeLogger::new);
 
     private static final String TAG = "SettingsChangeLogger";
-    private static final String ROOT_TAG = "androidx.preference.PreferenceScreen";
     private static final String BOOLEAN_PREF = "SwitchPreference";
 
     private final Context mContext;
@@ -85,8 +85,13 @@ public class SettingsChangeLogger implements
     private StatsLogManager.LauncherEvent mHomeScreenSuggestionEvent;
 
     private SettingsChangeLogger(Context context) {
+        this(context, StatsLogManager.newInstance(context));
+    }
+
+    @VisibleForTesting
+    SettingsChangeLogger(Context context, StatsLogManager statsLogManager) {
         mContext = context;
-        mStatsLogManager = StatsLogManager.newInstance(mContext);
+        mStatsLogManager = statsLogManager;
         mLoggablePrefs = loadPrefKeys(context);
         DisplayController.INSTANCE.get(context).addChangeListener(this);
         mNavMode = DisplayController.getNavigationMode(context);
@@ -105,7 +110,13 @@ public class SettingsChangeLogger implements
         ArrayMap<String, LoggablePref> result = new ArrayMap<>();
 
         try {
-            AutoInstallsLayout.beginDocument(parser, ROOT_TAG);
+            // Move cursor to first tag because it could be
+            // androidx.preference.PreferenceScreen or PreferenceScreen
+            int eventType = parser.getEventType();
+            while (eventType != XmlPullParser.START_TAG
+                    && eventType != XmlPullParser.END_DOCUMENT) {
+                eventType = parser.next();
+            }
             final int depth = parser.getDepth();
             int type;
             while (((type = parser.next()) != XmlPullParser.END_TAG
@@ -189,13 +200,19 @@ public class SettingsChangeLogger implements
                 prefs.getBoolean(key, lp.defaultValue) ? lp.eventIdOn : lp.eventIdOff));
     }
 
+    @VisibleForTesting
+    ArrayMap<String, LoggablePref> getLoggingPrefs() {
+        return mLoggablePrefs;
+    }
+
     @Override
     public void close() {
         getPrefs(mContext).unregisterOnSharedPreferenceChangeListener(this);
         getDevicePrefs(mContext).unregisterOnSharedPreferenceChangeListener(this);
     }
 
-    private static class LoggablePref {
+    @VisibleForTesting
+    static class LoggablePref {
         public boolean defaultValue;
         public int eventIdOn;
         public int eventIdOff;

@@ -29,10 +29,15 @@ import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.TaskUtils
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.get
+import com.android.quickstep.recents.di.getScope
+import com.android.quickstep.recents.di.inject
 import com.android.quickstep.recents.usecase.GetThumbnailUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskContainerData
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.systemui.shared.recents.model.Task
 
 /** Holder for all Task dependent information. */
@@ -55,21 +60,22 @@ class TaskContainer(
     taskOverlayFactory: TaskOverlayFactory
 ) {
     val overlay: TaskOverlayFactory.TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
-    val taskContainerData = TaskContainerData()
-
-    private val getThumbnailUseCase by lazy {
-        // TODO(b/335649589): Ideally create and obtain this from DI.
-        val recentsView =
-            RecentsViewContainer.containerFromContext<RecentsViewContainer>(
-                    overlay.taskView.context
-                )
-                .getOverviewPanel<RecentsView<*, *>>()
-        GetThumbnailUseCase(recentsView.mTasksRepository!!)
-    }
+    lateinit var taskContainerData: TaskContainerData
+    private val getThumbnailUseCase: GetThumbnailUseCase by RecentsDependencies.inject()
+    private val taskThumbnailViewModel: TaskThumbnailViewModel by
+        RecentsDependencies.inject(snapshotView)
 
     init {
         if (enableRefactorTaskThumbnail()) {
             require(snapshotView is TaskThumbnailView)
+            taskContainerData = RecentsDependencies.get(this)
+            RecentsDependencies.getScope(snapshotView).apply {
+                val taskViewScope = RecentsDependencies.getScope(taskView)
+                linkTo(taskViewScope)
+
+                val taskContainerScope = RecentsDependencies.getScope(this)
+                linkTo(taskContainerScope)
+            }
         } else {
             require(snapshotView is TaskThumbnailViewDeprecated)
         }
@@ -146,12 +152,10 @@ class TaskContainer(
         overlay.destroy()
     }
 
-    // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
-    //  so there will be no need to access TaskThumbnailView's VM through the TaskThumbnailView
     fun bindThumbnailView() {
         // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
         //  this should be decided inside TaskThumbnailViewModel.
-        thumbnailView.viewModel.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
+        taskThumbnailViewModel.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
     }
 
     fun setOverlayEnabled(enabled: Boolean) {

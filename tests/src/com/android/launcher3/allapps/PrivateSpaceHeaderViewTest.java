@@ -116,7 +116,8 @@ public class PrivateSpaceHeaderViewTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        mContext = new ActivityContextWrapper(getApplicationContext());
+        mContext = new ActivityContextWrapper(getApplicationContext(),
+                R.style.DynamicColorsBaseLauncherTheme);
         when(mAllApps.getContext()).thenReturn(mContext);
         when(mUserCache.getUserInfo(PRIVATE_HANDLE)).thenReturn(PRIVATE_ICON_INFO);
         when(mUserCache.getUserProfiles())
