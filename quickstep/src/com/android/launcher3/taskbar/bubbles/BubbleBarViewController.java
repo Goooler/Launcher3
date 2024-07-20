@@ -117,7 +117,7 @@ public class BubbleBarViewController {
                 dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
         mBubbleBarScale.updateValue(1f);
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
-        mBubbleBarClickListener = v -> onBubbleBarClicked();
+        mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
@@ -136,6 +136,21 @@ public class BubbleBarViewController {
             @Override
             public void onBubbleBarTouchedWhileAnimating() {
                 BubbleBarViewController.this.onBubbleBarTouchedWhileAnimating();
+            }
+
+            @Override
+            public void expandBubbleBar() {
+                BubbleBarViewController.this.expandBubbleBar();
+            }
+
+            @Override
+            public void dismissBubbleBar() {
+                onDismissAllBubbles();
+            }
+
+            @Override
+            public void updateBubbleBarLocation(BubbleBarLocation location) {
+                mBubbleBarController.updateBubbleBarLocation(location);
             }
         });
     }
@@ -162,7 +177,7 @@ public class BubbleBarViewController {
         mBubbleStashController.onNewBubbleAnimationInterrupted(false, mBarView.getTranslationY());
     }
 
-    private void onBubbleBarClicked() {
+    private void expandBubbleBar() {
         if (mShouldShowEducation) {
             mShouldShowEducation = false;
             // Get the bubble bar bounds on screen
@@ -609,17 +624,17 @@ public class BubbleBarViewController {
     }
 
     /**
-     * Called when bubble was dragged into the dismiss target. Notifies System
+     * Called when given bubble was dismissed. Notifies SystemUI
      * @param bubble dismissed bubble item
      */
-    public void onDismissBubbleWhileDragging(@NonNull BubbleBarItem bubble) {
+    public void onDismissBubble(@NonNull BubbleBarItem bubble) {
         mSystemUiProxy.dragBubbleToDismiss(bubble.getKey(), mTimeSource.currentTimeMillis());
     }
 
     /**
-     * Called when bubble stack was dragged into the dismiss target
+     * Called when bubble stack was dismissed
      */
-    public void onDismissAllBubblesWhileDragging() {
+    public void onDismissAllBubbles() {
         mSystemUiProxy.removeAllBubbles();
     }
 

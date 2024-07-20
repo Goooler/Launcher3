@@ -31,6 +31,7 @@ import android.os.Vibrator;
 import android.provider.Settings;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.Utilities;
 
@@ -49,14 +50,14 @@ public class VibratorWrapper implements SafeCloseable {
 
     public static final VibrationEffect EFFECT_CLICK =
             createPredefined(VibrationEffect.EFFECT_CLICK);
-    private static final Uri HAPTIC_FEEDBACK_URI =
-            Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED);
+    @VisibleForTesting
+    static final Uri HAPTIC_FEEDBACK_URI = Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED);
 
-    private static final float LOW_TICK_SCALE = 0.9f;
-    private static final float DRAG_TEXTURE_SCALE = 0.03f;
-    private static final float DRAG_COMMIT_SCALE = 0.5f;
-    private static final float DRAG_BUMP_SCALE = 0.4f;
-    private static final int DRAG_TEXTURE_EFFECT_SIZE = 200;
+    @VisibleForTesting static final float LOW_TICK_SCALE = 0.9f;
+    @VisibleForTesting static final float DRAG_TEXTURE_SCALE = 0.03f;
+    @VisibleForTesting static final float DRAG_COMMIT_SCALE = 0.5f;
+    @VisibleForTesting static final float DRAG_BUMP_SCALE = 0.4f;
+    @VisibleForTesting static final int DRAG_TEXTURE_EFFECT_SIZE = 200;
 
     @Nullable
     private final VibrationEffect mDragEffect;
@@ -73,22 +74,29 @@ public class VibratorWrapper implements SafeCloseable {
      */
     public static final VibrationEffect OVERVIEW_HAPTIC = EFFECT_CLICK;
 
-    private final Context mContext;
     private final Vibrator mVibrator;
     private final boolean mHasVibrator;
-    private final SettingsCache.OnChangeListener mHapticChangeListener =
+
+    private final SettingsCache mSettingsCache;
+
+    @VisibleForTesting
+    final SettingsCache.OnChangeListener mHapticChangeListener =
             isEnabled -> mIsHapticFeedbackEnabled = isEnabled;
 
     private boolean mIsHapticFeedbackEnabled;
 
     private VibratorWrapper(Context context) {
-        mContext = context;
-        mVibrator = context.getSystemService(Vibrator.class);
+        this(context.getSystemService(Vibrator.class), SettingsCache.INSTANCE.get(context));
+    }
+
+    @VisibleForTesting
+    VibratorWrapper(Vibrator vibrator, SettingsCache settingsCache) {
+        mVibrator = vibrator;
         mHasVibrator = mVibrator.hasVibrator();
+        mSettingsCache = settingsCache;
         if (mHasVibrator) {
-            SettingsCache cache = SettingsCache.INSTANCE.get(mContext);
-            cache.register(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
-            mIsHapticFeedbackEnabled = cache.getValue(HAPTIC_FEEDBACK_URI, 0);
+            mSettingsCache.register(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
+            mIsHapticFeedbackEnabled = mSettingsCache.getValue(HAPTIC_FEEDBACK_URI, 0);
         } else {
             mIsHapticFeedbackEnabled = false;
         }
@@ -98,12 +106,7 @@ public class VibratorWrapper implements SafeCloseable {
 
             // Drag texture, Commit, and Bump should only be used for premium phones.
             // Before using these haptics make sure check if the device can use it
-            VibrationEffect.Composition dragEffect = VibrationEffect.startComposition();
-            for (int i = 0; i < DRAG_TEXTURE_EFFECT_SIZE; i++) {
-                dragEffect.addPrimitive(
-                        PRIMITIVE_LOW_TICK, DRAG_TEXTURE_SCALE);
-            }
-            mDragEffect = dragEffect.compose();
+            mDragEffect = getDragEffect();
             mCommitEffect = VibrationEffect.startComposition().addPrimitive(
                     VibrationEffect.Composition.PRIMITIVE_TICK, DRAG_COMMIT_SCALE).compose();
             mBumpEffect = VibrationEffect.startComposition().addPrimitive(
@@ -124,8 +127,7 @@ public class VibratorWrapper implements SafeCloseable {
     @Override
     public void close() {
         if (mHasVibrator) {
-            SettingsCache.INSTANCE.get(mContext)
-                    .unregister(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
+            mSettingsCache.unregister(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
         }
     }
 
@@ -214,5 +216,14 @@ public class VibratorWrapper implements SafeCloseable {
 
             vibrate(primitiveLowTickEffect);
         }
+    }
+
+    static VibrationEffect getDragEffect() {
+        VibrationEffect.Composition dragEffect = VibrationEffect.startComposition();
+        for (int i = 0; i < DRAG_TEXTURE_EFFECT_SIZE; i++) {
+            dragEffect.addPrimitive(
+                    PRIMITIVE_LOW_TICK, DRAG_TEXTURE_SCALE);
+        }
+        return dragEffect.compose();
     }
 }
