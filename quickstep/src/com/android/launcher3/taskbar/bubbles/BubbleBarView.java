@@ -801,7 +801,6 @@ public class BubbleBarView extends FrameLayout {
                 listener);
     }
 
-    // TODO: (b/280605790) animate it
     @Override
     public void addView(View child, int index, ViewGroup.LayoutParams params) {
         super.addView(child, index, params);

@@ -24,6 +24,7 @@ import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.data.TasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.GetThumbnailUseCase
+import com.android.quickstep.recents.usecase.SysUiStatusNavFlagsUseCase
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
@@ -162,6 +163,8 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                     )
                 }
                 GetThumbnailUseCase::class.java -> GetThumbnailUseCase(taskRepository = inject())
+                SysUiStatusNavFlagsUseCase::class.java ->
+                    SysUiStatusNavFlagsUseCase(taskRepository = inject())
                 GetThumbnailPositionUseCase::class.java ->
                     GetThumbnailPositionUseCase(
                         deviceProfileRepository = inject(),

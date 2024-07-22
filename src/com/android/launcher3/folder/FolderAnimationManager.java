@@ -256,8 +256,8 @@ public class FolderAnimationManager {
                 mFolder.getContent(), contentStart, contentEnd, finalRadius, !mIsOpening));
 
         // Fade in the folder name, as the text can overlap the icons when grid size is small.
-        mFolder.mFolderName.setAlpha(mIsOpening ? 0f : 1f);
-        play(a, getAnimator(mFolder.mFolderName, View.ALPHA, 0, 1),
+        mFolder.getFolderName().setAlpha(mIsOpening ? 0f : 1f);
+        play(a, getAnimator(mFolder.getFolderName(), View.ALPHA, 0, 1),
                 mIsOpening ? FOLDER_NAME_ALPHA_DURATION : 0,
                 mIsOpening ? mDuration - FOLDER_NAME_ALPHA_DURATION : FOLDER_NAME_ALPHA_DURATION);
 
@@ -318,7 +318,7 @@ public class FolderAnimationManager {
                 mFolder.mFooter.setScaleX(1f);
                 mFolder.mFooter.setScaleY(1f);
                 mFolder.mFooter.setTranslationX(0f);
-                mFolder.mFolderName.setAlpha(1f);
+                mFolder.getFolderName().setAlpha(1f);
 
                 mFolder.setClipChildren(mFolderClipChildren);
                 mFolder.setClipToPadding(mFolderClipToPadding);

@@ -459,7 +459,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         mInfo.setTitle(newTitle, mFolder.mLauncherDelegate.getModelWriter());
         onTitleChanged(mInfo.title);
-        mFolder.mFolderName.setText(mInfo.title);
+        mFolder.getFolderName().setText(mInfo.title);
 
         // Logging for folder creation flow
         StatsLogManager.newInstance(getContext()).logger()
