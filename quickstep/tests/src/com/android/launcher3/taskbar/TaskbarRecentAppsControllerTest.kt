@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar
 
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.os.Process
 import android.os.UserHandle
@@ -56,6 +57,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
     @Mock private lateinit var mockIconCache: TaskIconCache
     @Mock private lateinit var mockRecentsModel: RecentsModel
+    @Mock private lateinit var mockContext: Context
     @Mock private lateinit var mockDesktopVisibilityController: DesktopVisibilityController
 
     private var taskListChangeId: Int = 1
@@ -71,7 +73,9 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
         whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
         recentAppsController =
-            TaskbarRecentAppsController(mockRecentsModel) { mockDesktopVisibilityController }
+            TaskbarRecentAppsController(mockContext, mockRecentsModel) {
+                mockDesktopVisibilityController
+            }
         recentAppsController.init(taskbarControllers)
         recentAppsController.canShowRunningApps = true
         recentAppsController.canShowRecentApps = true

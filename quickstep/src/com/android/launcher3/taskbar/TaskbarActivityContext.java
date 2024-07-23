@@ -315,6 +315,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarTranslationController(this),
                 new TaskbarSpringOnStashController(this),
                 new TaskbarRecentAppsController(
+                        this,
                         RecentsModel.INSTANCE.get(this),
                         LauncherActivityInterface.INSTANCE::getDesktopVisibilityController),
                 TaskbarEduTooltipController.newInstance(this),

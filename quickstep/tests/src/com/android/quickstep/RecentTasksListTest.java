@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
+import android.content.Context;
 
 import androidx.test.filters.SmallTest;
 
@@ -54,7 +55,9 @@ import java.util.stream.Collectors;
 public class RecentTasksListTest {
 
     @Mock
-    private SystemUiProxy mockSystemUiProxy;
+    private Context mContext;
+    @Mock
+    private SystemUiProxy mSystemUiProxy;
     @Mock
     private TopTaskTracker mTopTaskTracker;
 
@@ -66,14 +69,14 @@ public class RecentTasksListTest {
         MockitoAnnotations.initMocks(this);
         LooperExecutor mockMainThreadExecutor = mock(LooperExecutor.class);
         KeyguardManager mockKeyguardManager = mock(KeyguardManager.class);
-        mRecentTasksList = new RecentTasksList(mockMainThreadExecutor, mockKeyguardManager,
-                mockSystemUiProxy, mTopTaskTracker);
+        mRecentTasksList = new RecentTasksList(mContext, mockMainThreadExecutor,
+                mockKeyguardManager, mSystemUiProxy, mTopTaskTracker);
     }
 
     @Test
     public void onRecentTasksChanged_doesNotFetchTasks() throws Exception {
         mRecentTasksList.onRecentTasksChanged();
-        verify(mockSystemUiProxy, times(0))
+        verify(mSystemUiProxy, times(0))
                 .getRecentTasks(anyInt(), anyInt());
     }
 
@@ -81,7 +84,7 @@ public class RecentTasksListTest {
     public void loadTasksInBackground_onlyKeys_noValidTaskDescription() throws Exception  {
         GroupedRecentTaskInfo recentTaskInfos = GroupedRecentTaskInfo.forSplitTasks(
                 new ActivityManager.RecentTaskInfo(), new ActivityManager.RecentTaskInfo(), null);
-        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+        when(mSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
                 .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
 
         List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(Integer.MAX_VALUE, -1,
@@ -94,7 +97,7 @@ public class RecentTasksListTest {
 
     @Test
     public void loadTasksInBackground_GetRecentTasksException() throws Exception  {
-        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+        when(mSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
                 .thenThrow(new SystemUiProxy.GetRecentTasksException("task load failed"));
 
         RecentTasksList.TaskLoadResult taskList = mRecentTasksList.loadTasksInBackground(
@@ -113,7 +116,7 @@ public class RecentTasksListTest {
         task2.taskDescription = new ActivityManager.TaskDescription();
         GroupedRecentTaskInfo recentTaskInfos = GroupedRecentTaskInfo.forSplitTasks(task1, task2,
                 null);
-        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+        when(mSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
                 .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
 
         List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(Integer.MAX_VALUE, -1,
@@ -132,7 +135,7 @@ public class RecentTasksListTest {
                 createRecentTaskInfo(5 /* taskId */)};
         GroupedRecentTaskInfo recentTaskInfos = GroupedRecentTaskInfo.forFreeformTasks(
                 tasks, Collections.emptySet() /* minimizedTaskIds */);
-        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+        when(mSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
                 .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
 
         List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(
@@ -158,7 +161,7 @@ public class RecentTasksListTest {
                 Arrays.stream(new Integer[]{1, 4, 5}).collect(Collectors.toSet());
         GroupedRecentTaskInfo recentTaskInfos =
                 GroupedRecentTaskInfo.forFreeformTasks(tasks, minimizedTaskIds);
-        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+        when(mSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
                 .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
 
         List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(

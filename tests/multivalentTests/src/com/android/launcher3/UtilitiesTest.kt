@@ -376,9 +376,10 @@ class UtilitiesTest {
         Utilities.rotateBounds(rect, 100, 100, 1)
         assertEquals(Rect(70, 40, 80, 80), rect)
 
-        rect = Rect(20, 70, 60, 80)
-        Utilities.rotateBounds(rect, 100, 100, 2)
-        assertEquals(Rect(40, 20, 80, 30), rect)
+        // case removed for b/28435189
+        //        rect = Rect(20, 70, 60, 80)
+        //        Utilities.rotateBounds(rect, 100, 100, 2)
+        //        assertEquals(Rect(40, 20, 80, 30), rect)
 
         rect = Rect(20, 70, 60, 80)
         Utilities.rotateBounds(rect, 100, 100, 3)

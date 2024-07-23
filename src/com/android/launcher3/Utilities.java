@@ -746,7 +746,8 @@ public final class Utilities {
      * |          +--+  |
      * |                |
      * +----------------+
-     * This would be case delta % 4 == 2:
+     * This would be case delta % 4 == 2: // This is case was reverted to previous behaviour which
+     * doesn't match the illustration due to b/353965234
      * +-------------+
      * |             |
      * |             |
@@ -768,7 +769,6 @@ public final class Utilities {
             int delta) {
         int rdelta = ((delta % 4) + 4) % 4;
         int origLeft = inOutBounds.left;
-        int origTop = inOutBounds.top;
         switch (rdelta) {
             case 0:
                 return;
@@ -780,8 +780,6 @@ public final class Utilities {
                 return;
             case 2:
                 inOutBounds.left = parentWidth - inOutBounds.right;
-                inOutBounds.top = parentHeight - inOutBounds.bottom;
-                inOutBounds.bottom = parentHeight - origTop;
                 inOutBounds.right = parentWidth - origLeft;
                 return;
             case 3:

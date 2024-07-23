@@ -23,6 +23,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
 import com.google.common.truth.Truth.assertThat
 import java.util.function.Consumer
@@ -114,6 +115,7 @@ class SimpleBroadcastReceiverTest {
         underTest = SimpleBroadcastReceiver(Handler(Looper.getMainLooper()), intentConsumer)
 
         underTest.register(context, completionRunnable, 1, "test_action_1", "test_action_2")
+        getInstrumentation().waitForIdleSync()
 
         verify(context).registerReceiver(same(underTest), intentFilterCaptor.capture(), eq(1))
         verify(completionRunnable).run()
@@ -136,6 +138,7 @@ class SimpleBroadcastReceiverTest {
         underTest = SimpleBroadcastReceiver(Handler(Looper.getMainLooper()), intentConsumer)
 
         underTest.unregisterReceiverSafely(context)
+        getInstrumentation().waitForIdleSync()
 
         verify(context).unregisterReceiver(same(underTest))
     }

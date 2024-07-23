@@ -21,7 +21,7 @@ import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTI
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IGNORE_IN_APP;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -214,7 +214,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         DesktopVisibilityController desktopController =
                 LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-        if (!enableDesktopWindowingWallpaperActivity()
+        if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher)
                 && desktopController != null
                 && desktopController.areDesktopTasksVisible()) {
             // TODO: b/333533253 - Remove after flag rollout

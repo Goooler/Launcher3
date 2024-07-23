@@ -90,7 +90,9 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
 
     private RecentsModel(Context context, IconProvider iconProvider) {
         this(context,
-                new RecentTasksList(MAIN_EXECUTOR,
+                new RecentTasksList(
+                        context,
+                        MAIN_EXECUTOR,
                         context.getSystemService(KeyguardManager.class),
                         SystemUiProxy.INSTANCE.get(context),
                         TopTaskTracker.INSTANCE.get(context)),

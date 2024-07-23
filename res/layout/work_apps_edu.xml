@@ -44,8 +44,7 @@
         <FrameLayout
             android:layout_width="@dimen/rounded_button_width"
             android:layout_height="@dimen/rounded_button_width"
-            android:background="@drawable/rounded_action_button"
-            android:padding="@dimen/rounded_button_padding">
+            android:background="@drawable/rounded_action_button">
             <ImageButton
                 android:id="@+id/action_btn"
                 android:layout_width="@dimen/x_icon_size"

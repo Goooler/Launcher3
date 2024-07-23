@@ -183,6 +183,11 @@ public class UserCache implements SafeCloseable {
         mUserToSerialMap.put(userHandle, info);
     }
 
+    @VisibleForTesting
+    public void putToPreInstallCache(UserHandle userHandle, List<String> preInstalledApps) {
+        mUserToPreInstallAppMap.put(userHandle, preInstalledApps);
+    }
+
     /**
      * @see UserManager#getUserProfiles()
      */

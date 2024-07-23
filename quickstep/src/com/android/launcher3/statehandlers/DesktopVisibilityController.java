@@ -19,10 +19,9 @@ import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.os.Debug;
-import android.os.SystemProperties;
 import android.util.Log;
 import android.view.View;
 
@@ -145,7 +144,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (!enableDesktopWindowingWallpaperActivity() && wasVisible != isVisible) {
+            if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher) && wasVisible != isVisible) {
                 // TODO: b/333533253 - Remove after flag rollout
                 if (mVisibleDesktopTasksCount > 0) {
                     setLauncherViewsVisibility(View.INVISIBLE);
@@ -189,7 +188,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (enableDesktopWindowingWallpaperActivity()) {
+            if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
                 return;
             }
             // TODO: b/333533253 - Clean up after flag rollout
@@ -289,7 +288,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void setLauncherViewsVisibility(int visibility) {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {
@@ -314,7 +313,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherPaused() {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {
@@ -331,7 +330,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherResumed() {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {

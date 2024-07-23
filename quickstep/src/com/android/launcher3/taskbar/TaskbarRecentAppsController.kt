@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.taskbar
 
+import android.content.Context
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
@@ -26,8 +27,8 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.window.flags.Flags.enableDesktopWindowingMode
 import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
+import com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE
 import java.io.PrintWriter
 
 /**
@@ -36,6 +37,7 @@ import java.io.PrintWriter
  * - When in Desktop Mode: show the currently running (open) Tasks
  */
 class TaskbarRecentAppsController(
+    context: Context,
     private val recentsModel: RecentsModel,
     // Pass a provider here instead of the actual DesktopVisibilityController instance since that
     // instance might not be available when this constructor is called.
@@ -44,7 +46,7 @@ class TaskbarRecentAppsController(
 
     // TODO(b/335401172): unify DesktopMode checks in Launcher.
     var canShowRunningApps =
-        enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps()
+        DESKTOP_WINDOWING_MODE.isEnabled(context) && enableDesktopWindowingTaskbarRunningApps()
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest

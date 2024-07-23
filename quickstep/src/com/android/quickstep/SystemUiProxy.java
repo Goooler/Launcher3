@@ -23,8 +23,8 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENT_TASKS_MISSING;
 import static com.android.quickstep.util.LogUtils.splitFailureMessage;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 import static com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -1444,7 +1444,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
         // TODO(b/335401172): unify DesktopMode checks in Launcher
-        return enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps();
+        return DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+                && enableDesktopWindowingTaskbarRunningApps();
     }
 
     private boolean handleMessageAsync(Message msg) {
