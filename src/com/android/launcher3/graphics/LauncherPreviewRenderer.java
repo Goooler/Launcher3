@@ -22,10 +22,10 @@ import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.DeviceProfile.DEFAULT_SCALE;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
+import static com.android.launcher3.config.FeatureFlags.shouldShowFirstPageWidget;
 import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
 import static com.android.launcher3.model.ModelUtils.getMissingHotseatRanks;
 
-import android.annotation.TargetApi;
 import android.app.Fragment;
 import android.app.WallpaperColors;
 import android.app.WallpaperManager;
@@ -34,10 +34,10 @@ import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.graphics.PointF;
 import android.graphics.Rect;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
@@ -119,7 +119,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *   3) Place appropriate elements like icons and first-page qsb
  *   4) Measure and draw the view on a canvas
  */
-@TargetApi(Build.VERSION_CODES.R)
 public class LauncherPreviewRenderer extends ContextWrapper
         implements ActivityContext, WorkspaceLayoutManager, LayoutInflater.Factory2 {
 
@@ -196,7 +195,7 @@ public class LauncherPreviewRenderer extends ContextWrapper
         mUiHandler = new Handler(Looper.getMainLooper());
         mContext = context;
         mIdp = idp;
-        mDp = idp.getDeviceProfile(context).toBuilder(context).setViewScaleProvider(
+        mDp = getDeviceProfileForPreview(context).toBuilder(context).setViewScaleProvider(
                 this::getAppWidgetScale).build();
         if (context instanceof PreviewContext) {
             Context tempContext = ((PreviewContext) context).getBaseContext();
@@ -256,6 +255,21 @@ public class LauncherPreviewRenderer extends ContextWrapper
             mWallpaperColorResources = null;
         }
         mAppWidgetHost = new LauncherPreviewAppWidgetHost(context);
+    }
+
+    /**
+     * Returns the device profile based on resource configuration for previewing various display
+     * sizes
+     */
+    private DeviceProfile getDeviceProfileForPreview(Context context) {
+        float density = context.getResources().getDisplayMetrics().density;
+        Configuration config = context.getResources().getConfiguration();
+
+        return mIdp.getBestMatch(
+                config.screenWidthDp * density,
+                config.screenHeightDp * density,
+                WindowManagerProxy.INSTANCE.get(context).getRotation(context)
+        );
     }
 
     /**
@@ -526,7 +540,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
         }
 
         // Add first page QSB
-        if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
+        if (FeatureFlags.QSB_ON_FIRST_SCREEN && dataModel.isFirstPagePinnedItemEnabled
+                && !shouldShowFirstPageWidget()) {
             CellLayout firstScreen = mWorkspaceScreens.get(FIRST_SCREEN_ID);
             View qsb = mHomeElementInflater.inflate(R.layout.qsb_preview, firstScreen, false);
             CellLayoutLayoutParams lp = new CellLayoutLayoutParams(

@@ -54,7 +54,7 @@ import java.io.PrintWriter
  * state
  */
 class SplitSelectDataHolder(
-        val context: Context
+        var context: Context?
 ) {
     val TAG = SplitSelectDataHolder::class.simpleName
 
@@ -87,18 +87,24 @@ class SplitSelectDataHolder(
     @StagePosition
     private var initialStagePosition: Int = STAGE_POSITION_UNDEFINED
     private var itemInfo: ItemInfo? = null
+    private var secondItemInfo: ItemInfo? = null
     private var splitEvent: EventEnum? = null
 
     private var initialTaskId: Int = INVALID_TASK_ID
     private var secondTaskId: Int = INVALID_TASK_ID
     private var initialIntent: Intent? = null
     private var secondIntent: Intent? = null
+    private var widgetSecondIntent: Intent? = null
     private var initialUser: UserHandle? = null
     private var secondUser: UserHandle? = null
     private var initialPendingIntent: PendingIntent? = null
     private var secondPendingIntent: PendingIntent? = null
     private var initialShortcut: ShortcutInfo? = null
     private var secondShortcut: ShortcutInfo? = null
+
+    fun onDestroy() {
+        context = null
+    }
 
     /**
      * @param alreadyRunningTask if set to [android.app.ActivityTaskManager.INVALID_TASK_ID]
@@ -139,8 +145,9 @@ class SplitSelectDataHolder(
      * To be called as soon as user selects the second task (even if animations aren't complete)
      * @param taskId The second task that will be launched.
      */
-    fun setSecondTask(taskId: Int) {
+    fun setSecondTask(taskId: Int, itemInfo: ItemInfo) {
         secondTaskId = taskId
+        secondItemInfo = itemInfo
     }
 
     /**
@@ -148,9 +155,10 @@ class SplitSelectDataHolder(
      * @param intent The second intent that will be launched.
      * @param user The user of that intent.
      */
-    fun setSecondTask(intent: Intent, user: UserHandle) {
+    fun setSecondTask(intent: Intent, user: UserHandle, itemInfo: ItemInfo) {
         secondIntent = intent
         secondUser = user
+        secondItemInfo = itemInfo
     }
 
     /**
@@ -158,24 +166,32 @@ class SplitSelectDataHolder(
      * Sets [secondUser] from that of the pendingIntent
      * @param pendingIntent The second PendingIntent that will be launched.
      */
-    fun setSecondTask(pendingIntent: PendingIntent) {
+    fun setSecondTask(pendingIntent: PendingIntent, itemInfo: ItemInfo) {
         secondPendingIntent = pendingIntent
         secondUser = pendingIntent.creatorUserHandle
+        secondItemInfo = itemInfo
+    }
+
+    /**
+     * Similar to [setSecondTask] except this is to be called for widgets which can pass through
+     * an extra intent from their RemoteResponse.
+     * See [android.widget.RemoteViews.RemoteResponse.getLaunchOptions].first
+     */
+    fun setSecondWidget(pendingIntent: PendingIntent, widgetIntent: Intent?, itemInfo: ItemInfo) {
+        setSecondTask(pendingIntent, itemInfo)
+        widgetSecondIntent = widgetIntent
     }
 
     private fun getShortcutInfo(intent: Intent?, user: UserHandle?): ShortcutInfo? {
-        val intentPackage = intent?.getPackage()
-        if (intentPackage == null) {
-            return null
-        }
+        val intentPackage = intent?.getPackage() ?: return null
         val shortcutId = intent.getStringExtra(ShortcutKey.EXTRA_SHORTCUT_ID)
                 ?: return null
         try {
             val context: Context =
                 if (user != null) {
-                    context.createPackageContextAsUser(intentPackage, 0 /* flags */, user)
+                    context!!.createPackageContextAsUser(intentPackage, 0 /* flags */, user)
                 } else {
-                    context.createPackageContext(intentPackage, 0 /* *flags */)
+                    context!!.createPackageContext(intentPackage, 0 /* *flags */)
                 }
             return ShortcutInfo.Builder(context, shortcutId).build()
         } catch (e: PackageManager.NameNotFoundException) {
@@ -240,6 +256,7 @@ class SplitSelectDataHolder(
                 secondTaskId,
                 initialPendingIntent,
                 secondPendingIntent,
+                widgetSecondIntent,
                 initialUser?.identifier ?: -1,
                 secondUser?.identifier ?: -1,
                 initialShortcut,
@@ -256,7 +273,8 @@ class SplitSelectDataHolder(
      * Note that both [initialIntent] and [secondIntent] will be nullified on method return
      *
      * One caveat is that if [secondPendingIntent] is set, we will use that and *not* attempt to
-     * convert [secondIntent]
+     * convert [secondIntent].
+     * This also leaves [widgetSecondIntent] untouched.
      */
     private fun convertIntentsToFinalTypes() {
         initialShortcut = getShortcutInfo(initialIntent, initialUser)
@@ -342,6 +360,7 @@ class SplitSelectDataHolder(
             var secondTaskId: Int = INVALID_TASK_ID,
             var initialPendingIntent: PendingIntent? = null,
             var secondPendingIntent: PendingIntent? = null,
+            var widgetSecondIntent: Intent? = null,
             var initialUserId: Int = -1,
             var secondUserId: Int = -1,
             var initialShortcut: ShortcutInfo? = null,
@@ -368,7 +387,8 @@ class SplitSelectDataHolder(
     }
 
     private fun isInitialTaskIntentSet(): Boolean {
-        return initialTaskId != INVALID_TASK_ID || initialIntent != null
+        return initialTaskId != INVALID_TASK_ID || initialIntent != null ||
+                initialPendingIntent != null
     }
 
     fun getInitialTaskId(): Int {
@@ -391,6 +411,10 @@ class SplitSelectDataHolder(
         return itemInfo
     }
 
+    fun getSecondItemInfo(): ItemInfo? {
+        return secondItemInfo
+    }
+
     private fun isSecondTaskIntentSet(): Boolean {
         return secondTaskId != INVALID_TASK_ID || secondIntent != null
                 || secondPendingIntent != null
@@ -404,6 +428,7 @@ class SplitSelectDataHolder(
         secondUser = null
         initialIntent = null
         secondIntent = null
+        initialPendingIntent = null
         secondPendingIntent = null
         itemInfo = null
         splitEvent = null

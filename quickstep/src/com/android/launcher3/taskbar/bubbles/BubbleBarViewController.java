@@ -18,8 +18,10 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -74,7 +76,8 @@ public class BubbleBarViewController {
     // Whether the bar is hidden for a sysui state.
     private boolean mHiddenForSysui;
     // Whether the bar is hidden because there are no bubbles.
-    private boolean mHiddenForNoBubbles;
+    private boolean mHiddenForNoBubbles = true;
+    private boolean mShouldShowEducation;
 
     public BubbleBarViewController(TaskbarActivityContext activity, BubbleBarView barView) {
         mActivity = activity;
@@ -98,7 +101,7 @@ public class BubbleBarViewController {
         mBarView.getLayoutParams().height = mActivity.getDeviceProfile().taskbarHeight;
         mBubbleBarScale.updateValue(1f);
         mBubbleClickListener = v -> onBubbleClicked(v);
-        mBubbleBarClickListener = v -> setExpanded(true);
+        mBubbleBarClickListener = v -> onBubbleBarClicked();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) ->
@@ -118,6 +121,21 @@ public class BubbleBarViewController {
             mBubbleStashController.stashBubbleBar();
         } else {
             mBubbleBarController.showAndSelectBubble(bubble);
+        }
+    }
+
+    private void onBubbleBarClicked() {
+        if (mShouldShowEducation) {
+            mShouldShowEducation = false;
+            // Get the bubble bar bounds on screen
+            Rect bounds = new Rect();
+            mBarView.getBoundsOnScreen(bounds);
+            // Calculate user education reference position in Screen coordinates
+            Point position = new Point(bounds.centerX(), bounds.top);
+            // Show user education relative to the reference point
+            mSystemUiProxy.showUserEducation(position);
+        } else {
+            setExpanded(true);
         }
     }
 
@@ -195,6 +213,7 @@ public class BubbleBarViewController {
         if (mHiddenForNoBubbles != hidden) {
             mHiddenForNoBubbles = hidden;
             updateVisibilityForStateChange();
+            mActivity.bubbleBarVisibilityChanged(!hidden);
         }
     }
 
@@ -271,7 +290,8 @@ public class BubbleBarViewController {
      */
     public void addBubble(BubbleBarItem b) {
         if (b != null) {
-            mBarView.addView(b.getView(), 0, new FrameLayout.LayoutParams(mIconSize, mIconSize));
+            mBarView.addView(b.getView(), 0,
+                    new FrameLayout.LayoutParams(mIconSize, mIconSize, Gravity.LEFT));
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
         } else {
@@ -324,6 +344,12 @@ public class BubbleBarViewController {
         } else {
             mBubbleStashController.showBubbleBar(true /* expand the bubbles */);
         }
+    }
+
+    /** Marks as should show education and shows the bubble bar in a collapsed state */
+    public void prepareToShowEducation() {
+        mShouldShowEducation = true;
+        mBubbleStashController.showBubbleBar(false /* expand the bubbles */);
     }
 
     /**

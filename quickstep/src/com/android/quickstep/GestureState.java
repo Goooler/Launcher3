@@ -29,12 +29,12 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_HOME;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_NEW_TASK;
 
-import android.annotation.Nullable;
-import android.annotation.TargetApi;
 import android.content.Intent;
-import android.os.Build;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -56,7 +56,6 @@ import java.util.function.Predicate;
  * Manages the state for an active system gesture, listens for events from the system and Launcher,
  * and fires events when the states change.
  */
-@TargetApi(Build.VERSION_CODES.R)
 public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationListener {
 
     final Predicate<RemoteAnimationTarget> mLastStartedTaskIdPredicate = new Predicate<>() {
@@ -303,6 +302,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     /**
      * @return the running task for this gesture.
      */
+    @Nullable
     public CachedTaskInfo getRunningTask() {
         return mRunningTask;
     }
@@ -336,7 +336,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     /**
      * Updates the running task for the gesture to be the given {@param runningTask}.
      */
-    public void updateRunningTask(CachedTaskInfo runningTask) {
+    public void updateRunningTask(@NonNull CachedTaskInfo runningTask) {
         mRunningTask = runningTask;
     }
 
@@ -410,7 +410,8 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
         mEndTarget = target;
         mStateCallback.setState(STATE_END_TARGET_SET);
         ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "setEndTarget " + mEndTarget,
+                new ActiveGestureLog.CompoundString("setEndTarget ")
+                        .append(mEndTarget.name()),
                 /* gestureEvent= */ SET_END_TARGET);
         switch (mEndTarget) {
             case HOME:

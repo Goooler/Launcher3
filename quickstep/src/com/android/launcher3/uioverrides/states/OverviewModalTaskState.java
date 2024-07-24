@@ -21,9 +21,9 @@ import android.content.Context;
 import android.graphics.Rect;
 
 import com.android.launcher3.BaseDraggingActivity;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.quickstep.views.RecentsView;
 
 /**
@@ -62,17 +62,11 @@ public class OverviewModalTaskState extends OverviewState {
     @Override
     public void onBackPressed(Launcher launcher) {
         launcher.getStateManager().goToState(LauncherState.OVERVIEW);
-        RecentsView recentsView = launcher.<RecentsView>getOverviewPanel();
-        if (recentsView != null) {
-            recentsView.resetModalVisuals();
-        } else {
-            super.onBackPressed(launcher);
-        }
     }
 
     @Override
     public boolean isTaskbarStashed(Launcher launcher) {
-        if (FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()) {
+        if (Flags.enableGridOnlyOverview()) {
             return true;
         }
         return super.isTaskbarStashed(launcher);

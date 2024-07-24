@@ -19,6 +19,7 @@ import static android.util.Base64.NO_PADDING;
 import static android.util.Base64.NO_WRAP;
 
 import static com.android.launcher3.DefaultLayoutParser.RES_PARTNER_DEFAULT_LAYOUT;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE;
 import static com.android.launcher3.LauncherSettings.Favorites.addTableToDb;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_KEY;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_LABEL;
@@ -48,12 +49,14 @@ import android.util.Base64;
 import android.util.Log;
 import android.util.Xml;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.AutoInstallsLayout;
 import com.android.launcher3.AutoInstallsLayout.SourceResources;
 import com.android.launcher3.ConstantItem;
 import com.android.launcher3.DefaultLayoutParser;
+import com.android.launcher3.EncryptionType;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherFiles;
@@ -61,6 +64,9 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.backuprestore.LauncherRestoreEventLogger;
+import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.provider.LauncherDbUtils;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
@@ -259,9 +265,13 @@ public class ModelDbController {
     /**
      * Migrates the DB if needed. If the migration failed, it clears the DB.
      */
-    public void tryMigrateDB() {
+    public void tryMigrateDB(@Nullable LauncherRestoreEventLogger restoreEventLogger) {
+
         if (!migrateGridIfNeeded()) {
-            Log.d(TAG, "Migration failed: resetting launcher database");
+            if (restoreEventLogger != null) {
+                sendMetricsForFailedMigration(restoreEventLogger, getDb());
+            }
+            FileLog.d(TAG, "Migration failed: resetting launcher database");
             createEmptyDB();
             LauncherPrefs.get(mContext).putSync(
                     getEmptyDbCreatedKey(mOpenHelper.getDatabaseName()).to(true));
@@ -281,15 +291,17 @@ public class ModelDbController {
         createDbIfNotExists();
         if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
             // If we have already create a new DB, ignore migration
+            Log.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
             return false;
         }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
         if (!GridSizeMigrationUtil.needsToMigrate(mContext, idp)) {
+            Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
             return true;
         }
         String targetDbName = new DeviceGridState(idp).getDbFile();
         if (TextUtils.equals(targetDbName, mOpenHelper.getDatabaseName())) {
-            Log.e(TAG, "migrateGridIfNeeded - target db is same as current: " + targetDbName);
+            Log.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
             return false;
         }
         DatabaseHelper oldHelper = mOpenHelper;
@@ -298,10 +310,37 @@ public class ModelDbController {
         try {
             return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, idp, mOpenHelper,
                    oldHelper.getWritableDatabase());
+        } catch (Exception e) {
+            FileLog.e(TAG, "Failed to migrate grid", e);
+            return false;
         } finally {
             if (mOpenHelper != oldHelper) {
                 oldHelper.close();
             }
+        }
+    }
+
+    /**
+     * In case of migration failure, report metrics for the count of each itemType in the DB.
+     * @param restoreEventLogger logger used to report Launcher restore metrics
+     */
+    private void sendMetricsForFailedMigration(LauncherRestoreEventLogger restoreEventLogger,
+            SQLiteDatabase db) {
+        try (Cursor cursor = db.rawQuery(
+                "SELECT itemType, COUNT(*) AS count FROM favorites GROUP BY itemType",
+                null
+        )) {
+            if (cursor.moveToFirst()) {
+                do {
+                    restoreEventLogger.logFavoritesItemsRestoreFailed(
+                            cursor.getInt(cursor.getColumnIndexOrThrow(ITEM_TYPE)),
+                            cursor.getInt(cursor.getColumnIndexOrThrow("count")),
+                            RestoreError.GRID_MIGRATION_FAILURE
+                    );
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            FileLog.e(TAG, "sendMetricsForFailedDb: Error reading from database", e);
         }
     }
 
@@ -419,7 +458,7 @@ public class ModelDbController {
             LauncherWidgetHolder widgetHolder) {
         ContentResolver cr = mContext.getContentResolver();
         String blobHandlerDigest = Settings.Secure.getString(cr, LAYOUT_DIGEST_KEY);
-        if (Utilities.ATLEAST_R && !TextUtils.isEmpty(blobHandlerDigest)) {
+        if (!TextUtils.isEmpty(blobHandlerDigest)) {
             BlobStoreManager blobManager = mContext.getSystemService(BlobStoreManager.class);
             try (InputStream in = new ParcelFileDescriptor.AutoCloseInputStream(
                     blobManager.openBlob(BlobHandle.createWithSha256(
@@ -499,11 +538,11 @@ public class ModelDbController {
     private ConstantItem<Boolean> getEmptyDbCreatedKey(String dbName) {
         if (mContext instanceof SandboxContext) {
             return LauncherPrefs.nonRestorableItem(EMPTY_DATABASE_CREATED,
-                    false /* default value */, false /* boot aware */);
+                    false /* default value */, EncryptionType.ENCRYPTED);
         }
         String key = TextUtils.equals(dbName, LauncherFiles.LAUNCHER_DB)
                 ? EMPTY_DATABASE_CREATED : EMPTY_DATABASE_CREATED + "@" + dbName;
-        return LauncherPrefs.backedUpItem(key, false /* default value */, false /* boot aware */);
+        return LauncherPrefs.backedUpItem(key, false /* default value */, EncryptionType.ENCRYPTED);
     }
 
     /**

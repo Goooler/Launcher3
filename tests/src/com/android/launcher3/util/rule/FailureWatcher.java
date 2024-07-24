@@ -59,8 +59,9 @@ public class FailureWatcher extends TestWatcher {
                         throw new AssertionError(
                                 "Launcher received events not sent by the test. This may mean "
                                         + "that the touch screen of the lab device has sent false"
-                                        + " events. See the logcat for TaplEvents tag and look "
-                                        + "for events with deviceId != -1");
+                                        + " events. See the logcat for "
+                                        + "TaplEvents|LauncherEvents|TaplTarget tag and look for "
+                                        + "events with deviceId != -1");
                     }
                 }
             }
@@ -123,8 +124,6 @@ public class FailureWatcher extends TestWatcher {
         } catch (IOException ex) {
             Log.e(TAG, "Failed to save accessibility hierarchy", ex);
         }
-
-        dumpCommand("logcat -d -s TestRunner", diagFile(description, "FilteredLogcat", "txt"));
 
         // Dump bugreport
         if (!sSavedBugreport) {

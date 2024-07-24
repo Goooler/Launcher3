@@ -19,24 +19,24 @@ package com.android.launcher3.uioverrides.flags;
 import static com.android.launcher3.config.FeatureFlags.FlagState.TEAMFOOD;
 import static com.android.launcher3.uioverrides.flags.FlagsFactory.TEAMFOOD_FLAG;
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Process;
 import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.preference.PreferenceDataStore;
-import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceViewHolder;
 import androidx.preference.SwitchPreference;
 
-import com.android.launcher3.R;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.util.ActivityLifecycleCallbacksAdapter;
 
 import java.util.List;
 import java.util.Set;
@@ -44,12 +44,13 @@ import java.util.Set;
 /**
  * Dev-build only UI allowing developers to toggle flag settings. See {@link FeatureFlags}.
  */
-public final class FlagTogglerPrefUi {
+public final class FlagTogglerPrefUi implements ActivityLifecycleCallbacksAdapter {
 
     private static final String TAG = "FlagTogglerPrefFrag";
 
-    private final PreferenceFragmentCompat mFragment;
+    private final View mFlagsApplyButton;
     private final Context mContext;
+
     private final PreferenceDataStore mDataStore = new PreferenceDataStore() {
 
         @Override
@@ -64,9 +65,17 @@ public final class FlagTogglerPrefUi {
         }
     };
 
-    public FlagTogglerPrefUi(PreferenceFragmentCompat fragment) {
-        mFragment = fragment;
-        mContext = fragment.getActivity();
+    public FlagTogglerPrefUi(Activity activity, View flagsApplyButton) {
+        mFlagsApplyButton = flagsApplyButton;
+        mContext = mFlagsApplyButton.getContext();
+        activity.registerActivityLifecycleCallbacks(this);
+
+        mFlagsApplyButton.setOnClickListener(v -> {
+            FlagsFactory.getSharedPreferences().edit().commit();
+            Log.e(TAG,
+                    "Killing launcher process " + Process.myPid() + " to apply new flag values");
+            System.exit(0);
+        });
     }
 
     public void applyTo(PreferenceGroup parent) {
@@ -136,28 +145,12 @@ public final class FlagTogglerPrefUi {
         switchPreference.setSummary(Html.fromHtml(summary + flag.description));
     }
 
-    private void updateMenu() {
-        mFragment.setHasOptionsMenu(anyChanged());
-        mFragment.getActivity().invalidateOptionsMenu();
+    public void updateMenu() {
+        mFlagsApplyButton.setVisibility(anyChanged() ? View.VISIBLE : View.INVISIBLE);
     }
 
-    public void onCreateOptionsMenu(Menu menu) {
-        if (anyChanged()) {
-            menu.add(0, R.id.menu_apply_flags, 0, "Apply")
-                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-        }
-    }
-
-    public void onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.menu_apply_flags) {
-            FlagsFactory.getSharedPreferences().edit().commit();
-            Log.e(TAG,
-                    "Killing launcher process " + Process.myPid() + " to apply new flag values");
-            System.exit(0);
-        }
-    }
-
-    public void onStop() {
+    @Override
+    public void onActivityStopped(Activity activity) {
         if (anyChanged()) {
             Toast.makeText(mContext, "Flag won't be applied until you restart launcher",
                     Toast.LENGTH_LONG).show();
@@ -169,9 +162,19 @@ public final class FlagTogglerPrefUi {
         return mDataStore.getBoolean(flag.key, defaultValue);
     }
 
+    private int getIntFlagStateFromSharedPrefs(IntDebugFlag flag) {
+        LauncherPrefs prefs = LauncherPrefs.get(mContext);
+        return flag.launcherPrefFlag == null ? flag.get() : prefs.get(flag.launcherPrefFlag);
+    }
+
     private boolean anyChanged() {
         for (DebugFlag flag : FlagsFactory.getDebugFlags()) {
             if (getFlagStateFromSharedPrefs(flag) != flag.get()) {
+                return true;
+            }
+        }
+        for (IntDebugFlag flag : FlagsFactory.getIntDebugFlags()) {
+            if (getIntFlagStateFromSharedPrefs(flag) != flag.get()) {
                 return true;
             }
         }

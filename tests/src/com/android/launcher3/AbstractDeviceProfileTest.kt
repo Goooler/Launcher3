@@ -19,26 +19,36 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Point
 import android.graphics.Rect
+import android.platform.test.flag.junit.SetFlagsRule
+import android.platform.test.rule.AllowedDevices
+import android.platform.test.rule.DeviceProduct
+import android.platform.test.rule.IgnoreLimit
+import android.platform.test.rule.LimitDevicesRule
 import android.util.DisplayMetrics
 import android.view.Surface
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.DisplayController
+import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
 import com.android.launcher3.util.NavigationMode
 import com.android.launcher3.util.WindowBounds
+import com.android.launcher3.util.rule.TestStabilityRule
+import com.android.launcher3.util.rule.setFlags
 import com.android.launcher3.util.window.CachedDisplayInfo
 import com.android.launcher3.util.window.WindowManagerProxy
+import com.google.common.truth.Truth
+import org.junit.Rule
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.spy
+import org.mockito.kotlin.whenever
 import java.io.BufferedReader
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import kotlin.math.max
 import kotlin.math.min
-import org.junit.After
-import org.junit.Before
-import org.mockito.ArgumentMatchers
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when` as whenever
 
 /**
  * This is an abstract class for DeviceProfile tests that create an InvariantDeviceProfile based on
@@ -46,28 +56,21 @@ import org.mockito.Mockito.`when` as whenever
  *
  * For an implementation that mocks InvariantDeviceProfile, use [FakeInvariantDeviceProfileTest]
  */
+@AllowedDevices(allowed = [DeviceProduct.CF_PHONE])
+@IgnoreLimit(ignoreLimit = BuildConfig.IS_STUDIO_BUILD)
 abstract class AbstractDeviceProfileTest {
-    protected var context: Context? = null
+    protected val testContext: Context = InstrumentationRegistry.getInstrumentation().context
+    protected lateinit var context: SandboxContext
     protected open val runningContext: Context = ApplicationProvider.getApplicationContext()
-    private var displayController: DisplayController = mock(DisplayController::class.java)
-    private var windowManagerProxy: WindowManagerProxy = mock(WindowManagerProxy::class.java)
-    private lateinit var originalDisplayController: DisplayController
-    private lateinit var originalWindowManagerProxy: WindowManagerProxy
+    private val displayController: DisplayController = mock()
+    private val windowManagerProxy: WindowManagerProxy = mock()
+    private val launcherPrefs: LauncherPrefs = mock()
 
-    @Before
-    open fun setUp() {
-        val appContext: Context = ApplicationProvider.getApplicationContext()
-        originalWindowManagerProxy = WindowManagerProxy.INSTANCE.get(appContext)
-        originalDisplayController = DisplayController.INSTANCE.get(appContext)
-        WindowManagerProxy.INSTANCE.initializeForTesting(windowManagerProxy)
-        DisplayController.INSTANCE.initializeForTesting(displayController)
-    }
+    @get:Rule val setFlagsRule = SetFlagsRule(SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT)
 
-    @After
-    open fun tearDown() {
-        WindowManagerProxy.INSTANCE.initializeForTesting(originalWindowManagerProxy)
-        DisplayController.INSTANCE.initializeForTesting(originalDisplayController)
-    }
+    @Rule @JvmField val testStabilityRule = TestStabilityRule()
+
+    @Rule @JvmField val limitDevicesRule = LimitDevicesRule()
 
     class DeviceSpec(
         val naturalSize: Pair<Int, Int>,
@@ -125,8 +128,7 @@ abstract class AbstractDeviceProfileTest {
     ) {
         val (naturalX, naturalY) = deviceSpec.naturalSize
         val windowsBounds = phoneWindowsBounds(deviceSpec, isGestureMode, naturalX, naturalY)
-        val displayInfo =
-            CachedDisplayInfo(Point(naturalX, naturalY), Surface.ROTATION_0, Rect(0, 0, 0, 0))
+        val displayInfo = CachedDisplayInfo(Point(naturalX, naturalY), Surface.ROTATION_0)
         val perDisplayBoundsCache = mapOf(displayInfo to windowsBounds)
 
         initializeCommonVars(
@@ -145,8 +147,7 @@ abstract class AbstractDeviceProfileTest {
     ) {
         val (naturalX, naturalY) = deviceSpec.naturalSize
         val windowsBounds = tabletWindowsBounds(deviceSpec, naturalX, naturalY)
-        val displayInfo =
-            CachedDisplayInfo(Point(naturalX, naturalY), Surface.ROTATION_0, Rect(0, 0, 0, 0))
+        val displayInfo = CachedDisplayInfo(Point(naturalX, naturalY), Surface.ROTATION_0)
         val perDisplayBoundsCache = mapOf(displayInfo to windowsBounds)
 
         initializeCommonVars(
@@ -169,21 +170,13 @@ abstract class AbstractDeviceProfileTest {
         val unfoldedWindowsBounds =
             tabletWindowsBounds(deviceSpecUnfolded, unfoldedNaturalX, unfoldedNaturalY)
         val unfoldedDisplayInfo =
-            CachedDisplayInfo(
-                Point(unfoldedNaturalX, unfoldedNaturalY),
-                Surface.ROTATION_0,
-                Rect(0, 0, 0, 0)
-            )
+            CachedDisplayInfo(Point(unfoldedNaturalX, unfoldedNaturalY), Surface.ROTATION_0)
 
         val (foldedNaturalX, foldedNaturalY) = deviceSpecFolded.naturalSize
         val foldedWindowsBounds =
             phoneWindowsBounds(deviceSpecFolded, isGestureMode, foldedNaturalX, foldedNaturalY)
         val foldedDisplayInfo =
-            CachedDisplayInfo(
-                Point(foldedNaturalX, foldedNaturalY),
-                Surface.ROTATION_0,
-                Rect(0, 0, 0, 0)
-            )
+            CachedDisplayInfo(Point(foldedNaturalX, foldedNaturalY), Surface.ROTATION_0)
 
         val perDisplayBoundsCache =
             mapOf(
@@ -281,13 +274,15 @@ abstract class AbstractDeviceProfileTest {
         isGestureMode: Boolean = true,
         densityDpi: Int
     ) {
+        setFlagsRule.setFlags(true, Flags.FLAG_ENABLE_TWOLINE_TOGGLE)
+        LauncherPrefs.get(testContext).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, true)
         val windowsBounds = perDisplayBoundsCache[displayInfo]!!
         val realBounds = windowsBounds[rotation]
-        whenever(windowManagerProxy.getDisplayInfo(ArgumentMatchers.any())).thenReturn(displayInfo)
-        whenever(windowManagerProxy.getRealBounds(ArgumentMatchers.any(), ArgumentMatchers.any()))
-            .thenReturn(realBounds)
-        whenever(windowManagerProxy.getRotation(ArgumentMatchers.any())).thenReturn(rotation)
-        whenever(windowManagerProxy.getNavigationMode(ArgumentMatchers.any()))
+        whenever(windowManagerProxy.getDisplayInfo(any())).thenReturn(displayInfo)
+        whenever(windowManagerProxy.getRealBounds(any(), any())).thenReturn(realBounds)
+        whenever(windowManagerProxy.getCurrentBounds(any())).thenReturn(realBounds.bounds)
+        whenever(windowManagerProxy.getRotation(any())).thenReturn(rotation)
+        whenever(windowManagerProxy.getNavigationMode(any()))
             .thenReturn(
                 if (isGestureMode) NavigationMode.NO_BUTTON else NavigationMode.THREE_BUTTONS
             )
@@ -300,11 +295,29 @@ abstract class AbstractDeviceProfileTest {
                 screenHeightDp = (realBounds.bounds.height() / density).toInt()
                 smallestScreenWidthDp = min(screenWidthDp, screenHeightDp)
             }
-        context = runningContext.createConfigurationContext(config)
+        val configurationContext = runningContext.createConfigurationContext(config)
+        context =
+            SandboxContext(
+                configurationContext,
+                DisplayController.INSTANCE,
+                WindowManagerProxy.INSTANCE,
+                LauncherPrefs.INSTANCE
+            )
+        context.putObject(DisplayController.INSTANCE, displayController)
+        context.putObject(WindowManagerProxy.INSTANCE, windowManagerProxy)
+        context.putObject(LauncherPrefs.INSTANCE, launcherPrefs)
 
-        val info = DisplayController.Info(context, windowManagerProxy, perDisplayBoundsCache)
+        whenever(launcherPrefs.get(LauncherPrefs.TASKBAR_PINNING)).thenReturn(false)
+        val info = spy(DisplayController.Info(context, windowManagerProxy, perDisplayBoundsCache))
         whenever(displayController.info).thenReturn(info)
-        whenever(displayController.isTransientTaskbar).thenReturn(isGestureMode)
+        whenever(info.isTransientTaskbar).thenReturn(isGestureMode)
+    }
+
+    /** Asserts that the given device profile matches a previously dumped device profile state. */
+    protected fun assertDump(dp: DeviceProfile, folderName: String, filename: String) {
+        val dump = dump(context!!, dp, "${folderName}_$filename.txt")
+        var expected = readDumpFromAssets(testContext, "$folderName/$filename.txt")
+        Truth.assertThat(dump).isEqualTo(expected)
     }
 
     /** Create a new dump of DeviceProfile, saves to a file in the device and returns it */

@@ -16,7 +16,7 @@
 
 package com.android.quickstep.views;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW;
+import static com.android.launcher3.Flags.enableGridOnlyOverview;
 
 import android.content.Context;
 import android.util.AttributeSet;
@@ -25,7 +25,7 @@ import android.widget.Button;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.statemanager.StatefulActivity;
-import com.android.launcher3.touch.PagedOrientationHandler;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 
 public class ClearAllButton extends Button {
 
@@ -81,7 +81,8 @@ public class ClearAllButton extends Button {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        PagedOrientationHandler orientationHandler = getRecentsView().getPagedOrientationHandler();
+        RecentsPagedOrientationHandler orientationHandler =
+                getRecentsView().getPagedOrientationHandler();
         mSidePadding = orientationHandler.getClearAllSidePadding(getRecentsView(), mIsRtl);
     }
 
@@ -131,7 +132,8 @@ public class ClearAllButton extends Button {
             return;
         }
 
-        PagedOrientationHandler orientationHandler = recentsView.getPagedOrientationHandler();
+        RecentsPagedOrientationHandler orientationHandler =
+                recentsView.getPagedOrientationHandler();
         float orientationSize = orientationHandler.getPrimaryValue(getWidth(), getHeight());
         if (orientationSize == 0) {
             return;
@@ -219,7 +221,8 @@ public class ClearAllButton extends Button {
             return;
         }
 
-        PagedOrientationHandler orientationHandler = recentsView.getPagedOrientationHandler();
+        RecentsPagedOrientationHandler orientationHandler =
+                recentsView.getPagedOrientationHandler();
         orientationHandler.getPrimaryViewTranslate().set(this,
                 orientationHandler.getPrimaryValue(0f, getOriginalTranslationY())
                         + mNormalTranslationPrimary + getFullscreenTrans(
@@ -232,7 +235,8 @@ public class ClearAllButton extends Button {
             return;
         }
 
-        PagedOrientationHandler orientationHandler = recentsView.getPagedOrientationHandler();
+        RecentsPagedOrientationHandler orientationHandler =
+                recentsView.getPagedOrientationHandler();
         orientationHandler.getSecondaryViewTranslate().set(this,
                 orientationHandler.getSecondaryValue(0f, getOriginalTranslationY()));
     }
@@ -251,7 +255,7 @@ public class ClearAllButton extends Button {
     private float getOriginalTranslationY() {
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         if (deviceProfile.isTablet) {
-            if (ENABLE_GRID_ONLY_OVERVIEW.get()) {
+            if (enableGridOnlyOverview()) {
                 return (getRecentsView().getLastComputedTaskSize().height()
                         + deviceProfile.overviewTaskThumbnailTopMarginPx) / 2.0f
                         + deviceProfile.overviewRowSpacing;
