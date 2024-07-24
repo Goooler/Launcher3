@@ -38,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"ການຈັບຄູ່ແອັບບໍ່ມີໃຫ້"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"ແຕະຄ້າງໄວ້ເພື່ອຍ້າຍວິດເຈັດ."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"ແຕະສອງເທື່ອຄ້າງໄວ້ເພື່ອຍ້າຍວິດເຈັດ ຫຼື ໃຊ້ຄຳສັ່ງກຳນົດເອງ."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"ຕົວເລືອກເພີ່ມເຕີມ"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"ສະແດງວິດເຈັດທັງໝົດ"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"ກວ້າງ %1$d ຄູນສູງ %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"ວິດເຈັດ <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

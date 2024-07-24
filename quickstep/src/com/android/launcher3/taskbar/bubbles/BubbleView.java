@@ -23,11 +23,13 @@ import android.graphics.Canvas;
 import android.graphics.Outline;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewOutlineProvider;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
 
 import androidx.constraintlayout.widget.ConstraintLayout;
@@ -36,6 +38,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.wm.shell.animation.Interpolators;
+import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.common.bubbles.BubbleInfo;
 
 // TODO: (b/276978250) This is will be similar to WMShell's BadgedImageView, it'd be nice to share.
@@ -72,6 +75,9 @@ public class BubbleView extends ConstraintLayout {
     private boolean mOnLeft = false;
 
     private BubbleBarItem mBubble;
+
+    @Nullable
+    private Controller mController;
 
     public BubbleView(Context context) {
         this(context, null);
@@ -178,6 +184,58 @@ public class BubbleView extends ConstraintLayout {
         mDrawParams.scale = mDotScale;
 
         mDotRenderer.draw(canvas, mDrawParams);
+    }
+
+    @Override
+    public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
+        super.onInitializeAccessibilityNodeInfoInternal(info);
+        info.addAction(AccessibilityNodeInfo.ACTION_COLLAPSE);
+        if (mBubble instanceof BubbleBarBubble) {
+            info.addAction(AccessibilityNodeInfo.ACTION_DISMISS);
+        }
+        if (mController != null) {
+            if (mController.getBubbleBarLocation().isOnLeft(isLayoutRtl())) {
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_right,
+                        getResources().getString(R.string.bubble_bar_action_move_right)));
+            } else {
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_left,
+                        getResources().getString(R.string.bubble_bar_action_move_left)));
+            }
+        }
+    }
+
+    @Override
+    public boolean performAccessibilityActionInternal(int action, Bundle arguments) {
+        if (super.performAccessibilityActionInternal(action, arguments)) {
+            return true;
+        }
+        if (action == AccessibilityNodeInfo.ACTION_COLLAPSE) {
+            if (mController != null) {
+                mController.collapse();
+            }
+            return true;
+        }
+        if (action == AccessibilityNodeInfo.ACTION_DISMISS) {
+            if (mController != null) {
+                mController.dismiss(this);
+            }
+            return true;
+        }
+        if (action == R.id.action_move_left) {
+            if (mController != null) {
+                mController.updateBubbleBarLocation(BubbleBarLocation.LEFT);
+            }
+        }
+        if (action == R.id.action_move_right) {
+            if (mController != null) {
+                mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT);
+            }
+        }
+        return false;
+    }
+
+    void setController(@Nullable Controller controller) {
+        mController = controller;
     }
 
     /** Sets the bubble being rendered in this view. */
@@ -336,5 +394,20 @@ public class BubbleView extends ConstraintLayout {
     public String toString() {
         String toString = mBubble != null ? mBubble.getKey() : "null";
         return "BubbleView{" + toString + "}";
+    }
+
+    /** Interface for BubbleView to communicate with its controller */
+    public interface Controller {
+        /** Get current bubble bar {@link BubbleBarLocation} */
+        BubbleBarLocation getBubbleBarLocation();
+
+        /** This bubble should be dismissed */
+        void dismiss(BubbleView bubble);
+
+        /** Collapse the bubble bar */
+        void collapse();
+
+        /** Request bubble bar location to be updated to the given location */
+        void updateBubbleBarLocation(BubbleBarLocation location);
     }
 }

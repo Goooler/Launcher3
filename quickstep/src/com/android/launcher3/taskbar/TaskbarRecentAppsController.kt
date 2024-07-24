@@ -50,6 +50,9 @@ class TaskbarRecentAppsController(
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
+            if (!field && !canShowRecentApps) {
+                recentsModel.unregisterRecentTasksChangedListener()
+            }
         }
 
     // TODO(b/343532825): Add a setting to disable Recents even when the flag is on.
@@ -57,6 +60,9 @@ class TaskbarRecentAppsController(
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
+            if (!field && !canShowRunningApps) {
+                recentsModel.unregisterRecentTasksChangedListener()
+            }
         }
 
     // Initialized in init.
@@ -116,8 +122,10 @@ class TaskbarRecentAppsController(
 
     fun init(taskbarControllers: TaskbarControllers) {
         controllers = taskbarControllers
-        recentsModel.registerRecentTasksChangedListener(recentTasksChangedListener)
-        reloadRecentTasksIfNeeded()
+        if (canShowRunningApps || canShowRecentApps) {
+            recentsModel.registerRecentTasksChangedListener(recentTasksChangedListener)
+            reloadRecentTasksIfNeeded()
+        }
     }
 
     fun onDestroy() {

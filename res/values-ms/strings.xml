@@ -38,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"Gandingan apl tidak tersedia"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Sentuh &amp; tahan untuk menggerakkan widget."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Ketik dua kali &amp; tahan untuk menggerakkan widget atau menggunakan tindakan tersuai."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Lagi pilihan"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Tunjukkan semua widget"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"Lebar %1$d kali tinggi %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

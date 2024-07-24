@@ -32,7 +32,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.Flags;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.util.PackageUserKey;
 
 import java.lang.ref.WeakReference;

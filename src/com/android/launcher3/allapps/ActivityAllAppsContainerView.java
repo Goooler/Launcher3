@@ -71,6 +71,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.R;
@@ -761,6 +762,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             alignParentTop(mHeader, false /* includeTabsMargin */);
         } else {
             layoutBelowSearchContainer(mHeader, false /* includeTabsMargin */);
+        }
+    }
+
+    /**
+     * Force header height update with an offset. Used by {@link UniversalSearchInputView} to
+     * request {@link FloatingHeaderView} to update its maxTranslation for multiline search bar.
+     */
+    public void forceUpdateHeaderHeight(int offset) {
+        if (Flags.multilineSearchBar()) {
+            mHeader.updateSearchBarOffset(offset);
         }
     }
 

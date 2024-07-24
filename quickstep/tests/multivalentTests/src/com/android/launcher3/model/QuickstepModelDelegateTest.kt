@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.android.launcher3.model
 
 import android.app.prediction.AppPredictor
@@ -19,7 +34,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyZeroInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.MockitoAnnotations
 
 /** Unit tests for [QuickstepModelDelegate]. */
@@ -57,25 +72,25 @@ class QuickstepModelDelegateTest {
         underTest.onAppTargetEvent(mockedAppTargetEvent, CONTAINER_PREDICTION)
 
         verify(allAppsPredictor).notifyAppTargetEvent(mockedAppTargetEvent)
-        verifyZeroInteractions(hotseatPredictor)
-        verifyZeroInteractions(widgetRecommendationPredictor)
+        verifyNoMoreInteractions(hotseatPredictor)
+        verifyNoMoreInteractions(widgetRecommendationPredictor)
     }
 
     @Test
     fun onWidgetPrediction_notifyWidgetRecommendationPredictor() {
         underTest.onAppTargetEvent(mockedAppTargetEvent, CONTAINER_WIDGETS_PREDICTION)
 
-        verifyZeroInteractions(allAppsPredictor)
+        verifyNoMoreInteractions(allAppsPredictor)
         verify(widgetRecommendationPredictor).notifyAppTargetEvent(mockedAppTargetEvent)
-        verifyZeroInteractions(hotseatPredictor)
+        verifyNoMoreInteractions(hotseatPredictor)
     }
 
     @Test
     fun onHotseatPrediction_notifyHotseatPredictor() {
         underTest.onAppTargetEvent(mockedAppTargetEvent, CONTAINER_HOTSEAT_PREDICTION)
 
-        verifyZeroInteractions(allAppsPredictor)
-        verifyZeroInteractions(widgetRecommendationPredictor)
+        verifyNoMoreInteractions(allAppsPredictor)
+        verifyNoMoreInteractions(widgetRecommendationPredictor)
         verify(hotseatPredictor).notifyAppTargetEvent(mockedAppTargetEvent)
     }
 
@@ -83,8 +98,8 @@ class QuickstepModelDelegateTest {
     fun onOtherClient_notifyHotseatPredictor() {
         underTest.onAppTargetEvent(mockedAppTargetEvent, CONTAINER_WALLPAPERS)
 
-        verifyZeroInteractions(allAppsPredictor)
-        verifyZeroInteractions(widgetRecommendationPredictor)
+        verifyNoMoreInteractions(allAppsPredictor)
+        verifyNoMoreInteractions(widgetRecommendationPredictor)
         verify(hotseatPredictor).notifyAppTargetEvent(mockedAppTargetEvent)
     }
 

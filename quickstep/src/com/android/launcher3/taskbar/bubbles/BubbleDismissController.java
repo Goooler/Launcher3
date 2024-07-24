@@ -143,7 +143,7 @@ public class BubbleDismissController {
         if (mMagnetizedObject.getUnderlyingObject() instanceof BubbleView) {
             BubbleView bubbleView = (BubbleView) mMagnetizedObject.getUnderlyingObject();
             if (bubbleView.getBubble() != null) {
-                mBubbleBarViewController.onDismissBubble(bubbleView.getBubble());
+                mBubbleBarViewController.notifySysUiBubbleDismissed(bubbleView.getBubble());
             }
         } else if (mMagnetizedObject.getUnderlyingObject() instanceof BubbleBarView) {
             mBubbleBarViewController.onDismissAllBubbles();

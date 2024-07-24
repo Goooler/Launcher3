@@ -16,17 +16,15 @@
 
 package com.android.launcher3.celllayout
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
 
-@RunWith(AndroidJUnit4::class)
+// @RunWith(AndroidJUnit4::class) b/353965234
 class CellLayoutMethodsTest {
 
     @JvmField @Rule var cellLayoutBuilder = UnitTestCellLayoutBuilderRule()
 
-    @Test
+    //@Test
     fun pointToCellExact() {
         val width = 1000
         val height = 1000

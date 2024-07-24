@@ -22,9 +22,9 @@ import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
 
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyFloat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -41,6 +41,8 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.testcomponent.TouchEventGenerator;
 
+import com.google.errorprone.annotations.FormatMethod;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,7 +54,8 @@ import org.mockito.MockitoAnnotations;
 public class SingleAxisSwipeDetectorTest {
 
     private static final String TAG = SingleAxisSwipeDetectorTest.class.getSimpleName();
-    public static void L(String s, Object... parts) {
+    @FormatMethod
+    public static void logD(String s, Object... parts) {
         Log.d(TAG, (parts.length == 0) ? s : String.format(s, parts));
     }
 
@@ -82,7 +85,7 @@ public class SingleAxisSwipeDetectorTest {
         mTouchSlop = orgConfig.getScaledTouchSlop();
         doReturn(mTouchSlop).when(mMockConfig).getScaledTouchSlop();
 
-        L("mTouchSlop=", mTouchSlop);
+        logD("mTouchSlop= %s", mTouchSlop);
     }
 
     @Test

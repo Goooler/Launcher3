@@ -38,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"Non está dispoñible o emparellamento de aplicacións"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Mantén premido un widget para movelo."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Toca dúas veces un widget e manteno premido para movelo ou utiliza accións personalizadas."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Máis opcións"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Mostrar todos os widgets"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d de largo por %2$d de alto"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

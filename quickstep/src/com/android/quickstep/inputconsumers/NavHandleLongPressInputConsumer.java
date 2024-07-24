@@ -27,6 +27,8 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.launcher3.Utilities;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.util.DisplayController;
@@ -48,7 +50,7 @@ public class NavHandleLongPressInputConsumer extends DelegateInputConsumer {
     private static final boolean DEBUG_NAV_HANDLE = Utilities.isPropertyEnabled(
             NAV_HANDLE_LONG_PRESS);
 
-    private final NavHandleLongPressHandler mNavHandleLongPressHandler;
+    private NavHandleLongPressHandler mNavHandleLongPressHandler;
     private final float mNavHandleWidth;
     private final float mScreenWidth;
 
@@ -264,5 +266,10 @@ public class NavHandleLongPressInputConsumer extends DelegateInputConsumer {
     @Override
     protected String getDelegatorName() {
         return "NavHandleLongPressInputConsumer";
+    }
+
+    @VisibleForTesting
+    void setNavHandleLongPressHandler(NavHandleLongPressHandler navHandleLongPressHandler) {
+        mNavHandleLongPressHandler = navHandleLongPressHandler;
     }
 }

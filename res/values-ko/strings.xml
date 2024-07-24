@@ -38,6 +38,10 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"앱 페어링을 사용할 수 없습니다."</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"길게 터치하여 위젯을 이동하세요."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"두 번 탭한 다음 길게 터치하여 위젯을 이동하거나 맞춤 작업을 사용하세요."</string>
+    <!-- no translation found for widget_picker_widget_options_button_description (4770099264476852363) -->
+    <skip />
+    <!-- no translation found for widget_picker_show_all_widgets_menu_item_title (9023638224586908119) -->
+    <skip />
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d×%2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"너비 %1$d, 높이 %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"위젯 <xliff:g id="WIDGET_NAME">%1$s</xliff:g>개"</string>

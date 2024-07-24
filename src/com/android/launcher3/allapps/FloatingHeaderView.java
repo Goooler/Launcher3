@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder;
@@ -104,6 +105,8 @@ public class FloatingHeaderView extends LinearLayout implements
     private boolean mFloatingRowsCollapsed;
     // Total height of all current floating rows. Collapsed rows == 0 height.
     private int mFloatingRowsHeight;
+    // Offset of search bar. Adds to the floating view height when multi-line is supported.
+    private int mSearchBarOffset = 0;
 
     // This is initialized once during inflation and stays constant after that. Fixed views
     // cannot be added or removed dynamically.
@@ -198,6 +201,14 @@ public class FloatingHeaderView extends LinearLayout implements
         }
     }
 
+    /**
+     * Offset floating rows height by search bar
+     */
+    void updateSearchBarOffset(int offset) {
+        mSearchBarOffset = offset;
+        onHeightUpdated();
+    }
+
     @Override
     public void onPluginDisconnected(AllAppsRow plugin) {
         PluginHeaderRow row = mPluginRows.get(plugin);
@@ -258,9 +269,18 @@ public class FloatingHeaderView extends LinearLayout implements
         mTabLayout.setVisibility(mTabsHidden ? GONE : visibility);
     }
 
+    /** Returns whether search bar has multi-line support, and is currently in multi-line state. */
+    private boolean isSearchBarMultiline() {
+        return Flags.multilineSearchBar() && mSearchBarOffset > 0;
+    }
+
     private void updateExpectedHeight() {
         updateFloatingRowsHeight();
         mMaxTranslation = 0;
+        boolean shouldAddSearchBarHeight = isSearchBarMultiline() && !Flags.floatingSearchBar();
+        if (shouldAddSearchBarHeight) {
+            mMaxTranslation += mSearchBarOffset;
+        }
         if (mFloatingRowsCollapsed) {
             return;
         }

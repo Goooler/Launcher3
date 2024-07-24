@@ -23,7 +23,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
-import com.android.launcher3.LauncherPrefs
+import com.android.launcher3.LauncherPrefs.Companion.THEMED_ICONS
 import com.android.launcher3.LauncherPrefs.Companion.get
 import com.android.launcher3.icons.BaseIconFactory
 import com.android.launcher3.icons.FastBitmapDrawable
@@ -50,6 +50,8 @@ class PreviewItemManagerTest {
     private lateinit var folderItems: ArrayList<ItemInfo>
     private lateinit var modelHelper: LauncherModelHelper
     private lateinit var folderIcon: FolderIcon
+
+    private var defaultThemedIcons = false
 
     @Before
     fun setup() {
@@ -127,16 +129,20 @@ class PreviewItemManagerTest {
                     previewItemManager.mIconSize
                 )
             )
+
+        defaultThemedIcons = get(context).get(THEMED_ICONS)
     }
+
     @After
     @Throws(Exception::class)
     fun tearDown() {
+        get(context).put(THEMED_ICONS, defaultThemedIcons)
         modelHelper.destroy()
     }
 
     @Test
     fun checkThemedIconWithThemingOn_iconShouldBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, true)
+        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[0])
@@ -146,7 +152,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkThemedIconWithThemingOff_iconShouldNotBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, false)
+        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[0])
@@ -156,7 +162,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkUnthemedIconWithThemingOn_iconShouldNotBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, true)
+        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[1])
@@ -166,7 +172,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkUnthemedIconWithThemingOff_iconShouldNotBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, false)
+        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[1])
@@ -176,7 +182,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkThemedIconWithBadgeWithThemingOn_iconAndBadgeShouldBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, true)
+        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[2])
@@ -189,7 +195,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkUnthemedIconWithBadgeWithThemingOn_badgeShouldBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, true)
+        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[3])
@@ -202,7 +208,7 @@ class PreviewItemManagerTest {
 
     @Test
     fun checkUnthemedIconWithBadgeWithThemingOff_iconAndBadgeShouldNotBeThemed() {
-        get(context).put(LauncherPrefs.THEMED_ICONS, false)
+        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[3])

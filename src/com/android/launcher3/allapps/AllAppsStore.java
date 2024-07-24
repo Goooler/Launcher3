@@ -262,11 +262,12 @@ public class AllAppsStore<T extends Context & ActivityContext> {
         writer.println(prefix + "\tAllAppsStore Apps[] size: " + mApps.length);
         for (int i = 0; i < mApps.length; i++) {
             writer.println(String.format(Locale.getDefault(),
-                    "%s\tPackage index, name, and class: " + "%d/%s:%s",
+                    "%s\tPackage index, name, class, and description: %d/%s:%s, %s",
                     prefix,
                     i,
                     mApps[i].componentName.getPackageName(),
-                    mApps[i].componentName.getClassName()));
+                    mApps[i].componentName.getClassName(),
+                    mApps[i].contentDescription));
         }
     }
 }

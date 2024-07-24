@@ -144,4 +144,10 @@
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"Илүү хэсэг"</string>
     <string name="bubble_bar_bubble_description" msgid="1882466152448446446">"<xliff:g id="APP_NAME">%2$s</xliff:g>-с ирсэн <xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>"</string>
     <string name="bubble_bar_description_multiple_bubbles" msgid="3922207715357143648">"<xliff:g id="BUBBLE_BAR_BUBBLE_DESCRIPTION">%1$s</xliff:g> болон бусад <xliff:g id="BUBBLE_COUNT">%2$d</xliff:g>"</string>
+    <!-- no translation found for bubble_bar_action_move_left (3306922475737714758) -->
+    <skip />
+    <!-- no translation found for bubble_bar_action_move_right (3455099638571411251) -->
+    <skip />
+    <!-- no translation found for bubble_bar_action_dismiss_all (3290722022983403060) -->
+    <skip />
 </resources>

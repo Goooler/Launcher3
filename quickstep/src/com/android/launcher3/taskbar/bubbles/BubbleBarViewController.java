@@ -73,6 +73,7 @@ public class BubbleBarViewController {
     private TaskbarInsetsController mTaskbarInsetsController;
     private View.OnClickListener mBubbleClickListener;
     private View.OnClickListener mBubbleBarClickListener;
+    private BubbleView.Controller mBubbleViewController;
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
@@ -153,6 +154,31 @@ public class BubbleBarViewController {
                 mBubbleBarController.updateBubbleBarLocation(location);
             }
         });
+
+        mBubbleViewController = new BubbleView.Controller() {
+            @Override
+            public BubbleBarLocation getBubbleBarLocation() {
+                return BubbleBarViewController.this.getBubbleBarLocation();
+            }
+
+            @Override
+            public void dismiss(BubbleView bubble) {
+                if (bubble.getBubble() != null) {
+                    notifySysUiBubbleDismissed(bubble.getBubble());
+                }
+                onBubbleDismissed(bubble);
+            }
+
+            @Override
+            public void collapse() {
+                collapseBubbleBar();
+            }
+
+            @Override
+            public void updateBubbleBarLocation(BubbleBarLocation location) {
+                mBubbleBarController.updateBubbleBarLocation(location);
+            }
+        };
     }
 
     private void onBubbleClicked(BubbleView bubbleView) {
@@ -165,8 +191,7 @@ public class BubbleBarViewController {
         final String currentlySelected = mBubbleBarController.getSelectedBubbleKey();
         if (mBarView.isExpanded() && Objects.equals(bubble.getKey(), currentlySelected)) {
             // Tapping the currently selected bubble while expanded collapses the view.
-            setExpanded(false);
-            mBubbleStashController.stashBubbleBar();
+            collapseBubbleBar();
         } else {
             mBubbleBarController.showAndSelectBubble(bubble);
         }
@@ -196,6 +221,11 @@ public class BubbleBarViewController {
         }
     }
 
+    private void collapseBubbleBar() {
+        setExpanded(false);
+        mBubbleStashController.stashBubbleBar();
+    }
+
     /** Notifies that the stash state is changing. */
     public void onStashStateChanging() {
         if (isAnimatingNewBubble()) {
@@ -220,7 +250,7 @@ public class BubbleBarViewController {
         return mBubbleBarTranslationY;
     }
 
-    float getBubbleBarCollapsedHeight() {
+    public float getBubbleBarCollapsedHeight() {
         return mBarView.getBubbleBarCollapsedHeight();
     }
 
@@ -440,6 +470,7 @@ public class BubbleBarViewController {
     public void removeBubble(BubbleBarBubble b) {
         if (b != null) {
             mBarView.removeBubble(b.getView());
+            b.getView().setController(null);
         } else {
             Log.w(TAG, "removeBubble, bubble was null!");
         }
@@ -450,6 +481,8 @@ public class BubbleBarViewController {
             BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation) {
         mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView());
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
+        addedBubble.getView().setController(mBubbleViewController);
+        removedBubble.getView().setController(null);
         mBubbleDragController.setupBubbleView(addedBubble.getView());
         if (!suppressAnimation) {
             animateBubbleNotification(addedBubble, isExpanding, /* isUpdate= */ false);
@@ -464,6 +497,7 @@ public class BubbleBarViewController {
             mBarView.addBubble(b.getView());
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
+            b.getView().setController(mBubbleViewController);
 
             if (b instanceof BubbleBarOverflow) {
                 return;
@@ -580,8 +614,8 @@ public class BubbleBarViewController {
         mSystemUiProxy.stopBubbleDrag(location, mBarView.getRestingTopPositionOnScreen());
     }
 
-    /** Notifies {@link BubbleBarView} that the dragged bubble was dismissed. */
-    public void onBubbleDragDismissed(BubbleView bubble) {
+    /** Handle given bubble being dismissed */
+    public void onBubbleDismissed(BubbleView bubble) {
         mBubbleBarController.onBubbleDismissed(bubble);
         mBarView.removeBubble(bubble);
     }
@@ -624,10 +658,9 @@ public class BubbleBarViewController {
     }
 
     /**
-     * Called when given bubble was dismissed. Notifies SystemUI
-     * @param bubble dismissed bubble item
+     * Notify SystemUI that the given bubble has been dismissed.
      */
-    public void onDismissBubble(@NonNull BubbleBarItem bubble) {
+    public void notifySysUiBubbleDismissed(@NonNull BubbleBarItem bubble) {
         mSystemUiProxy.dragBubbleToDismiss(bubble.getKey(), mTimeSource.currentTimeMillis());
     }
 
