@@ -225,10 +225,10 @@ public class FloatingHeaderView extends LinearLayout implements
         for (FloatingHeaderRow row : mAllRows) {
             row.setup(this, mAllRows, tabsHidden);
         }
-        updateExpectedHeight();
 
         mTabsHidden = tabsHidden;
         maybeSetTabVisibility(VISIBLE);
+        updateExpectedHeight();
         mMainRV = mainRV;
         mWorkRV = workRV;
         mSearchRV = searchRV;
@@ -451,9 +451,9 @@ public class FloatingHeaderView extends LinearLayout implements
 
     @Override
     public void setInsets(Rect insets) {
-        int leftRightPadding = ActivityContext.lookupContext(getContext())
-                .getDeviceProfile().allAppsLeftRightPadding;
-        setPadding(leftRightPadding, getPaddingTop(), leftRightPadding, getPaddingBottom());
+        Rect allAppsPadding = ActivityContext.lookupContext(getContext())
+                .getDeviceProfile().allAppsPadding;
+        setPadding(allAppsPadding.left, getPaddingTop(), allAppsPadding.right, getPaddingBottom());
     }
 
     public <T extends FloatingHeaderRow> T findFixedRowByType(Class<T> type) {

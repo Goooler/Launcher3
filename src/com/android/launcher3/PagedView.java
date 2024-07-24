@@ -19,6 +19,7 @@ package com.android.launcher3;
 import static com.android.app.animation.Interpolators.SCROLL;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.isAccessibilityEnabled;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.isObservedEventType;
+import static com.android.launcher3.testing.shared.TestProtocol.SCROLL_FINISHED_MESSAGE;
 import static com.android.launcher3.touch.OverScroll.OVERSCROLL_DAMP_FACTOR;
 import static com.android.launcher3.touch.PagedOrientationHandler.VIEW_SCROLL_BY;
 import static com.android.launcher3.touch.PagedOrientationHandler.VIEW_SCROLL_TO;
@@ -117,7 +118,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     private float mTotalMotion;
     // Used in special cases where the fling checks can be relaxed for an intentional gesture
     private boolean mAllowEasyFling;
-    protected PagedOrientationHandler mOrientationHandler = PagedOrientationHandler.PORTRAIT;
+    private PagedOrientationHandler mOrientationHandler =
+            PagedOrientationHandler.DEFAULT;
 
     private final ArrayList<Runnable> mOnPageScrollsInitializedCallbacks = new ArrayList<>();
 
@@ -228,6 +230,14 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     public View getPageAt(int index) {
         return getChildAt(index);
+    }
+
+    protected PagedOrientationHandler getPagedOrientationHandler() {
+        return mOrientationHandler;
+    }
+
+    protected void setOrientationHandler(PagedOrientationHandler orientationHandler) {
+        this.mOrientationHandler = orientationHandler;
     }
 
     /**
@@ -492,7 +502,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
      */
     protected void onPageEndTransition() {
         mCurrentPageScrollDiff = 0;
-        AccessibilityManagerCompat.sendScrollFinishedEventToTest(getContext());
+        AccessibilityManagerCompat.sendTestProtocolEventToTest(getContext(),
+                SCROLL_FINISHED_MESSAGE);
         AccessibilityManagerCompat.sendCustomAccessibilityEvent(getPageAt(mCurrentPage),
                 AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
         if (mOnPageTransitionEndCallback != null) {
@@ -626,6 +637,11 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         mMinFlingVelocity = res.getDimensionPixelSize(R.dimen.min_fling_velocity);
         mMinSnapVelocity = res.getDimensionPixelSize(R.dimen.min_page_snap_velocity);
         mPageSnapAnimationDuration = res.getInteger(R.integer.config_pageSnapAnimationDuration);
+        onVelocityValuesUpdated();
+    }
+
+    protected void onVelocityValuesUpdated() {
+        // Overridden in RecentsView
     }
 
     @Override
@@ -1124,7 +1140,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             mEdgeGlowLeft.onPullDistance(0f, 1f - displacement);
         }
         if (!mEdgeGlowRight.isFinished()) {
-            mEdgeGlowRight.onPullDistance(0f, displacement);
+            mEdgeGlowRight.onPullDistance(0f, displacement, ev);
         }
     }
 
@@ -1304,10 +1320,10 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                     int consumed = 0;
                     if (delta < 0 && mEdgeGlowRight.getDistance() != 0f) {
                         consumed = Math.round(size *
-                                mEdgeGlowRight.onPullDistance(delta / size, displacement));
+                                mEdgeGlowRight.onPullDistance(delta / size, displacement, ev));
                     } else if (delta > 0 && mEdgeGlowLeft.getDistance() != 0f) {
                         consumed = Math.round(-size *
-                                mEdgeGlowLeft.onPullDistance(-delta / size, 1 - displacement));
+                                mEdgeGlowLeft.onPullDistance(-delta / size, 1 - displacement, ev));
                     }
                     delta -= consumed;
                 }
@@ -1325,14 +1341,14 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                         final float pulledToX = oldScroll + delta;
 
                         if (pulledToX < mMinScroll) {
-                            mEdgeGlowLeft.onPullDistance(-delta / size, 1.f - displacement);
+                            mEdgeGlowLeft.onPullDistance(-delta / size, 1.f - displacement, ev);
                             if (!mEdgeGlowRight.isFinished()) {
-                                mEdgeGlowRight.onRelease();
+                                mEdgeGlowRight.onRelease(ev);
                             }
                         } else if (pulledToX > mMaxScroll) {
-                            mEdgeGlowRight.onPullDistance(delta / size, displacement);
+                            mEdgeGlowRight.onPullDistance(delta / size, displacement, ev);
                             if (!mEdgeGlowLeft.isFinished()) {
-                                mEdgeGlowLeft.onRelease();
+                                mEdgeGlowLeft.onRelease(ev);
                             }
                         }
 
@@ -1340,7 +1356,6 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                             postInvalidateOnAnimation();
                         }
                     }
-
                 } else {
                     awakenScrollBars();
                 }
@@ -1440,10 +1455,11 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                     }
                     invalidate();
                 }
+                mEdgeGlowLeft.onFlingVelocity(velocity);
+                mEdgeGlowRight.onFlingVelocity(velocity);
             }
-
-            mEdgeGlowLeft.onRelease();
-            mEdgeGlowRight.onRelease();
+            mEdgeGlowLeft.onRelease(ev);
+            mEdgeGlowRight.onRelease(ev);
             // End any intermediate reordering states
             resetTouchState();
             break;
@@ -1452,8 +1468,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             if (mIsBeingDragged) {
                 runOnPageScrollsInitialized(this::snapToDestination);
             }
-            mEdgeGlowLeft.onRelease();
-            mEdgeGlowRight.onRelease();
+            mEdgeGlowLeft.onRelease(ev);
+            mEdgeGlowRight.onRelease(ev);
             resetTouchState();
             break;
 
@@ -1571,7 +1587,9 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     @Override
     public void requestChildFocus(View child, View focused) {
         super.requestChildFocus(child, focused);
-
+        if (!shouldHandleRequestChildFocus(child)) {
+            return;
+        }
         // In case the device is controlled by a controller, mCurrentPage isn't updated properly
         // which results in incorrect navigation
         int nextPage = getNextPage();
@@ -1583,6 +1601,10 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         if (page >= 0 && !isVisible(page) && !isInTouchMode()) {
             snapToPage(page);
         }
+    }
+
+    protected boolean shouldHandleRequestChildFocus(View child) {
+        return true;
     }
 
     public int getDestinationPage() {
@@ -1635,7 +1657,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     }
 
     protected void snapToDestination() {
-        snapToPage(getDestinationPage(), mPageSnapAnimationDuration);
+        snapToPage(getDestinationPage(), getSnapAnimationDuration());
     }
 
     // We want the duration of the page snap animation to be influenced by the distance that
@@ -1659,7 +1681,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         if (Math.abs(velocity) < mMinFlingVelocity) {
             // If the velocity is low enough, then treat this more as an automatic page advance
             // as opposed to an apparent physical response to flinging
-            return snapToPage(whichPage, mPageSnapAnimationDuration);
+            return snapToPage(whichPage, getSnapAnimationDuration());
         }
 
         // Here we compute a "distance" that will be used in the computation of the overall
@@ -1681,12 +1703,16 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         return snapToPage(whichPage, delta, duration);
     }
 
+    protected int getSnapAnimationDuration() {
+        return mPageSnapAnimationDuration;
+    }
+
     public boolean snapToPage(int whichPage) {
-        return snapToPage(whichPage, mPageSnapAnimationDuration);
+        return snapToPage(whichPage, getSnapAnimationDuration());
     }
 
     public boolean snapToPageImmediately(int whichPage) {
-        return snapToPage(whichPage, mPageSnapAnimationDuration, true);
+        return snapToPage(whichPage, getSnapAnimationDuration(), true);
     }
 
     public boolean snapToPage(int whichPage, int duration) {

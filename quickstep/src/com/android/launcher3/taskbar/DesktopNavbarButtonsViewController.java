@@ -18,12 +18,17 @@ package com.android.launcher3.taskbar;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_NOTIFICATIONS;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_QUICK_SETTINGS;
 
+import android.content.Context;
+import android.content.pm.ActivityInfo.Config;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.R;
+import com.android.launcher3.taskbar.navbutton.NearestTouchFrame;
 
 /**
  * Controller for managing buttons and status icons in taskbar in a desktop environment.
@@ -39,8 +44,8 @@ public class DesktopNavbarButtonsViewController extends NavbarButtonsViewControl
     private TaskbarControllers mControllers;
 
     public DesktopNavbarButtonsViewController(TaskbarActivityContext context,
-            FrameLayout navButtonsView) {
-        super(context, navButtonsView);
+            @Nullable Context navigationBarPanelContext, NearestTouchFrame navButtonsView) {
+        super(context, navigationBarPanelContext, navButtonsView);
         mContext = context;
         mNavButtonsView = navButtonsView;
         mNavButtonContainer = mNavButtonsView.findViewById(R.id.end_nav_buttons);
@@ -56,6 +61,11 @@ public class DesktopNavbarButtonsViewController extends NavbarButtonsViewControl
     @Override
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
+        super.init(controllers);
+    }
+
+    @Override
+    protected void setupController() {
         mNavButtonsView.getLayoutParams().height = mContext.getDeviceProfile().taskbarHeight;
 
         // Quick settings and notifications buttons
@@ -72,4 +82,7 @@ public class DesktopNavbarButtonsViewController extends NavbarButtonsViewControl
     /** Cleans up on destroy */
     @Override
     public void onDestroy() { }
+
+    @Override
+    public void onConfigurationChanged(@Config int configChanges) { }
 }

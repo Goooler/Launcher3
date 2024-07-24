@@ -23,6 +23,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOTSEAT_RANKED;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
+import static com.android.launcher3.util.OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -40,7 +41,9 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Hotseat;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimationSuccessListener;
@@ -53,13 +56,13 @@ import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.uioverrides.PredictedAppIcon;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
-import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.views.Snackbar;
 
 import java.io.PrintWriter;
@@ -104,12 +107,11 @@ public class HotseatPredictionController implements DragController.DragListener,
         if (mLauncher.getWorkspace().isSwitchingState()) return false;
 
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onWorkspaceItemLongClick");
-        if (mEnableHotseatLongPressTipForTesting && !mLauncher.getOnboardingPrefs().getBoolean(
-                OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN)) {
+        if (mEnableHotseatLongPressTipForTesting && !HOTSEAT_LONGPRESS_TIP_SEEN.get(mLauncher)) {
             Snackbar.show(mLauncher, R.string.hotseat_tip_gaps_filled,
                     R.string.hotseat_prediction_settings, null,
                     () -> mLauncher.startActivity(getSettingsIntent()));
-            mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN);
+            LauncherPrefs.get(mLauncher).put(HOTSEAT_LONGPRESS_TIP_SEEN, true);
             mLauncher.getDragLayer().performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             return true;
         }
@@ -415,6 +417,10 @@ public class HotseatPredictionController implements DragController.DragListener,
     public SystemShortcut<QuickstepLauncher> getShortcut(QuickstepLauncher activity,
             ItemInfo itemInfo, View originalView) {
         if (itemInfo.container != LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION) {
+            return null;
+        }
+        if (Flags.enablePrivateSpace() && UserCache.getInstance(
+                activity.getApplicationContext()).getUserInfo(itemInfo.user).isPrivate()) {
             return null;
         }
         return new PinPrediction(activity, itemInfo, originalView);

@@ -25,6 +25,7 @@ import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_FADE_ANIM;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_X_ANIM;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
@@ -34,13 +35,11 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.PointF;
 import android.graphics.Rect;
-import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
@@ -50,10 +49,10 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.BaseState;
@@ -63,9 +62,9 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.views.ScrimView;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
-import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
@@ -77,7 +76,6 @@ import java.util.function.Predicate;
 /**
  * Utility class which abstracts out the logical differences between Launcher and RecentsActivity.
  */
-@TargetApi(Build.VERSION_CODES.P)
 public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_TYPE>,
         ACTIVITY_TYPE extends StatefulActivity<STATE_TYPE>> {
 
@@ -111,7 +109,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         if (endTarget != null) {
             // We were on our way to this state when we got canceled, end there instead.
             startState = stateFromGestureEndTarget(endTarget);
-            if (DesktopTaskView.DESKTOP_MODE_SUPPORTED) {
+            if (isDesktopModeSupported()) {
                 DesktopVisibilityController controller = getDesktopVisibilityController();
                 if (controller != null && controller.areFreeformTasksVisible()
                         && endTarget == LAST_TASK) {
@@ -131,7 +129,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public abstract int getSwipeUpDestinationAndLength(
             DeviceProfile dp, Context context, Rect outRect,
-            PagedOrientationHandler orientationHandler);
+            RecentsPagedOrientationHandler orientationHandler);
 
     /** Called when the animation to home has fully settled. */
     public void onSwipeUpToHomeComplete(RecentsAnimationDeviceState deviceState) {}
@@ -180,7 +178,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract <T extends RecentsView> T getVisibleRecentsView();
 
     @UiThread
-    public abstract boolean switchToRecentsIfVisible(Runnable onCompleteCallback);
+    public abstract boolean switchToRecentsIfVisible(Animator.AnimatorListener animatorListener);
 
     public abstract Rect getOverviewWindowBounds(
             Rect homeBounds, RemoteAnimationTarget target);
@@ -191,8 +189,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract boolean allowAllAppsFromOverview();
 
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
+        TaskbarUIController controller = getTaskbarController();
+        boolean isEventOverBubbleBarStashHandle =
+                controller != null && controller.isEventOverBubbleBarStashHandle(ev);
         return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons()
-                || isTrackpadMultiFingerSwipe(ev);
+                || isTrackpadMultiFingerSwipe(ev) || isEventOverBubbleBarStashHandle;
     }
 
     /**
@@ -239,7 +240,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         if (dp.isTablet) {
-            if (FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()) {
+            if (Flags.enableGridOnlyOverview()) {
                 calculateGridTaskSize(context, dp, outRect, orientedState);
             } else {
                 calculateFocusTaskSize(context, dp, outRect);
@@ -260,11 +261,28 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         }
     }
 
+    /**
+     * Calculates the taskView size for carousel during app to overview animation on tablets.
+     */
+    public final void calculateCarouselTaskSize(Context context, DeviceProfile dp, Rect outRect,
+            PagedOrientationHandler orientedState) {
+        if (dp.isTablet && dp.isGestureMode) {
+            Resources res = context.getResources();
+            float minScale = res.getFloat(R.dimen.overview_carousel_min_scale);
+            Rect gridRect = new Rect();
+            calculateGridSize(dp, context, gridRect);
+            calculateTaskSizeInternal(context, dp, gridRect, minScale, Gravity.CENTER | Gravity.TOP,
+                    outRect);
+        } else {
+            calculateTaskSize(context, dp, outRect, orientedState);
+        }
+    }
+
     private void calculateFocusTaskSize(Context context, DeviceProfile dp, Rect outRect) {
         Resources res = context.getResources();
         float maxScale = res.getFloat(R.dimen.overview_max_scale);
         Rect gridRect = new Rect();
-        calculateGridSize(dp, gridRect);
+        calculateGridSize(dp, context, gridRect);
         calculateTaskSizeInternal(context, dp, gridRect, maxScale, Gravity.CENTER, outRect);
     }
 
@@ -285,13 +303,13 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
-            Rect potentialTaskRect, float maxScale, int gravity, Rect outRect) {
+            Rect potentialTaskRect, float targetScale, int gravity, Rect outRect) {
         PointF taskDimension = getTaskDimension(context, dp);
 
         float scale = Math.min(
                 potentialTaskRect.width() / taskDimension.x,
                 potentialTaskRect.height() / taskDimension.y);
-        scale = Math.min(scale, maxScale);
+        scale = Math.min(scale, targetScale);
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
@@ -318,10 +336,16 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     /**
      * Calculates the overview grid size for the provided device configuration.
      */
-    public final void calculateGridSize(DeviceProfile dp, Rect outRect) {
+    public final void calculateGridSize(DeviceProfile dp, Context context, Rect outRect) {
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
         int bottomMargin = dp.getOverviewActionsClaimedSpace();
+        if (dp.isTaskbarPresent && Flags.enableGridOnlyOverview()) {
+            topMargin += context.getResources().getDimensionPixelSize(
+                    R.dimen.overview_top_margin_grid_only);
+            bottomMargin += context.getResources().getDimensionPixelSize(
+                    R.dimen.overview_bottom_margin_grid_only);
+        }
         int sideMargin = dp.overviewGridSideMargin;
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
@@ -336,8 +360,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             PagedOrientationHandler orientedState) {
         Resources res = context.getResources();
         Rect potentialTaskRect = new Rect();
-        if (FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()) {
-            calculateGridSize(dp, potentialTaskRect);
+        if (Flags.enableGridOnlyOverview()) {
+            calculateGridSize(dp, context, potentialTaskRect);
         } else {
             calculateFocusTaskSize(context, dp, potentialTaskRect);
         }
@@ -368,7 +392,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         calculateTaskSize(context, dp, outRect, orientedState);
-        boolean isGridOnlyOverview = dp.isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get();
+        boolean isGridOnlyOverview = dp.isTablet && Flags.enableGridOnlyOverview();
         int claimedSpaceBelow = isGridOnlyOverview
                 ? dp.overviewActionsTopMarginPx + dp.overviewActionsHeight + dp.stashedTaskbarHeight
                 : (dp.heightPx - outRect.bottom - dp.getInsets().bottom);
@@ -401,11 +425,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             if (activity == null) {
                 return null;
             }
+            RecentsView recentsView = activity.getOverviewPanel();
             STATE_TYPE state = stateFromGestureEndTarget(endTarget);
             ScrimView scrimView = activity.getScrimView();
             ObjectAnimator anim = ObjectAnimator.ofArgb(scrimView, VIEW_BACKGROUND_COLOR,
                     getOverviewScrimColorForState(activity, state));
             anim.setDuration(duration);
+            anim.setInterpolator(recentsView == null || !recentsView.isKeyboardTaskFocusPending()
+                    ? LINEAR : INSTANT);
             return anim;
         }
         return null;
@@ -437,11 +464,13 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     protected void runOnInitBackgroundStateUI(Runnable callback) {
-        mOnInitBackgroundStateUICallback = callback;
         ACTIVITY_TYPE activity = getCreatedActivity();
         if (activity != null && activity.getStateManager().getState() == mBackgroundState) {
+            callback.run();
             onInitBackgroundStateUI();
+            return;
         }
+        mOnInitBackgroundStateUICallback = callback;
     }
 
     private void onInitBackgroundStateUI() {
@@ -511,7 +540,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             // Since we are changing the start position of the UI, reapply the state, at the end
             controller.setEndAction(() -> mActivity.getStateManager().goToState(
                     controller.getInterpolatedProgress() > 0.5 ? mTargetState : mBackgroundState,
-                    false));
+                    /* animated= */ false));
 
             RecentsView recentsView = mActivity.getOverviewPanel();
             AnimatorControllerWithResistance controllerWithResistance =

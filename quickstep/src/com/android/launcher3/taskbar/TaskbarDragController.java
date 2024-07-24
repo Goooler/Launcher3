@@ -21,6 +21,9 @@ import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APP
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION;
+import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
+import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_DRAGDROP;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -64,6 +67,7 @@ import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.graphics.DragPreviewProvider;
+import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -259,6 +263,8 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             DraggableView originalView, int dragLayerX, int dragLayerY, DragSource source,
             ItemInfo dragInfo, Rect dragRegion, float initialDragViewScale,
             float dragViewScaleOnDrop, DragOptions options) {
+        mActivity.hideKeyboard();
+
         mOptions = options;
 
         mRegistrationX = mMotionDown.x - dragLayerX;
@@ -512,6 +518,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 // Note, this must be done last to ensure no AutohideSuspendFlags are active, as
                 // that will prevent us from stashing until the timeout.
                 mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+
+                mActivity.getStatsLogManager().logger().withItemInfo(mDragObject.dragInfo)
+                        .log(LAUNCHER_APP_LAUNCH_DRAGDROP);
             }
         }
     }
@@ -624,7 +633,9 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
         if (tag instanceof ItemInfo) {
             ItemInfo item = (ItemInfo) tag;
-            if (item.container == CONTAINER_ALL_APPS || item.container == CONTAINER_PREDICTION) {
+            if (item.container == CONTAINER_ALL_APPS
+                    || item.container == CONTAINER_PREDICTION
+                    || isInSearchResultContainer(item)) {
                 if (mDisallowGlobalDrag) {
                     // We're dragging in taskbarAllApps, we don't have folders or shortcuts
                     return iconView;
@@ -644,6 +655,13 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             }
         }
         return iconView;
+    }
+
+    private static boolean isInSearchResultContainer(ItemInfo item) {
+        ContainerInfo containerInfo = item.getContainerInfo();
+        return containerInfo.getContainerCase() == EXTENDED_CONTAINERS
+                && containerInfo.getExtendedContainers().getContainerCase()
+                        == DEVICE_SEARCH_RESULT_CONTAINER;
     }
 
     private void setupReturnDragAnimator(float fromX, float fromY, View originalView,

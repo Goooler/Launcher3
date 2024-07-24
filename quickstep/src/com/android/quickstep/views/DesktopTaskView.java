@@ -18,7 +18,6 @@ package com.android.quickstep.views;
 
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED;
 
 import android.content.Context;
@@ -29,7 +28,6 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RoundRectShape;
-import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -41,19 +39,21 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.icons.IconProvider;
+import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.RunnableList;
 import com.android.quickstep.RecentsModel;
-import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskThumbnailCache;
-import com.android.quickstep.util.CancellableTask;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.QuickStepContract;
+import com.android.window.flags.Flags;
+
+import kotlin.Unit;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -67,18 +67,6 @@ import java.util.function.Consumer;
  */
 // TODO(b/249371338): TaskView needs to be refactored to have better support for N tasks.
 public class DesktopTaskView extends TaskView {
-
-    /** Flag to indicate whether desktop windowing proto 1 is enabled */
-    private static final boolean DESKTOP_IS_PROTO1_ENABLED = SystemProperties.getBoolean(
-            "persist.wm.debug.desktop_mode", false);
-
-    /** Flag to indicate whether desktop windowing proto 2 is enabled */
-    public static final boolean DESKTOP_IS_PROTO2_ENABLED = SystemProperties.getBoolean(
-            "persist.wm.debug.desktop_mode_2", false);
-
-    /** Flags to indicate whether desktop mode is available on the device */
-    public static final boolean DESKTOP_MODE_SUPPORTED =
-            DESKTOP_IS_PROTO1_ENABLED || DESKTOP_IS_PROTO2_ENABLED;
 
     private static final String TAG = DesktopTaskView.class.getSimpleName();
 
@@ -97,6 +85,13 @@ public class DesktopTaskView extends TaskView {
     private final TaskView.FullscreenDrawParams mSnapshotDrawParams;
 
     private View mBackgroundView;
+
+    private int mChildCountAtInflation;
+
+    /** Check whether desktop windowing is enabled */
+    public static boolean isDesktopModeSupported() {
+        return Flags.enableDesktopWindowingMode();
+    }
 
     public DesktopTaskView(Context context) {
         this(context, null);
@@ -147,12 +142,15 @@ public class DesktopTaskView extends TaskView {
         Drawable iconBackground = getResources().getDrawable(R.drawable.bg_circle,
                 getContext().getTheme());
         mIconView.setDrawable(new LayerDrawable(new Drawable[]{iconBackground, icon}));
+
+        mChildCountAtInflation = getChildCount();
     }
 
     @Override
-    protected void updateBorderBounds(Rect bounds) {
+    protected Unit updateBorderBounds(@NonNull Rect bounds) {
         bounds.set(mBackgroundView.getLeft(), mBackgroundView.getTop(), mBackgroundView.getRight(),
                 mBackgroundView.getBottom());
+        return Unit.INSTANCE;
     }
 
     @Override
@@ -191,7 +189,9 @@ public class DesktopTaskView extends TaskView {
             for (int i = 0; i < diff; i++) {
                 TaskThumbnailView snapshotView = new TaskThumbnailView(getContext());
                 mSnapshotViews.add(snapshotView);
-                addView(snapshotView, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                // Add snapshots from to position after the initial child views.
+                addView(snapshotView, mChildCountAtInflation,
+                        new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             }
         }
 
@@ -335,21 +335,27 @@ public class DesktopTaskView extends TaskView {
     }
 
     @Override
-    protected boolean showTaskMenuWithContainer(IconView iconView) {
+    protected boolean showTaskMenuWithContainer(TaskViewIcon iconView) {
         return false;
-    }
-
-    @Override
-    public RunnableList launchTasks() {
-        SystemUiProxy.INSTANCE.get(getContext()).showDesktopApps(mActivity.getDisplayId());
-        Launcher.getLauncher(mActivity).getStateManager().goToState(NORMAL, false /* animated */);
-        return null;
     }
 
     @Nullable
     @Override
     public RunnableList launchTaskAnimated() {
-        return launchTasks();
+        RunnableList endCallback = new RunnableList();
+
+        RecentsView recentsView = getRecentsView();
+        DesktopRecentsTransitionController recentsController =
+                recentsView.getDesktopRecentsController();
+        if (recentsController != null) {
+            recentsController.launchDesktopFromRecents(this, success -> {
+                endCallback.executeAllAndDestroy();
+            });
+        }
+
+        // Callbacks get run from recentsView for case when recents animation already running
+        recentsView.addSideTaskLaunchCallback(endCallback);
+        return endCallback;
     }
 
     @Override
@@ -507,8 +513,7 @@ public class DesktopTaskView extends TaskView {
         for (int i = 0; i < mSnapshotViewMap.size(); i++) {
             if (i == 0) {
                 // All snapshots share the same params. Only update it with the first snapshot.
-                updateFullscreenParams(mSnapshotDrawParams,
-                        mSnapshotView.getPreviewPositionHelper());
+                updateFullscreenParams(mSnapshotDrawParams);
             }
             mSnapshotViewMap.valueAt(i).setFullscreenParams(mSnapshotDrawParams);
         }

@@ -15,11 +15,17 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_LEFT;
+import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_RIGHT;
+import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_NOTHING;
+
 import android.content.Context;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.DiffUtil;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -29,6 +35,7 @@ import com.android.launcher3.views.ActivityContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.Predicate;
@@ -46,6 +53,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     public static final String TAG = "AlphabeticalAppsList";
 
     private final WorkProfileManager mWorkProviderManager;
+
+    private final PrivateProfileManager mPrivateProviderManager;
 
     /**
      * Info about a fast scroller section, depending if sections are merged, the fast scroller
@@ -68,6 +77,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
 
     // The set of apps from the system
     private final List<AppInfo> mApps = new ArrayList<>();
+    private final List<AppInfo> mPrivateApps = new ArrayList<>();
     @Nullable
     private final AllAppsStore<T> mAllAppsStore;
 
@@ -87,11 +97,12 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     private Predicate<ItemInfo> mItemFilter;
 
     public AlphabeticalAppsList(Context context, @Nullable AllAppsStore<T> appsStore,
-            WorkProfileManager workProfileManager) {
+            WorkProfileManager workProfileManager, PrivateProfileManager privateProfileManager) {
         mAllAppsStore = appsStore;
         mActivityContext = ActivityContext.lookupContext(context);
         mAppNameComparator = new AppInfoComparator(context);
         mWorkProviderManager = workProfileManager;
+        mPrivateProviderManager = privateProfileManager;
         mNumAppsPerRowAllApps = mActivityContext.getDeviceProfile().numShownAllAppsColumns;
         if (mAllAppsStore != null) {
             mAllAppsStore.addUpdateListener(this);
@@ -197,12 +208,20 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         }
         // Sort the list of apps
         mApps.clear();
+        mPrivateApps.clear();
 
         Stream<AppInfo> appSteam = Stream.of(mAllAppsStore.getApps());
+        Stream<AppInfo> privateAppStream = Stream.of(mAllAppsStore.getApps());
+
         if (!hasSearchResults() && mItemFilter != null) {
             appSteam = appSteam.filter(mItemFilter);
+            if (mPrivateProviderManager != null) {
+                privateAppStream = privateAppStream
+                        .filter(mPrivateProviderManager.getItemInfoMatcher());
+            }
         }
         appSteam = appSteam.sorted(mAppNameComparator);
+        privateAppStream = privateAppStream.sorted(mAppNameComparator);
 
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
@@ -221,6 +240,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         }
 
         appSteam.forEachOrdered(mApps::add);
+        privateAppStream.forEachOrdered(mPrivateApps::add);
         // Recompose the set of adapter items from the current set of apps
         if (mSearchResults.isEmpty()) {
             updateAdapterItems();
@@ -250,18 +270,10 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 addApps = mWorkProviderManager.shouldShowWorkApps();
             }
             if (addApps) {
-                String lastSectionName = null;
-                for (AppInfo info : mApps) {
-                    mAdapterItems.add(AdapterItem.asApp(info));
-
-                    String sectionName = info.sectionName;
-                    // Create a new section if the section names do not match
-                    if (!sectionName.equals(lastSectionName)) {
-                        lastSectionName = sectionName;
-                        mFastScrollerSections.add(new FastScrollSectionInfo(sectionName, position));
-                    }
-                    position++;
-                }
+                position = addAppsWithSections(mApps, position);
+            }
+            if (Flags.enablePrivateSpace()) {
+                position = addPrivateSpaceItems(position);
             }
         }
         mAccessibilityResultsCount = (int) mAdapterItems.stream()
@@ -275,7 +287,9 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             int rowIndex = -1;
             for (AdapterItem item : mAdapterItems) {
                 item.rowIndex = 0;
-                if (BaseAllAppsAdapter.isDividerViewType(item.viewType)) {
+                if (BaseAllAppsAdapter.isDividerViewType(item.viewType)
+                        || BaseAllAppsAdapter.isPrivateSpaceHeaderView(item.viewType)
+                        || BaseAllAppsAdapter.isPrivateSpaceSysAppsDividerView(item.viewType)) {
                     numAppsInSection = 0;
                 } else if (BaseAllAppsAdapter.isIconViewType(item.viewType)) {
                     if (numAppsInSection % mNumAppsPerRowAllApps == 0) {
@@ -295,6 +309,116 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             DiffUtil.calculateDiff(new MyDiffCallback(oldItems, mAdapterItems), false)
                     .dispatchUpdatesTo(mAdapter);
         }
+    }
+
+    int addPrivateSpaceItems(int position) {
+        if (mPrivateProviderManager != null
+                && !mPrivateProviderManager.isPrivateSpaceHidden()
+                && !mPrivateApps.isEmpty()) {
+            // Always add PS Header if Space is present and visible.
+            position = mPrivateProviderManager.addPrivateSpaceHeader(mAdapterItems);
+            int privateSpaceState = mPrivateProviderManager.getCurrentState();
+            switch (privateSpaceState) {
+                case PrivateProfileManager.STATE_DISABLED:
+                case PrivateProfileManager.STATE_TRANSITION:
+                    break;
+                case PrivateProfileManager.STATE_ENABLED:
+                    // Add PS Apps only in Enabled State.
+                    position = addPrivateSpaceApps(position);
+                    break;
+            }
+        }
+        return position;
+    }
+
+    private int addPrivateSpaceApps(int position) {
+        // Add Install Apps Button first.
+        if (Flags.privateSpaceAppInstallerButton()) {
+            mPrivateProviderManager.addPrivateSpaceInstallAppButton(mAdapterItems);
+            position++;
+        }
+
+        // Split of private space apps into user-installed and system apps.
+        Map<Boolean, List<AppInfo>> split = mPrivateApps.stream()
+                .collect(Collectors.partitioningBy(mPrivateProviderManager
+                                .splitIntoUserInstalledAndSystemApps()));
+        // Add user installed apps
+        position = addAppsWithSections(split.get(true), position);
+        // Add system apps separator.
+        if (Flags.privateSpaceSysAppsSeparation()) {
+            position = mPrivateProviderManager.addSystemAppsDivider(mAdapterItems);
+        }
+        // Add system apps.
+        position = addAppsWithSections(split.get(false), position);
+
+        return position;
+    }
+
+    private int addAppsWithSections(List<AppInfo> appList, int startPosition) {
+        String lastSectionName = null;
+        boolean hasPrivateApps = false;
+        if (mPrivateProviderManager != null) {
+            hasPrivateApps = appList.stream().
+                    allMatch(mPrivateProviderManager.getItemInfoMatcher());
+        }
+        for (int i = 0; i < appList.size(); i++) {
+            AppInfo info = appList.get(i);
+            // Apply decorator to private apps.
+            if (hasPrivateApps) {
+                mAdapterItems.add(AdapterItem.asAppWithDecorationInfo(info,
+                        new SectionDecorationInfo(mActivityContext.getApplicationContext(),
+                                getRoundRegions(i, appList.size()),
+                                true /* decorateTogether */)));
+            } else {
+                mAdapterItems.add(AdapterItem.asApp(info));
+            }
+
+            String sectionName = info.sectionName;
+            // Create a new section if the section names do not match
+            if (!sectionName.equals(lastSectionName)) {
+                lastSectionName = sectionName;
+                mFastScrollerSections.add(new FastScrollSectionInfo(sectionName, startPosition));
+            }
+            startPosition++;
+        }
+        return startPosition;
+    }
+
+    /**
+     * Determines the corner regions that should be rounded for a specific app icon based on its
+     * position in a grid. Apps that should only be cared about rounding are the apps in the last
+     * row. In the last row on the first column, the app should only be rounded on the bottom left.
+     * Apps in the middle would not be rounded and the last app on the last row will ALWAYS have a
+     * {@link SectionDecorationInfo#ROUND_BOTTOM_RIGHT}.
+     *
+     * @param appIndex The index of the app icon within the app list.
+     * @param appListSize The total number of apps within the app list.
+     * @return  An integer representing the corner regions to be rounded, using bitwise flags:
+     *          - {@link SectionDecorationInfo#ROUND_NOTHING}: No corners should be rounded.
+     *          - {@link SectionDecorationInfo#ROUND_TOP_LEFT}: Round the top-left corner.
+     *          - {@link SectionDecorationInfo#ROUND_TOP_RIGHT}: Round the top-right corner.
+     *          - {@link SectionDecorationInfo#ROUND_BOTTOM_LEFT}: Round the bottom-left corner.
+     *          - {@link SectionDecorationInfo#ROUND_BOTTOM_RIGHT}: Round the bottom-right corner.
+     */
+    @VisibleForTesting
+    int getRoundRegions(int appIndex, int appListSize) {
+        int numberOfAppRows = (int) Math.ceil((double) appListSize / mNumAppsPerRowAllApps);
+        int roundRegion = ROUND_NOTHING;
+        // App is in the last row.
+        if ((appIndex / mNumAppsPerRowAllApps) == numberOfAppRows - 1) {
+            if ((appIndex % mNumAppsPerRowAllApps) == 0) {
+                // App is the first column.
+                roundRegion = ROUND_BOTTOM_LEFT;
+            } else if ((appIndex % mNumAppsPerRowAllApps) == mNumAppsPerRowAllApps-1) {
+                // App is in the last column.
+                roundRegion = ROUND_BOTTOM_RIGHT;
+            }
+            // Ensure the last private app is rounded on the bottom right.
+            if (appIndex == appListSize - 1) {
+                roundRegion |= ROUND_BOTTOM_RIGHT;
+            }
+        }
+        return roundRegion;
     }
 
     private static class MyDiffCallback extends DiffUtil.Callback {

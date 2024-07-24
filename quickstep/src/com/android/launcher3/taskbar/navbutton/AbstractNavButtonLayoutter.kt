@@ -18,12 +18,16 @@ package com.android.launcher3.taskbar.navbutton
 
 import android.content.res.Resources
 import android.graphics.drawable.RotateDrawable
+import android.view.Gravity
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Space
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory.NavButtonLayoutter
+import com.android.systemui.shared.rotation.RotationButton
 
 /**
  * Meant to be a simple container for data subclasses will need
@@ -37,10 +41,14 @@ import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory.NavButtonL
  * @property startContextualContainer ViewGroup that holds the start contextual button (ex, A11y).
  */
 abstract class AbstractNavButtonLayoutter(
-    val resources: Resources,
-    val navButtonContainer: LinearLayout,
-    protected val endContextualContainer: ViewGroup,
-    protected val startContextualContainer: ViewGroup
+        val resources: Resources,
+        val navButtonContainer: LinearLayout,
+        protected val endContextualContainer: ViewGroup,
+        protected val startContextualContainer: ViewGroup,
+        protected val imeSwitcher: ImageView?,
+        protected val rotationButton: RotationButton?,
+        protected val a11yButton: ImageView?,
+        protected val space: Space?
 ) : NavButtonLayoutter {
     protected val homeButton: ImageView? = navButtonContainer.findViewById(R.id.home)
     protected val recentsButton: ImageView? = navButtonContainer.findViewById(R.id.recent_apps)
@@ -55,5 +63,27 @@ abstract class AbstractNavButtonLayoutter(
             rotateDrawable.toDegrees = if (Utilities.isRtl(backButton.resources)) 90f else -90f
             backButton.setImageDrawable(rotateDrawable)
         }
+    }
+
+    fun getParamsToCenterView(): FrameLayout.LayoutParams {
+        val params = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        params.gravity = Gravity.CENTER
+        return params;
+    }
+
+    open fun repositionContextualContainer(contextualContainer: ViewGroup, buttonSize: Int,
+                                           barAxisMarginStart: Int, barAxisMarginEnd: Int,
+                                           gravity: Int) {
+        val contextualContainerParams = FrameLayout.LayoutParams(
+                buttonSize, ViewGroup.LayoutParams.MATCH_PARENT)
+        contextualContainerParams.apply {
+            marginStart = barAxisMarginStart
+            marginEnd = barAxisMarginEnd
+            topMargin = 0
+            bottomMargin = 0
+        }
+        contextualContainerParams.gravity = gravity or Gravity.CENTER_VERTICAL
+        contextualContainer.layoutParams = contextualContainerParams
     }
 }

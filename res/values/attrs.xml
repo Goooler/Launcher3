@@ -42,6 +42,7 @@
     <attr name="overviewScrimColor" format="color" />
     <attr name="popupNotificationDotColor" format="color" />
     <attr name="notificationDotColor" format="color" />
+    <attr name="focusOutlineColor" format="color" />
 
     <attr name="folderPaginationColor" format="color" />
     <attr name="folderPreviewColor" format="color" />
@@ -164,7 +165,19 @@
 
         <!-- numFolderRows & numFolderColumns defaults to numRows & numColumns, if not specified -->
         <attr name="numFolderRows" format="integer" />
+        <!-- defaults to numFolderRows, if not specified -->
+        <attr name="numFolderRowsLandscape" format="integer" />
+        <!-- defaults to numFolderRows, if not specified -->
+        <attr name="numFolderRowsTwoPanelLandscape" format="integer" />
+        <!-- defaults to numFolderRows, if not specified -->
+        <attr name="numFolderRowsTwoPanelPortrait" format="integer" />
         <attr name="numFolderColumns" format="integer" />
+        <!-- defaults to numFolderColumns, if not specified -->
+        <attr name="numFolderColumnsLandscape" format="integer" />
+        <!-- defaults to numFolderColumns, if not specified -->
+        <attr name="numFolderColumnsTwoPanelLandscape" format="integer" />
+        <!-- defaults to numFolderColumns, if not specified -->
+        <attr name="numFolderColumnsTwoPanelPortrait" format="integer" />
         <!-- Support attributes in FolderStyle -->
         <attr name="folderStyle" format="reference" />
 
@@ -176,6 +189,10 @@
         <!-- Number of columns to use when extending the all-apps size,
          defaults to 2 * numAllAppsColumns -->
         <attr name="numExtendedAllAppsColumns" format="integer" />
+
+        <!-- Number of rows to calculate the cell height for all apps when it's necessary.
+          Defaults to numRows. Requires FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE to be enabled. -->
+        <attr name="numAllAppsRowsForCellHeightCalculation" format="integer" />
 
         <!-- numHotseatIcons defaults to numColumns, if not specified -->
         <attr name="numHotseatIcons" format="integer" />
@@ -207,19 +224,33 @@
         <!-- File that contains the specs for the workspace.
         Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
         <attr name="workspaceSpecsId" format="reference" />
+        <!-- defaults to workspaceSpecsId, if not specified -->
         <attr name="workspaceSpecsTwoPanelId" format="reference" />
         <!-- File that contains the specs for all apps.
         Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
         <attr name="allAppsSpecsId" format="reference" />
+        <!-- defaults to allAppsSpecsId, if not specified -->
         <attr name="allAppsSpecsTwoPanelId" format="reference" />
         <!-- File that contains the specs for the workspace.
         Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
         <attr name="folderSpecsId" format="reference" />
+        <!-- defaults to folderSpecsId, if not specified -->
         <attr name="folderSpecsTwoPanelId" format="reference" />
         <!-- File that contains the specs for hotseat bar.
         Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
         <attr name="hotseatSpecsId" format="reference" />
+        <!-- defaults to hotseatSpecsId, if not specified -->
         <attr name="hotseatSpecsTwoPanelId" format="reference" />
+        <!-- File that contains the specs for workspace icon and text size.
+        Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
+        <attr name="workspaceCellSpecsId" format="reference" />
+        <!-- defaults to workspaceCellSpecsId, if not specified -->
+        <attr name="workspaceCellSpecsTwoPanelId" format="reference" />
+        <!-- File that contains the specs for all apps icon and text size.
+        Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
+        <attr name="allAppsCellSpecsId" format="reference" />
+        <!-- defaults to allAppsCellSpecsId, if not specified -->
+        <attr name="allAppsCellSpecsTwoPanelId" format="reference" />
 
         <!-- By default all categories are enabled -->
         <attr name="deviceCategory" format="integer">
@@ -261,30 +292,39 @@
 
     <!--  Responsive grids attributes  -->
     <declare-styleable name="ResponsiveSpec">
-        <attr name="specType" format="integer">
+        <attr name="dimensionType" format="integer">
             <enum name="height" value="0" />
             <enum name="width" value="1" />
         </attr>
         <attr name="maxAvailableSize" format="dimension" />
     </declare-styleable>
 
+    <declare-styleable name="ResponsiveSpecGroup">
+        <attr name="maxAspectRatio" format="float" />
+    </declare-styleable>
+
     <declare-styleable name="WorkspaceSpec">
-        <attr name="specType" />
+        <attr name="dimensionType" />
         <attr name="maxAvailableSize" />
     </declare-styleable>
 
     <declare-styleable name="FolderSpec">
-        <attr name="specType" />
+        <attr name="dimensionType" />
         <attr name="maxAvailableSize" />
     </declare-styleable>
 
     <declare-styleable name="AllAppsSpec">
-        <attr name="specType" />
+        <attr name="dimensionType" />
         <attr name="maxAvailableSize" />
     </declare-styleable>
 
     <declare-styleable name="HotseatSpec">
-        <attr name="specType" />
+        <attr name="dimensionType" />
+        <attr name="maxAvailableSize" />
+    </declare-styleable>
+
+    <declare-styleable name="CellSpec">
+        <attr name="dimensionType" />
         <attr name="maxAvailableSize" />
     </declare-styleable>
 
@@ -542,6 +582,7 @@
 
     <declare-styleable name="WidgetsListRowHeader">
         <attr name="appIconSize" format="dimension" />
+        <attr name="collapsable" format="boolean" />
     </declare-styleable>
 
     <attr name="materialColorOnSecondaryFixedVariant" format="color" />

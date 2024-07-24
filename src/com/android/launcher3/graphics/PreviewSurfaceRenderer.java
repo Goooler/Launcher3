@@ -49,7 +49,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.graphics.LauncherPreviewRenderer.PreviewContext;
 import com.android.launcher3.model.BgDataModel;
@@ -114,10 +113,15 @@ public class PreviewSurfaceRenderer {
         mDisplay = context.getSystemService(DisplayManager.class)
                 .getDisplay(bundle.getInt(KEY_DISPLAY_ID));
 
-        mSurfaceControlViewHost = MAIN_EXECUTOR.submit(() -> new SurfaceControlViewHost(mContext,
-                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY),
-                mHostToken)).get(5, TimeUnit.SECONDS);
+        mSurfaceControlViewHost = MAIN_EXECUTOR.submit(() ->
+                new SurfaceControlViewHost(mContext, context.getSystemService(DisplayManager.class)
+                        .getDisplay(DEFAULT_DISPLAY), mHostToken)
+        ).get(5, TimeUnit.SECONDS);
         mOnDestroyCallbacks.add(mSurfaceControlViewHost::release);
+    }
+
+    public int getDisplayId() {
+        return mDisplay.getDisplayId();
     }
 
     public IBinder getHostToken() {
@@ -206,10 +210,7 @@ public class PreviewSurfaceRenderer {
             return new ContextThemeWrapper(context,
                     Themes.getActivityThemeRes(context));
         }
-        if (Utilities.ATLEAST_R) {
-            context = context.createWindowContext(
-                    LayoutParams.TYPE_APPLICATION_OVERLAY, null);
-        }
+        context = context.createWindowContext(LayoutParams.TYPE_APPLICATION_OVERLAY, null);
         LocalColorExtractor.newInstance(context)
                 .applyColorsOverride(context, mWallpaperColors);
         return new ContextThemeWrapper(context,
@@ -225,7 +226,7 @@ public class PreviewSurfaceRenderer {
             PreviewContext previewContext = new PreviewContext(inflationContext, idp);
             // Copy existing data to preview DB
             LauncherDbUtils.copyTable(LauncherAppState.getInstance(mContext)
-                    .getModel().getModelDbController().getDb(),
+                            .getModel().getModelDbController().getDb(),
                     TABLE_NAME,
                     LauncherAppState.getInstance(previewContext)
                             .getModel().getModelDbController().getDb(),
@@ -254,7 +255,7 @@ public class PreviewSurfaceRenderer {
                         query += " or " + LauncherSettings.Favorites.SCREEN + " = "
                                 + Workspace.SECOND_SCREEN_ID;
                     }
-                    loadWorkspace(new ArrayList<>(), query, null);
+                    loadWorkspace(new ArrayList<>(), query, null, null);
 
                     final SparseArray<Size> spanInfo =
                             getLoadedLauncherWidgetInfo(previewContext.getBaseContext());

@@ -46,6 +46,8 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Path;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -66,8 +68,10 @@ import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.taskbar.TaskbarControllers;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.quickstep.SystemUiProxy;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.bubbles.IBubblesListener;
 import com.android.wm.shell.common.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.common.bubbles.BubbleInfo;
@@ -85,16 +89,32 @@ import java.util.concurrent.Executors;
  * information to render each of the bubbles & dispatches changes to
  * {@link BubbleBarViewController} which will then update {@link BubbleBarView} as needed.
  *
- * For details around the behavior of the bubble bar, see {@link BubbleBarView}.
+ * <p>For details around the behavior of the bubble bar, see {@link BubbleBarView}.
  */
 public class BubbleBarController extends IBubblesListener.Stub {
 
     private static final String TAG = BubbleBarController.class.getSimpleName();
     private static final boolean DEBUG = false;
 
-    // Whether bubbles are showing in the bubble bar from launcher
-    public static final boolean BUBBLE_BAR_ENABLED =
-            SystemProperties.getBoolean("persist.wm.debug.bubble_bar", false);
+    /**
+     * Determines whether bubbles can be shown in the bubble bar. This value updates when the
+     * taskbar is recreated.
+     *
+     * @see #onTaskbarRecreated()
+     */
+    private static boolean sBubbleBarEnabled = Flags.enableBubbleBar()
+            || SystemProperties.getBoolean("persist.wm.debug.bubble_bar", false);
+
+    /** Whether showing bubbles in the launcher bubble bar is enabled. */
+    public static boolean isBubbleBarEnabled() {
+        return sBubbleBarEnabled;
+    }
+
+    /** Re-reads the value of the flag from SystemProperties when taskbar is recreated. */
+    public static void onTaskbarRecreated() {
+        sBubbleBarEnabled = Flags.enableBubbleBar()
+                || SystemProperties.getBoolean("persist.wm.debug.bubble_bar", false);
+    }
 
     private static final int MASK_HIDE_BUBBLE_BAR = SYSUI_STATE_BOUNCER_SHOWING
             | SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
@@ -137,6 +157,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private static class BubbleBarViewUpdate {
         boolean expandedChanged;
         boolean expanded;
+        boolean shouldShowEducation;
         String selectedBubbleKey;
         String suppressedBubbleKey;
         String unsuppressedBubbleKey;
@@ -151,6 +172,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         BubbleBarViewUpdate(BubbleBarUpdate update) {
             expandedChanged = update.expandedChanged;
             expanded = update.expanded;
+            shouldShowEducation = update.shouldShowEducation;
             selectedBubbleKey = update.selectedBubbleKey;
             suppressedBubbleKey = update.suppressedBubbleKey;
             unsuppressedBubbleKey = update.unsupressedBubbleKey;
@@ -165,7 +187,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(context);
 
-        if (BUBBLE_BAR_ENABLED) {
+        if (sBubbleBarEnabled) {
             mSystemUiProxy.setBubblesListener(this);
         }
         mMainExecutor = MAIN_EXECUTOR;
@@ -188,8 +210,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
         mBubbleStashedHandleViewController = bubbleControllers.bubbleStashedHandleViewController;
 
         bubbleControllers.runAfterInit(() -> {
-            mBubbleBarViewController.setHiddenForBubbles(!BUBBLE_BAR_ENABLED);
-            mBubbleStashedHandleViewController.setHiddenForBubbles(!BUBBLE_BAR_ENABLED);
+            mBubbleBarViewController.setHiddenForBubbles(
+                    !sBubbleBarEnabled || mBubbles.isEmpty());
+            mBubbleStashedHandleViewController.setHiddenForBubbles(
+                    !sBubbleBarEnabled || mBubbles.isEmpty());
             mBubbleBarViewController.setUpdateSelectedBubbleAfterCollapse(
                     key -> setSelectedBubble(mBubbles.get(key)));
         });
@@ -366,7 +390,9 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 mBubbleStashController.animateToInitialState(update.expanded);
             }
         }
-
+        if (update.shouldShowEducation) {
+            mBubbleBarViewController.prepareToShowEducation();
+        }
         if (update.expandedChanged) {
             if (update.expanded != mBubbleBarViewController.isExpanded()) {
                 mBubbleBarViewController.setExpandedFromSysui(update.expanded);
@@ -388,8 +414,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
                         info.getFlags() | Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION);
                 mSelectedBubble.getView().updateDotVisibility(true /* animate */);
             }
-            mSystemUiProxy.showBubble(getSelectedBubbleKey(),
-                    getBubbleBarOffsetX(), getBubbleBarOffsetY());
+            mSystemUiProxy.showBubble(getSelectedBubbleKey(), getExpandedBubbleBarDisplayBounds());
         } else {
             Log.w(TAG, "Trying to show the selected bubble but it's null");
         }
@@ -557,12 +582,27 @@ public class BubbleBarController extends IBubblesListener.Stub {
         return mIconFactory.createBadgedIconBitmap(drawable).icon;
     }
 
-    private int getBubbleBarOffsetY() {
+    /**
+     * Get bounds of the bubble bar as if it would be expanded.
+     * Calculates the bounds instead of retrieving current view location as the view may be
+     * animating.
+     */
+    private Rect getExpandedBubbleBarDisplayBounds() {
+        Point displaySize = DisplayController.INSTANCE.get(mContext).getInfo().currentSize;
+        Rect currentBarBounds = mBarView.getBubbleBarBounds();
+        Rect location = new Rect();
+        // currentBarBounds is only useful for distance from left or right edge.
+        // It contains the current bounds, calculate the expanded bounds.
+        if (mBarView.isOnLeft()) {
+            location.left = currentBarBounds.left;
+            location.right = (int) (currentBarBounds.left + mBarView.expandedWidth());
+        } else {
+            location.left = (int) (currentBarBounds.right - mBarView.expandedWidth());
+            location.right = currentBarBounds.right;
+        }
         final int translation = (int) abs(mBubbleStashController.getBubbleBarTranslationY());
-        return translation + mBarView.getHeight();
-    }
-
-    private int getBubbleBarOffsetX() {
-        return mBarView.getWidth() + mBarView.getHorizontalMargin();
+        location.top = displaySize.y - mBarView.getHeight() - translation;
+        location.bottom = displaySize.y - translation;
+        return location;
     }
 }

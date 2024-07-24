@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.tapl;
 
+import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
+
 import android.widget.TextView;
 
 import androidx.test.uiautomator.By;
@@ -25,9 +27,7 @@ import java.util.ArrayList;
 /**
  * Operations on search result page opened from qsb.
  */
-public class SearchResultFromQsb {
-    // The input resource id in the search box.
-    private static final String INPUT_RES = "input";
+public class SearchResultFromQsb implements SearchInputSource {
     private static final String BOTTOM_SHEET_RES_ID = "bottom_sheet_background";
 
     // This particular ID change should happen with caution
@@ -39,18 +39,9 @@ public class SearchResultFromQsb {
         mLauncher.waitForLauncherObject("search_container_all_apps");
     }
 
-    /** Set the input to the search input edit text and update search results. */
-    public void searchForInput(String input) {
-        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
-                "want to search for result with an input");
-             LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
-            mLauncher.waitForLauncherObject(INPUT_RES).setText(input);
-        }
-    }
-
     /** Find the app from search results with app name. */
     public AppIcon findAppIcon(String appName) {
-        UiObject2 icon = mLauncher.waitForLauncherObject(By.clazz(TextView.class).text(appName));
+        UiObject2 icon = mLauncher.waitForLauncherObject(AppIcon.getAppIconSelector(appName));
         return createAppIcon(icon);
     }
 
@@ -91,18 +82,39 @@ public class SearchResultFromQsb {
      * Taps outside bottom sheet to dismiss and return to workspace. Available on tablets only.
      * @param tapRight Tap on the right of bottom sheet if true, or left otherwise.
      */
-    public Workspace dismissByTappingOutsideForTablet(boolean tapRight) {
+    public void dismissByTappingOutsideForTablet(boolean tapRight) {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "want to tap outside AllApps bottom sheet on the "
                              + (tapRight ? "right" : "left"))) {
             final UiObject2 allAppsBottomSheet =
                     mLauncher.waitForLauncherObject(BOTTOM_SHEET_RES_ID);
-            mLauncher.touchOutsideContainer(allAppsBottomSheet, tapRight);
+            tapOutside(tapRight, allAppsBottomSheet);
             try (LauncherInstrumentation.Closable tapped = mLauncher.addContextLayer(
                     "tapped outside AllApps bottom sheet")) {
-                return mLauncher.getWorkspace();
+                verifyVisibleContainerOnDismiss();
             }
         }
+    }
+
+    protected void tapOutside(boolean tapRight, UiObject2 allAppsBottomSheet) {
+        mLauncher.runToState(
+                () -> mLauncher.touchOutsideContainer(allAppsBottomSheet, tapRight),
+                NORMAL_STATE_ORDINAL,
+                "tappig outside");
+    }
+
+    protected void verifyVisibleContainerOnDismiss() {
+        mLauncher.getWorkspace();
+    }
+
+    @Override
+    public LauncherInstrumentation getLauncher() {
+        return mLauncher;
+    }
+
+    @Override
+    public SearchResultFromQsb getSearchResultForInput() {
+        return this;
     }
 }

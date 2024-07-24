@@ -32,6 +32,7 @@
     <item type="id" name="ime_switcher" />
     <item type="id" name="accessibility_button" />
     <item type="id" name="rotate_suggestion" />
+    <item type="id" name="space" />
     <!--  /Do not change, must be kept in sync with sysui navbar button IDs for tests!  -->
 
     <item type="id" name="quick_settings_button" />
@@ -42,5 +43,13 @@
 
     <item type="id" name="saved_floating_widget_foreground" />
     <item type="id" name="saved_floating_widget_background" />
+
+    <item type="id" name="dismiss_view" />
+
+    <!-- Private Space parameters -->
+    <item type="id" name="ps_container_header" />
+    <item type="id" name="ps_lock_unlock_button" />
+    <item type="id" name="ps_settings_button" />
+    <item type="id" name="ps_transition_image" />
 
 </resources>

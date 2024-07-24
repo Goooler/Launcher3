@@ -22,6 +22,7 @@ import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.ResourceBasedOverride;
 
 import java.io.PrintWriter;
+import java.util.Optional;
 
 /** Class to manage Assistant states. */
 public class AssistStateManager implements ResourceBasedOverride {
@@ -31,9 +32,24 @@ public class AssistStateManager implements ResourceBasedOverride {
 
     public AssistStateManager() {}
 
+    /** Whether search supports haptic on invocation. */
+    public boolean supportsCommitHaptic() {
+        return false;
+    }
+
     /** Whether search is available. */
     public boolean isSearchAvailable() {
         return false;
+    }
+
+    /** Whether CsHelper CtS invocation path is available. */
+    public Optional<Boolean> isCsHelperAvailable() {
+        return Optional.empty();
+    }
+
+    /** Whether VIS CtS invocation path is available. */
+    public Optional<Boolean> isVisAvailable() {
+        return Optional.empty();
     }
 
     /** Return {@code true} if the Settings toggle is enabled. */

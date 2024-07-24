@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.stream.IntStream;
 
-
 /**
  * Represents a folder containing shortcuts or apps.
  */
@@ -371,5 +370,14 @@ public class FolderInfo extends ItemInfo {
                 // fall through
         }
         return LauncherAtom.ToState.TO_STATE_UNSPECIFIED;
+    }
+
+    @Override
+    public boolean isDisabled() {
+        if (itemType == LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR) {
+            return contents.stream().anyMatch((WorkspaceItemInfo::isDisabled));
+        }
+
+        return super.isDisabled();
     }
 }

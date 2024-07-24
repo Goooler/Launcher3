@@ -23,6 +23,8 @@ import static com.android.launcher3.config.FeatureFlags.FlagState.DISABLED;
 import static com.android.launcher3.config.FeatureFlags.FlagState.ENABLED;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
+import static java.util.Collections.unmodifiableList;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.provider.DeviceConfig;
@@ -30,7 +32,10 @@ import android.provider.DeviceConfig.Properties;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import com.android.launcher3.ConstantItem;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.config.FeatureFlags.BooleanFlag;
 import com.android.launcher3.config.FeatureFlags.FlagState;
 import com.android.launcher3.config.FeatureFlags.IntFlag;
@@ -57,6 +62,7 @@ public class FlagsFactory {
     public static final String NAMESPACE_LAUNCHER = "launcher";
 
     private static final List<DebugFlag> sDebugFlags = new ArrayList<>();
+    private static final List<IntDebugFlag> sIntDebugFlags = new ArrayList<>();
     private static SharedPreferences sSharedPreferences;
 
     static final BooleanFlag TEAMFOOD_FLAG = getReleaseFlag(
@@ -131,8 +137,36 @@ public class FlagsFactory {
      */
     public static IntFlag getIntFlag(
             int bugId, String key, int defaultValueInCode, String description) {
+        return getIntFlag(bugId, key, defaultValueInCode, description, null);
+    }
+
+    /**
+     * Creates a new integer flag.
+     *
+     * @param launcherPrefFlag Set launcherPrefFlag to non-null if you want
+     * to modify the int flag in Launcher Developer Options and IntDebugFlag
+     * will be backed up by LauncherPrefs. Modified int value will be saved
+     * in LauncherPrefs.
+     */
+    public static IntFlag getIntFlag(
+            int bugId, String key, int defaultValueInCode, String description,
+            @Nullable ConstantItem<Integer> launcherPrefFlag) {
         INSTANCE.mKeySet.add(key);
-        return new IntFlag(DeviceConfig.getInt(NAMESPACE_LAUNCHER, key, defaultValueInCode));
+        int defaultValue = DeviceConfig.getInt(NAMESPACE_LAUNCHER, key, defaultValueInCode);
+        if (IS_DEBUG_DEVICE) {
+            int currentValue;
+            if (launcherPrefFlag == null) {
+                currentValue = defaultValue;
+            } else {
+                currentValue = LauncherPrefs.get(currentApplication()).get(launcherPrefFlag);
+            }
+            IntDebugFlag flag = new IntDebugFlag(key, currentValue, defaultValueInCode,
+                    launcherPrefFlag);
+            sIntDebugFlags.add(flag);
+            return flag;
+        } else {
+            return new IntFlag(defaultValue);
+        }
     }
 
     static List<DebugFlag> getDebugFlags() {
@@ -141,6 +175,15 @@ public class FlagsFactory {
         }
         synchronized (sDebugFlags) {
             return new ArrayList<>(sDebugFlags);
+        }
+    }
+
+    static List<IntDebugFlag> getIntDebugFlags() {
+        if (!IS_DEBUG_DEVICE) {
+            return unmodifiableList(Collections.emptyList());
+        }
+        synchronized (sIntDebugFlags) {
+            return unmodifiableList(sIntDebugFlags);
         }
     }
 
@@ -163,18 +206,25 @@ public class FlagsFactory {
             return;
         }
         pw.println("DeviceFlags:");
+        pw.println("  BooleanFlags:");
         synchronized (sDebugFlags) {
             for (DebugFlag flag : sDebugFlags) {
                 if (flag instanceof DeviceFlag) {
-                    pw.println("  " + flag);
+                    pw.println((flag.currentValueModified() ? "  ->" : "    ") + flag);
                 }
             }
         }
-        pw.println("DebugFlags:");
+        pw.println("  IntFlags:");
+        synchronized (sIntDebugFlags) {
+            for (IntFlag flag : sIntDebugFlags) {
+                pw.println("    " + flag);
+            }
+        }
+        pw.println("  DebugFlags:");
         synchronized (sDebugFlags) {
             for (DebugFlag flag : sDebugFlags) {
                 if (!(flag instanceof DeviceFlag)) {
-                    pw.println("  " + flag);
+                    pw.println((flag.currentValueModified() ? "  ->" : "    ") + flag);
                 }
             }
         }
