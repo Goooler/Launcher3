@@ -272,6 +272,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * app launch animation.
      */
     public void setIgnoreInAppFlagForSync(boolean enabled) {
+        if (mControllers == null) {
+            // This method can be called before init() is called.
+            return;
+        }
         mControllers.taskbarStashController.updateStateForFlag(FLAG_IGNORE_IN_APP, enabled);
     }
 

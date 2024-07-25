@@ -5,6 +5,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_DONT_SUGGEST_APP_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_WIDGETS_TAP;
+import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findAllWidgetsForPackageUser;
 
 import android.app.ActivityOptions;
 import android.content.ComponentName;
@@ -28,7 +29,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.SecondaryDropTarget;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.PrivateProfileManager;
-import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
@@ -39,9 +39,9 @@ import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.WidgetsBottomSheet;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Represents a system shortcut for a given app. The shortcut should have a label and icon, and an
@@ -107,11 +107,12 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
     }
 
     public static final Factory<ActivityContext> WIDGETS = (context, itemInfo, originalView) -> {
-        if (itemInfo.getTargetComponent() == null) return null;
-        final List<WidgetItem> widgets =
-                context.getPopupDataProvider().getWidgetsForPackageUser(new PackageUserKey(
-                        itemInfo.getTargetComponent().getPackageName(), itemInfo.user));
-        if (widgets.isEmpty()) {
+        final PackageUserKey packageUserKey = PackageUserKey.fromItemInfo(itemInfo);
+        if (packageUserKey == null) return null;
+
+        final WidgetPickerData data = context.getWidgetPickerDataProvider().get();
+        if (findAllWidgetsForPackageUser(data, packageUserKey).isEmpty()) {
+            // hides widget picker shortcut if there are no widgets for the package.
             return null;
         }
         return new Widgets(context, itemInfo, originalView);

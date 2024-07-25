@@ -266,6 +266,7 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
 import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.LauncherOverlayPlugin;
 import com.android.systemui.plugins.PluginListener;
@@ -371,6 +372,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private LauncherAccessibilityDelegate mAccessibilityDelegate;
 
     private PopupDataProvider mPopupDataProvider;
+    private WidgetPickerDataProvider mWidgetPickerDataProvider;
 
     // We only want to get the SharedPreferences once since it does an FS stat each time we get
     // it from the context.
@@ -532,6 +534,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 mFocusHandler, new CellLayout(mWorkspace.getContext(), mWorkspace));
 
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
+        mWidgetPickerDataProvider = new WidgetPickerDataProvider();
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
         if (internalStateHandled) {
@@ -2702,6 +2705,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
+        mWidgetPickerDataProvider.dump(prefix, writer);
         mDeviceProfile.dump(this, prefix, writer);
         mAppsView.getAppsStore().dump(prefix, writer);
 
@@ -3009,6 +3013,12 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public PopupDataProvider getPopupDataProvider() {
         return mPopupDataProvider;
+    }
+
+    @NonNull
+    @Override
+    public WidgetPickerDataProvider getWidgetPickerDataProvider() {
+        return mWidgetPickerDataProvider;
     }
 
     @Override

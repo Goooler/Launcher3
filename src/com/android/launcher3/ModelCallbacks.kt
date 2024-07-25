@@ -254,8 +254,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         PopupContainerWithArrow.dismissInvalidPopup(launcher)
     }
 
-    override fun bindAllWidgets(allWidgets: List<WidgetsListBaseEntry?>?) {
-        launcher.popupDataProvider.allWidgets = allWidgets
+    override fun bindAllWidgets(allWidgets: List<WidgetsListBaseEntry>) {
+        launcher.widgetPickerDataProvider.setWidgets(allWidgets, /* defaultWidgets= */ listOf())
     }
 
     /** Returns the ids of the workspaces to bind. */
@@ -304,7 +304,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         }
 
         val widgetsListBaseEntry: WidgetsListBaseEntry =
-            launcher.popupDataProvider.allWidgets.firstOrNull { item: WidgetsListBaseEntry ->
+            launcher.widgetPickerDataProvider.get().allWidgets.firstOrNull {
+                item: WidgetsListBaseEntry ->
                 item.mPkgItem.packageName == BuildConfig.APPLICATION_ID
             } ?: return
 

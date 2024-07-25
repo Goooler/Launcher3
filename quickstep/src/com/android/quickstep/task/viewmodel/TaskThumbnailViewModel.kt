@@ -30,6 +30,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.systemui.shared.recents.model.Task
+import kotlin.math.max
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +64,12 @@ class TaskThumbnailViewModel(
         combine(recentsViewData.scale, taskViewData.scale) { recentsScale, taskScale ->
             recentsScale * taskScale
         }
-    val dimProgress: Flow<Float> = taskContainerData.taskMenuOpenProgress
+    val dimProgress: Flow<Float> =
+        combine(taskContainerData.taskMenuOpenProgress, recentsViewData.tintAmount) {
+            taskMenuOpenProgress,
+            tintAmount ->
+            max(taskMenuOpenProgress * MAX_SCRIM_ALPHA, tintAmount)
+        }
     val uiState: Flow<TaskThumbnailUiState> =
         task
             .flatMapLatest { taskFlow ->
@@ -110,4 +116,8 @@ class TaskThumbnailViewModel(
     }
 
     @ColorInt private fun Int.removeAlpha(): Int = ColorUtils.setAlphaComponent(this, 0xff)
+
+    private companion object {
+        const val MAX_SCRIM_ALPHA = 0.4f
+    }
 }

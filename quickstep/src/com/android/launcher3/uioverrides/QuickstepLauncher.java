@@ -515,7 +515,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION) {
             mHotseatPredictionController.setPredictedItems(item);
         } else if (item.containerId == Favorites.CONTAINER_WIDGETS_PREDICTION) {
-            getPopupDataProvider().setRecommendedWidgets(item.items);
+            getWidgetPickerDataProvider().setWidgetRecommendations(item.items);
         }
     }
 

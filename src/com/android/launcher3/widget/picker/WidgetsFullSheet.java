@@ -74,6 +74,7 @@ import com.android.launcher3.workprofile.PersonalWorkPagedView;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePageChangedListener;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -471,7 +472,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
      * Returns all displayable widgets.
      */
     protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
-        return mActivityContext.getPopupDataProvider().getAllWidgets();
+        return mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
     }
 
     @Override
@@ -572,12 +573,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         if (mIsInSearchMode) {
             return;
         }
-
         if (enableCategorizedWidgetSuggestions()) {
             // We avoid applying new recommendations when some are already displayed.
             if (mRecommendedWidgetsMap.isEmpty()) {
                 mRecommendedWidgetsMap =
-                        mActivityContext.getPopupDataProvider().getCategorizedRecommendedWidgets();
+                        mActivityContext.getWidgetPickerDataProvider().get().getRecommendations();
             }
             mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
                     mRecommendedWidgetsMap,
@@ -589,17 +589,20 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             );
         } else {
             if (mRecommendedWidgets.isEmpty()) {
-                mRecommendedWidgets =
-                        mActivityContext.getPopupDataProvider().getRecommendedWidgets();
+                mRecommendedWidgets = mActivityContext.getWidgetPickerDataProvider().get()
+                        .getRecommendations()
+                        .values().stream()
+                        .flatMap(Collection::stream).toList();
+                mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
+                        mRecommendedWidgets,
+                        mDeviceProfile,
+                        /* availableHeight= */ getMaxAvailableHeightForRecommendations(),
+                        /* availableWidth= */ mMaxSpanPerRow,
+                        /* cellPadding= */ mWidgetCellHorizontalPadding
+                );
             }
-            mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
-                    mRecommendedWidgets,
-                    mDeviceProfile,
-                    /* availableHeight= */ getMaxAvailableHeightForRecommendations(),
-                    /* availableWidth= */ mMaxSpanPerRow,
-                    /* cellPadding= */ mWidgetCellHorizontalPadding
-            );
         }
+
         mWidgetRecommendationsContainer.setVisibility(
                 mRecommendedWidgetsCount > 0 ? VISIBLE : GONE);
     }

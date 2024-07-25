@@ -212,6 +212,27 @@ class TaskThumbnailViewModelTest {
             .isEqualTo(MATRIX)
     }
 
+    @Test
+    fun getForegroundScrimDimProgress_returnsForegroundMaxScrim() = runTest {
+        recentsViewData.tintAmount.value = 0.32f
+        taskContainerData.taskMenuOpenProgress.value = 0f
+        assertThat(systemUnderTest.dimProgress.first()).isEqualTo(0.32f)
+    }
+
+    @Test
+    fun getTaskMenuScrimDimProgress_returnsTaskMenuScrim() = runTest {
+        recentsViewData.tintAmount.value = 0f
+        taskContainerData.taskMenuOpenProgress.value = 1f
+        assertThat(systemUnderTest.dimProgress.first()).isEqualTo(0.4f)
+    }
+
+    @Test
+    fun getForegroundScrimDimProgress_returnsNoScrim() = runTest {
+        recentsViewData.tintAmount.value = 0f
+        taskContainerData.taskMenuOpenProgress.value = 0f
+        assertThat(systemUnderTest.dimProgress.first()).isEqualTo(0f)
+    }
+
     private fun createTaskWithId(taskId: Int) =
         Task(Task.TaskKey(taskId, 0, Intent(), ComponentName("", ""), 0, 2000)).apply {
             colorBackground = Color.argb(taskId, taskId, taskId, taskId)

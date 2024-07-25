@@ -22,6 +22,7 @@ import static com.android.launcher3.UtilitiesKt.CLIP_TO_PADDING_FALSE_MODIFIER;
 import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
 import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
 import static com.android.launcher3.widget.picker.WidgetsListItemAnimator.WIDGET_LIST_ITEM_APPEARANCE_DELAY;
+import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findContentEntryForPackageUser;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -287,9 +288,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     @Override
     protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
         List<WidgetsListBaseEntry> allWidgets =
-                mActivityContext.getPopupDataProvider().getAllWidgets();
+                mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
         List<WidgetsListBaseEntry> defaultWidgets =
-                mActivityContext.getPopupDataProvider().getDefaultWidgets();
+                mActivityContext.getWidgetPickerDataProvider().get().getDefaultWidgets();
 
         if (allWidgets.isEmpty() || defaultWidgets.isEmpty()) {
             // no menu if there are no default widgets to show
@@ -359,7 +360,7 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         WidgetsListHeaderEntry widgetsListHeaderEntry = WidgetsListHeaderEntry.create(
                         packageItemInfo,
                         /*titleSectionName=*/ suggestionsHeaderTitle,
-                        /*items=*/ mActivityContext.getPopupDataProvider().getRecommendedWidgets(),
+                        /*items=*/ List.of(), // not necessary
                         /*visibleWidgetsCount=*/ 0)
                 .withWidgetListShown();
 
@@ -509,11 +510,11 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 final boolean isUserClick = mSelectedHeader != null
                         && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
-                WidgetsListContentEntry contentEntry =
-                        mActivityContext.getPopupDataProvider().getSelectedAppWidgets(
-                                selectedHeader, /*useDefault=*/
-                                (mWidgetOptionsMenuState != null
-                                        && !mWidgetOptionsMenuState.showAllWidgets));
+                final boolean showDefaultWidgets = mWidgetOptionsMenuState != null
+                        && !mWidgetOptionsMenuState.showAllWidgets;
+                WidgetsListContentEntry contentEntry = findContentEntryForPackageUser(
+                        mActivityContext.getWidgetPickerDataProvider().get(),
+                        selectedHeader, showDefaultWidgets);
 
                 if (contentEntry == null || mRightPane == null) {
                     return;

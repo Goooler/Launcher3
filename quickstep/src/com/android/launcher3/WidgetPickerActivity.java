@@ -28,7 +28,6 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ClipData;
 import android.content.ClipDescription;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -48,11 +47,11 @@ import com.android.launcher3.model.WidgetPredictionsRequester;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.PackageItemInfo;
-import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntriesBuilder;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -110,8 +109,8 @@ public class WidgetPickerActivity extends BaseActivity {
     private WidgetsModel mModel;
     private LauncherAppState mApp;
     private WidgetPredictionsRequester mWidgetPredictionsRequester;
-    private final PopupDataProvider mPopupDataProvider = new PopupDataProvider(i -> {
-    });
+    private final WidgetPickerDataProvider mWidgetPickerDataProvider =
+            new WidgetPickerDataProvider();
 
     private int mDesiredWidgetWidth;
     private int mDesiredWidgetHeight;
@@ -215,8 +214,8 @@ public class WidgetPickerActivity extends BaseActivity {
 
     @NonNull
     @Override
-    public PopupDataProvider getPopupDataProvider() {
-        return mPopupDataProvider;
+    public WidgetPickerDataProvider getWidgetPickerDataProvider() {
+        return mWidgetPickerDataProvider;
     }
 
     @Override
@@ -293,8 +292,6 @@ public class WidgetPickerActivity extends BaseActivity {
     private void refreshAndBindWidgets() {
         MODEL_EXECUTOR.execute(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
-            Context context = app.getContext();
-
             mModel.update(app, null);
             bindWidgets(mModel.getWidgetsByPackageItem());
             // Open sheet once widgets are available, so that it doesn't interrupt the open
@@ -317,7 +314,8 @@ public class WidgetPickerActivity extends BaseActivity {
                 shouldShowDefaultWidgets() ? builder.build(widgets,
                         mDefaultWidgetsFilter) : List.of();
 
-        MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(allWidgets, defaultWidgets));
+        MAIN_EXECUTOR.execute(
+                () -> mWidgetPickerDataProvider.setWidgets(allWidgets, defaultWidgets));
     }
 
     private void openWidgetsSheet() {
@@ -332,7 +330,7 @@ public class WidgetPickerActivity extends BaseActivity {
     private void bindRecommendedWidgets(List<ItemInfo> recommendedWidgets) {
         // Bind recommendations once picker has finished open animation.
         MAIN_EXECUTOR.getHandler().postDelayed(
-                () -> mPopupDataProvider.setRecommendedWidgets(recommendedWidgets),
+                () -> mWidgetPickerDataProvider.setWidgetRecommendations(recommendedWidgets),
                 mDeviceProfile.bottomSheetOpenDuration);
     }
 

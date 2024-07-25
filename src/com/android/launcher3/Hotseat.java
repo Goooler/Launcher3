@@ -162,14 +162,14 @@ public class Hotseat extends CellLayout implements Insettable {
                 animatorSet.play(ObjectAnimator.ofFloat(child, VIEW_TRANSLATE_X, tx));
             }
         }
-        if (mQsb instanceof HorizontalInsettableView) {
-            HorizontalInsettableView horizontalInsettableQsb = (HorizontalInsettableView) mQsb;
-            ValueAnimator qsbAnimator = ValueAnimator.ofFloat(0f, 1f);
+        if (mQsb instanceof HorizontalInsettableView horizontalInsettableQsb) {
+            final float currentInsetFraction = horizontalInsettableQsb.getHorizontalInsets();
+            final float targetInsetFraction =
+                    isBubbleBarVisible ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
+            ValueAnimator qsbAnimator =
+                    ValueAnimator.ofFloat(currentInsetFraction, targetInsetFraction);
             qsbAnimator.addUpdateListener(animation -> {
-                float fraction = qsbAnimator.getAnimatedFraction();
-                float insetFraction = isBubbleBarVisible
-                        ? (float) dp.iconSizePx * fraction / dp.hotseatQsbWidth
-                        : (float) dp.iconSizePx * (1 - fraction) / dp.hotseatQsbWidth;
+                float insetFraction = (float) animation.getAnimatedValue();
                 horizontalInsettableQsb.setHorizontalInsets(insetFraction);
             });
             animatorSet.play(qsbAnimator);

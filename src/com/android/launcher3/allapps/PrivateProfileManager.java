@@ -403,6 +403,7 @@ public class PrivateProfileManager extends UserProfileManager {
                     mLockText.setHorizontallyScrolling(false);
                     mPrivateSpaceSettingsButton.setVisibility(
                             isPrivateSpaceSettingsAvailable() ? VISIBLE : GONE);
+                    mPrivateSpaceSettingsButton.setClickable(isPrivateSpaceSettingsAvailable());
                 }
                 lockPill.setVisibility(VISIBLE);
                 lockPill.setOnClickListener(view -> lockingAction(/* lock */ true));
@@ -425,6 +426,7 @@ public class PrivateProfileManager extends UserProfileManager {
                 lockPill.setContentDescription(mLockedStateContentDesc);
 
                 mPrivateSpaceSettingsButton.setVisibility(GONE);
+                mPrivateSpaceSettingsButton.setClickable(false);
                 transitionView.setVisibility(GONE);
             }
             case STATE_TRANSITION -> {
@@ -660,10 +662,7 @@ public class PrivateProfileManager extends UserProfileManager {
             return;
         }
         attachFloatingMaskView(expand);
-        PropertySetter headerSetter = new AnimatedPropertySetter();
-        headerSetter.add(updateSettingsGearAlpha(expand));
-        headerSetter.add(updateLockTextAlpha(expand));
-        AnimatorSet animatorSet = headerSetter.buildAnim();
+        AnimatorSet animatorSet = new AnimatedPropertySetter().buildAnim();
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
@@ -708,12 +707,16 @@ public class PrivateProfileManager extends UserProfileManager {
             }
         }));
         if (expand) {
-            animatorSet.playTogether(animateAlphaOfIcons(true),
+            animatorSet.playTogether(updateSettingsGearAlpha(true),
+                    updateLockTextAlpha(true),
+                    animateAlphaOfIcons(true),
                     animatePillTransition(true),
                     translateFloatingMaskView(false));
         } else {
             AnimatorSet parallelSet = new AnimatorSet();
-            parallelSet.playTogether(animateAlphaOfIcons(false),
+            parallelSet.playTogether(updateSettingsGearAlpha(false),
+                    updateLockTextAlpha(false),
+                    animateAlphaOfIcons(false),
                     animatePillTransition(false));
             if (isPrivateSpaceHidden()) {
                 animatorSet.playSequentially(parallelSet,
@@ -794,6 +797,14 @@ public class PrivateProfileManager extends UserProfileManager {
             @Override
             public void onAnimationStart(Animator animator) {
                 mPrivateSpaceSettingsButton.setVisibility(VISIBLE);
+                mPrivateSpaceSettingsButton.setClickable(false);
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animator) {
+                if (expand) {
+                    mPrivateSpaceSettingsButton.setClickable(true);
+                }
             }
         });
         return settingsAlphaAnim;

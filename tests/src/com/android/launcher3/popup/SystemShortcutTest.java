@@ -63,6 +63,8 @@ import com.android.launcher3.util.LauncherMultivalentJUnit;
 import com.android.launcher3.util.TestSandboxModelContextWrapper;
 import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -72,8 +74,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.util.ArrayList;
 
 @SmallTest
 @RunWith(LauncherMultivalentJUnit.class)
@@ -86,7 +86,7 @@ public class SystemShortcutTest {
     private TestSandboxModelContextWrapper mTestContext;
     private final SandboxModelContext mSandboxContext = new SandboxModelContext();
     private PrivateProfileManager mPrivateProfileManager;
-    private PopupDataProvider mPopupDataProvider;
+    private WidgetPickerDataProvider mWidgetPickerDataProvider;
     private AppInfo mAppInfo;
     @Mock UserCache mUserCache;
     @Mock ApiWrapper mApiWrapper;
@@ -119,8 +119,8 @@ public class SystemShortcutTest {
         spyOn(mPrivateProfileManager);
         when(mPrivateProfileManager.getProfileUser()).thenReturn(PRIVATE_HANDLE);
 
-        mPopupDataProvider = mTestContext.getPopupDataProvider();
-        spyOn(mPopupDataProvider);
+        mWidgetPickerDataProvider = mTestContext.getWidgetPickerDataProvider();
+        spyOn(mWidgetPickerDataProvider);
     }
 
     @After
@@ -141,7 +141,7 @@ public class SystemShortcutTest {
         mAppInfo = new AppInfo();
         mAppInfo.componentName = new ComponentName(mTestContext, getClass());
         assertNotNull(mAppInfo.getTargetComponent());
-        doReturn(new ArrayList<>()).when(mPopupDataProvider).getWidgetsForPackageUser(any());
+        doReturn(new WidgetPickerData()).when(mWidgetPickerDataProvider).get();
         spyOn(mAppInfo);
         SystemShortcut systemShortcut = SystemShortcut.WIDGETS
                 .getShortcut(mTestContext, mAppInfo, mView);

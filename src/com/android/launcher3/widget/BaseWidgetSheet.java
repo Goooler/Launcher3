@@ -45,13 +45,13 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.model.WidgetItem;
-import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.AbstractSlideInView;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider.WidgetPickerDataChangeListener;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
         implements OnClickListener, OnLongClickListener,
-        PopupDataProvider.PopupDataChangeListener, Insettable, OnDeviceProfileChangeListener {
+        WidgetPickerDataChangeListener, Insettable, OnDeviceProfileChangeListener {
     /** The default number of cells that can fit horizontally in a widget sheet. */
     public static final int DEFAULT_MAX_HORIZONTAL_SPANS = 4;
 
@@ -106,14 +106,14 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
         WindowInsets windowInsets = WindowManagerProxy.INSTANCE.get(getContext())
                 .normalizeWindowInsets(getContext(), getRootWindowInsets(), new Rect());
         mNavBarScrimHeight = getNavBarScrimHeight(windowInsets);
-        mActivityContext.getPopupDataProvider().setChangeListener(this);
+        mActivityContext.getWidgetPickerDataProvider().setChangeListener(this);
         mActivityContext.addOnDeviceProfileChangeListener(this);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mActivityContext.getPopupDataProvider().setChangeListener(null);
+        mActivityContext.getWidgetPickerDataProvider().setChangeListener(null);
         mActivityContext.removeOnDeviceProfileChangeListener(this);
     }
 

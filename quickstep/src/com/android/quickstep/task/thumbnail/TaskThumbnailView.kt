@@ -98,10 +98,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             }
             .launchIn(viewAttachedScope)
         viewModel.dimProgress
-            .onEach { dimProgress ->
-                // TODO(b/348195366) Add fade in/out for scrim
-                scrimView.alpha = dimProgress * MAX_SCRIM_ALPHA
-            }
+            .onEach { dimProgress -> scrimView.alpha = dimProgress }
             .launchIn(viewAttachedScope)
         viewModel.cornerRadiusProgress.onEach { invalidateOutline() }.launchIn(viewAttachedScope)
         viewModel.inheritedScale
@@ -176,8 +173,4 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             overviewCornerRadius,
             fullscreenCornerRadius
         ) / inheritedScale
-
-    private companion object {
-        const val MAX_SCRIM_ALPHA = 0.4f
-    }
 }
