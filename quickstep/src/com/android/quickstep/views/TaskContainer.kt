@@ -34,7 +34,6 @@ import com.android.quickstep.recents.di.get
 import com.android.quickstep.recents.di.getScope
 import com.android.quickstep.recents.di.inject
 import com.android.quickstep.recents.viewmodel.TaskContainerViewModel
-import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
@@ -164,9 +163,7 @@ class TaskContainer(
     }
 
     fun bindThumbnailView() {
-        // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
-        //  this should be decided inside TaskThumbnailViewModel.
-        taskThumbnailViewModel.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
+        taskThumbnailViewModel.bind(task.key.id)
     }
 
     fun setOverlayEnabled(enabled: Boolean) {

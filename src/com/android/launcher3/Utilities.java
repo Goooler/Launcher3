@@ -178,6 +178,11 @@ public final class Utilities {
         sIsRunningInTestHarness = true;
     }
 
+    /** Disables running test in test harness mode */
+    public static void disableRunningInTestHarnessForTests() {
+        sIsRunningInTestHarness = false;
+    }
+
     public static boolean isPropertyEnabled(String propertyName) {
         return Log.isLoggable(propertyName, Log.VERBOSE);
     }

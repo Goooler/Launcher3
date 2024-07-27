@@ -123,6 +123,10 @@ constructor(
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
 
+    val taskIdSet: Set<Int>
+        /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
+        get() = taskContainers.map { it.task.key.id }.toSet()
+
     val snapshotViews: Array<View>
         get() = taskContainers.map { it.snapshotView }.toTypedArray()
 
@@ -569,9 +573,7 @@ constructor(
         resetPersistentViewTransforms()
         // Clear any references to the thumbnail (it will be re-read either from the cache or the
         // system on next bind)
-        if (enableRefactorTaskThumbnail()) {
-            notifyIsRunningTaskUpdated()
-        } else {
+        if (!enableRefactorTaskThumbnail()) {
             taskContainers.forEach { it.thumbnailViewDeprecated.setThumbnail(it.task, null) }
         }
         setOverlayEnabled(false)
@@ -921,9 +923,8 @@ constructor(
         iconView.setText(text)
     }
 
-    open fun refreshThumbnails(thumbnailDatas: HashMap<Int, ThumbnailData?>?) {
+    open fun refreshThumbnails(thumbnailDatas: Map<Int, ThumbnailData?>?) {
         if (enableRefactorTaskThumbnail()) {
-            // TODO(b/342560598) add thumbnail logic
             return
         }
 
@@ -1488,11 +1489,6 @@ constructor(
             it.iconView.setModalAlpha(1 - modalness)
             it.digitalWellBeingToast?.updateBannerOffset(modalness)
         }
-    }
-
-    /** Updates [TaskThumbnailView] to reflect the latest [Task] state (i.e., task isRunning). */
-    fun notifyIsRunningTaskUpdated() {
-        taskContainers.forEach { it.bindThumbnailView() }
     }
 
     fun resetPersistentViewTransforms() {

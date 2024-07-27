@@ -26,6 +26,7 @@ import com.android.launcher3.appprediction.PredictionRowView
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.notification.NotificationKeyData
+import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayController
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
@@ -56,13 +57,13 @@ class TaskbarAllAppsControllerTest {
 
     @Test
     fun testToggle_once_showsAllApps() {
-        getInstrumentation().runOnMainSync { allAppsController.toggle() }
+        runOnMainSync { allAppsController.toggle() }
         assertThat(allAppsController.isOpen).isTrue()
     }
 
     @Test
     fun testToggle_twice_closesAllApps() {
-        getInstrumentation().runOnMainSync {
+        runOnMainSync {
             allAppsController.toggle()
             allAppsController.toggle()
         }
@@ -71,7 +72,7 @@ class TaskbarAllAppsControllerTest {
 
     @Test
     fun testToggle_taskbarRecreated_allAppsReopened() {
-        getInstrumentation().runOnMainSync { allAppsController.toggle() }
+        runOnMainSync { allAppsController.toggle() }
         taskbarUnitTestRule.recreateTaskbar()
         assertThat(allAppsController.isOpen).isTrue()
     }
@@ -138,7 +139,7 @@ class TaskbarAllAppsControllerTest {
 
     @Test
     fun testUpdateNotificationDots_appInfo_hasDot() {
-        getInstrumentation().runOnMainSync {
+        runOnMainSync {
             allAppsController.setApps(TEST_APPS, 0, emptyMap())
             allAppsController.toggle()
             taskbarUnitTestRule.activityContext.popupDataProvider.onNotificationPosted(
@@ -162,7 +163,7 @@ class TaskbarAllAppsControllerTest {
 
     @Test
     fun testUpdateNotificationDots_predictedApp_hasDot() {
-        getInstrumentation().runOnMainSync {
+        runOnMainSync {
             allAppsController.setPredictedApps(TEST_PREDICTED_APPS)
             allAppsController.toggle()
             taskbarUnitTestRule.activityContext.popupDataProvider.onNotificationPosted(
@@ -185,12 +186,12 @@ class TaskbarAllAppsControllerTest {
 
     @Test
     fun testToggleSearch_searchEditTextFocused() {
-        getInstrumentation().runOnMainSync { allAppsController.toggleSearch() }
-        getInstrumentation().runOnMainSync {
+        runOnMainSync { allAppsController.toggleSearch() }
+        runOnMainSync {
             // All Apps is now attached to window. Open animation is posted but not started.
         }
 
-        getInstrumentation().runOnMainSync {
+        runOnMainSync {
             // Animation has started. Advance to end of animation.
             animatorTestRule.advanceTimeBy(overlayController.openDuration.toLong())
         }

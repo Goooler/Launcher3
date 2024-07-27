@@ -17,6 +17,10 @@
 package com.android.quickstep.recents.viewmodel
 
 import com.android.quickstep.recents.data.RecentTasksRepository
+import com.android.systemui.shared.recents.model.ThumbnailData
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
 class RecentsViewModel(
     private val recentsTasksRepository: RecentTasksRepository,
@@ -52,5 +56,36 @@ class RecentsViewModel(
 
     fun updateThumbnailSplashProgress(taskThumbnailSplashAlpha: Float) {
         recentsViewData.thumbnailSplashProgress.value = taskThumbnailSplashAlpha
+    }
+
+    fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
+        recentsTasksRepository.setThumbnailOverride(thumbnailOverride)
+    }
+
+    suspend fun waitForThumbnailsToUpdate(updatedThumbnails: Map<Int, ThumbnailData>) {
+        combine(
+                updatedThumbnails.map {
+                    recentsTasksRepository.getThumbnailById(it.key).filter { thumbnailData ->
+                        thumbnailData == it.value
+                    }
+                }
+            ) {}
+            .first()
+    }
+
+    suspend fun waitForRunningTaskShowScreenshotToUpdate() {
+        recentsViewData.runningTaskShowScreenshot.filter { it }.first()
+    }
+
+    fun onReset() {
+        updateVisibleTasks(emptyList())
+    }
+
+    fun updateRunningTask(taskIds: Set<Int>) {
+        recentsViewData.runningTaskIds.value = taskIds
+    }
+
+    fun setRunningTaskShowScreenshot(showScreenshot: Boolean) {
+        recentsViewData.runningTaskShowScreenshot.value = showScreenshot
     }
 }

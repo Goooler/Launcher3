@@ -36,4 +36,10 @@ class RecentsViewData {
     val tintAmount = MutableStateFlow(0f)
 
     val thumbnailSplashProgress = MutableStateFlow(0f)
+
+    // A list of taskIds that are associated with a RecentsAnimationController. */
+    val runningTaskIds = MutableStateFlow(emptySet<Int>())
+
+    // Whether we should use static screenshot instead of live tile for taskIds in [runningTaskIds]
+    val runningTaskShowScreenshot = MutableStateFlow(false)
 }

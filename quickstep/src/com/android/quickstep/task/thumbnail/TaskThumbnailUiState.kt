@@ -45,5 +45,3 @@ sealed class TaskThumbnailUiState {
         val size: Point,
     )
 }
-
-data class TaskThumbnail(val taskId: Int, val isRunning: Boolean)

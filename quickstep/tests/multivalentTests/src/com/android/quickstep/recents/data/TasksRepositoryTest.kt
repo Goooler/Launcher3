@@ -18,9 +18,13 @@ package com.android.quickstep.recents.data
 
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Bitmap
+import android.view.Surface
+import com.android.quickstep.task.thumbnail.TaskThumbnailViewModelTest
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
 import com.android.systemui.shared.recents.model.Task
+import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.drop
@@ -30,6 +34,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TasksRepositoryTest {
@@ -186,6 +192,68 @@ class TasksRepositoryTest {
         assertThat(taskFlowValuesList[1]!!.thumbnail!!.thumbnail).isEqualTo(bitmap2)
     }
 
+    @Test
+    fun setThumbnailOverrideOverrideThumbnails() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
+        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
+        val thumbnailOverride = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1))
+        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+
+        // .drop(1) to ignore initial null content before from thumbnail was loaded.
+        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
+            .isEqualTo(bitmap1)
+        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
+    }
+
+    @Test
+    fun setThumbnailOverrideClearedWhenTaskBecomeInvisible() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
+        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
+        val thumbnailOverride = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
+        systemUnderTest.setVisibleTasks(listOf(1))
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+
+        // .drop(1) to ignore initial null content before from thumbnail was loaded.
+        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
+            .isEqualTo(bitmap1)
+        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
+    }
+
+    @Test
+    fun setThumbnailOverrideDoesNotOverrideInvisibleTasks() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
+        val thumbnailOverride = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
+
+        // .drop(1) to ignore initial null content before from thumbnail was loaded.
+        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
+            .isEqualTo(bitmap1)
+        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail)
+            .isEqualTo(thumbnailOverride.thumbnail)
+    }
+
     private fun createTaskWithId(taskId: Int) =
         Task(Task.TaskKey(taskId, 0, Intent(), ComponentName("", ""), 0, 2000))
+
+    private fun createThumbnailData(rotation: Int = Surface.ROTATION_0): ThumbnailData {
+        val bitmap = mock<Bitmap>()
+        whenever(bitmap.width).thenReturn(TaskThumbnailViewModelTest.THUMBNAIL_WIDTH)
+        whenever(bitmap.height).thenReturn(TaskThumbnailViewModelTest.THUMBNAIL_HEIGHT)
+
+        return ThumbnailData(thumbnail = bitmap, rotation = rotation)
+    }
 }
