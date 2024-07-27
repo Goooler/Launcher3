@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.viewmodel
+package com.android.quickstep.recents.data
 
-import com.android.quickstep.views.TaskViewType
-import kotlinx.coroutines.flow.MutableStateFlow
+import android.view.Surface
 
-class TaskViewData(taskViewType: TaskViewType) {
-    // This is typically a View concern but it is used to invalidate rendering in other Views
-    val scale = MutableStateFlow(1f)
+class FakeRecentsRotationStateRepository : RecentsRotationStateRepository {
+    private var recentsRotationState =
+        RecentsRotationState(
+            activityRotation = Surface.ROTATION_0,
+            orientationHandlerRotation = Surface.ROTATION_0
+        )
 
-    val nonGridScale = MutableStateFlow(1f)
+    override fun getRecentsRotationState() = recentsRotationState
 
-    // TODO(b/331753115): This property should not be in TaskViewData once TaskView is MVVM.
-    /** Whether outline of TaskView is formed by outline thumbnail view(s). */
-    val isOutlineFormedByThumbnailView: Boolean = taskViewType != TaskViewType.DESKTOP
+    fun setRecentsRotationState(newValue: RecentsRotationState) {
+        recentsRotationState = newValue
+    }
 }

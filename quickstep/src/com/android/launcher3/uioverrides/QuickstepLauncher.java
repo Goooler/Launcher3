@@ -258,6 +258,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
 
     private boolean mCanShowAllAppsEducationView;
 
+    private boolean mIsOverlayVisible;
+
     public static QuickstepLauncher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -495,13 +497,20 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
                     (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
                     && (willUserBeActive || isUserActive())
-                    && !profile.isVerticalBarLayout();
+                    && !profile.isVerticalBarLayout()
+                    && !mIsOverlayVisible;
             SystemUiProxy.INSTANCE.get(this)
                     .setLauncherKeepClearAreaHeight(visible, profile.hotseatBarSizePx);
         }
         if (state == NORMAL && !inTransition) {
             ((RecentsView) getOverviewPanel()).setSwipeDownShouldLaunchApp(false);
         }
+    }
+
+    @Override
+    public void onOverlayVisibilityChanged(boolean visible) {
+        super.onOverlayVisibilityChanged(visible);
+        mIsOverlayVisible = visible;
     }
 
     @Override

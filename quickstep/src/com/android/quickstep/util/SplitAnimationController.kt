@@ -187,7 +187,6 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
     ) {
         val snapshot = taskContainer.snapshotView
         val iconView: View = taskContainer.iconView.asView()
-        // TODO(334826842): Switch to splash state in TaskThumbnailView
         if (!enableRefactorTaskThumbnail()) {
             val thumbnailViewDeprecated = taskContainer.thumbnailViewDeprecated
             builder.add(
@@ -198,6 +197,15 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 )
             )
             thumbnailViewDeprecated.setShowSplashForSplitSelection(true)
+        } else {
+            builder.add(
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    addUpdateListener {
+                        taskContainer.taskContainerData.thumbnailSplashProgress.value =
+                            it.animatedFraction
+                    }
+                }
+            )
         }
         // With the new `IconAppChipView`, we always want to keep the chip pinned to the
         // top left of the task / thumbnail.

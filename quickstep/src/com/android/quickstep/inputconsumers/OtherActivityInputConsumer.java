@@ -409,6 +409,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         mInteractionHandler = mHandlerFactory.newHandler(mGestureState, touchTimeMs);
         mInteractionHandler.setGestureEndCallback(this::onInteractionGestureFinished);
         mMotionPauseDetector.setOnMotionPauseListener(mInteractionHandler.getMotionPauseListener());
+        mMotionPauseDetector.setIsTrackpadGesture(mGestureState.isTrackpadGesture());
         mInteractionHandler.initWhenReady(
                 "OtherActivityInputConsumer.startTouchTrackingForWindowAnimation");
 

@@ -16,6 +16,13 @@
 
 package com.android.quickstep.recents.data
 
-interface RecentsDeviceProfileRepository {
-    fun getRecentsDeviceProfile(): RecentsDeviceProfile
-}
+/**
+ * Container to hold [com.android.launcher3.DeviceProfile] related to Recents.
+ *
+ * @property isLargeScreen whether the current device posture has a large screen
+ */
+data class RecentsDeviceProfile(
+    val isLargeScreen: Boolean,
+    val widthPx: Int,
+    val heightPx: Int,
+)

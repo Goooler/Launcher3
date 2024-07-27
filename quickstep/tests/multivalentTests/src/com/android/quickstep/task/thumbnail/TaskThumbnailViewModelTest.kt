@@ -21,8 +21,12 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Point
+import android.graphics.drawable.Drawable
+import android.view.Surface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.quickstep.recents.data.FakeTasksRepository
+import com.android.quickstep.recents.data.TaskIconQueryResponse
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState.MatrixScaling
 import com.android.quickstep.recents.usecase.ThumbnailPositionState.MissingThumbnail
@@ -30,6 +34,8 @@ import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Splash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
@@ -40,8 +46,10 @@ import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
@@ -53,17 +61,26 @@ class TaskThumbnailViewModelTest {
     private val taskContainerData = TaskContainerData()
     private val tasksRepository = FakeTasksRepository()
     private val mGetThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
+    private val splashAlphaUseCase: SplashAlphaUseCase = mock()
+    private val getSplashSizeUseCase: GetSplashSizeUseCase = mock()
     private val systemUnderTest by lazy {
         TaskThumbnailViewModel(
             recentsViewData,
             taskViewData,
             taskContainerData,
             tasksRepository,
-            mGetThumbnailPositionUseCase
+            mGetThumbnailPositionUseCase,
+            splashAlphaUseCase,
+            getSplashSizeUseCase,
         )
     }
 
     private val tasks = (0..5).map(::createTaskWithId)
+
+    @Before
+    fun setUp() {
+        whenever(getSplashSizeUseCase.execute(any())).thenReturn(Point())
+    }
 
     @Test
     fun initialStateIsUninitialized() = runTest {
@@ -147,9 +164,11 @@ class TaskThumbnailViewModelTest {
     }
 
     @Test
-    fun bindStoppedTaskWithThumbnail_thenStateIs_Snapshot_withAlphaRemoved() = runTest {
-        val expectedThumbnailData = createThumbnailData()
+    fun bindStoppedTaskWithThumbnail_thenStateIs_SnapshotSplash_withAlphaRemoved() = runTest {
+        val expectedThumbnailData = createThumbnailData(rotation = Surface.ROTATION_270)
         tasksRepository.seedThumbnailData(mapOf(2 to expectedThumbnailData))
+        val expectedIconData = createIconData("Task 2")
+        tasksRepository.seedIconData(mapOf(2 to expectedIconData))
         tasksRepository.seedTasks(tasks)
         tasksRepository.setVisibleTasks(listOf(2))
         val recentTask = TaskThumbnail(taskId = 2, isRunning = false)
@@ -157,17 +176,23 @@ class TaskThumbnailViewModelTest {
         systemUnderTest.bind(recentTask)
         assertThat(systemUnderTest.uiState.first())
             .isEqualTo(
-                Snapshot(
-                    backgroundColor = Color.rgb(2, 2, 2),
-                    bitmap = expectedThumbnailData.thumbnail!!,
+                SnapshotSplash(
+                    Snapshot(
+                        backgroundColor = Color.rgb(2, 2, 2),
+                        bitmap = expectedThumbnailData.thumbnail!!,
+                        thumbnailRotation = Surface.ROTATION_270,
+                    ),
+                    Splash(expectedIconData.icon, Point())
                 )
             )
     }
 
     @Test
-    fun bindNonVisibleStoppedTask_whenMadeVisible_thenStateIsSnapshot() = runTest {
+    fun bindNonVisibleStoppedTask_whenMadeVisible_thenStateIsSnapshotSplash() = runTest {
         val expectedThumbnailData = createThumbnailData()
         tasksRepository.seedThumbnailData(mapOf(2 to expectedThumbnailData))
+        val expectedIconData = createIconData("Task 2")
+        tasksRepository.seedIconData(mapOf(2 to expectedIconData))
         tasksRepository.seedTasks(tasks)
         val recentTask = TaskThumbnail(taskId = 2, isRunning = false)
 
@@ -177,11 +202,32 @@ class TaskThumbnailViewModelTest {
         tasksRepository.setVisibleTasks(listOf(2))
         assertThat(systemUnderTest.uiState.first())
             .isEqualTo(
-                Snapshot(
-                    backgroundColor = Color.rgb(2, 2, 2),
-                    bitmap = expectedThumbnailData.thumbnail!!,
+                SnapshotSplash(
+                    Snapshot(
+                        backgroundColor = Color.rgb(2, 2, 2),
+                        bitmap = expectedThumbnailData.thumbnail!!,
+                        thumbnailRotation = Surface.ROTATION_0,
+                    ),
+                    Splash(expectedIconData.icon, Point())
                 )
             )
+    }
+
+    @Test
+    fun bindStoppedTask_thenStateContainsSplashSizeFromUseCase() = runTest {
+        val expectedSplashSize = Point(100, 150)
+        whenever(getSplashSizeUseCase.execute(any())).thenReturn(expectedSplashSize)
+        val expectedThumbnailData = createThumbnailData(rotation = Surface.ROTATION_270)
+        tasksRepository.seedThumbnailData(mapOf(2 to expectedThumbnailData))
+        val expectedIconData = createIconData("Task 2")
+        tasksRepository.seedIconData(mapOf(2 to expectedIconData))
+        tasksRepository.seedTasks(tasks)
+        tasksRepository.setVisibleTasks(listOf(2))
+        val recentTask = TaskThumbnail(taskId = 2, isRunning = false)
+
+        systemUnderTest.bind(recentTask)
+        val uiState = systemUnderTest.uiState.first() as SnapshotSplash
+        assertThat(uiState.splash.size).isEqualTo(expectedSplashSize)
     }
 
     @Test
@@ -238,13 +284,15 @@ class TaskThumbnailViewModelTest {
             colorBackground = Color.argb(taskId, taskId, taskId, taskId)
         }
 
-    private fun createThumbnailData(): ThumbnailData {
+    private fun createThumbnailData(rotation: Int = Surface.ROTATION_0): ThumbnailData {
         val bitmap = mock<Bitmap>()
         whenever(bitmap.width).thenReturn(THUMBNAIL_WIDTH)
         whenever(bitmap.height).thenReturn(THUMBNAIL_HEIGHT)
 
-        return ThumbnailData(thumbnail = bitmap)
+        return ThumbnailData(thumbnail = bitmap, rotation = rotation)
     }
+
+    private fun createIconData(title: String) = TaskIconQueryResponse(mock<Drawable>(), "", title)
 
     companion object {
         const val THUMBNAIL_WIDTH = 100

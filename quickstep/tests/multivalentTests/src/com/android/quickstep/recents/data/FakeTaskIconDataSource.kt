@@ -23,10 +23,12 @@ import com.android.quickstep.task.thumbnail.data.TaskIconDataSource
 import com.android.systemui.shared.recents.model.Task
 import com.google.common.truth.Truth.assertThat
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 class FakeTaskIconDataSource : TaskIconDataSource {
 
-    val taskIdToDrawable: Map<Int, Drawable> = (0..10).associateWith { mock() }
+    val taskIdToDrawable: Map<Int, Drawable> = (0..10).associateWith { mockCopyableDrawable() }
+
     val taskIdToUpdatingTask: MutableMap<Int, () -> Unit> = mutableMapOf()
     var shouldLoadSynchronously: Boolean = true
 
@@ -48,6 +50,17 @@ class FakeTaskIconDataSource : TaskIconDataSource {
             taskIdToUpdatingTask[task.key.id] = wrappedCallback
         }
         return null
+    }
+
+    private fun mockCopyableDrawable(): Drawable {
+        val mutableDrawable = mock<Drawable>()
+        val immutableDrawable =
+            mock<Drawable>().apply { whenever(mutate()).thenReturn(mutableDrawable) }
+        val constantState =
+            mock<Drawable.ConstantState>().apply {
+                whenever(newDrawable()).thenReturn(immutableDrawable)
+            }
+        return mutableDrawable.apply { whenever(this.constantState).thenReturn(constantState) }
     }
 }
 

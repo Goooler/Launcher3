@@ -16,6 +16,14 @@
 
 package com.android.quickstep.recents.data
 
-interface RecentsDeviceProfileRepository {
-    fun getRecentsDeviceProfile(): RecentsDeviceProfile
-}
+import android.view.Surface
+
+/**
+ * Container to hold orientation/rotation related information related to Recents.
+ *
+ * @property activityRotation rotation of the activity hosting RecentsView
+ */
+data class RecentsRotationState(
+    @Surface.Rotation val activityRotation: Int,
+    @Surface.Rotation val orientationHandlerRotation: Int,
+)

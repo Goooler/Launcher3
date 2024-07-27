@@ -26,6 +26,9 @@ import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.GetThumbnailUseCase
 import com.android.quickstep.recents.usecase.SysUiStatusNavFlagsUseCase
 import com.android.quickstep.recents.viewmodel.RecentsViewData
+import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
+import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
+import com.android.quickstep.task.thumbnail.TaskThumbnailViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
@@ -33,7 +36,6 @@ import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
-import java.util.logging.Level
 
 internal typealias RecentsScopeId = String
 
@@ -145,13 +147,16 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                     TaskViewData(taskViewType)
                 }
                 TaskContainerData::class.java -> TaskContainerData()
+                TaskThumbnailViewData::class.java -> TaskThumbnailViewData()
                 TaskThumbnailViewModel::class.java ->
                     TaskThumbnailViewModel(
                         recentsViewData = inject(),
                         taskViewData = inject(scopeId, extras),
-                        taskContainerData = inject(),
+                        taskContainerData = inject(scopeId),
                         getThumbnailPositionUseCase = inject(),
-                        tasksRepository = inject()
+                        tasksRepository = inject(),
+                        splashAlphaUseCase = inject(scopeId),
+                        getSplashSizeUseCase = inject(scopeId),
                     )
                 TaskOverlayViewModel::class.java -> {
                     val task = extras["Task"] as Task
@@ -170,6 +175,20 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         deviceProfileRepository = inject(),
                         rotationStateRepository = inject(),
                         tasksRepository = inject()
+                    )
+                SplashAlphaUseCase::class.java ->
+                    SplashAlphaUseCase(
+                        recentsViewData = inject(),
+                        taskContainerData = inject(scopeId),
+                        taskThumbnailViewData = inject(scopeId),
+                        tasksRepository = inject(),
+                        rotationStateRepository = inject(),
+                    )
+                GetSplashSizeUseCase::class.java ->
+                    GetSplashSizeUseCase(
+                        taskThumbnailViewData = inject(scopeId),
+                        taskViewData = inject(scopeId, extras),
+                        deviceProfileRepository = inject(),
                     )
                 else -> {
                     log("Factory for ${modelClass.simpleName} not defined!", Log.ERROR)

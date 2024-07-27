@@ -16,6 +16,17 @@
 
 package com.android.quickstep.recents.data
 
-interface RecentsDeviceProfileRepository {
-    fun getRecentsDeviceProfile(): RecentsDeviceProfile
+class FakeRecentsDeviceProfileRepository : RecentsDeviceProfileRepository {
+    private var recentsDeviceProfile =
+        RecentsDeviceProfile(
+            isLargeScreen = false,
+            widthPx = 1080,
+            heightPx = 1920,
+        )
+
+    override fun getRecentsDeviceProfile() = recentsDeviceProfile
+
+    fun setRecentsDeviceProfile(newValue: RecentsDeviceProfile) {
+        recentsDeviceProfile = newValue
+    }
 }

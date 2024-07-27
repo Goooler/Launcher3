@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 
 class FakeTasksRepository : RecentTasksRepository {
     private var thumbnailDataMap: Map<Int, ThumbnailData> = emptyMap()
+    private var taskIconDataMap: Map<Int, TaskIconQueryResponse> = emptyMap()
     private var tasks: MutableStateFlow<List<Task>> = MutableStateFlow(emptyList())
     private var visibleTasks: MutableStateFlow<List<Int>> = MutableStateFlow(emptyList())
 
@@ -37,7 +38,17 @@ class FakeTasksRepository : RecentTasksRepository {
 
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         visibleTasks.value = visibleTaskIdList
-        tasks.value = tasks.value.map { it.apply { thumbnail = thumbnailDataMap[it.key.id] } }
+        tasks.value =
+            tasks.value.map {
+                it.apply {
+                    thumbnail = thumbnailDataMap[it.key.id]
+                    taskIconDataMap[it.key.id].let { taskIconData ->
+                        icon = taskIconData?.icon
+                        titleDescription = taskIconData?.contentDescription
+                        title = taskIconData?.title
+                    }
+                }
+            }
     }
 
     fun seedTasks(tasks: List<Task>) {
@@ -46,5 +57,9 @@ class FakeTasksRepository : RecentTasksRepository {
 
     fun seedThumbnailData(thumbnailDataMap: Map<Int, ThumbnailData>) {
         this.thumbnailDataMap = thumbnailDataMap
+    }
+
+    fun seedIconData(iconDataMap: Map<Int, TaskIconQueryResponse>) {
+        this.taskIconDataMap = iconDataMap
     }
 }

@@ -16,20 +16,6 @@
 
 package com.android.quickstep.recents.data
 
-import com.android.quickstep.util.RecentsOrientedState
-
-/**
- * Repository for [RecentsRotationState] which holds orientation/rotation related information
- * related to Recents
- */
-class RecentsRotationStateRepository(private val state: RecentsOrientedState) {
-    fun getRecentsRotationState() =
-        with(state) { RecentsRotationState(activityRotation = recentsActivityRotation) }
-
-    /**
-     * Container to hold orientation/rotation related information related to Recents.
-     *
-     * @property activityRotation rotation of the activity hosting RecentsView
-     */
-    data class RecentsRotationState(val activityRotation: Int)
+interface RecentsRotationStateRepository {
+    fun getRecentsRotationState(): RecentsRotationState
 }

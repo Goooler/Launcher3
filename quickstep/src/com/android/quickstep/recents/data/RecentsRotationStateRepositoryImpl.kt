@@ -16,6 +16,19 @@
 
 package com.android.quickstep.recents.data
 
-interface RecentsDeviceProfileRepository {
-    fun getRecentsDeviceProfile(): RecentsDeviceProfile
+import com.android.quickstep.util.RecentsOrientedState
+
+/**
+ * Repository for [RecentsRotationState] which holds orientation/rotation related information
+ * related to Recents
+ */
+class RecentsRotationStateRepositoryImpl(private val state: RecentsOrientedState) :
+    RecentsRotationStateRepository {
+    override fun getRecentsRotationState() =
+        with(state) {
+            RecentsRotationState(
+                activityRotation = recentsActivityRotation,
+                orientationHandlerRotation = orientationHandler.rotation
+            )
+        }
 }

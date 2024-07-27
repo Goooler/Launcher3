@@ -285,6 +285,9 @@ constructor(
         set(value) {
             field = value
             applyScale()
+            if (enableRefactorTaskThumbnail()) {
+                taskViewModel.updateNonGridScale(value)
+            }
         }
 
     private var dismissScale = 1f
@@ -1051,11 +1054,9 @@ constructor(
                     if (isQuickSwitch) {
                         setFreezeRecentTasksReordering()
                     }
-                    // TODO(b/334826842) add splash functionality to new TTV
-                    if (!enableRefactorTaskThumbnail()) {
-                        disableStartingWindow =
-                            firstContainer.thumbnailViewDeprecated.shouldShowSplashView()
-                    }
+                    // TODO(b/334826842) no work required - add splash functionality to new TTV -
+                    // cold start e.g. restart device. Small splash moving to bigger splash
+                    disableStartingWindow = firstContainer.shouldShowSplashView
                 }
         Executors.UI_HELPER_EXECUTOR.execute {
             if (
@@ -1396,7 +1397,7 @@ constructor(
 
     protected open fun refreshTaskThumbnailSplash() {
         if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/334826842) add splash functionality to new TTV
+            // TODO(b/342560598) handle onTaskIconChanged
             taskContainers.forEach { it.thumbnailViewDeprecated.refreshSplashView() }
         }
     }
@@ -1420,7 +1421,6 @@ constructor(
 
     protected open fun applyThumbnailSplashAlpha() {
         if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/334826842) add splash functionality to new TTV
             taskContainers.forEach {
                 it.thumbnailViewDeprecated.setSplashAlpha(taskThumbnailSplashAlpha)
             }

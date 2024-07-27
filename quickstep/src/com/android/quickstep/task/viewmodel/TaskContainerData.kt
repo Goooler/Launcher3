@@ -20,4 +20,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class TaskContainerData {
     val taskMenuOpenProgress = MutableStateFlow(0f)
+
+    val thumbnailSplashProgress = MutableStateFlow(0f)
 }

@@ -23,8 +23,12 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.annotation.Nullable;
+
 import com.android.internal.jank.Cuj;
+import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
+import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
 /**
  * Callbacks for {@link TaskbarView} to interact with its controller.
@@ -103,5 +107,19 @@ public class TaskbarViewCallbacks {
     public void notifyVisibilityChanged() {
         mControllers.taskbarScrimViewController.onTaskbarVisibilityChanged(
                 mTaskbarView.getVisibility());
+    }
+
+    /**
+     * Get current location of bubble bar, if it is visible.
+     * Returns {@code null} if bubble bar is not shown.
+     */
+    @Nullable
+    public BubbleBarLocation getBubbleBarLocationIfVisible() {
+        BubbleBarViewController bubbleBarViewController =
+                mControllers.bubbleControllers.map(c -> c.bubbleBarViewController).orElse(null);
+        if (bubbleBarViewController != null && bubbleBarViewController.isBubbleBarVisible()) {
+            return bubbleBarViewController.getBubbleBarLocation();
+        }
+        return null;
     }
 }

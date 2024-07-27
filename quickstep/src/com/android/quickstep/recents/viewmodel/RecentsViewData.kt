@@ -34,4 +34,6 @@ class RecentsViewData {
 
     // Color tint on foreground scrim
     val tintAmount = MutableStateFlow(0f)
+
+    val thumbnailSplashProgress = MutableStateFlow(0f)
 }

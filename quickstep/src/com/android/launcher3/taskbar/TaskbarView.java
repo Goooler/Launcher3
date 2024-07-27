@@ -72,6 +72,7 @@ import com.android.quickstep.util.AssistStateManager;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -246,12 +247,34 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     @Override
     public boolean performAccessibilityActionInternal(int action, Bundle arguments) {
         if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
-            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_shown_title));
+            announceTaskbarShown();
         } else if (action == AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS) {
-            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_hidden_title));
+            announceTaskbarHidden();
         }
         return super.performAccessibilityActionInternal(action, arguments);
+    }
 
+    private void announceTaskbarShown() {
+        BubbleBarLocation bubbleBarLocation = mControllerCallbacks.getBubbleBarLocationIfVisible();
+        if (bubbleBarLocation == null) {
+            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_shown_title));
+        } else if (bubbleBarLocation.isOnLeft(isLayoutRtl())) {
+            announceForAccessibility(
+                    mContext.getString(R.string.taskbar_a11y_shown_with_bubbles_left_title));
+        } else {
+            announceForAccessibility(
+                    mContext.getString(R.string.taskbar_a11y_shown_with_bubbles_right_title));
+        }
+    }
+
+    private void announceTaskbarHidden() {
+        BubbleBarLocation bubbleBarLocation = mControllerCallbacks.getBubbleBarLocationIfVisible();
+        if (bubbleBarLocation == null) {
+            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_hidden_title));
+        } else {
+            announceForAccessibility(
+                    mContext.getString(R.string.taskbar_a11y_hidden_with_bubbles_title));
+        }
     }
 
     protected void announceAccessibilityChanges() {

@@ -40,10 +40,10 @@ import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
-/** Unit tests for [PersistentTaskbarStashController]. */
+/** Unit tests for [PersistentBubbleStashController]. */
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-class PersistentTaskbarStashControllerTest {
+class PersistentBubbleStashControllerTest {
 
     companion object {
         const val BUBBLE_BAR_HEIGHT = 100f
@@ -52,15 +52,17 @@ class PersistentTaskbarStashControllerTest {
     }
 
     @get:Rule val animatorTestRule: AnimatorTestRule = AnimatorTestRule(this)
+
     @get:Rule val rule: MockitoRule = MockitoJUnit.rule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private lateinit var bubbleBarView: BubbleBarView
 
     @Mock lateinit var bubbleBarViewController: BubbleBarViewController
+
     @Mock lateinit var taskbarInsetsController: TaskbarInsetsController
 
-    private lateinit var persistentTaskBarStashController: PersistentTaskbarStashController
+    private lateinit var persistentTaskBarStashController: PersistentBubbleStashController
     private lateinit var translationY: AnimatedFloat
     private lateinit var scale: AnimatedFloat
     private lateinit var alpha: MultiValueAlpha
@@ -68,7 +70,7 @@ class PersistentTaskbarStashControllerTest {
     @Before
     fun setUp() {
         persistentTaskBarStashController =
-            PersistentTaskbarStashController(DefaultDimensionsProvider())
+            PersistentBubbleStashController(DefaultDimensionsProvider())
         setUpBubbleBarView()
         setUpBubbleBarController()
         persistentTaskBarStashController.init(

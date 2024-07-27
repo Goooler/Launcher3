@@ -18,16 +18,21 @@ package com.android.quickstep.task.viewmodel
 
 import android.annotation.ColorInt
 import android.graphics.Matrix
+import android.graphics.Point
 import androidx.core.graphics.ColorUtils
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState
 import com.android.quickstep.recents.viewmodel.RecentsViewData
+import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
+import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Splash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.systemui.shared.recents.model.Task
 import kotlin.math.max
@@ -48,9 +53,12 @@ class TaskThumbnailViewModel(
     taskViewData: TaskViewData,
     taskContainerData: TaskContainerData,
     private val tasksRepository: RecentTasksRepository,
-    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase
+    private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase,
+    private val splashAlphaUseCase: SplashAlphaUseCase,
+    private val getSplashSizeUseCase: GetSplashSizeUseCase,
 ) {
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
+    private val splashProgress = MutableStateFlow(flowOf(0f))
     private lateinit var taskThumbnail: TaskThumbnail
 
     /**
@@ -70,6 +78,7 @@ class TaskThumbnailViewModel(
             tintAmount ->
             max(taskMenuOpenProgress * MAX_SCRIM_ALPHA, tintAmount)
         }
+    val splashAlpha = splashProgress.flatMapLatest { it }
     val uiState: Flow<TaskThumbnailUiState> =
         task
             .flatMapLatest { taskFlow ->
@@ -79,10 +88,8 @@ class TaskThumbnailViewModel(
                         taskThumbnail.isRunning -> LiveTile
                         isBackgroundOnly(taskVal) ->
                             BackgroundOnly(taskVal.colorBackground.removeAlpha())
-                        isSnapshotState(taskVal) -> {
-                            val bitmap = taskVal.thumbnail?.thumbnail!!
-                            Snapshot(bitmap, taskVal.colorBackground.removeAlpha())
-                        }
+                        isSnapshotSplashState(taskVal) ->
+                            SnapshotSplash(createSnapshotState(taskVal), createSplashState(taskVal))
                         else -> Uninitialized
                     }
                 }
@@ -92,6 +99,7 @@ class TaskThumbnailViewModel(
     fun bind(taskThumbnail: TaskThumbnail) {
         this.taskThumbnail = taskThumbnail
         task.value = tasksRepository.getTaskDataById(taskThumbnail.taskId)
+        splashProgress.value = splashAlphaUseCase.execute(taskThumbnail.taskId)
     }
 
     fun getThumbnailPositionState(width: Int, height: Int, isRtl: Boolean): Matrix {
@@ -108,11 +116,23 @@ class TaskThumbnailViewModel(
 
     private fun isBackgroundOnly(task: Task): Boolean = task.isLocked || task.thumbnail == null
 
-    private fun isSnapshotState(task: Task): Boolean {
+    private fun isSnapshotSplashState(task: Task): Boolean {
         val thumbnailPresent = task.thumbnail?.thumbnail != null
         val taskLocked = task.isLocked
 
         return thumbnailPresent && !taskLocked
+    }
+
+    private fun createSnapshotState(task: Task): Snapshot {
+        val thumbnailData = task.thumbnail
+        val bitmap = thumbnailData?.thumbnail!!
+        return Snapshot(bitmap, thumbnailData.rotation, task.colorBackground.removeAlpha())
+    }
+
+    private fun createSplashState(task: Task): Splash {
+        val taskIcon = task.icon
+        val size = if (taskIcon == null) Point() else getSplashSizeUseCase.execute(taskIcon)
+        return Splash(taskIcon, size)
     }
 
     @ColorInt private fun Int.removeAlpha(): Int = ColorUtils.setAlphaComponent(this, 0xff)

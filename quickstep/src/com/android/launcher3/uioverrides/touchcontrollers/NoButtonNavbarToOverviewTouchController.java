@@ -88,6 +88,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
     private ObjectAnimator mNormalToHintOverviewScrimAnimator;
 
     private final QuickstepLauncher mLauncher;
+    private boolean mIsTrackpadSwipe;
 
     /**
      * @param cancelSplitRunnable Called when split placeholder view needs to be cancelled.
@@ -106,9 +107,9 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
 
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
-        boolean isTrackpadEvent = isTrackpadMotionEvent(ev);
-        mLauncher.setCanShowAllAppsEducationView(!isTrackpadEvent);
-        if (!isTrackpadEvent && DisplayController.getNavigationMode(mLauncher)
+        mIsTrackpadSwipe = isTrackpadMotionEvent(ev);
+        mLauncher.setCanShowAllAppsEducationView(!mIsTrackpadSwipe);
+        if (!mIsTrackpadSwipe && DisplayController.getNavigationMode(mLauncher)
                 == THREE_BUTTONS) {
             return false;
         }
@@ -152,6 +153,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
         super.onDragStart(start, startDisplacement);
 
         mMotionPauseDetector.clear();
+        mMotionPauseDetector.setIsTrackpadGesture(mIsTrackpadSwipe);
 
         if (handlingOverviewAnim()) {
             InteractionJankMonitorWrapper.begin(mRecentsView, Cuj.CUJ_LAUNCHER_APP_SWIPE_TO_RECENTS,
@@ -195,6 +197,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
         }
 
         mMotionPauseDetector.clear();
+        mIsTrackpadSwipe = false;
         mNormalToHintOverviewScrimAnimator = null;
         if (mLauncher.isInState(OVERVIEW)) {
             // Normally we would cleanup the state based on mCurrentAnimation, but since we stop

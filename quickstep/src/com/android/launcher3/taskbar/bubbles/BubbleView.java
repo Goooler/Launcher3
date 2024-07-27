@@ -70,6 +70,8 @@ public class BubbleView extends ConstraintLayout {
     // The current scale value of the dot
     private float mDotScale;
 
+    private boolean mProvideShadowOutline = true;
+
     // TODO: (b/273310265) handle RTL
     // Whether the bubbles are positioned on the left or right side of the screen
     private boolean mOnLeft = false;
@@ -113,17 +115,28 @@ public class BubbleView extends ConstraintLayout {
         });
     }
 
+    //TODO(b/345490679) remove once proper shadow is applied
+    /** Set whether provide an outline. */
+    public void setProvideShadowOutline(boolean provideOutline) {
+        if (mProvideShadowOutline == provideOutline) return;
+        mProvideShadowOutline = provideOutline;
+        invalidateOutline();
+    }
+
     private void getOutline(Outline outline) {
         updateBubbleSizeAndDotRender();
         final int normalizedSize = IconNormalizer.getNormalizedCircleSize(mBubbleSize);
         final int inset = (mBubbleSize - normalizedSize) / 2;
-        outline.setOval(inset, inset, inset + normalizedSize, inset + normalizedSize);
+        if (mProvideShadowOutline) {
+            outline.setOval(inset, inset, inset + normalizedSize, inset + normalizedSize);
+        }
     }
 
     private void updateBubbleSizeAndDotRender() {
         int updatedBubbleSize = Math.min(getWidth(), getHeight());
         if (updatedBubbleSize == mBubbleSize) return;
         mBubbleSize = updatedBubbleSize;
+        invalidateOutline();
         if (mBubble == null || mBubble instanceof BubbleBarOverflow) return;
         Path dotPath = ((BubbleBarBubble) mBubble).getDotPath();
         mDotRenderer = new DotRenderer(mBubbleSize, dotPath, DEFAULT_PATH_SIZE);

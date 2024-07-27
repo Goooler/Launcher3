@@ -69,7 +69,8 @@ class TaskContainer(
     private val taskContainerViewModel: TaskContainerViewModel by lazy {
         TaskContainerViewModel(
             sysUiStatusNavFlagsUseCase = RecentsDependencies.get(),
-            getThumbnailUseCase = RecentsDependencies.get()
+            getThumbnailUseCase = RecentsDependencies.get(),
+            splashAlphaUseCase = RecentsDependencies.get(),
         )
     }
 
@@ -81,7 +82,7 @@ class TaskContainer(
                 val taskViewScope = RecentsDependencies.getScope(taskView)
                 linkTo(taskViewScope)
 
-                val taskContainerScope = RecentsDependencies.getScope(this)
+                val taskContainerScope = RecentsDependencies.getScope(this@TaskContainer)
                 linkTo(taskContainerScope)
             }
         } else {
@@ -112,10 +113,10 @@ class TaskContainer(
     // TODO(b/334826842): Support shouldShowSplashView for new TTV.
     val shouldShowSplashView: Boolean
         get() =
-            if (enableRefactorTaskThumbnail()) false
+            if (enableRefactorTaskThumbnail())
+                taskContainerViewModel.shouldShowThumbnailSplash(task.key.id)
             else thumbnailViewDeprecated.shouldShowSplashView()
 
-    // TODO(b/350743460) Support sysUiStatusNavFlags for new TTV.
     val sysUiStatusNavFlags: Int
         get() =
             if (enableRefactorTaskThumbnail())

@@ -25,12 +25,12 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
-/** Test for [RecentsDeviceProfileRepository] */
+/** Test for [RecentsDeviceProfileRepositoryImpl] */
 @RunWith(AndroidJUnit4::class)
-class RecentsDeviceProfileRepositoryTest : FakeInvariantDeviceProfileTest() {
+class RecentsDeviceProfileRepositoryImplTest : FakeInvariantDeviceProfileTest() {
     private val recentsViewContainer = mock<RecentsViewContainer>()
 
-    private val systemUnderTest = RecentsDeviceProfileRepository(recentsViewContainer)
+    private val systemUnderTest = RecentsDeviceProfileRepositoryImpl(recentsViewContainer)
 
     @Test
     fun deviceProfileMappedCorrectly() {
@@ -39,6 +39,6 @@ class RecentsDeviceProfileRepositoryTest : FakeInvariantDeviceProfileTest() {
         whenever(recentsViewContainer.deviceProfile).thenReturn(tabletDeviceProfile)
 
         assertThat(systemUnderTest.getRecentsDeviceProfile())
-            .isEqualTo(RecentsDeviceProfileRepository.RecentsDeviceProfile(isLargeScreen = true))
+            .isEqualTo(RecentsDeviceProfile(isLargeScreen = true, widthPx = 1600, heightPx = 2560))
     }
 }

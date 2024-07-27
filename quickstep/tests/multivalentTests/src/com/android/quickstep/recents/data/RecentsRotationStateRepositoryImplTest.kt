@@ -16,26 +16,32 @@
 
 package com.android.quickstep.recents.data
 
+import android.view.Surface.ROTATION_270
 import android.view.Surface.ROTATION_90
+import com.android.quickstep.orientation.SeascapePagedViewHandler
 import com.android.quickstep.util.RecentsOrientedState
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
-/** Test for [RecentsRotationStateRepository] */
-class RecentsRotationStateRepositoryTest {
+/** Test for [RecentsRotationStateRepositoryImpl] */
+class RecentsRotationStateRepositoryImplTest {
     private val recentsOrientedState = mock<RecentsOrientedState>()
 
-    private val systemUnderTest = RecentsRotationStateRepository(recentsOrientedState)
+    private val systemUnderTest = RecentsRotationStateRepositoryImpl(recentsOrientedState)
 
     @Test
     fun orientedStateMappedCorrectly() {
         whenever(recentsOrientedState.recentsActivityRotation).thenReturn(ROTATION_90)
+        whenever(recentsOrientedState.orientationHandler).thenReturn(SeascapePagedViewHandler())
 
         assertThat(systemUnderTest.getRecentsRotationState())
             .isEqualTo(
-                RecentsRotationStateRepository.RecentsRotationState(activityRotation = ROTATION_90)
+                RecentsRotationState(
+                    activityRotation = ROTATION_90,
+                    orientationHandlerRotation = ROTATION_270
+                )
             )
     }
 }

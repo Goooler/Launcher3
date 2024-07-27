@@ -24,9 +24,9 @@ import android.graphics.Matrix
 import android.graphics.Rect
 import android.view.Surface.ROTATION_90
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.quickstep.recents.data.FakeRecentsDeviceProfileRepository
+import com.android.quickstep.recents.data.FakeRecentsRotationStateRepository
 import com.android.quickstep.recents.data.FakeTasksRepository
-import com.android.quickstep.recents.data.RecentsDeviceProfileRepository
-import com.android.quickstep.recents.data.RecentsRotationStateRepository
 import com.android.quickstep.recents.usecase.ThumbnailPositionState.MatrixScaling
 import com.android.quickstep.recents.usecase.ThumbnailPositionState.MissingThumbnail
 import com.android.systemui.shared.recents.model.Task
@@ -56,8 +56,8 @@ class GetThumbnailPositionUseCaseTest {
                 }
         )
 
-    private val deviceProfileRepository = mock<RecentsDeviceProfileRepository>()
-    private val rotationStateRepository = mock<RecentsRotationStateRepository>()
+    private val deviceProfileRepository = FakeRecentsDeviceProfileRepository()
+    private val rotationStateRepository = FakeRecentsRotationStateRepository()
     private val tasksRepository = FakeTasksRepository()
     private val previewPositionHelper = mock<PreviewPositionHelper>()
 
@@ -93,14 +93,17 @@ class GetThumbnailPositionUseCaseTest {
         tasksRepository.setVisibleTasks(listOf(TASK_ID))
 
         val isLargeScreen = true
+        deviceProfileRepository.setRecentsDeviceProfile(
+            deviceProfileRepository.getRecentsDeviceProfile().copy(isLargeScreen = isLargeScreen)
+        )
         val activityRotation = ROTATION_90
+        rotationStateRepository.setRecentsRotationState(
+            rotationStateRepository
+                .getRecentsRotationState()
+                .copy(activityRotation = activityRotation)
+        )
         val isRtl = true
         val isRotated = true
-
-        whenever(deviceProfileRepository.getRecentsDeviceProfile())
-            .thenReturn(RecentsDeviceProfileRepository.RecentsDeviceProfile(isLargeScreen))
-        whenever(rotationStateRepository.getRecentsRotationState())
-            .thenReturn(RecentsRotationStateRepository.RecentsRotationState(activityRotation))
 
         whenever(previewPositionHelper.matrix).thenReturn(MATRIX)
         whenever(previewPositionHelper.isOrientationChanged).thenReturn(isRotated)

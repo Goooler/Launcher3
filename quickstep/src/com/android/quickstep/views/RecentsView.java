@@ -193,7 +193,9 @@ import com.android.quickstep.ViewUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.recents.data.RecentTasksRepository;
 import com.android.quickstep.recents.data.RecentsDeviceProfileRepository;
+import com.android.quickstep.recents.data.RecentsDeviceProfileRepositoryImpl;
 import com.android.quickstep.recents.data.RecentsRotationStateRepository;
+import com.android.quickstep.recents.data.RecentsRotationStateRepositoryImpl;
 import com.android.quickstep.recents.di.RecentsDependencies;
 import com.android.quickstep.recents.viewmodel.RecentsViewData;
 import com.android.quickstep.recents.viewmodel.RecentsViewModel;
@@ -828,10 +830,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             );
 
             recentsDependencies.provide(RecentsRotationStateRepository.class,
-                    () -> new RecentsRotationStateRepository(mOrientationState));
+                    () -> new RecentsRotationStateRepositoryImpl(mOrientationState));
 
             recentsDependencies.provide(RecentsDeviceProfileRepository.class,
-                    () -> new RecentsDeviceProfileRepository(mContainer));
+                    () -> new RecentsDeviceProfileRepositoryImpl(mContainer));
         } else {
             mRecentsViewModel = null;
         }
@@ -3297,6 +3299,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     }
 
     private void setTaskThumbnailSplashAlpha(float taskThumbnailSplashAlpha) {
+        if (enableRefactorTaskThumbnail()) {
+            mRecentsViewModel.updateThumbnailSplashProgress(taskThumbnailSplashAlpha);
+            return;
+        }
         int taskCount = getTaskViewCount();
         if (taskCount == 0) {
             return;
@@ -4894,7 +4900,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                             mSplitHiddenTaskView.getWidth(), mSplitHiddenTaskView.getHeight(),
                             primaryTaskSelected);
             builder.addOnFrameCallback(() -> {
-                // TODO(b/334826842): Handle splash icon for new TTV.
                 if (!enableRefactorTaskThumbnail()) {
                     taskContainer.getThumbnailViewDeprecated().refreshSplashView();
                 }

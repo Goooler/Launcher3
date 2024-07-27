@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.viewmodel
+package com.android.quickstep.task.thumbnail
 
-import com.android.quickstep.views.TaskViewType
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class TaskViewData(taskViewType: TaskViewType) {
-    // This is typically a View concern but it is used to invalidate rendering in other Views
-    val scale = MutableStateFlow(1f)
-
-    val nonGridScale = MutableStateFlow(1f)
-
-    // TODO(b/331753115): This property should not be in TaskViewData once TaskView is MVVM.
-    /** Whether outline of TaskView is formed by outline thumbnail view(s). */
-    val isOutlineFormedByThumbnailView: Boolean = taskViewType != TaskViewType.DESKTOP
+class TaskThumbnailViewData {
+    val width = MutableStateFlow(0)
+    val height = MutableStateFlow(0)
+    val scaleX = MutableStateFlow(1f)
+    val scaleY = MutableStateFlow(1f)
 }

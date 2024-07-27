@@ -33,7 +33,7 @@ import com.android.launcher3.util.MultiPropertyFactory
 import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 
-class PersistentTaskbarStashController(
+class PersistentBubbleStashController(
     private val taskbarHotseatDimensionsProvider: TaskbarHotseatDimensionsProvider,
 ) : BubbleStashController {
 
@@ -54,7 +54,7 @@ class PersistentTaskbarStashController(
             }
             if (onHome) {
                 // When transition to home we should show collapse the bubble bar
-                updateStashedAndExpandedState(stash = false, expand = false)
+                updateExpandedState(expand = false)
             }
             animateBubbleBarY()
             bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
@@ -66,7 +66,7 @@ class PersistentTaskbarStashController(
             field = onOverview
             if (!onOverview) {
                 // When transition from overview we should show collapse the bubble bar
-                updateStashedAndExpandedState(stash = false, expand = false)
+                updateExpandedState(expand = false)
             }
             bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
         }
@@ -114,7 +114,8 @@ class PersistentTaskbarStashController(
         this.bubbleBarViewController = bubbleBarViewController
         this.controllersAfterInitAction = controllersAfterInitAction
         bubbleBarTranslationYAnimator = bubbleBarViewController.bubbleBarTranslationY
-        bubbleBarAlphaAnimator = bubbleBarViewController.bubbleBarAlpha.get(0)
+        // bubble bar has only alpha property, getting it at index 0
+        bubbleBarAlphaAnimator = bubbleBarViewController.bubbleBarAlpha.get(/* index= */ 0)
         bubbleBarScaleAnimator = bubbleBarViewController.bubbleBarScale
     }
 
@@ -131,16 +132,6 @@ class PersistentTaskbarStashController(
         animatorSet.setDuration(BAR_STASH_DURATION).start()
     }
 
-    override fun updateStashedAndExpandedState(stash: Boolean, expand: Boolean) {
-        if (bubbleBarViewController.isHiddenForNoBubbles) {
-            // If there are no bubbles the bar is invisible, nothing to do here.
-            return
-        }
-        if (bubbleBarViewController.isExpanded != expand) {
-            bubbleBarViewController.isExpanded = expand
-        }
-    }
-
     override fun showBubbleBarImmediate() = showBubbleBarImmediate(bubbleBarTranslationY)
 
     override fun showBubbleBarImmediate(bubbleBarTranslationY: Float) {
@@ -152,6 +143,14 @@ class PersistentTaskbarStashController(
     override fun setBubbleBarLocation(bubbleBarLocation: BubbleBarLocation) {
         // When the bubble bar is shown for the persistent task bar, there is no handle view, so no
         // operation is performed.
+    }
+
+    override fun stashBubbleBar() {
+        updateExpandedState(expand = false)
+    }
+
+    override fun showBubbleBar(expandBubbles: Boolean) {
+        updateExpandedState(expandBubbles)
     }
 
     override fun stashBubbleBarImmediate() {
@@ -176,7 +175,7 @@ class PersistentTaskbarStashController(
     override fun isEventOverBubbleBarViews(ev: MotionEvent): Boolean =
         bubbleBarViewController.isEventOverAnyItem(ev)
 
-    override fun getSlideInAnimationDistanceY(): Float {
+    override fun getDiffBetweenHandleAndBarCenters(): Float {
         // distance from the bottom of the screen and the bubble bar center.
         return -bubbleBarViewController.bubbleBarCollapsedHeight / 2f
     }
@@ -197,6 +196,16 @@ class PersistentTaskbarStashController(
      */
     override fun setHandleTranslationY(translationY: Float) {
         // no op since does not have a handle view
+    }
+
+    private fun updateExpandedState(expand: Boolean) {
+        if (bubbleBarViewController.isHiddenForNoBubbles) {
+            // If there are no bubbles the bar is invisible, nothing to do here.
+            return
+        }
+        if (bubbleBarViewController.isExpanded != expand) {
+            bubbleBarViewController.isExpanded = expand
+        }
     }
 
     /** Animates bubble bar Y accordingly to the showing mode */

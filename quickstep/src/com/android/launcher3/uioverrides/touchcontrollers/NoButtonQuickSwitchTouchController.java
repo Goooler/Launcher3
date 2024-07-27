@@ -121,6 +121,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     private AnimatorPlaybackController mNonOverviewAnim;
     private AnimatorPlaybackController mXOverviewAnim;
     private AnimatedFloat mYOverviewAnim;
+    private boolean mIsTrackpadSwipe;
 
     public NoButtonQuickSwitchTouchController(QuickstepLauncher launcher) {
         mLauncher = launcher;
@@ -177,7 +178,8 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
             return false;
         }
         if (isTrackpadMultiFingerSwipe(ev)) {
-            return isTrackpadFourFingerSwipe(ev);
+            mIsTrackpadSwipe = isTrackpadFourFingerSwipe(ev);
+            return mIsTrackpadSwipe;
         }
         return true;
     }
@@ -185,6 +187,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     @Override
     public void onDragStart(boolean start) {
         mMotionPauseDetector.clear();
+        mMotionPauseDetector.setIsTrackpadGesture(mIsTrackpadSwipe);
         if (start) {
             InteractionJankMonitorWrapper.begin(mRecentsView, Cuj.CUJ_LAUNCHER_QUICK_SWITCH);
             InteractionJankMonitorWrapper.begin(mRecentsView, Cuj.CUJ_LAUNCHER_APP_SWIPE_TO_RECENTS,

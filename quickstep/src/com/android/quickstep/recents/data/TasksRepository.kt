@@ -130,9 +130,15 @@ class TasksRepository(
                                 icon,
                                 contentDescription,
                                 title ->
-                                continuation.resume(
-                                    TaskIconQueryResponse(icon, contentDescription, title)
-                                )
+                                icon.constantState?.let {
+                                    continuation.resume(
+                                        TaskIconQueryResponse(
+                                            it.newDrawable().mutate(),
+                                            contentDescription,
+                                            title
+                                        )
+                                    )
+                                }
                             }
                         continuation.invokeOnCancellation { cancellableTask?.cancel() }
                     }
@@ -157,7 +163,7 @@ class TasksRepository(
     }
 }
 
-private data class TaskIconQueryResponse(
+data class TaskIconQueryResponse(
     val icon: Drawable,
     val contentDescription: String,
     val title: String

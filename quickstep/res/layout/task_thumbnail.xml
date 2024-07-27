@@ -39,4 +39,16 @@
         android:background="@color/overview_foreground_scrim_color"
         android:alpha="0" />
 
+    <FrameLayout
+        android:id="@+id/splash_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+        <ImageView
+            android:id="@+id/splash_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no" />
+    </FrameLayout>
 </com.android.quickstep.task.thumbnail.TaskThumbnailView>
