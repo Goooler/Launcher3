@@ -130,7 +130,10 @@
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"క్విక్ సెట్టింగ్‌లు"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"టాస్క్‌బార్"</string>
     <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"టాస్క్‌బార్ చూపబడింది"</string>
+    <string name="taskbar_a11y_shown_with_bubbles_left_title" msgid="4242431789851790046">"టాస్క్‌బార్, బబుల్స్ ఎడమవైపున చూపబడ్డాయి"</string>
+    <string name="taskbar_a11y_shown_with_bubbles_right_title" msgid="8219065376188180113">"టాస్క్‌బార్, బబుల్స్ కుడివైపున చూపబడ్డాయి"</string>
     <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"టాస్క్‌బార్ దాచబడింది"</string>
+    <string name="taskbar_a11y_hidden_with_bubbles_title" msgid="7397395993149508087">"టాస్క్‌బార్, బబుల్స్ దాచబడినవి"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"నావిగేషన్ బార్"</string>
     <string name="always_show_taskbar" msgid="3608801276107751229">"టాస్క్‌బార్‌ను నిరంతరం చూపండి"</string>
     <string name="change_navigation_mode" msgid="9088393078736808968">"నావిగేషన్ మోడ్‌ను మార్చండి"</string>
@@ -144,10 +147,9 @@
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"ఓవర్‌ఫ్లో"</string>
     <string name="bubble_bar_bubble_description" msgid="1882466152448446446">"<xliff:g id="APP_NAME">%2$s</xliff:g> నుండి <xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>"</string>
     <string name="bubble_bar_description_multiple_bubbles" msgid="3922207715357143648">"<xliff:g id="BUBBLE_BAR_BUBBLE_DESCRIPTION">%1$s</xliff:g>, మరో <xliff:g id="BUBBLE_COUNT">%2$d</xliff:g>"</string>
-    <!-- no translation found for bubble_bar_action_move_left (3306922475737714758) -->
-    <skip />
-    <!-- no translation found for bubble_bar_action_move_right (3455099638571411251) -->
-    <skip />
-    <!-- no translation found for bubble_bar_action_dismiss_all (3290722022983403060) -->
-    <skip />
+    <string name="bubble_bar_action_move_left" msgid="3306922475737714758">"ఎడమ వైపుగా జరపండి"</string>
+    <string name="bubble_bar_action_move_right" msgid="3455099638571411251">"కుడి వైపుగా జరపండి"</string>
+    <string name="bubble_bar_action_dismiss_all" msgid="3290722022983403060">"అన్నింటినీ విస్మరించండి"</string>
+    <string name="bubble_bar_accessibility_announce_expand" msgid="1503192695527477102">"<xliff:g id="BUBBLE_DESCRIPTION">%1$s</xliff:g>ను విస్తరించండి"</string>
+    <string name="bubble_bar_accessibility_announce_collapse" msgid="928284600086798791">"<xliff:g id="BUBBLE_DESCRIPTION">%1$s</xliff:g>ను కుదించండి"</string>
 </resources>

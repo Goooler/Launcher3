@@ -25,6 +25,7 @@ import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
+import android.graphics.Rect;
 import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
@@ -178,6 +179,24 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 /* fromInit= */ false,
                 /* startAnimation= */ false,
                 placeholderDuration));
+    }
+
+    /**
+     * Returns the bounds of launcher's hotseat.
+     */
+    public void getHotseatBounds(Rect hotseatBoundsOut) {
+        DeviceProfile launcherDP = mLauncher.getDeviceProfile();
+        if (launcherDP.isQsbInline) {
+            // Not currently supported.
+            hotseatBoundsOut.setEmpty();
+            return;
+        }
+        int left = (launcherDP.widthPx - launcherDP.getHotseatWidthPx()
+                - mLauncher.getHotseat().getUnusedHorizontalSpace()) / 2;
+        int right = left + launcherDP.getHotseatWidthPx();
+        int bottom = launcherDP.getHotseatLayoutPadding(mLauncher).bottom;
+        int top = bottom - launcherDP.hotseatCellHeightPx;
+        hotseatBoundsOut.set(left, top, right, bottom);
     }
 
     /**

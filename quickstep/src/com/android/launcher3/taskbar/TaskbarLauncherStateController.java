@@ -250,7 +250,7 @@ public class TaskbarLauncherStateController {
 
         applyState(0);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
         updateOverviewDragState(mLauncherState);
     }
@@ -263,7 +263,7 @@ public class TaskbarLauncherStateController {
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
     }
 
@@ -743,8 +743,7 @@ public class TaskbarLauncherStateController {
         if (firstFrameVisChanged && mCanSyncViews && !Utilities.isRunningInTestHarness()) {
             ViewRootSync.synchronizeNextDraw(mLauncher.getHotseat(),
                     mControllers.taskbarActivityContext.getDragLayer(),
-                    () -> {
-                    });
+                    () -> {});
         }
     }
 

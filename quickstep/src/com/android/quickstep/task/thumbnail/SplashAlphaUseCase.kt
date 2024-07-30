@@ -45,7 +45,7 @@ class SplashAlphaUseCase(
             ) { width, height, thumbnailData, taskSplashProgress, globalSplashProgress ->
                 val thumbnail = thumbnailData?.thumbnail
                 when {
-                    thumbnail == null -> 1f
+                    thumbnail == null -> 0f
                     taskSplashProgress > 0f -> taskSplashProgress
                     globalSplashProgress > 0f &&
                         isInaccurateThumbnail(thumbnail, thumbnailData.rotation, width, height) ->

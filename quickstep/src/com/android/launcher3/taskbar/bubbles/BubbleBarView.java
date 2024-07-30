@@ -307,17 +307,6 @@ public class BubbleBarView extends FrameLayout {
         }
     }
 
-    @Override
-    public void setAlpha(float alpha) {
-        super.setAlpha(alpha);
-        int childCount = getChildCount();
-        for (int i = 0; i < childCount; i++) {
-            View childView = getChildAt(i);
-            if (!(childView instanceof BubbleView)) continue;
-            ((BubbleView) childView).setProvideShadowOutline(alpha == 1f);
-        }
-    }
-
     /**
      * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
      *
@@ -970,11 +959,14 @@ public class BubbleBarView extends FrameLayout {
             float fullElevationForChild = (MAX_BUBBLES * mBubbleElevation) - i;
             bv.setZ(fullElevationForChild * elevationState);
 
-            // only update the dot scale if we're expanding or collapsing
+            // only update the dot and badge scale if we're expanding or collapsing
             if (mWidthAnimator.isRunning()) {
                 // The dot for the selected bubble scales in the opposite direction of the expansion
                 // animation.
                 bv.showDotIfNeeded(bv == mSelectedBubbleView ? 1 - widthState : widthState);
+                // The badge for the selected bubble is always at full scale. All other bubbles
+                // scale according to the expand animation.
+                bv.setBadgeScale(bv == mSelectedBubbleView ? 1 : widthState);
             }
 
             if (mIsBarExpanded) {
@@ -983,16 +975,12 @@ public class BubbleBarView extends FrameLayout {
                 // where the bubble will end up when the animation ends
                 final float targetX = expandedX + expandedBarShift;
                 bv.setTranslationX(widthState * (targetX - collapsedX) + collapsedX);
-                // When we're expanded, the badge is visible for all bubbles
-                bv.updateBadgeVisibility(/* show= */ true);
                 bv.setAlpha(1);
             } else {
                 // If bar is on the right, account for bubble bar expanding and shifting left
                 final float collapsedBarShift = onLeft ? 0 : currentWidth - collapsedWidth;
                 final float targetX = collapsedX + collapsedBarShift;
                 bv.setTranslationX(widthState * (expandedX - targetX) + targetX);
-                // The badge is always visible for the first bubble
-                bv.updateBadgeVisibility(/* show= */ i == 0);
                 // If we're fully collapsed, hide all bubbles except for the first 2. If there are
                 // only 2 bubbles, hide the second bubble as well because it's the overflow.
                 if (widthState == 0) {

@@ -38,10 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"جفت برنامه دردسترس نیست"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"برای جابه‌جا کردن ابزارک، لمس کنید و نگه دارید."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"برای جابه‌جا کردن ابزارک یا استفاده از کنش‌های سفارشی، دو تک‌ضرب بزنید و نگه دارید."</string>
-    <!-- no translation found for widget_picker_widget_options_button_description (4770099264476852363) -->
-    <skip />
-    <!-- no translation found for widget_picker_show_all_widgets_menu_item_title (9023638224586908119) -->
-    <skip />
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"گزینه‌های بیشتر"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"نمایش همه ابزاره‌ها"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"‏%1$d عرض در %2$d طول"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"ابزارک <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

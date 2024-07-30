@@ -20,15 +20,13 @@ import android.app.Notification;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Outline;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewOutlineProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
 
@@ -36,7 +34,6 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.launcher3.icons.IconNormalizer;
 import com.android.wm.shell.animation.Interpolators;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.common.bubbles.BubbleInfo;
@@ -78,8 +75,13 @@ public class BubbleView extends ConstraintLayout {
 
     private BubbleBarItem mBubble;
 
+    private Bitmap mIcon;
+
     @Nullable
     private Controller mController;
+
+    @Nullable
+    private BubbleBarBubbleIconsFactory mIconFactory = null;
 
     public BubbleView(Context context) {
         this(context, null);
@@ -107,36 +109,14 @@ public class BubbleView extends ConstraintLayout {
 
         setFocusable(true);
         setClickable(true);
-        setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, Outline outline) {
-                BubbleView.this.getOutline(outline);
-            }
-        });
-    }
-
-    //TODO(b/345490679) remove once proper shadow is applied
-    /** Set whether provide an outline. */
-    public void setProvideShadowOutline(boolean provideOutline) {
-        if (mProvideShadowOutline == provideOutline) return;
-        mProvideShadowOutline = provideOutline;
-        invalidateOutline();
-    }
-
-    private void getOutline(Outline outline) {
-        updateBubbleSizeAndDotRender();
-        final int normalizedSize = IconNormalizer.getNormalizedCircleSize(mBubbleSize);
-        final int inset = (mBubbleSize - normalizedSize) / 2;
-        if (mProvideShadowOutline) {
-            outline.setOval(inset, inset, inset + normalizedSize, inset + normalizedSize);
-        }
     }
 
     private void updateBubbleSizeAndDotRender() {
         int updatedBubbleSize = Math.min(getWidth(), getHeight());
         if (updatedBubbleSize == mBubbleSize) return;
         mBubbleSize = updatedBubbleSize;
-        invalidateOutline();
+        mIconFactory = new BubbleBarBubbleIconsFactory(mContext, mBubbleSize);
+        updateBubbleIcon();
         if (mBubble == null || mBubble instanceof BubbleBarOverflow) return;
         Path dotPath = ((BubbleBarBubble) mBubble).getDotPath();
         mDotRenderer = new DotRenderer(mBubbleSize, dotPath, DEFAULT_PATH_SIZE);
@@ -254,7 +234,8 @@ public class BubbleView extends ConstraintLayout {
     /** Sets the bubble being rendered in this view. */
     public void setBubble(BubbleBarBubble bubble) {
         mBubble = bubble;
-        mBubbleIcon.setImageBitmap(bubble.getIcon());
+        mIcon = bubble.getIcon();
+        updateBubbleIcon();
         mAppIcon.setImageBitmap(bubble.getBadge());
         mDotColor = bubble.getDotColor();
         mDotRenderer = new DotRenderer(mBubbleSize, bubble.getDotPath(), DEFAULT_PATH_SIZE);
@@ -270,6 +251,18 @@ public class BubbleView extends ConstraintLayout {
         setContentDescription(contentDesc);
     }
 
+    private void updateBubbleIcon() {
+        Bitmap icon = null;
+        if (mIcon != null) {
+            icon = mIcon;
+            if (mIconFactory != null) {
+                BitmapDrawable iconDrawable = new BitmapDrawable(getResources(), icon);
+                icon = mIconFactory.createShadowedIconBitmap(iconDrawable, /* scale = */ 1f);
+            }
+        }
+        mBubbleIcon.setImageBitmap(icon);
+    }
+
     /**
      * Sets that this bubble represents the overflow. The overflow appears in the list of bubbles
      * but does not represent app content, instead it shows recent bubbles that couldn't fit into
@@ -278,7 +271,8 @@ public class BubbleView extends ConstraintLayout {
      */
     public void setOverflow(BubbleBarOverflow overflow, Bitmap bitmap) {
         mBubble = overflow;
-        mBubbleIcon.setImageBitmap(bitmap);
+        mIcon = bitmap;
+        updateBubbleIcon();
         mAppIcon.setVisibility(GONE); // Overflow doesn't show the app badge
         setContentDescription(getResources().getString(R.string.bubble_bar_overflow_description));
     }
@@ -300,18 +294,9 @@ public class BubbleView extends ConstraintLayout {
         }
     }
 
-    void updateBadgeVisibility(boolean show) {
-        if (mBubble instanceof BubbleBarOverflow) {
-            // The overflow bubble does not have a badge, so just bail.
-            return;
-        }
-        BubbleBarBubble bubble = (BubbleBarBubble) mBubble;
-        Bitmap appBadgeBitmap = bubble.getBadge();
-        int translationX = mOnLeft
-                ? -(bubble.getIcon().getWidth() - appBadgeBitmap.getWidth())
-                : 0;
-        mAppIcon.setTranslationX(translationX);
-        mAppIcon.setVisibility(show ? VISIBLE : GONE);
+    void setBadgeScale(float fraction) {
+        mAppIcon.setScaleX(fraction);
+        mAppIcon.setScaleY(fraction);
     }
 
     boolean hasUnseenContent() {

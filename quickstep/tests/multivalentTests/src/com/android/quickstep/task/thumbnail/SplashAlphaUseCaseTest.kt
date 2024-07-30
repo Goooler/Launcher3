@@ -54,7 +54,7 @@ class SplashAlphaUseCaseTest {
 
     @Test
     fun execute_withNullThumbnail_showsSplash() = runTest {
-        assertThat(systemUnderTest.execute(0).first()).isEqualTo(SPLASH_SHOWN)
+        assertThat(systemUnderTest.execute(0).first()).isEqualTo(SPLASH_HIDDEN)
     }
 
     @Test
