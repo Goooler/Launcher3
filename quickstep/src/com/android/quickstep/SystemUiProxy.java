@@ -24,7 +24,6 @@ import static com.android.launcher3.util.SplitConfigurationOptions.StagePosition
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENT_TASKS_MISSING;
 import static com.android.quickstep.util.LogUtils.splitFailureMessage;
 import static com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -96,6 +95,7 @@ import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.recents.IRecentTasks;
 import com.android.wm.shell.recents.IRecentTasksListener;
 import com.android.wm.shell.shared.IShellTransitions;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.splitscreen.ISplitScreen;
 import com.android.wm.shell.splitscreen.ISplitScreenListener;
 import com.android.wm.shell.splitscreen.ISplitSelectListener;
@@ -1443,8 +1443,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
-        // TODO(b/335401172): unify DesktopMode checks in Launcher
-        return DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        return DesktopModeStatus.canEnterDesktopMode(mContext)
                 && enableDesktopWindowingTaskbarRunningApps();
     }
 

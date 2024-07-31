@@ -28,6 +28,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_OVERLAY_PROXY;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
+import static com.android.launcher3.Flags.enableTaskbarCustomization;
 import static com.android.launcher3.Utilities.calculateTextHeight;
 import static com.android.launcher3.Utilities.isRunningInTestHarness;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
@@ -207,9 +208,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     private final LauncherPrefs mLauncherPrefs;
 
-    private final TaskbarFeatureEvaluator mTaskbarFeatureEvaluator;
+    private TaskbarFeatureEvaluator mTaskbarFeatureEvaluator;
 
-    private final TaskbarSpecsEvaluator mTaskbarSpecsEvaluator;
+    private TaskbarSpecsEvaluator mTaskbarSpecsEvaluator;
 
     public TaskbarActivityContext(Context windowContext,
             @Nullable Context navigationBarPanelContext, DeviceProfile launcherDp,
@@ -221,12 +222,14 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         applyDeviceProfile(launcherDp);
         final Resources resources = getResources();
 
-        mTaskbarFeatureEvaluator = TaskbarFeatureEvaluator.getInstance(this);
-        mTaskbarSpecsEvaluator = new TaskbarSpecsEvaluator(
-                this,
-                mTaskbarFeatureEvaluator,
-                mDeviceProfile.inv.numRows,
-                mDeviceProfile.inv.numColumns);
+        if (enableTaskbarCustomization()) {
+            mTaskbarFeatureEvaluator = TaskbarFeatureEvaluator.getInstance(this);
+            mTaskbarSpecsEvaluator = new TaskbarSpecsEvaluator(
+                    this,
+                    mTaskbarFeatureEvaluator,
+                    mDeviceProfile.inv.numRows,
+                    mDeviceProfile.inv.numColumns);
+        }
 
         mImeDrawsImeNavBar = getBoolByName(IME_DRAWS_IME_NAV_BAR_RES_NAME, resources, false);
         mIsSafeModeEnabled = TraceHelper.allowIpcs("isSafeMode",
@@ -1707,10 +1710,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return mControllers.taskbarStashController.isInStashedLauncherState();
     }
 
+    @Nullable
     public TaskbarFeatureEvaluator getTaskbarFeatureEvaluator() {
         return mTaskbarFeatureEvaluator;
     }
 
+    @Nullable
     public TaskbarSpecsEvaluator getTaskbarSpecsEvaluator() {
         return mTaskbarSpecsEvaluator;
     }

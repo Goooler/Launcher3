@@ -20,10 +20,12 @@ import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Process
 import android.os.UserHandle
 import android.platform.test.rule.TestWatcher
 import android.testing.AndroidTestingRunner
+import com.android.internal.R
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION
 import com.android.launcher3.model.data.AppInfo
@@ -73,6 +75,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     @Mock private lateinit var mockIconCache: TaskIconCache
     @Mock private lateinit var mockRecentsModel: RecentsModel
     @Mock private lateinit var mockContext: Context
+    @Mock private lateinit var mockResources: Resources
     @Mock private lateinit var mockDesktopVisibilityController: DesktopVisibilityController
 
     private var taskListChangeId: Int = 1
@@ -87,6 +90,10 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     fun setUp() {
         super.setup()
         userHandle = Process.myUserHandle()
+
+        // Set desktop mode supported
+        whenever(mockContext.getResources()).thenReturn(mockResources)
+        whenever(mockResources.getBoolean(R.bool.config_isDesktopModeSupported)).thenReturn(true)
 
         whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
         whenever(mockRecentsModel.unregisterRecentTasksChangedListener()).then {

@@ -28,7 +28,7 @@ import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
 import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
 /**
@@ -44,9 +44,8 @@ class TaskbarRecentAppsController(
     private val desktopVisibilityControllerProvider: () -> DesktopVisibilityController?,
 ) : LoggableTaskbarController {
 
-    // TODO(b/335401172): unify DesktopMode checks in Launcher.
     var canShowRunningApps =
-        DESKTOP_WINDOWING_MODE.isEnabled(context) && enableDesktopWindowingTaskbarRunningApps()
+        DesktopModeStatus.canEnterDesktopMode(context) && enableDesktopWindowingTaskbarRunningApps()
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest

@@ -62,7 +62,6 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -151,6 +150,7 @@ import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
 
 import kotlin.Unit;
@@ -1273,7 +1273,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         TaskView currentPageTaskView = mRecentsView != null
                 ? mRecentsView.getCurrentPageTaskView() : null;
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if ((nextPageTaskView instanceof DesktopTaskView
@@ -1446,7 +1446,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             setClampScrollOffset(false);
         };
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView != null && (mRecentsView.getCurrentPageTaskView() != null
@@ -2294,7 +2294,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                     mRecentsAnimationController, mRecentsAnimationTargets);
         });
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                         && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView.getNextPageTaskView() instanceof DesktopTaskView

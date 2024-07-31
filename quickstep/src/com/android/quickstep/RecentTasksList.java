@@ -20,7 +20,6 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 import static com.android.wm.shell.util.GroupedRecentTaskInfo.TYPE_FREEFORM;
 
 import android.app.ActivityManager;
@@ -41,6 +40,7 @@ import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
@@ -329,9 +329,9 @@ public class RecentTasksList {
         int numVisibleTasks = 0;
         for (GroupedRecentTaskInfo rawTask : rawTasks) {
             if (rawTask.getType() == TYPE_FREEFORM) {
-                // TYPE_FREEFORM tasks is only created whenDESKTOP_WINDOWING_MODE.isEnabled is true,
+                // TYPE_FREEFORM tasks is only created when desktop mode can be entered,
                 // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
-                if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)) {
+                if (DesktopModeStatus.canEnterDesktopMode(mContext)) {
                     GroupTask desktopTask = createDesktopTask(rawTask);
                     if (desktopTask != null) {
                         allTasks.add(desktopTask);

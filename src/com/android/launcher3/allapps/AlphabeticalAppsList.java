@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_LEFT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_RIGHT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_NOTHING;
@@ -294,6 +295,14 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             }
             if (Flags.enablePrivateSpace()) {
                 position = addPrivateSpaceItems(position);
+            }
+            if (!mFastScrollerSections.isEmpty()) {
+                // After all the adapterItems are added, add a view to the bottom so that user can
+                // scroll all the way down.
+                mAdapterItems.add(new AdapterItem(VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO));
+                mFastScrollerSections.add(new FastScrollSectionInfo(
+                        mFastScrollerSections.get(mFastScrollerSections.size() - 1).sectionName,
+                        position++));
             }
         }
         mAccessibilityResultsCount = (int) mAdapterItems.stream()

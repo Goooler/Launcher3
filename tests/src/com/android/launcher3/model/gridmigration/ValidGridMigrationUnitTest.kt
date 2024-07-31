@@ -94,7 +94,13 @@ class ValidGridMigrationUnitTest {
 
         val srcCountMap = itemsToMap(srcGrid.items)
         val resultCountMap = itemsToMap(resultItems)
-        val diff = resultCountMap - srcCountMap
+        val diff = resultCountMap.toMutableMap()
+        for ((srcKey, srcValue) in srcCountMap) {
+            val destValue = diff[srcKey]
+            if (destValue != null) {
+                diff[srcKey] = destValue - srcValue
+            }
+        }
 
         diff.forEach { (k, count) ->
             assert(count >= 0) { "Source item $k not present on the result" }

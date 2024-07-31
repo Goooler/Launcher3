@@ -68,7 +68,8 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
     public static final int VIEW_TYPE_WORK_DISABLED_CARD = 1 << 5;
     public static final int VIEW_TYPE_PRIVATE_SPACE_HEADER = 1 << 6;
     public static final int VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER = 1 << 7;
-    public static final int NEXT_ID = 8;
+    public static final int VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO = 1 << 8;
+    public static final int NEXT_ID = 9;
 
     // Common view type masks
     public static final int VIEW_TYPE_MASK_DIVIDER = VIEW_TYPE_ALL_APPS_DIVIDER;
@@ -247,6 +248,8 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_PRIVATE_SPACE_HEADER:
                 return new ViewHolder(mLayoutInflater.inflate(
                         R.layout.private_space_header, parent, false));
+            case VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO:
+                return new ViewHolder(new View(mActivityContext));
             default:
                 if (mAdapterProvider.isViewSupported(viewType)) {
                     return mAdapterProvider.onCreateViewHolder(mLayoutInflater, parent, viewType);
@@ -324,6 +327,7 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                         == STATE_DISABLED ? null : new SectionDecorationInfo(mActivityContext,
                         ROUND_NOTHING, true /* decorateTogether */);
                 break;
+            case VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO:
             case VIEW_TYPE_ALL_APPS_DIVIDER:
             case VIEW_TYPE_WORK_DISABLED_CARD:
                 // nothing to do
