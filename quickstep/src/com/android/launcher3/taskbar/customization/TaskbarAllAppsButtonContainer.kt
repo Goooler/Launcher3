@@ -63,10 +63,10 @@ constructor(
         val padding = activityContext.taskbarSpecsEvaluator!!.taskbarIconPadding
 
         allAppsButton.setIconDrawable(drawable)
-        allAppsButton.setPadding(/* left= */ padding)
+        allAppsButton.setPadding(padding)
         allAppsButton.setForegroundTint(activityContext.getColor(R.color.all_apps_button_color))
 
-        // TODO(jagrutdesai) : add click listeners in future cl
+        // TODO(b/356465292) : add click listeners in future cl
         addView(allAppsButton)
     }
 

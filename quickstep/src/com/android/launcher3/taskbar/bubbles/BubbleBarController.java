@@ -63,6 +63,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.launcher3.shortcuts.ShortcutRequest;
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.quickstep.SystemUiProxy;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -76,6 +77,7 @@ import com.android.wm.shell.common.bubbles.RemovedBubble;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -144,7 +146,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private ImeVisibilityChecker mImeVisibilityChecker;
     private BubbleBarViewController mBubbleBarViewController;
     private BubbleStashController mBubbleStashController;
-    private BubbleStashedHandleViewController mBubbleStashedHandleViewController;
+    private Optional<BubbleStashedHandleViewController> mBubbleStashedHandleViewController;
     private BubblePinController mBubblePinController;
 
     // Cache last sent top coordinate to avoid sending duplicate updates to shell
@@ -221,8 +223,9 @@ public class BubbleBarController extends IBubblesListener.Stub {
         bubbleControllers.runAfterInit(() -> {
             mBubbleBarViewController.setHiddenForBubbles(
                     !sBubbleBarEnabled || mBubbles.isEmpty());
-            mBubbleStashedHandleViewController.setHiddenForBubbles(
-                    !sBubbleBarEnabled || mBubbles.isEmpty());
+            mBubbleStashedHandleViewController.ifPresent(
+                    controller -> controller.setHiddenForBubbles(
+                            !sBubbleBarEnabled || mBubbles.isEmpty()));
             mBubbleBarViewController.setUpdateSelectedBubbleAfterCollapse(
                     key -> setSelectedBubbleInternal(mBubbles.get(key)));
             mBubbleBarViewController.setBoundsChangeListener(this::onBubbleBarBoundsChanged);
@@ -258,10 +261,11 @@ public class BubbleBarController extends IBubblesListener.Stub {
         mBubbleBarViewController.setHiddenForSysui(hideBubbleBar);
 
         boolean hideHandleView = (flags & MASK_HIDE_HANDLE_VIEW) != 0;
-        mBubbleStashedHandleViewController.setHiddenForSysui(hideHandleView);
+        mBubbleStashedHandleViewController.ifPresent(
+                controller -> controller.setHiddenForSysui(hideHandleView));
 
         boolean sysuiLocked = (flags & MASK_SYSUI_LOCKED) != 0;
-        mBubbleStashController.onSysuiLockedStateChange(sysuiLocked);
+        mBubbleStashController.setSysuiLocked(sysuiLocked);
     }
 
     //
@@ -387,7 +391,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         // Adds and removals have happened, update visibility before any other visual changes.
         mBubbleBarViewController.setHiddenForBubbles(mBubbles.isEmpty());
-        mBubbleStashedHandleViewController.setHiddenForBubbles(mBubbles.isEmpty());
+        mBubbleStashedHandleViewController.ifPresent(
+                controller -> controller.setHiddenForBubbles(mBubbles.isEmpty()));
 
         if (mBubbles.isEmpty()) {
             // all bubbles were removed. clear the selected bubble

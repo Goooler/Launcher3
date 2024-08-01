@@ -321,8 +321,9 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
         if (controllers == null) {
             return false;
         }
-        if (controllers.bubbleStashController.isStashed()) {
-            return controllers.bubbleStashedHandleViewController.containsX((int) x);
+        if (controllers.bubbleStashController.isStashed()
+                && controllers.bubbleStashedHandleViewController.isPresent()) {
+            return controllers.bubbleStashedHandleViewController.get().containsX((int) x);
         } else {
             Rect bubbleBarBounds = controllers.bubbleBarViewController.getBubbleBarBounds();
             return x >= bubbleBarBounds.left && x <= bubbleBarBounds.right;

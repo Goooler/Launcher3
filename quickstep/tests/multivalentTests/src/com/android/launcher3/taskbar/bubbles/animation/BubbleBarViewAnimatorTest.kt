@@ -35,8 +35,8 @@ import com.android.launcher3.R
 import com.android.launcher3.taskbar.bubbles.BubbleBarBubble
 import com.android.launcher3.taskbar.bubbles.BubbleBarOverflow
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
-import com.android.launcher3.taskbar.bubbles.BubbleStashController
 import com.android.launcher3.taskbar.bubbles.BubbleView
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.wm.shell.common.bubbles.BubbleInfo
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
@@ -78,7 +78,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
@@ -122,7 +122,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
@@ -165,7 +165,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
@@ -205,7 +205,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
@@ -246,7 +246,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
@@ -278,7 +278,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
@@ -321,7 +321,7 @@ class BubbleBarViewAnimatorTest {
 
         val handle = View(context)
         val handleAnimator = PhysicsAnimator.getInstance(handle)
-        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
@@ -451,9 +451,9 @@ class BubbleBarViewAnimatorTest {
     private fun setUpBubbleStashController() {
         bubbleStashController = mock<BubbleStashController>()
         whenever(bubbleStashController.isStashed).thenReturn(true)
-        whenever(bubbleStashController.diffBetweenHandleAndBarCenters)
+        whenever(bubbleStashController.getDiffBetweenHandleAndBarCenters())
             .thenReturn(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS)
-        whenever(bubbleStashController.stashedHandleTranslationForNewBubbleAnimation)
+        whenever(bubbleStashController.getStashedHandleTranslationForNewBubbleAnimation())
             .thenReturn(HANDLE_TRANSLATION)
         whenever(bubbleStashController.bubbleBarTranslationYForTaskbar)
             .thenReturn(BAR_TRANSLATION_Y_FOR_TASKBAR)

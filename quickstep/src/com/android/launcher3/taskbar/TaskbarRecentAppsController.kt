@@ -27,7 +27,7 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
+import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
@@ -45,7 +45,8 @@ class TaskbarRecentAppsController(
 ) : LoggableTaskbarController {
 
     var canShowRunningApps =
-        DesktopModeStatus.canEnterDesktopMode(context) && enableDesktopWindowingTaskbarRunningApps()
+        DesktopModeStatus.canEnterDesktopMode(context) &&
+            DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(context)
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest

@@ -17,7 +17,7 @@
 package com.android.launcher3.taskbar.bubbles.stashing
 
 class ImmediateAction : BubbleStashController.ControllersAfterInitAction {
-    override fun runAfterInit(action: () -> Unit) = action.invoke()
+    override fun runAfterInit(action: Runnable) = action.run()
 }
 
 class DefaultDimensionsProvider(

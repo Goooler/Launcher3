@@ -276,17 +276,15 @@ public class SplitSelectStateController {
                     // Loop through tasks in reverse, since they are ordered with recent tasks last
                     for (int j = taskGroups.size() - 1; j >= 0; j--) {
                         GroupTask groupTask = taskGroups.get(j);
-                        Task task1 = groupTask.task1;
-                        // Don't add duplicate Tasks
-                        if (isInstanceOfComponent(task1, key)
-                                && !Arrays.asList(lastActiveTasks).contains(task1)) {
-                            lastActiveTask = task1;
-                            break;
+                        // Account for desktop cases where there can be N tasks in the group
+                        for (Task task : groupTask.getTasks()) {
+                            if (isInstanceOfComponent(task, key)
+                                    && !Arrays.asList(lastActiveTasks).contains(task)) {
+                                lastActiveTask = task;
+                                break;
+                            }
                         }
-                        Task task2 = groupTask.task2;
-                        if (isInstanceOfComponent(task2, key)
-                                && !Arrays.asList(lastActiveTasks).contains(task2)) {
-                            lastActiveTask = task2;
+                        if (lastActiveTask != null) {
                             break;
                         }
                     }

@@ -58,8 +58,8 @@ class RecentsViewModel(
         recentsViewData.thumbnailSplashProgress.value = taskThumbnailSplashAlpha
     }
 
-    fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
-        recentsTasksRepository.setThumbnailOverride(thumbnailOverride)
+    fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
+        recentsTasksRepository.addOrUpdateThumbnailOverride(thumbnailOverride)
     }
 
     suspend fun waitForThumbnailsToUpdate(updatedThumbnails: Map<Int, ThumbnailData>) {

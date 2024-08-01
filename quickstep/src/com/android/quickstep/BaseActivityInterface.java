@@ -31,7 +31,6 @@ import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.graphics.Color;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
@@ -133,7 +132,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
         TaskbarUIController controller = getTaskbarController();
         boolean isEventOverBubbleBarStashHandle =
-                controller != null && controller.isEventOverBubbleBarStashHandle(ev);
+                controller != null && controller.isEventOverBubbleBarViews(ev);
         return deviceState.isInDeferredGestureRegion(ev) || deviceState.isImeRenderingNavButtons()
                 || isTrackpadMultiFingerSwipe(ev) || isEventOverBubbleBarStashHandle;
     }

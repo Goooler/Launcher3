@@ -39,6 +39,7 @@ import com.android.launcher3.taskbar.TaskbarControllers;
 import com.android.launcher3.taskbar.TaskbarInsetsController;
 import com.android.launcher3.taskbar.TaskbarStashController;
 import com.android.launcher3.taskbar.bubbles.animation.BubbleBarViewAnimator;
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
@@ -92,7 +93,7 @@ public class BubbleBarViewController {
 
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
 
-    private TimeSource mTimeSource = System::currentTimeMillis;
+    private final TimeSource mTimeSource = System::currentTimeMillis;
 
     @Nullable
     private BubbleBarBoundsChangeListener mBoundsChangeListener;
@@ -386,7 +387,8 @@ public class BubbleBarViewController {
         int newIconSize;
         int newPadding;
         Resources res = mActivity.getResources();
-        if (mBubbleStashController.isBubblesShowingOnHome()) {
+        if (mBubbleStashController.isBubblesShowingOnHome()
+                || mBubbleStashController.isTransientTaskBar()) {
             newIconSize = getBubbleBarIconSizeFromDeviceProfile(res);
             newPadding = getBubbleBarPaddingFromDeviceProfile(res);
         } else {
@@ -507,7 +509,8 @@ public class BubbleBarViewController {
                 // the bubble bar and handle are initialized as part of the first bubble animation.
                 // if the animation is suppressed, immediately stash or show the bubble bar to
                 // ensure they've been initialized.
-                if (mTaskbarStashController.isInApp()) {
+                if (mTaskbarStashController.isInApp()
+                        && mBubbleStashController.isTransientTaskBar()) {
                     mBubbleStashController.stashBubbleBarImmediate();
                 } else {
                     mBubbleStashController.showBubbleBarImmediate();
@@ -530,14 +533,15 @@ public class BubbleBarViewController {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
-
-        if (mBubbleStashController.isBubblesShowingOnHome() && !isExpanding && !isExpanded()) {
+        boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
+                || !mBubbleStashController.isTransientTaskBar();
+        if (persistentTaskbarOrOnHome && !isExpanding && !isExpanded()) {
             mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble);
             return;
         }
 
-        // only animate the new bubble if we're in an app and not auto expanding
-        if (isInApp && !isExpanding && !isExpanded()) {
+        // only animate the new bubble if we're in an app, have handle view and not auto expanding
+        if (isInApp && !isExpanding && mBubbleStashController.getHasHandleView() && !isExpanded()) {
             mBubbleBarViewAnimator.animateBubbleInForStashed(bubble);
         }
     }
@@ -598,6 +602,7 @@ public class BubbleBarViewController {
     /**
      * Updates the dragged bubble view in the bubble bar view, and notifies SystemUI
      * that a bubble is being dragged to dismiss.
+     *
      * @param bubbleView dragged bubble view
      */
     public void onBubbleDragStart(@NonNull BubbleView bubbleView) {

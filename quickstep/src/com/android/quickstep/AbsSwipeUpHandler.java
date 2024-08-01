@@ -2100,7 +2100,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // If there are no targets, then we don't need to capture anything
             mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED);
         } else {
-            boolean finishTransitionPosted = false;
             // If we already have cached screenshot(s) from running tasks, skip update
             boolean shouldUpdate = false;
             int[] runningTaskIds = mGestureState.getRunningTaskIds(mIsSwipeForSplit);
@@ -2124,45 +2123,32 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                         }
 
                         MAIN_EXECUTOR.execute(() -> {
-                            if (!updateThumbnail(false /* refreshView */)) {
-                                setScreenshotCapturedState();
-                            }
+                            updateThumbnail();
+                            setScreenshotCapturedState();
                         });
                     });
                     return;
                 }
 
-                finishTransitionPosted = updateThumbnail(false /* refreshView */);
+                updateThumbnail();
             }
 
-            if (!finishTransitionPosted) {
-                setScreenshotCapturedState();
-            }
+            setScreenshotCapturedState();
         }
     }
 
     // Returns whether finish transition was posted.
-    private boolean updateThumbnail(boolean refreshView) {
+    private void updateThumbnail() {
         if (mGestureState.getEndTarget() == HOME
                 || mGestureState.getEndTarget() == NEW_TASK
                 || mGestureState.getEndTarget() == ALL_APPS
                 || mRecentsView == null) {
             // Capture the screenshot before finishing the transition to home or quickswitching to
             // ensure it's taken in the correct orientation, but no need to update the thumbnail.
-            return false;
+            return;
         }
 
-        boolean finishTransitionPosted = false;
-        TaskView updatedTaskView = mRecentsView.updateThumbnail(mTaskSnapshotCache, refreshView);
-        if (updatedTaskView != null && refreshView && !mCanceled) {
-            // Defer finishing the animation until the next launcher frame with the
-            // new thumbnail
-            finishTransitionPosted = ViewUtils.postFrameDrawn(updatedTaskView,
-                    () -> mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED),
-                    this::isCanceled);
-        }
-
-        return finishTransitionPosted;
+        mRecentsView.updateThumbnail(mTaskSnapshotCache);
     }
 
     private void setScreenshotCapturedState() {

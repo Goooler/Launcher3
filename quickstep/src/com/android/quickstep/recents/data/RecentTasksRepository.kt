@@ -46,5 +46,5 @@ interface RecentTasksRepository {
      * Override [ThumbnailData] with a map of taskId to [ThumbnailData]. The override only applies
      * if the tasks are already visible, and will be invalidated when tasks become invisible.
      */
-    fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>)
+    fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>)
 }

@@ -33,7 +33,7 @@ import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.taskbar.StashedHandleView;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.taskbar.TaskbarControllers;
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
@@ -79,7 +79,8 @@ public class BubbleStashedHandleViewController {
         mStashedHandleAlpha = new MultiValueAlpha(mStashedHandleView, 1);
     }
 
-    public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers) {
+    /** Initialize controller. */
+    public void init(BubbleControllers bubbleControllers) {
         mBarViewController = bubbleControllers.bubbleBarViewController;
         mBubbleStashController = bubbleControllers.bubbleStashController;
 
@@ -117,7 +118,7 @@ public class BubbleStashedHandleViewController {
                     public Rect getSampledRegion(View sampledView) {
                         return mStashedHandleView.getSampledRegion();
                     }
-                }, Executors.UI_HELPER_EXECUTOR);
+                }, Executors.MAIN_EXECUTOR, Executors.UI_HELPER_EXECUTOR);
 
         mStashedHandleView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) ->
                 updateBounds(mBarViewController.getBubbleBarLocation()));

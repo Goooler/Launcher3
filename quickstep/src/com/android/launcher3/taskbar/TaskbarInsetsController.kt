@@ -131,7 +131,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         val taskbarTouchableHeight = controllers.taskbarStashController.touchableHeight
         val bubblesTouchableHeight =
             if (controllers.bubbleControllers.isPresent) {
-                controllers.bubbleControllers.get().bubbleStashController.touchableHeight
+                controllers.bubbleControllers.get().bubbleStashController.getTouchableHeight()
             } else {
                 0
             }
@@ -139,7 +139,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
 
         if (
             controllers.bubbleControllers.isPresent &&
-                controllers.bubbleControllers.get().bubbleStashController.isBubblesShowingOnHome
+                controllers.bubbleControllers.get().bubbleStashController.isBubbleBarVisible()
         ) {
             val iconBounds =
                 controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
@@ -162,8 +162,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 controllers.bubbleControllers
                     .getOrNull()
                     ?.bubbleBarViewController
-                    ?.isAnimatingNewBubble
-                    ?: false
+                    ?.isAnimatingNewBubble ?: false
             if (isAnimatingNewBubble) {
                 val iconBounds =
                     controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
@@ -358,13 +357,6 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
      */
     fun updateInsetsTouchability(insetsInfo: ViewTreeObserver.InternalInsetsInfo) {
         insetsInfo.touchableRegion.setEmpty()
-        // Always have nav buttons be touchable
-        controllers.navbarButtonsViewController.addVisibleButtonsRegion(
-            context.dragLayer,
-            insetsInfo.touchableRegion
-        )
-        debugTouchableRegion.lastSetTouchableBounds.set(insetsInfo.touchableRegion.bounds)
-
         val bubbleBarVisible =
             controllers.bubbleControllers.isPresent &&
                 controllers.bubbleControllers.get().bubbleBarViewController.isBubbleBarVisible()
@@ -443,6 +435,12 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             debugTouchableRegion.lastSetTouchableReason =
                 "Icons are not visible, but other components such as 3 buttons might be"
         }
+        // Always have nav buttons be touchable
+        controllers.navbarButtonsViewController.addVisibleButtonsRegion(
+            context.dragLayer,
+            insetsInfo.touchableRegion
+        )
+        debugTouchableRegion.lastSetTouchableBounds.set(insetsInfo.touchableRegion.bounds)
         context.excludeFromMagnificationRegion(insetsIsTouchableRegion)
     }
 

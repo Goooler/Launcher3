@@ -27,6 +27,7 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.R
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.wm.shell.common.bubbles.BaseBubblePinController
 import com.android.wm.shell.common.bubbles.BubbleBarLocation
 

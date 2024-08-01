@@ -82,12 +82,15 @@ class TasksRepository(
 
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         this.visibleTaskIds.value = visibleTaskIdList.toSet()
-        setThumbnailOverride(thumbnailOverride.value)
+        addOrUpdateThumbnailOverride(emptyMap())
     }
 
-    override fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
+    override fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
         this.thumbnailOverride.value =
-            thumbnailOverride.filterKeys(this.visibleTaskIds.value::contains).toMap()
+            this.thumbnailOverride.value
+                .toMutableMap()
+                .apply { putAll(thumbnailOverride) }
+                .filterKeys(this.visibleTaskIds.value::contains)
     }
 
     /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */

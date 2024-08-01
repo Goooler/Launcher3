@@ -89,7 +89,7 @@ class RecentsViewModelTest {
 
         val thumbnailUpdate = mapOf(2 to thumbnailDataOverride)
         systemUnderTest.setRunningTaskShowScreenshot(true)
-        systemUnderTest.setThumbnailOverride(thumbnailUpdate)
+        systemUnderTest.addOrUpdateThumbnailOverride(thumbnailUpdate)
 
         systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
         systemUnderTest.waitForThumbnailsToUpdate(thumbnailUpdate)

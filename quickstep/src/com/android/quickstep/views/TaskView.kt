@@ -1398,7 +1398,6 @@ constructor(
 
     protected open fun refreshTaskThumbnailSplash() {
         if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/342560598) handle onTaskIconChanged
             taskContainers.forEach { it.thumbnailViewDeprecated.refreshSplashView() }
         }
     }

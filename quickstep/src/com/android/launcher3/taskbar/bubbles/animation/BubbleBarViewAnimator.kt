@@ -26,8 +26,8 @@ import androidx.dynamicanimation.animation.SpringForce
 import com.android.launcher3.R
 import com.android.launcher3.taskbar.bubbles.BubbleBarBubble
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
-import com.android.launcher3.taskbar.bubbles.BubbleStashController
 import com.android.launcher3.taskbar.bubbles.BubbleView
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 
 /** Handles animations for bubble bar bubbles. */
@@ -138,19 +138,20 @@ constructor(
         // handle. when the handle becomes invisible and we start animating in the bubble bar,
         // the translation y is offset by this value to make the transition from the handle to the
         // bar smooth.
-        val offset = bubbleStashController.diffBetweenHandleAndBarCenters
-        val stashedHandleTranslationY =
-            bubbleStashController.stashedHandleTranslationForNewBubbleAnimation
+        val offset: Float = bubbleStashController.getDiffBetweenHandleAndBarCenters()
+        val stashedHandleTranslationY: Float =
+            bubbleStashController.getStashedHandleTranslationForNewBubbleAnimation()
 
         // this is the total distance that both the stashed handle and the bubble will be traveling
         // at the end of the animation the bubble bar will be positioned in the same place when it
         // shows while we're in an app.
         val totalTranslationY = bubbleStashController.bubbleBarTranslationYForTaskbar + offset
-        val animator = bubbleStashController.stashedHandlePhysicsAnimator
+        val animator = bubbleStashController.getStashedHandlePhysicsAnimator() ?: return@Runnable
         animator.setDefaultSpringConfig(springConfig)
         animator.spring(DynamicAnimation.TRANSLATION_Y, totalTranslationY)
         animator.addUpdateListener { handle, values ->
-            val ty = values[DynamicAnimation.TRANSLATION_Y]?.value ?: return@addUpdateListener
+            val ty: Float =
+                values[DynamicAnimation.TRANSLATION_Y]?.value ?: return@addUpdateListener
             when {
                 ty >= stashedHandleTranslationY -> {
                     // we're in the first leg of the animation. only animate the handle. the bubble
@@ -226,13 +227,13 @@ constructor(
      */
     private fun buildBubbleBarToHandleAnimation() = Runnable {
         if (animatingBubble == null) return@Runnable
-        val offset = bubbleStashController.diffBetweenHandleAndBarCenters
+        val offset = bubbleStashController.getStashedHandleTranslationForNewBubbleAnimation()
         val stashedHandleTranslationY =
-            bubbleStashController.stashedHandleTranslationForNewBubbleAnimation
+            bubbleStashController.getStashedHandleTranslationForNewBubbleAnimation()
         // this is the total distance that both the stashed handle and the bar will be traveling
         val totalTranslationY = bubbleStashController.bubbleBarTranslationYForTaskbar + offset
         bubbleStashController.setHandleTranslationY(totalTranslationY)
-        val animator = bubbleStashController.stashedHandlePhysicsAnimator
+        val animator = bubbleStashController.getStashedHandlePhysicsAnimator() ?: return@Runnable
         animator.setDefaultSpringConfig(springConfig)
         animator.spring(DynamicAnimation.TRANSLATION_Y, 0f)
         animator.addUpdateListener { handle, values ->
@@ -363,7 +364,7 @@ constructor(
     /** Handles touching the animating bubble bar. */
     fun onBubbleBarTouchedWhileAnimating() {
         PhysicsAnimator.getInstance(bubbleBarView).cancelIfRunning()
-        bubbleStashController.stashedHandlePhysicsAnimator.cancelIfRunning()
+        bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
         val hideAnimation = animatingBubble?.hideAnimation ?: return
         scheduler.cancel(hideAnimation)
         bubbleBarView.onAnimatingBubbleCompleted()
@@ -376,7 +377,7 @@ constructor(
         val hideAnimation = animatingBubble?.hideAnimation ?: return
         scheduler.cancel(hideAnimation)
         animatingBubble = null
-        bubbleStashController.stashedHandlePhysicsAnimator.cancel()
+        bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
         bubbleBarView.onAnimatingBubbleCompleted()
         bubbleBarView.relativePivotY = 1f
         bubbleStashController.onNewBubbleAnimationInterrupted(
@@ -385,8 +386,8 @@ constructor(
         )
     }
 
-    private fun <T> PhysicsAnimator<T>.cancelIfRunning() {
-        if (isRunning()) cancel()
+    private fun <T> PhysicsAnimator<T>?.cancelIfRunning() {
+        if (this?.isRunning() == true) cancel()
     }
 
     private fun ObjectAnimator.withDuration(duration: Long): ObjectAnimator {

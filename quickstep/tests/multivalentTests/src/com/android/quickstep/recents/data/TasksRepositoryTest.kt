@@ -193,57 +193,79 @@ class TasksRepositoryTest {
     }
 
     @Test
-    fun setThumbnailOverrideOverrideThumbnails() = runTest {
+    fun addThumbnailOverrideOverrideThumbnails() = runTest {
         recentsModel.seedTasks(defaultTaskList)
         val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
-        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
-        val thumbnailOverride = createThumbnailData()
-        systemUnderTest.getAllTaskData(forceRefresh = true)
-
-        systemUnderTest.setVisibleTasks(listOf(1))
-        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
-        systemUnderTest.setVisibleTasks(listOf(1, 2))
-
-        // .drop(1) to ignore initial null content before from thumbnail was loaded.
-        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
-            .isEqualTo(bitmap1)
-        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
-    }
-
-    @Test
-    fun setThumbnailOverrideClearedWhenTaskBecomeInvisible() = runTest {
-        recentsModel.seedTasks(defaultTaskList)
-        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
-        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
-        val thumbnailOverride = createThumbnailData()
+        val thumbnailOverride2 = createThumbnailData()
         systemUnderTest.getAllTaskData(forceRefresh = true)
 
         systemUnderTest.setVisibleTasks(listOf(1, 2))
-        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
-        systemUnderTest.setVisibleTasks(listOf(1))
-        systemUnderTest.setVisibleTasks(listOf(1, 2))
-
-        // .drop(1) to ignore initial null content before from thumbnail was loaded.
-        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
-            .isEqualTo(bitmap1)
-        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
-    }
-
-    @Test
-    fun setThumbnailOverrideDoesNotOverrideInvisibleTasks() = runTest {
-        recentsModel.seedTasks(defaultTaskList)
-        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
-        val thumbnailOverride = createThumbnailData()
-        systemUnderTest.getAllTaskData(forceRefresh = true)
-
-        systemUnderTest.setVisibleTasks(listOf(1, 2))
-        systemUnderTest.setThumbnailOverride(mapOf(2 to thumbnailOverride))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
 
         // .drop(1) to ignore initial null content before from thumbnail was loaded.
         assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
             .isEqualTo(bitmap1)
         assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail)
-            .isEqualTo(thumbnailOverride.thumbnail)
+            .isEqualTo(thumbnailOverride2.thumbnail)
+    }
+
+    @Test
+    fun addThumbnailOverrideMultipleOverrides() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val thumbnailOverride1 = createThumbnailData()
+        val thumbnailOverride2 = createThumbnailData()
+        val thumbnailOverride3 = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(1 to thumbnailOverride1))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride3))
+
+        assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail)
+            .isEqualTo(thumbnailOverride1.thumbnail)
+        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail)
+            .isEqualTo(thumbnailOverride3.thumbnail)
+    }
+
+    @Test
+    fun addThumbnailOverrideClearedWhenTaskBecomeInvisible() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
+        val thumbnailOverride1 = createThumbnailData()
+        val thumbnailOverride2 = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(1 to thumbnailOverride1))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
+        // Making task 2 invisible and visible again should clear the override
+        systemUnderTest.setVisibleTasks(listOf(1))
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+
+        // .drop(1) to ignore initial null content before from thumbnail was loaded.
+        assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail)
+            .isEqualTo(thumbnailOverride1.thumbnail)
+        assertThat(systemUnderTest.getThumbnailById(2).drop(1).first()!!.thumbnail)
+            .isEqualTo(bitmap2)
+    }
+
+    @Test
+    fun addThumbnailOverrideDoesNotOverrideInvisibleTasks() = runTest {
+        recentsModel.seedTasks(defaultTaskList)
+        val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
+        val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
+        val thumbnailOverride = createThumbnailData()
+        systemUnderTest.getAllTaskData(forceRefresh = true)
+
+        systemUnderTest.setVisibleTasks(listOf(1))
+        systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride))
+        systemUnderTest.setVisibleTasks(listOf(1, 2))
+
+        // .drop(1) to ignore initial null content before from thumbnail was loaded.
+        assertThat(systemUnderTest.getThumbnailById(1).drop(1).first()!!.thumbnail)
+            .isEqualTo(bitmap1)
+        assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
     }
 
     private fun createTaskWithId(taskId: Int) =

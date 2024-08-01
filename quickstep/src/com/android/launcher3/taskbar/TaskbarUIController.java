@@ -174,11 +174,11 @@ public class TaskbarUIController {
                 || mControllers.navbarButtonsViewController.isEventOverAnyItem(ev);
     }
 
-    /** Checks if the given {@link MotionEvent} is over the bubble bar stash handle. */
-    public boolean isEventOverBubbleBarStashHandle(MotionEvent ev) {
+    /** Checks if the given {@link MotionEvent} is over the bubble bar views. */
+    public boolean isEventOverBubbleBarViews(MotionEvent ev) {
         return mControllers.bubbleControllers.map(
                 bubbleControllers ->
-                        bubbleControllers.bubbleStashController.isEventOverStashHandle(ev))
+                        bubbleControllers.bubbleStashController.isEventOverBubbleBarViews(ev))
                 .orElse(false);
     }
 

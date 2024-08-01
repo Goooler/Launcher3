@@ -1610,7 +1610,6 @@ public class TouchInteractionService extends Service {
         pw.println("\tmConsumer=" + mConsumer.getName());
         ActiveGestureLog.INSTANCE.dump("", pw);
         RecentsModel.INSTANCE.get(this).dump("", pw);
-        TopTaskTracker.INSTANCE.get(this).dump("", pw);
         if (mTaskAnimationManager != null) {
             mTaskAnimationManager.dump("", pw);
         }

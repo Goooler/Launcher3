@@ -65,7 +65,7 @@ class FakeTasksRepository : RecentTasksRepository {
         setThumbnailOverrideInternal(thumbnailOverrideMap)
     }
 
-    override fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
+    override fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
         setThumbnailOverrideInternal(thumbnailOverride)
     }
 
