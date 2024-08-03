@@ -57,4 +57,6 @@
         @android:color/system_accent1_200</color>
     <color name="work_fab_icon_color">
         @android:color/system_accent1_900</color>
+
+    <color name="material_color_on_surface">@android:color/system_neutral1_100</color>
 </resources>

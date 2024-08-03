@@ -128,15 +128,11 @@ public class RecentsAnimationCallbacks implements
                     mController::finishAnimationToApp);
         } else {
             RemoteAnimationTarget[] nonAppTargets;
-            if (!TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
-                nonAppTargets = mSystemUiProxy.onGoingToRecentsLegacy(appTargets);
-            } else {
-                final ArrayList<RemoteAnimationTarget> apps = new ArrayList<>();
-                final ArrayList<RemoteAnimationTarget> nonApps = new ArrayList<>();
-                classifyTargets(appTargets, apps, nonApps);
-                appTargets = apps.toArray(new RemoteAnimationTarget[apps.size()]);
-                nonAppTargets = nonApps.toArray(new RemoteAnimationTarget[nonApps.size()]);
-            }
+            final ArrayList<RemoteAnimationTarget> apps = new ArrayList<>();
+            final ArrayList<RemoteAnimationTarget> nonApps = new ArrayList<>();
+            classifyTargets(appTargets, apps, nonApps);
+            appTargets = apps.toArray(new RemoteAnimationTarget[apps.size()]);
+            nonAppTargets = nonApps.toArray(new RemoteAnimationTarget[nonApps.size()]);
             if (nonAppTargets == null) {
                 nonAppTargets = new RemoteAnimationTarget[0];
             }

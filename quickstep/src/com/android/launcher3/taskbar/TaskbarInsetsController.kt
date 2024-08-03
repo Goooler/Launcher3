@@ -64,6 +64,10 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
     companion object {
         private const val INDEX_LEFT = 0
         private const val INDEX_RIGHT = 1
+
+        private fun Region.addBoundsToRegion(bounds: Rect?) {
+            bounds?.let { op(it, Region.Op.UNION) }
+        }
     }
 
     /** The bottom insets taskbar provides to the IME when IME is visible. */
@@ -128,32 +132,26 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             }
         }
 
+        val bubbleControllers = controllers.bubbleControllers.getOrNull()
         val taskbarTouchableHeight = controllers.taskbarStashController.touchableHeight
         val bubblesTouchableHeight =
-            if (controllers.bubbleControllers.isPresent) {
-                controllers.bubbleControllers.get().bubbleStashController.getTouchableHeight()
-            } else {
-                0
-            }
+            bubbleControllers?.bubbleStashController?.getTouchableHeight() ?: 0
+        // add bounds for task bar and bubble bar stash controllers
         val touchableHeight = max(taskbarTouchableHeight, bubblesTouchableHeight)
-
         defaultTouchableRegion.set(
             0,
             windowLayoutParams.height - touchableHeight,
             context.deviceProfile.widthPx,
             windowLayoutParams.height
         )
-        val isBubbleBarVisible =
-            controllers.bubbleControllers.isPresent &&
-                controllers.bubbleControllers.get().bubbleStashController.isBubbleBarVisible()
-        // if there's an animating bubble add it to the touch region so that it's clickable
-        val isAnimatingNewBubble =
-            controllers.bubbleControllers.getOrNull()?.bubbleBarViewController?.isAnimatingNewBubble
-                ?: false
-        if (isBubbleBarVisible || isAnimatingNewBubble) {
-            val iconBounds =
-                controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
-            defaultTouchableRegion.op(iconBounds, Region.Op.UNION)
+        if (bubbleControllers != null) {
+            val bubbleBarViewController = bubbleControllers.bubbleBarViewController
+            val isBubbleBarVisible = bubbleControllers.bubbleStashController.isBubbleBarVisible()
+            val isAnimatingNewBubble = bubbleBarViewController.isAnimatingNewBubble
+            // if bubble bar is visible or animating new bubble, add bar bounds to the touch region
+            if (isBubbleBarVisible || isAnimatingNewBubble) {
+                defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.bubbleBarBounds)
+            }
         }
 
         // Pre-calculate insets for different providers across different rotations for this gravity
@@ -404,7 +402,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
 
                 // Include the bounds of the bubble bar in the touchable region if they exist.
                 if (bubbleBarBounds != null) {
-                    region.op(bubbleBarBounds, Region.Op.UNION)
+                    region.addBoundsToRegion(bubbleBarBounds)
                 }
                 insetsInfo.touchableRegion.set(region)
                 debugTouchableRegion.lastSetTouchableReason = "Transient Taskbar is in Overview"

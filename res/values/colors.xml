@@ -142,6 +142,9 @@
     <color name="widget_cell_title_color_dark">@color/system_on_surface_dark</color>
     <color name="widget_cell_subtitle_color_dark">@color/system_on_surface_variant_dark</color>
 
+    <color name="material_color_surface_container_lowest">#FFFFFF</color>
+    <color name="material_color_on_surface">#1B1B1F</color>
+
     <color name="system_primary_container_light">#D9E2FF</color>
     <color name="system_on_primary_container_light">#001945</color>
     <color name="system_primary_light">#475D92</color>
