@@ -24,6 +24,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.util.Executors;
@@ -75,6 +76,11 @@ class LauncherAppWidgetHost extends AppWidgetHost {
      */
     public void recycleViewForNextCreation(ListenableHostView viewToRecycle) {
         mViewToRecycle = viewToRecycle;
+    }
+
+    @VisibleForTesting
+    @Nullable ListenableHostView getViewToRecycle() {
+        return mViewToRecycle;
     }
 
     @Override

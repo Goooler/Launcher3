@@ -89,7 +89,7 @@ public class WidgetsModel {
         if (!WIDGETS_ENABLED) {
             return Collections.emptyMap();
         }
-        return mWidgetsByPackageItem;
+        return new HashMap<>(mWidgetsByPackageItem);
     }
 
     /**

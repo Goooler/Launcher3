@@ -17,6 +17,7 @@
 package com.android.launcher3.recyclerview
 
 import android.content.Context
+import android.util.Log
 import android.view.ViewGroup
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.VisibleForTesting.Companion.PROTECTED
@@ -24,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.android.launcher3.BubbleTextView
+import com.android.launcher3.BuildConfig
 import com.android.launcher3.allapps.BaseAllAppsAdapter
 import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.util.CancellableTask
@@ -32,6 +34,7 @@ import com.android.launcher3.util.Executors.VIEW_PREINFLATION_EXECUTOR
 import com.android.launcher3.util.Themes
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.ActivityContext.ActivityContextDelegate
+import java.lang.IllegalStateException
 
 const val PREINFLATE_ICONS_ROW_COUNT = 4
 const val EXTRA_ICONS_COUNT = 2
@@ -47,12 +50,27 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
     @VisibleForTesting(otherwise = PROTECTED)
     var mCancellableTask: CancellableTask<List<ViewHolder>>? = null
 
+    companion object {
+        private const val TAG = "AllAppsRecyclerViewPool"
+        private const val NULL_LAYOUT_MANAGER_ERROR_STRING =
+            "activeRv's layoutManager should not be null"
+    }
+
     /**
      * Preinflate app icons. If all apps RV cannot be scrolled down, we don't need to preinflate.
      */
     fun preInflateAllAppsViewHolders(context: T) {
         val appsView = context.appsView ?: return
         val activeRv: RecyclerView = appsView.activeRecyclerView ?: return
+
+        if (activeRv.layoutManager == null) {
+            if (BuildConfig.IS_STUDIO_BUILD) {
+                throw IllegalStateException(NULL_LAYOUT_MANAGER_ERROR_STRING)
+            } else {
+                Log.e(TAG, NULL_LAYOUT_MANAGER_ERROR_STRING)
+            }
+            return
+        }
 
         // Create a separate context dedicated for all apps preinflation thread. The goal is to
         // create a separate AssetManager obj internally to avoid lock contention with

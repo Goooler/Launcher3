@@ -186,6 +186,35 @@ class WidgetsModelTest {
         assertThat(underTest.widgetsByComponentKey).isEmpty()
     }
 
+    @Test
+    fun getWidgetsByPackageItem_returnsACopyOfMap() {
+        loadWidgets()
+
+        val latch = CountDownLatch(1)
+        Executors.MODEL_EXECUTOR.execute {
+            var update = true
+
+            // each "widgetsByPackageItem" read returns a different copy of the map held internally.
+            // Modifying one shouldn't impact another.
+            for ((_, _) in underTest.widgetsByPackageItem.entries) {
+                underTest.widgetsByPackageItem.clear()
+                if (update) { // trigger update
+                    update = false
+                    // Similarly, model could update its code independently while a client is
+                    // iterating on the list.
+                    underTest.update(app, /* packageUser= */ null)
+                }
+            }
+
+            latch.countDown()
+        }
+        if (!latch.await(LOAD_WIDGETS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            fail("Timed out waiting for test")
+        }
+
+        // No exception
+    }
+
     private fun loadWidgets() {
         val latch = CountDownLatch(1)
         Executors.MODEL_EXECUTOR.execute {
