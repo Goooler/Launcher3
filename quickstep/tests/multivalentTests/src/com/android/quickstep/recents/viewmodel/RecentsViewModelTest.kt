@@ -72,9 +72,8 @@ class RecentsViewModelTest {
 
     @Test
     fun thumbnailOverrideWaitAndReset() = runTest {
-        val thumbnailData1 = createThumbnailData()
-        val thumbnailData2 = createThumbnailData()
-        val thumbnailDataOverride = createThumbnailData()
+        val thumbnailData1 = createThumbnailData().apply { snapshotId = 1 }
+        val thumbnailData2 = createThumbnailData().apply { snapshotId = 2 }
         tasksRepository.seedTasks(tasks)
         tasksRepository.seedThumbnailData(mapOf(1 to thumbnailData1, 2 to thumbnailData2))
 
@@ -87,15 +86,16 @@ class RecentsViewModelTest {
         assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
         assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
 
-        val thumbnailUpdate = mapOf(2 to thumbnailDataOverride)
         systemUnderTest.setRunningTaskShowScreenshot(true)
-        systemUnderTest.addOrUpdateThumbnailOverride(thumbnailUpdate)
+        val thumbnailOverride = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
+        systemUnderTest.addOrUpdateThumbnailOverride(thumbnailOverride)
 
         systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
-        systemUnderTest.waitForThumbnailsToUpdate(thumbnailUpdate)
+        val expectedUpdate = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
+        systemUnderTest.waitForThumbnailsToUpdate(expectedUpdate)
 
         assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
-        assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailDataOverride)
+        assertThat(thumbnailDataFlow2.first()?.snapshotId).isEqualTo(3)
 
         systemUnderTest.onReset()
 

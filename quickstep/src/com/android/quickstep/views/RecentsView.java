@@ -1048,7 +1048,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     @Nullable
     public Task onTaskThumbnailChanged(int taskId, ThumbnailData thumbnailData) {
         if (enableRefactorTaskThumbnail()) {
-            // TODO(b/342560598): Listen in TaskRepository and reload
+            mHelper.onTaskThumbnailChanged(taskId, thumbnailData);
             return null;
         }
         if (mHandleTaskStackChanges) {
@@ -1097,9 +1097,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /** Updates the thumbnail(s) of the relevant TaskView. */
     public void updateThumbnail(Map<Integer, ThumbnailData> thumbnailData) {
-        if (enableRefactorTaskThumbnail()) {
-            mRecentsViewModel.addOrUpdateThumbnailOverride(thumbnailData);
-        } else {
+        if (!enableRefactorTaskThumbnail()) {
             for (Map.Entry<Integer, ThumbnailData> entry : thumbnailData.entrySet()) {
                 Integer id = entry.getKey();
                 ThumbnailData thumbnail = entry.getValue();

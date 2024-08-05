@@ -108,6 +108,7 @@ import com.android.launcher3.taskbar.bubbles.BubbleBarPinController;
 import com.android.launcher3.taskbar.bubbles.BubbleBarView;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.launcher3.taskbar.bubbles.BubbleControllers;
+import com.android.launcher3.taskbar.bubbles.BubbleCreator;
 import com.android.launcher3.taskbar.bubbles.BubbleDismissController;
 import com.android.launcher3.taskbar.bubbles.BubbleDragController;
 import com.android.launcher3.taskbar.bubbles.BubblePinController;
@@ -296,7 +297,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     new BubbleBarPinController(this, mDragLayer,
                             () -> DisplayController.INSTANCE.get(this).getInfo().currentSize),
                     new BubblePinController(this, mDragLayer,
-                            () -> DisplayController.INSTANCE.get(this).getInfo().currentSize)
+                            () -> DisplayController.INSTANCE.get(this).getInfo().currentSize),
+                    new BubbleCreator(this)
             ));
         }
 

@@ -66,7 +66,7 @@ class RecentsViewModel(
         combine(
                 updatedThumbnails.map {
                     recentsTasksRepository.getThumbnailById(it.key).filter { thumbnailData ->
-                        thumbnailData == it.value
+                        thumbnailData?.snapshotId == it.value.snapshotId
                     }
                 }
             ) {}

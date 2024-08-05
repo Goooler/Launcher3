@@ -60,9 +60,6 @@ class RecentsViewHelper(private val recentsViewModel: RecentsViewModel) {
         // Update recentsViewModel and apply the thumbnailOverride ASAP, before waiting inside
         // viewAttachedScope.
         recentsViewModel.setRunningTaskShowScreenshot(true)
-        if (updatedThumbnails != null) {
-            recentsViewModel.addOrUpdateThumbnailOverride(updatedThumbnails)
-        }
         viewAttachedScope.launch {
             recentsViewModel.waitForRunningTaskShowScreenshotToUpdate()
             if (updatedThumbnails != null) {
@@ -70,5 +67,9 @@ class RecentsViewHelper(private val recentsViewModel: RecentsViewModel) {
             }
             ViewUtils.postFrameDrawn(taskView, onFinishRunnable)
         }
+    }
+
+    fun onTaskThumbnailChanged(taskId: Int, thumbnailData: ThumbnailData) {
+        recentsViewModel.addOrUpdateThumbnailOverride(mapOf(taskId to thumbnailData))
     }
 }

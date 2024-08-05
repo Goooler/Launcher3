@@ -115,7 +115,7 @@ public class LauncherAppState implements SafeCloseable {
         if (BuildCompat.isAtLeastV() && Flags.enableSupportForArchiving()) {
             ArchiveCompatibilityParams params = new ArchiveCompatibilityParams();
             params.setEnableUnarchivalConfirmation(false);
-            params.setEnableIconOverlay(!Flags.enableNewArchivingIcon());
+            params.setEnableIconOverlay(!Flags.useNewIconForArchivedApps());
             launcherApps.setArchiveCompatibility(params);
         }
 

@@ -15,13 +15,8 @@
  */
 package com.android.launcher3.taskbar.bubbles;
 
-import static android.content.pm.LauncherApps.ShortcutQuery.FLAG_GET_PERSONS_DATA;
-import static android.content.pm.LauncherApps.ShortcutQuery.FLAG_MATCH_CACHED;
-import static android.content.pm.LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC;
-import static android.content.pm.LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED_BY_ANY_LAUNCHER;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 
-import static com.android.launcher3.icons.FastBitmapDrawable.WHITE_SCRIM_ALPHA;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BOUNCER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
@@ -34,35 +29,12 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_S
 import android.annotation.BinderThread;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.LauncherApps;
-import android.content.pm.PackageManager;
-import android.content.pm.ShortcutInfo;
-import android.content.res.TypedArray;
-import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.graphics.Matrix;
-import android.graphics.Path;
 import android.graphics.Point;
-import android.graphics.drawable.AdaptiveIconDrawable;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.InsetDrawable;
 import android.os.Bundle;
 import android.os.SystemProperties;
-import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.Log;
-import android.util.PathParser;
-import android.view.LayoutInflater;
 
-import androidx.appcompat.content.res.AppCompatResources;
-
-import com.android.internal.graphics.ColorUtils;
-import com.android.launcher3.R;
-import com.android.launcher3.icons.BitmapInfo;
-import com.android.launcher3.icons.BubbleIconFactory;
-import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.quickstep.SystemUiProxy;
@@ -136,18 +108,16 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
     private static final Executor BUBBLE_STATE_EXECUTOR = Executors.newSingleThreadExecutor(
             new SimpleThreadFactory("BubbleStateUpdates-", THREAD_PRIORITY_BACKGROUND));
-    private final LauncherApps mLauncherApps;
-    private final BubbleIconFactory mIconFactory;
     private final SystemUiProxy mSystemUiProxy;
 
     private BubbleBarItem mSelectedBubble;
-    private BubbleBarOverflow mOverflowBubble;
 
     private ImeVisibilityChecker mImeVisibilityChecker;
     private BubbleBarViewController mBubbleBarViewController;
     private BubbleStashController mBubbleStashController;
     private Optional<BubbleStashedHandleViewController> mBubbleStashedHandleViewController;
     private BubblePinController mBubblePinController;
+    private BubbleCreator mBubbleCreator;
 
     // Cache last sent top coordinate to avoid sending duplicate updates to shell
     private int mLastSentBubbleBarTop;
@@ -198,13 +168,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
         if (sBubbleBarEnabled) {
             mSystemUiProxy.setBubblesListener(this);
         }
-        mLauncherApps = context.getSystemService(LauncherApps.class);
-        mIconFactory = new BubbleIconFactory(context,
-                context.getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_size),
-                context.getResources().getDimensionPixelSize(R.dimen.bubblebar_badge_size),
-                context.getResources().getColor(R.color.important_conversation),
-                context.getResources().getDimensionPixelSize(
-                        com.android.internal.R.dimen.importance_ring_stroke_width));
     }
 
     public void onDestroy() {
@@ -219,6 +182,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         mBubbleStashController = bubbleControllers.bubbleStashController;
         mBubbleStashedHandleViewController = bubbleControllers.bubbleStashedHandleViewController;
         mBubblePinController = bubbleControllers.bubblePinController;
+        mBubbleCreator = bubbleControllers.bubbleCreator;
 
         bubbleControllers.runAfterInit(() -> {
             mBubbleBarViewController.setHiddenForBubbles(
@@ -230,27 +194,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
                     key -> setSelectedBubbleInternal(mBubbles.get(key)));
             mBubbleBarViewController.setBoundsChangeListener(this::onBubbleBarBoundsChanged);
         });
-    }
-
-    /**
-     * Creates and adds the overflow bubble to the bubble bar if it hasn't been created yet.
-     *
-     * <p>This should be called on the {@link #BUBBLE_STATE_EXECUTOR} executor to avoid inflating
-     * the overflow multiple times.
-     */
-    private void createAndAddOverflowIfNeeded() {
-        if (mOverflowBubble == null) {
-            BubbleBarOverflow overflow = createOverflow(mContext);
-            MAIN_EXECUTOR.execute(() -> {
-                // we're on the main executor now, so check that the overflow hasn't been created
-                // again to avoid races.
-                if (mOverflowBubble == null) {
-                    mBubbleBarViewController.addBubble(
-                            overflow, /* isExpanding= */ false, /* suppressAnimation= */ true);
-                    mOverflowBubble = overflow;
-                }
-            });
-        }
     }
 
     /**
@@ -283,23 +226,25 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 || !update.currentBubbleList.isEmpty()) {
             // We have bubbles to load
             BUBBLE_STATE_EXECUTOR.execute(() -> {
-                createAndAddOverflowIfNeeded();
                 if (update.addedBubble != null) {
-                    viewUpdate.addedBubble = populateBubble(mContext, update.addedBubble, mBarView,
+                    viewUpdate.addedBubble = mBubbleCreator.populateBubble(mContext,
+                            update.addedBubble,
+                            mBarView,
                             null /* existingBubble */);
                 }
                 if (update.updatedBubble != null) {
                     BubbleBarBubble existingBubble = mBubbles.get(update.updatedBubble.getKey());
                     viewUpdate.updatedBubble =
-                            populateBubble(mContext, update.updatedBubble, mBarView,
+                            mBubbleCreator.populateBubble(mContext, update.updatedBubble,
+                                    mBarView,
                                     existingBubble);
                 }
                 if (update.currentBubbleList != null && !update.currentBubbleList.isEmpty()) {
                     List<BubbleBarBubble> currentBubbles = new ArrayList<>();
                     for (int i = 0; i < update.currentBubbleList.size(); i++) {
-                        BubbleBarBubble b =
-                                populateBubble(mContext, update.currentBubbleList.get(i), mBarView,
-                                        null /* existingBubble */);
+                        BubbleBarBubble b = mBubbleCreator.populateBubble(mContext,
+                                update.currentBubbleList.get(i), mBarView,
+                                null /* existingBubble */);
                         currentBubbles.add(b);
                     }
                     viewUpdate.currentBubbles = currentBubbles;
@@ -529,133 +474,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
     //
     // Loading data for the bubbles
     //
-
-    @Nullable
-    private BubbleBarBubble populateBubble(Context context, BubbleInfo b, BubbleBarView bbv,
-            @Nullable BubbleBarBubble existingBubble) {
-        String appName;
-        Bitmap badgeBitmap;
-        Bitmap bubbleBitmap;
-        Path dotPath;
-        int dotColor;
-
-        boolean isImportantConvo = b.isImportantConversation();
-
-        ShortcutRequest.QueryResult result = new ShortcutRequest(context,
-                new UserHandle(b.getUserId()))
-                .forPackage(b.getPackageName(), b.getShortcutId())
-                .query(FLAG_MATCH_DYNAMIC
-                        | FLAG_MATCH_PINNED_BY_ANY_LAUNCHER
-                        | FLAG_MATCH_CACHED
-                        | FLAG_GET_PERSONS_DATA);
-
-        ShortcutInfo shortcutInfo = result.size() > 0 ? result.get(0) : null;
-        if (shortcutInfo == null) {
-            Log.w(TAG, "No shortcutInfo found for bubble: " + b.getKey()
-                    + " with shortcutId: " + b.getShortcutId());
-        }
-
-        ApplicationInfo appInfo;
-        try {
-            appInfo = mLauncherApps.getApplicationInfo(
-                    b.getPackageName(),
-                    0,
-                    new UserHandle(b.getUserId()));
-        } catch (PackageManager.NameNotFoundException e) {
-            // If we can't find package... don't think we should show the bubble.
-            Log.w(TAG, "Unable to find packageName: " + b.getPackageName());
-            return null;
-        }
-        if (appInfo == null) {
-            Log.w(TAG, "Unable to find appInfo: " + b.getPackageName());
-            return null;
-        }
-        PackageManager pm = context.getPackageManager();
-        appName = String.valueOf(appInfo.loadLabel(pm));
-        Drawable appIcon = appInfo.loadUnbadgedIcon(pm);
-        Drawable badgedIcon = pm.getUserBadgedIcon(appIcon, new UserHandle(b.getUserId()));
-
-        // Badged bubble image
-        Drawable bubbleDrawable = mIconFactory.getBubbleDrawable(context, shortcutInfo,
-                b.getIcon());
-        if (bubbleDrawable == null) {
-            // Default to app icon
-            bubbleDrawable = appIcon;
-        }
-
-        BitmapInfo badgeBitmapInfo = mIconFactory.getBadgeBitmap(badgedIcon, isImportantConvo);
-        badgeBitmap = badgeBitmapInfo.icon;
-
-        float[] bubbleBitmapScale = new float[1];
-        bubbleBitmap = mIconFactory.getBubbleBitmap(bubbleDrawable, bubbleBitmapScale);
-
-        // Dot color & placement
-        Path iconPath = PathParser.createPathFromPathData(
-                context.getResources().getString(
-                        com.android.internal.R.string.config_icon_mask));
-        Matrix matrix = new Matrix();
-        float scale = bubbleBitmapScale[0];
-        float radius = BubbleView.DEFAULT_PATH_SIZE / 2f;
-        matrix.setScale(scale /* x scale */, scale /* y scale */, radius /* pivot x */,
-                radius /* pivot y */);
-        iconPath.transform(matrix);
-        dotPath = iconPath;
-        dotColor = ColorUtils.blendARGB(badgeBitmapInfo.color,
-                Color.WHITE, WHITE_SCRIM_ALPHA / 255f);
-
-        if (existingBubble == null) {
-            LayoutInflater inflater = LayoutInflater.from(context);
-            BubbleView bubbleView = (BubbleView) inflater.inflate(
-                    R.layout.bubblebar_item_view, bbv, false /* attachToRoot */);
-
-            BubbleBarBubble bubble = new BubbleBarBubble(b, bubbleView,
-                    badgeBitmap, bubbleBitmap, dotColor, dotPath, appName);
-            bubbleView.setBubble(bubble);
-            return bubble;
-        } else {
-            // If we already have a bubble (so it already has an inflated view), update it.
-            existingBubble.setInfo(b);
-            existingBubble.setBadge(badgeBitmap);
-            existingBubble.setIcon(bubbleBitmap);
-            existingBubble.setDotColor(dotColor);
-            existingBubble.setDotPath(dotPath);
-            existingBubble.setAppName(appName);
-            return existingBubble;
-        }
-    }
-
-    private BubbleBarOverflow createOverflow(Context context) {
-        Bitmap bitmap = createOverflowBitmap(context);
-        LayoutInflater inflater = LayoutInflater.from(context);
-        BubbleView bubbleView = (BubbleView) inflater.inflate(
-                R.layout.bubble_bar_overflow_button, mBarView, false /* attachToRoot */);
-        BubbleBarOverflow overflow = new BubbleBarOverflow(bubbleView);
-        bubbleView.setOverflow(overflow, bitmap);
-        return overflow;
-    }
-
-    private Bitmap createOverflowBitmap(Context context) {
-        Drawable iconDrawable = AppCompatResources.getDrawable(mContext,
-                R.drawable.bubble_ic_overflow_button);
-
-        final TypedArray ta = mContext.obtainStyledAttributes(
-                new int[]{
-                        R.attr.materialColorOnPrimaryFixed,
-                        R.attr.materialColorPrimaryFixed
-                });
-        int overflowIconColor = ta.getColor(0, Color.WHITE);
-        int overflowBackgroundColor = ta.getColor(1, Color.BLACK);
-        ta.recycle();
-
-        iconDrawable.setTint(overflowIconColor);
-
-        int inset = context.getResources().getDimensionPixelSize(R.dimen.bubblebar_overflow_inset);
-        Drawable foreground = new InsetDrawable(iconDrawable, inset);
-        Drawable drawable = new AdaptiveIconDrawable(new ColorDrawable(overflowBackgroundColor),
-                foreground);
-
-        return mIconFactory.createBadgedIconBitmap(drawable).icon;
-    }
 
     private void onBubbleBarBoundsChanged() {
         int newTop = mBarView.getRestingTopPositionOnScreen();

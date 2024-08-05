@@ -33,6 +33,7 @@ public class BubbleControllers {
     public final BubbleDismissController bubbleDismissController;
     public final BubbleBarPinController bubbleBarPinController;
     public final BubblePinController bubblePinController;
+    public final BubbleCreator bubbleCreator;
 
     private final RunnableList mPostInitRunnables = new RunnableList();
 
@@ -49,7 +50,8 @@ public class BubbleControllers {
             BubbleDragController bubbleDragController,
             BubbleDismissController bubbleDismissController,
             BubbleBarPinController bubbleBarPinController,
-            BubblePinController bubblePinController) {
+            BubblePinController bubblePinController,
+            BubbleCreator bubbleCreator) {
         this.bubbleBarController = bubbleBarController;
         this.bubbleBarViewController = bubbleBarViewController;
         this.bubbleStashController = bubbleStashController;
@@ -58,6 +60,7 @@ public class BubbleControllers {
         this.bubbleDismissController = bubbleDismissController;
         this.bubbleBarPinController = bubbleBarPinController;
         this.bubblePinController = bubblePinController;
+        this.bubbleCreator = bubbleCreator;
     }
 
     /**

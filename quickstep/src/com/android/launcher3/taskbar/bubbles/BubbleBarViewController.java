@@ -75,6 +75,7 @@ public class BubbleBarViewController {
     private View.OnClickListener mBubbleClickListener;
     private View.OnClickListener mBubbleBarClickListener;
     private BubbleView.Controller mBubbleViewController;
+    private BubbleBarOverflow mOverflowBubble;
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
@@ -121,6 +122,8 @@ public class BubbleBarViewController {
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
+        mOverflowBubble = bubbleControllers.bubbleCreator.createOverflow(mBarView);
+        addOverflow();
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -492,6 +495,15 @@ public class BubbleBarViewController {
     }
 
     /**
+     * Adds the overflow view to the bubble bar.
+     */
+    public void addOverflow() {
+        mBarView.addBubble(mOverflowBubble.getView());
+        mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
+        mOverflowBubble.getView().setController(mBubbleViewController);
+    }
+
+    /**
      * Adds the provided bubble to the bubble bar.
      */
     public void addBubble(BubbleBarItem b, boolean isExpanding, boolean suppressAnimation) {
@@ -500,10 +512,6 @@ public class BubbleBarViewController {
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
             b.getView().setController(mBubbleViewController);
-
-            if (b instanceof BubbleBarOverflow) {
-                return;
-            }
 
             if (suppressAnimation || !(b instanceof BubbleBarBubble bubble)) {
                 // the bubble bar and handle are initialized as part of the first bubble animation.

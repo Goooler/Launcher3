@@ -412,9 +412,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             // Apply decorator to private apps.
             if (hasPrivateApps) {
                 mAdapterItems.add(AdapterItem.asAppWithDecorationInfo(info,
-                        new SectionDecorationInfo(mActivityContext.getApplicationContext(),
-                                getRoundRegions(i, appList.size()),
-                                true /* decorateTogether */)));
+                        new SectionDecorationInfo(mActivityContext,
+                                getRoundRegions(i, appList.size()), true /* decorateTogether */)));
             } else {
                 mAdapterItems.add(AdapterItem.asApp(info));
             }
