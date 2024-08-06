@@ -138,6 +138,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
         List<RemovedBubble> removedBubbles;
         List<String> bubbleKeysInOrder;
         Point expandedViewDropTargetSize;
+        boolean showOverflow;
+        boolean showOverflowChanged;
 
         // These need to be loaded in the background
         BubbleBarBubble addedBubble;
@@ -156,6 +158,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
             removedBubbles = update.removedBubbles;
             bubbleKeysInOrder = update.bubbleKeysInOrder;
             expandedViewDropTargetSize = update.expandedViewDropTargetSize;
+            showOverflow = update.showOverflow;
+            showOverflowChanged = update.showOverflowChanged;
         }
     }
 
@@ -271,7 +275,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         BubbleBarBubble bubbleToSelect = null;
 
-        if (update.addedBubble != null && update.removedBubbles.size() == 1) {
+        if (Flags.enableOptionalBubbleOverflow()
+                && update.showOverflowChanged && !update.showOverflow && update.addedBubble != null
+                && update.removedBubbles.isEmpty()) {
+            // A bubble was added from the overflow (& now it's empty / not showing)
+            mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
+            mBubbleBarViewController.removeOverflowAndAddBubble(update.addedBubble);
+        } else if (update.addedBubble != null && update.removedBubbles.size() == 1) {
             // we're adding and removing a bubble at the same time. handle this as a single update.
             RemovedBubble removedBubble = update.removedBubbles.get(0);
             BubbleBarBubble bubbleToRemove = mBubbles.remove(removedBubble.getKey());
@@ -285,11 +295,17 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 Log.w(TAG, "trying to remove bubble that doesn't exist: " + removedBubble.getKey());
             }
         } else {
+            boolean overflowNeedsToBeAdded = Flags.enableOptionalBubbleOverflow()
+                    && update.showOverflowChanged && update.showOverflow;
             if (!update.removedBubbles.isEmpty()) {
                 for (int i = 0; i < update.removedBubbles.size(); i++) {
                     RemovedBubble removedBubble = update.removedBubbles.get(i);
                     BubbleBarBubble bubble = mBubbles.remove(removedBubble.getKey());
-                    if (bubble != null) {
+                    if (bubble != null && overflowNeedsToBeAdded) {
+                        // First removal, show the overflow
+                        overflowNeedsToBeAdded = false;
+                        mBubbleBarViewController.addOverflowAndRemoveBubble(bubble);
+                    } else if (bubble != null) {
                         mBubbleBarViewController.removeBubble(bubble);
                     } else {
                         Log.w(TAG, "trying to remove bubble that doesn't exist: "
@@ -301,6 +317,11 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
                 mBubbleBarViewController.addBubble(update.addedBubble, isExpanding,
                         suppressAnimation);
+            }
+            if (Flags.enableOptionalBubbleOverflow()
+                    && update.showOverflowChanged
+                    && update.showOverflow != mBubbleBarViewController.isOverflowAdded()) {
+                mBubbleBarViewController.showOverflow(update.showOverflow);
             }
         }
 
@@ -332,6 +353,9 @@ public class BubbleBarController extends IBubblesListener.Stub {
                             + update.addedBubble.getKey());
                 }
             }
+        }
+        if (Flags.enableOptionalBubbleOverflow() && update.initialState && update.showOverflow) {
+            mBubbleBarViewController.showOverflow(true);
         }
 
         // Adds and removals have happened, update visibility before any other visual changes.

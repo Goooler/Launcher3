@@ -74,6 +74,7 @@ public class BubbleView extends ConstraintLayout {
     private boolean mOnLeft = false;
 
     private BubbleBarItem mBubble;
+    private boolean mIsOverflow;
 
     private Bitmap mIcon;
 
@@ -271,10 +272,16 @@ public class BubbleView extends ConstraintLayout {
      */
     public void setOverflow(BubbleBarOverflow overflow, Bitmap bitmap) {
         mBubble = overflow;
+        mIsOverflow = true;
         mIcon = bitmap;
         updateBubbleIcon();
         mAppIcon.setVisibility(GONE); // Overflow doesn't show the app badge
         setContentDescription(getResources().getString(R.string.bubble_bar_overflow_description));
+    }
+
+    /** Whether this view represents the overflow button. */
+    public boolean isOverflow() {
+        return mIsOverflow;
     }
 
     /** Returns the bubble being rendered in this view. */

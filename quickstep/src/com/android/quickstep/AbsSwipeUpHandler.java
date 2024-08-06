@@ -989,7 +989,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 dp = dp.copy(mContext);
             }
             dp.updateInsets(targets.homeContentInsets);
-            dp.updateIsSeascape(mContext);
             initTransitionEndpoints(dp);
             orientationState.setMultiWindowMode(dp.isMultiWindowMode);
         }

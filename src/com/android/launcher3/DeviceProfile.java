@@ -65,7 +65,6 @@ import com.android.launcher3.responsive.ResponsiveSpec.Companion.ResponsiveSpecT
 import com.android.launcher3.responsive.ResponsiveSpec.DimensionType;
 import com.android.launcher3.responsive.ResponsiveSpecsProvider;
 import com.android.launcher3.util.CellContentDimensions;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IconSizeSteps;
 import com.android.launcher3.util.ResourceHelper;
@@ -297,9 +296,6 @@ public class DeviceProfile {
     // Additional padding added to the widget inside its cellSpace. It is applied outside
     // the widgetView, such that the actual view size is same as the widget size.
     public final Rect widgetPadding = new Rect();
-
-    // When true, nav bar is on the left side of the screen.
-    private boolean mIsSeascape;
 
     // Notification dots
     public final DotRenderer mDotRendererWorkSpace;
@@ -2007,25 +2003,8 @@ public class DeviceProfile {
         return isLandscape && transposeLayoutWithOrientation;
     }
 
-    /**
-     * Updates orientation information and returns true if it has changed from the previous value.
-     */
-    public boolean updateIsSeascape(Context context) {
-        if (isVerticalBarLayout()) {
-            boolean isSeascape = DisplayController.INSTANCE.get(context)
-                    .getInfo().rotation == Surface.ROTATION_270;
-            if (mIsSeascape != isSeascape) {
-                mIsSeascape = isSeascape;
-                // Hotseat changing sides requires updating workspace left/right paddings
-                updateWorkspacePadding();
-                return true;
-            }
-        }
-        return false;
-    }
-
     public boolean isSeascape() {
-        return isVerticalBarLayout() && mIsSeascape;
+        return rotationHint == Surface.ROTATION_270 && isVerticalBarLayout();
     }
 
     public boolean shouldFadeAdjacentWorkspaceScreens() {

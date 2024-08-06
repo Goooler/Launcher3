@@ -65,7 +65,7 @@ class AllAppsRecyclerViewPoolTest<T> where T : Context, T : ActivityContext {
 
     @Test
     fun preinflate_success() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
 
         awaitTasksCompleted()
         assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(10)
@@ -73,7 +73,7 @@ class AllAppsRecyclerViewPoolTest<T> where T : Context, T : ActivityContext {
 
     @Test
     fun preinflate_not_triggered() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent) { 0 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 0) { 0 }
 
         awaitTasksCompleted()
         assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(0)
@@ -81,7 +81,7 @@ class AllAppsRecyclerViewPoolTest<T> where T : Context, T : ActivityContext {
 
     @Test
     fun preinflate_cancel_before_runOnMainThread() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
         assertThat(underTest.mCancellableTask!!.canceled).isFalse()
 
         underTest.clear()
@@ -94,7 +94,7 @@ class AllAppsRecyclerViewPoolTest<T> where T : Context, T : ActivityContext {
 
     @Test
     fun preinflate_cancel_after_run() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
         assertThat(underTest.mCancellableTask!!.canceled).isFalse()
         awaitTasksCompleted()
 

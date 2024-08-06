@@ -782,7 +782,6 @@ abstract class TutorialController implements BackGestureAttemptCallback,
                 (RelativeLayout.LayoutParams) mFakeHotseatView.getLayoutParams();
         if (!mTutorialFragment.isLargeScreen()) {
             DeviceProfile dp = mTutorialFragment.getDeviceProfile();
-            dp.updateIsSeascape(mContext);
 
             hotseatLayoutParams.addRule(dp.isLandscape
                     ? (dp.isSeascape()

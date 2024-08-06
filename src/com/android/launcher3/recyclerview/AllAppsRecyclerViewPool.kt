@@ -62,6 +62,10 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
     fun preInflateAllAppsViewHolders(context: T) {
         val appsView = context.appsView ?: return
         val activeRv: RecyclerView = appsView.activeRecyclerView ?: return
+        val preInflateCount = getPreinflateCount(context)
+        if (preInflateCount <= 0) {
+            return
+        }
 
         if (activeRv.layoutManager == null) {
             if (BuildConfig.IS_STUDIO_BUILD) {
@@ -99,7 +103,12 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
                 override fun getLayoutManager(): RecyclerView.LayoutManager? = null
             }
 
-        preInflateAllAppsViewHolders(adapter, BaseAllAppsAdapter.VIEW_TYPE_ICON, activeRv) {
+        preInflateAllAppsViewHolders(
+            adapter,
+            BaseAllAppsAdapter.VIEW_TYPE_ICON,
+            activeRv,
+            preInflateCount
+        ) {
             getPreinflateCount(context)
         }
     }
@@ -109,10 +118,10 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
         adapter: RecyclerView.Adapter<*>,
         viewType: Int,
         parent: ViewGroup,
+        preInflationCount: Int,
         preInflationCountProvider: () -> Int
     ) {
-        val preinflationCount = preInflationCountProvider.invoke()
-        if (preinflationCount <= 0) {
+        if (preInflationCount <= 0) {
             return
         }
         mCancellableTask?.cancel()
@@ -121,7 +130,7 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
             CancellableTask(
                 {
                     val list: ArrayList<ViewHolder> = ArrayList()
-                    for (i in 0 until preinflationCount) {
+                    for (i in 0 until preInflationCount) {
                         if (task?.canceled == true) {
                             break
                         }
@@ -132,8 +141,8 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() where T : Context, T : Act
                 MAIN_EXECUTOR,
                 { viewHolders ->
                     // Run preInflationCountProvider again as the needed VH might have changed
-                    val newPreinflationCount = preInflationCountProvider.invoke()
-                    for (i in 0 until minOf(viewHolders.size, newPreinflationCount)) {
+                    val newPreInflationCount = preInflationCountProvider.invoke()
+                    for (i in 0 until minOf(viewHolders.size, newPreInflationCount)) {
                         putRecycledView(viewHolders[i])
                     }
                 }
