@@ -264,11 +264,19 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         boolean isThreeButtonNav = mContext.isThreeButtonNav();
         DeviceProfile deviceProfile = mContext.getDeviceProfile();
         Resources resources = mContext.getResources();
-        Point p = !mContext.isUserSetupComplete()
-                ? new Point(0, mControllers.taskbarActivityContext.getSetupWindowSize())
-                : DimensionUtils.getTaskbarPhoneDimensions(deviceProfile, resources,
-                        mContext.isPhoneMode());
-        mNavButtonsView.getLayoutParams().height = p.y;
+
+        int setupSize = mControllers.taskbarActivityContext.getSetupWindowSize();
+        Point p = DimensionUtils.getTaskbarPhoneDimensions(deviceProfile, resources,
+                mContext.isPhoneMode());
+        ViewGroup.LayoutParams navButtonsViewLayoutParams = mNavButtonsView.getLayoutParams();
+        navButtonsViewLayoutParams.width = p.x;
+        if (!mContext.isUserSetupComplete()) {
+            // Setup mode in phone mode uses gesture nav.
+            navButtonsViewLayoutParams.height = setupSize;
+        } else {
+            navButtonsViewLayoutParams.height = p.y;
+        }
+        mNavButtonsView.setLayoutParams(navButtonsViewLayoutParams);
 
         mIsImeRenderingNavButtons =
                 InputMethodService.canImeRenderGesturalNavButtons() && mContext.imeDrawsImeNavBar();

@@ -42,7 +42,11 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
     companion object {
         const val TAG = "TaskMenuViewWithArrow"
 
-        fun showForTask(taskContainer: TaskContainer, alignedOptionIndex: Int = 0): Boolean {
+        fun showForTask(
+            taskContainer: TaskContainer,
+            alignedOptionIndex: Int = 0,
+            onClosedCallback: Runnable? = null
+        ): Boolean {
             val container: RecentsViewContainer =
                 RecentsViewContainer.containerFromContext(taskContainer.taskView.context)
             val taskMenuViewWithArrow =
@@ -52,7 +56,11 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
                     false
                 ) as TaskMenuViewWithArrow<*>
 
-            return taskMenuViewWithArrow.populateAndShowForTask(taskContainer, alignedOptionIndex)
+            return taskMenuViewWithArrow.populateAndShowForTask(
+                taskContainer,
+                alignedOptionIndex,
+                onClosedCallback
+            )
         }
     }
 
@@ -98,6 +106,7 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
     private var iconView: IconView? = null
     private var scrim: View? = null
     private val scrimAlpha = 0.8f
+    private var onClosedCallback: Runnable? = null
 
     override fun isOfType(type: Int): Boolean = type and TYPE_TASK_MENU != 0
 
@@ -141,7 +150,8 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
 
     private fun populateAndShowForTask(
         taskContainer: TaskContainer,
-        alignedOptionIndex: Int
+        alignedOptionIndex: Int,
+        onClosedCallback: Runnable?
     ): Boolean {
         if (isAttachedToWindow) {
             return false
@@ -150,6 +160,7 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
         taskView = taskContainer.taskView
         this.taskContainer = taskContainer
         this.alignedOptionIndex = alignedOptionIndex
+        this.onClosedCallback = onClosedCallback
         if (!populateMenu()) return false
         addScrim()
         show()
@@ -252,6 +263,7 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
         super.closeComplete()
         popupContainer.removeView(scrim)
         popupContainer.removeView(iconView)
+        onClosedCallback?.run()
     }
 
     /**

@@ -21,3 +21,13 @@ flag {
     description: "Enables rewritten version of TaskThumbnailViews in Overview"
     bug: "331753115"
 }
+
+flag {
+    name: "enable_hover_of_child_elements_in_taskview"
+    namespace: "launcher_overview"
+    description: "Enables child elements to receive hover events in TaskView and respond visually to those hover events."
+    bug: "342594235"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
