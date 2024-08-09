@@ -303,7 +303,8 @@ public class BubbleBarViewController {
 
     /** Whether a new bubble is animating. */
     public boolean isAnimatingNewBubble() {
-        return mBarView.isAnimatingNewBubble();
+        return mBarView.isAnimatingNewBubble()
+                || (mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.hasAnimatingBubble());
     }
 
     /** The horizontal margin of the bubble bar from the edge of the screen. */
@@ -575,14 +576,14 @@ public class BubbleBarViewController {
         }
         boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
                 || !mBubbleStashController.isTransientTaskBar();
-        if (persistentTaskbarOrOnHome && !isExpanding && !isExpanded()) {
-            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble);
+        if (persistentTaskbarOrOnHome && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble, isExpanding);
             return;
         }
 
         // only animate the new bubble if we're in an app, have handle view and not auto expanding
-        if (isInApp && !isExpanding && mBubbleStashController.getHasHandleView() && !isExpanded()) {
-            mBubbleBarViewAnimator.animateBubbleInForStashed(bubble);
+        if (isInApp && mBubbleStashController.getHasHandleView() && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleInForStashed(bubble, isExpanding);
         }
     }
 
@@ -626,6 +627,10 @@ public class BubbleBarViewController {
      * from SystemUI.
      */
     public void setExpandedFromSysui(boolean isExpanded) {
+        if (isAnimatingNewBubble() && isExpanded) {
+            mBubbleBarViewAnimator.expandedWhileAnimating();
+            return;
+        }
         if (!isExpanded) {
             mBubbleStashController.stashBubbleBar();
         } else {

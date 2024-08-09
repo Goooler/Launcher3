@@ -40,16 +40,23 @@ import java.util.stream.Collectors;
 public final class OverviewTask {
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
     static final Pattern TASK_START_EVENT = Pattern.compile("startActivityFromRecentsAsync");
+    static final Pattern TASK_START_EVENT_DESKTOP = Pattern.compile("launchDesktopFromRecents");
+    static final Pattern TASK_START_EVENT_LIVE_TILE = Pattern.compile(
+            "composeRecentsLaunchAnimator");
     static final Pattern SPLIT_SELECT_EVENT = Pattern.compile("enterSplitSelect");
     static final Pattern SPLIT_START_EVENT = Pattern.compile("launchSplitTasks");
     private final LauncherInstrumentation mLauncher;
+    @NonNull
     private final UiObject2 mTask;
+    private final TaskViewType mType;
     private final BaseOverview mOverview;
 
-    OverviewTask(LauncherInstrumentation launcher, UiObject2 task, BaseOverview overview) {
+    OverviewTask(LauncherInstrumentation launcher, @NonNull UiObject2 task, BaseOverview overview) {
         mLauncher = launcher;
+        mLauncher.assertNotNull("task must not be null", task);
         mTask = task;
         mOverview = overview;
+        mType = getType();
         verifyActiveContainer();
     }
 
@@ -220,7 +227,22 @@ public final class OverviewTask {
                     return new LaunchedAppState(mLauncher);
                 }
             } else {
-                mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, TASK_START_EVENT);
+                final Pattern event;
+                if (mOverview.isLiveTile(mTask)) {
+                    event = TASK_START_EVENT_LIVE_TILE;
+                } else if (mType == TaskViewType.DESKTOP) {
+                    event = TASK_START_EVENT_DESKTOP;
+                } else {
+                    event = TASK_START_EVENT;
+                }
+                mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, event);
+
+                if (mType == TaskViewType.DESKTOP) {
+                    try (LauncherInstrumentation.Closable ignored = mLauncher.addContextLayer(
+                            "launched desktop")) {
+                        mLauncher.waitForSystemUiObject("desktop_mode_caption");
+                    }
+                }
                 return new LaunchedAppState(mLauncher);
             }
         }
@@ -273,6 +295,17 @@ public final class OverviewTask {
         return actual.contains(expected);
     }
 
+    private TaskViewType getType() {
+        String resourceName = mTask.getResourceName();
+        if (resourceName.endsWith("task_view_grouped")) {
+            return TaskViewType.GROUPED;
+        } else if (resourceName.endsWith("task_view_desktop")) {
+            return TaskViewType.DESKTOP;
+        } else {
+            return TaskViewType.SINGLE;
+        }
+    }
+
     /**
      * Enum used to specify  which task is retrieved when it is a split task.
      */
@@ -291,5 +324,11 @@ public final class OverviewTask {
             this.snapshotRes = snapshotRes;
             this.iconAppRes = iconAppRes;
         }
+    }
+
+    private enum TaskViewType {
+        SINGLE,
+        GROUPED,
+        DESKTOP
     }
 }

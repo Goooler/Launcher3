@@ -143,6 +143,9 @@ interface BubbleStashController {
     /** Set the translation Y for the stashed handle. */
     fun setHandleTranslationY(translationY: Float)
 
+    /** Returns the translation of the handle. */
+    fun getHandleTranslationY(): Float?
+
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and
      * [isBubblesShowingOnOverview] values. Default implementation only analyse

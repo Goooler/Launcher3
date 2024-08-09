@@ -43,6 +43,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.platform.test.flag.junit.SetFlagsRule;
+import android.platform.test.rule.LimitDevicesRule;
 import android.system.OsConstants;
 import android.util.Log;
 
@@ -221,6 +222,9 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     @Rule
     public ExtendedLongPressTimeoutRule mLongPressTimeoutRule = new ExtendedLongPressTimeoutRule();
+
+    @Rule
+    public LimitDevicesRule mlimitDevicesRule = new LimitDevicesRule();
 
     public static void initialize(AbstractLauncherUiTest test) throws Exception {
         test.reinitializeLauncherData();

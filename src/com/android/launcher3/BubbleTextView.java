@@ -873,7 +873,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (drawable == null) {
             setText(text);
             Log.w(TAG, "setTextWithStartIcon: start icon Drawable not found from resources"
-                    + ", will just set text instead. text=" + text);
+                    + ", will just set text instead.");
             return;
         }
         drawable.setTint(getCurrentTextColor());

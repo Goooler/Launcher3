@@ -901,18 +901,11 @@ constructor(
                             it.task.icon = icon
                             it.task.titleDescription = contentDescription
                             it.task.title = title
-                            setIcon(it.iconView, icon)
-                            if (enableOverviewIconMenu()) {
-                                setText(it.iconView, title)
-                            }
-                            it.digitalWellBeingToast?.initialize(it.task)
+                            onIconLoaded(it)
                         }
                         ?.also { request -> pendingIconLoadRequests.add(request) }
                 } else {
-                    setIcon(it.iconView, null)
-                    if (enableOverviewIconMenu()) {
-                        setText(it.iconView, null)
-                    }
+                    onIconUnloaded(it)
                 }
             }
         }
@@ -929,6 +922,21 @@ constructor(
         pendingThumbnailLoadRequests.clear()
         pendingIconLoadRequests.forEach { it.cancel() }
         pendingIconLoadRequests.clear()
+    }
+
+    protected open fun onIconLoaded(taskContainer: TaskContainer) {
+        setIcon(taskContainer.iconView, taskContainer.task.icon)
+        if (enableOverviewIconMenu()) {
+            setText(taskContainer.iconView, taskContainer.task.title)
+        }
+        taskContainer.digitalWellBeingToast?.initialize(taskContainer.task)
+    }
+
+    protected open fun onIconUnloaded(taskContainer: TaskContainer) {
+        setIcon(taskContainer.iconView, null)
+        if (enableOverviewIconMenu()) {
+            setText(taskContainer.iconView, null)
+        }
     }
 
     protected fun setIcon(iconView: TaskViewIcon, icon: Drawable?) {
@@ -1152,6 +1160,11 @@ constructor(
             isClickableAsLiveTile = true
             return runnableList
         }
+        TestLogging.recordEvent(
+            TestProtocol.SEQUENCE_MAIN,
+            "composeRecentsLaunchAnimator",
+            taskIds.contentToString()
+        )
         val runnableList = RunnableList()
         with(AnimatorSet()) {
             TaskViewUtils.composeRecentsLaunchAnimator(

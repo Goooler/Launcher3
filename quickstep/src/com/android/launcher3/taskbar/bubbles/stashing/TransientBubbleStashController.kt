@@ -242,6 +242,8 @@ class TransientBubbleStashController(
         bubbleStashedHandleViewController?.setTranslationYForSwipe(translationY)
     }
 
+    override fun getHandleTranslationY(): Float? = bubbleStashedHandleViewController?.translationY
+
     private fun getStashTranslation(): Float {
         return (bubbleBarViewController.bubbleBarCollapsedHeight - stashedHeight) / 2f
     }

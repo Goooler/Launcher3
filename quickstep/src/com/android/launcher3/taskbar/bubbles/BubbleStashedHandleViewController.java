@@ -245,6 +245,11 @@ public class BubbleStashedHandleViewController {
         mStashedHandleView.setTranslationY(transY);
     }
 
+    /** Returns the translation of the stashed handle. */
+    public float getTranslationY() {
+        return mStashedHandleView.getTranslationY();
+    }
+
     /**
      * Used by {@link BubbleStashController} to animate the handle when stashing or un stashing.
      */

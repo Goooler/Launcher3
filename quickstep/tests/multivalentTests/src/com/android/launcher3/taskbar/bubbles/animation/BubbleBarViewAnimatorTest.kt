@@ -84,7 +84,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleInForStashed(bubble)
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
         }
 
         // let the animation start and wait for it to complete
@@ -128,7 +128,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleInForStashed(bubble)
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
         }
 
         // let the animation start and wait for it to complete
@@ -171,7 +171,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleInForStashed(bubble)
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
         }
 
         // wait for the animation to start
@@ -211,7 +211,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleInForStashed(bubble)
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
         }
 
         // let the animation start and wait for it to complete
@@ -252,7 +252,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleInForStashed(bubble)
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
         }
 
         // wait for the animation to start
@@ -267,6 +267,123 @@ class BubbleBarViewAnimatorTest {
         handleAnimator.assertIsNotRunning()
         assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
         assertThat(animatorScheduler.delayedBlock).isNull()
+    }
+
+    @Test
+    fun animateBubbleInForStashed_autoExpanding() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+
+        val handle = View(context)
+        val handleAnimator = PhysicsAnimator.getInstance(handle)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleInForStashed(bubble, isExpanding = true)
+        }
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        assertThat(handle.alpha).isEqualTo(0)
+        assertThat(handle.translationY)
+            .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
+        assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
+        assertThat(bubbleBarView.scaleX).isEqualTo(1)
+        assertThat(bubbleBarView.scaleY).isEqualTo(1)
+        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(bubbleBarView.isExpanded).isTrue()
+
+        // verify there is no hide animation
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
+    @Test
+    fun animateBubbleInForStashed_expandedWhileAnimatingIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+
+        val handle = View(context)
+        val handleAnimator = PhysicsAnimator.getInstance(handle)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
+        }
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(handleAnimator) { true }
+
+        handleAnimator.assertIsRunning()
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        // verify the hide bubble animation is pending
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // let the animation finish
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        assertThat(handle.alpha).isEqualTo(0)
+        assertThat(handle.translationY)
+            .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
+        verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+    }
+
+    @Test
+    fun animateBubbleInForStashed_expandedWhileFullyIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+
+        val handle = View(context)
+        val handleAnimator = PhysicsAnimator.getInstance(handle)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
+        }
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        // wait for the animation to end
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        // verify the hide bubble animation is pending
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        assertThat(handle.alpha).isEqualTo(0)
+        assertThat(handle.translationY)
+            .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
+        verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
     }
 
     @Test
@@ -336,17 +453,11 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         barAnimator.assertIsNotRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
-        assertThat(bubbleBarView.alpha).isEqualTo(1)
-        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
-
-        assertThat(animatorScheduler.delayedBlock).isNotNull()
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
-
         assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
 
+        assertThat(animatorScheduler.delayedBlock).isNull()
         verify(bubbleStashController).showBubbleBarImmediate()
     }
 
@@ -385,6 +496,79 @@ class BubbleBarViewAnimatorTest {
     }
 
     @Test
+    fun animateToInitialState_expandedWhileAnimatingIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateToInitialState(bubble, isInApp = false, isExpanding = false)
+        }
+
+        val bubbleBarAnimator = PhysicsAnimator.getInstance(bubbleBarView)
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(bubbleBarAnimator) { true }
+
+        bubbleBarAnimator.assertIsRunning()
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        // verify the hide bubble animation is pending
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // let the animation finish
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
+    @Test
+    fun animateToInitialState_expandedWhileFullyIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateToInitialState(bubble, isInApp = false, isExpanding = false)
+        }
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        // verify the hide bubble animation is pending
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+    }
+
+    @Test
     fun animateBubbleBarForCollapsed() {
         setUpBubbleBar()
         setUpBubbleStashController()
@@ -397,7 +581,7 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.animateBubbleBarForCollapsed(bubble)
+            animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
         }
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
@@ -421,6 +605,142 @@ class BubbleBarViewAnimatorTest {
         // the bubble bar translation y should be back to its initial value
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
+    @Test
+    fun animateBubbleBarForCollapsed_autoExpanding() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleBarForCollapsed(bubble, isExpanding = true)
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        // verify we started animating
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        // advance the animation handler by the duration of the initial lift
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(250)
+        }
+
+        // the lift animation is complete; the spring back animation should start now
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        barAnimator.assertIsRunning()
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        // verify there is no hide animation
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+        assertThat(bubbleBarView.isExpanded).isTrue()
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
+    @Test
+    fun animateBubbleBarForCollapsed_expandingWhileAnimatingIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        // verify we started animating
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        // advance the animation handler by the duration of the initial lift
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(250)
+        }
+
+        // the lift animation is complete; the spring back animation should start now
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        barAnimator.assertIsRunning()
+        PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(barAnimator) { true }
+
+        // verify there is a pending hide animation
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // let the animation finish
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+        assertThat(bubbleBarView.isExpanded).isTrue()
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
+    @Test
+    fun animateBubbleBarForCollapsed_expandingWhileFullyIn() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        whenever(bubbleStashController.bubbleBarTranslationY)
+            .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        // verify we started animating
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        // advance the animation handler by the duration of the initial lift
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(250)
+        }
+
+        // the lift animation is complete; the spring back animation should start now
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        barAnimator.assertIsRunning()
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        // verify there is a pending hide animation
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.expandedWhileAnimating()
+        }
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+        assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
     }
 
@@ -457,6 +777,14 @@ class BubbleBarViewAnimatorTest {
             .thenReturn(HANDLE_TRANSLATION)
         whenever(bubbleStashController.bubbleBarTranslationYForTaskbar)
             .thenReturn(BAR_TRANSLATION_Y_FOR_TASKBAR)
+    }
+
+    private fun verifyBubbleBarIsExpandedWithTranslation(ty: Float) {
+        assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
+        assertThat(bubbleBarView.scaleX).isEqualTo(1)
+        assertThat(bubbleBarView.scaleY).isEqualTo(1)
+        assertThat(bubbleBarView.translationY).isEqualTo(ty)
+        assertThat(bubbleBarView.isExpanded).isTrue()
     }
 
     private fun <T> PhysicsAnimator<T>.assertIsRunning() {

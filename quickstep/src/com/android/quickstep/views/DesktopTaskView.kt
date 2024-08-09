@@ -30,6 +30,8 @@ import android.view.ViewGroup
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
+import com.android.launcher3.testing.TestLogging
+import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.launcher3.util.TransformingTouchDelegate
@@ -213,7 +215,15 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     override fun needsUpdate(dataChange: Int, flag: Int) =
-        if (flag == FLAG_UPDATE_THUMBNAIL) super.needsUpdate(dataChange, flag) else false
+        if (flag == FLAG_UPDATE_CORNER_RADIUS) false else super.needsUpdate(dataChange, flag)
+
+    override fun onIconLoaded(taskContainer: TaskContainer) {
+        // Update contentDescription of snapshotView only, individual task icon is unused.
+        taskContainer.snapshotView.contentDescription = taskContainer.task.titleDescription
+    }
+
+    // Ignoring [onIconUnloaded] as all tasks shares the same Desktop icon
+    override fun onIconUnloaded(taskContainer: TaskContainer) {}
 
     // thumbnailView is laid out differently and is handled in onMeasure
     override fun updateThumbnailSize() {}
@@ -228,6 +238,11 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun launchTaskAnimated(): RunnableList? {
         val recentsView = recentsView ?: return null
+        TestLogging.recordEvent(
+            TestProtocol.SEQUENCE_MAIN,
+            "launchDesktopFromRecents",
+            taskIds.contentToString()
+        )
         val endCallback = RunnableList()
         val desktopController = recentsView.desktopRecentsController
         checkNotNull(desktopController) { "recentsController is null" }

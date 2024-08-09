@@ -19,7 +19,9 @@ package com.android.launcher3.tapl;
 import static android.view.KeyEvent.KEYCODE_ESCAPE;
 
 import static com.android.launcher3.tapl.LauncherInstrumentation.TASKBAR_RES_ID;
+import static com.android.launcher3.tapl.LauncherInstrumentation.log;
 import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
+import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
 import android.graphics.Rect;
@@ -35,9 +37,11 @@ import androidx.test.uiautomator.UiObject2;
 
 import com.android.launcher3.testing.shared.TestProtocol;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -46,7 +50,9 @@ import java.util.stream.Collectors;
  */
 public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     private static final String TAG = "BaseOverview";
-    protected static final String TASK_RES_ID = "task";
+    protected static final BySelector TASK_SELECTOR = By.res(Pattern.compile(
+            getOverviewPackageName()
+                    + ":id/(task_view_single|task_view_grouped|task_view_desktop)"));
     private static final Pattern EVENT_ALT_ESC_UP = Pattern.compile(
             "Key event: KeyEvent.*?action=ACTION_UP.*?keyCode=KEYCODE_ESCAPE.*?metaState=0");
     private static final Pattern EVENT_ENTER_DOWN = Pattern.compile(
@@ -56,10 +62,22 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
 
     private static final int FLINGS_FOR_DISMISS_LIMIT = 40;
 
+    private final @Nullable UiObject2 mLiveTileTask;
+
+
     BaseOverview(LauncherInstrumentation launcher) {
+        this(launcher, /*launchedFromApp=*/false);
+    }
+
+    BaseOverview(LauncherInstrumentation launcher, boolean launchedFromApp) {
         super(launcher);
         verifyActiveContainer();
         verifyActionsViewVisibility();
+        if (launchedFromApp) {
+            mLiveTileTask = getCurrentTaskUnchecked();
+        } else {
+            mLiveTileTask = null;
+        }
     }
 
     @Override
@@ -79,7 +97,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     private void flingForwardImpl() {
         try (LauncherInstrumentation.Closable c =
                      mLauncher.addContextLayer("want to fling forward in overview")) {
-            LauncherInstrumentation.log("Overview.flingForward before fling");
+            log("Overview.flingForward before fling");
             final UiObject2 overview = verifyActiveContainer();
             final int leftMargin =
                     mLauncher.getTargetInsets().left + mLauncher.getEdgeSensitivityWidth();
@@ -105,7 +123,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     private void flingBackwardImpl() {
         try (LauncherInstrumentation.Closable c =
                      mLauncher.addContextLayer("want to fling backward in overview")) {
-            LauncherInstrumentation.log("Overview.flingBackward before fling");
+            log("Overview.flingBackward before fling");
             final UiObject2 overview = verifyActiveContainer();
             final int rightMargin =
                     mLauncher.getTargetInsets().right + mLauncher.getEdgeSensitivityWidth();
@@ -276,37 +294,56 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
      */
     @NonNull
     public OverviewTask getCurrentTask() {
+        UiObject2 currentTask = getCurrentTaskUnchecked();
+        mLauncher.assertNotNull("Unable to find a task", currentTask);
+        return new OverviewTask(mLauncher, currentTask, this);
+    }
+
+    @Nullable
+    private UiObject2 getCurrentTaskUnchecked() {
         final List<UiObject2> taskViews = getTasks();
-        mLauncher.assertNotEquals("Unable to find a task", 0, taskViews.size());
+        if (taskViews.isEmpty()) {
+            return null;
+        }
 
         // The widest, and most top-right task should be the current task
-        UiObject2 currentTask = Collections.max(taskViews,
+        return Collections.max(taskViews,
                 Comparator.comparingInt((UiObject2 t) -> t.getVisibleBounds().width())
                         .thenComparingInt((UiObject2 t) -> t.getVisibleCenter().x)
                         .thenComparing(Comparator.comparing(
                                 (UiObject2 t) -> t.getVisibleCenter().y).reversed()));
-        return new OverviewTask(mLauncher, currentTask, this);
     }
 
-    /** Returns an overview task matching TestActivity {@param activityNumber}. */
+    /**
+     * Returns an overview task that contains the specified test activity in its thumbnails.
+     *
+     * @param activityIndex index of TestActivity to match against
+     */
     @NonNull
-    public OverviewTask getTestActivityTask(int activityNumber) {
+    public OverviewTask getTestActivityTask(int activityIndex) {
+        return getTestActivityTask(Collections.singleton(activityIndex));
+    }
+
+    /**
+     * Returns an overview task that contains all the specified test activities in its thumbnails.
+     *
+     * @param activityNumbers collection of indices of TestActivity to match against
+     */
+    @NonNull
+    public OverviewTask getTestActivityTask(Collection<Integer> activityNumbers) {
         final List<UiObject2> taskViews = getTasks();
         mLauncher.assertNotEquals("Unable to find a task", 0, taskViews.size());
 
-        final String activityName = "TestActivity" + activityNumber;
-        UiObject2 task = null;
-        for (UiObject2 taskView : taskViews) {
-            // TODO(b/239452415): Use equals instead of descEndsWith
-            if (taskView.getParent().hasObject(By.descEndsWith(activityName))) {
-                task = taskView;
-                break;
-            }
-        }
-        mLauncher.assertNotNull(
-                "Unable to find a task with " + activityName + " from the task list", task);
+        Optional<UiObject2> task = taskViews.stream().filter(
+                taskView -> activityNumbers.stream().allMatch(activityNumber ->
+                    // TODO(b/239452415): Use equals instead of descEndsWith
+                    taskView.hasObject(By.descEndsWith("TestActivity" + activityNumber))
+                )).findFirst();
 
-        return new OverviewTask(mLauncher, task, this);
+        mLauncher.assertTrue("Unable to find a task with test activities " + activityNumbers
+                + " from the task list", task.isPresent());
+
+        return new OverviewTask(mLauncher, task.get(), this);
     }
 
     /**
@@ -328,8 +365,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                 "want to get overview tasks")) {
             verifyActiveContainer();
-            return mLauncher.getDevice().findObjects(
-                    mLauncher.getOverviewObjectSelector(TASK_RES_ID));
+            return mLauncher.getDevice().findObjects(TASK_SELECTOR);
         }
     }
 
@@ -505,5 +541,11 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             }
         }
         return null;
+    }
+
+    protected boolean isLiveTile(UiObject2 task) {
+        // UiObject2.equals returns false even when mLiveTileTask and task have the same node, hence
+        // compare only hashCode as a workaround.
+        return mLiveTileTask != null && mLiveTileTask.hashCode() == task.hashCode();
     }
 }
