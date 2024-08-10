@@ -836,7 +836,7 @@ public class SplitSelectStateController {
         private final int mSplitPlaceholderSize;
         private final int mSplitPlaceholderInset;
         private ActivityManager.RunningTaskInfo mTaskInfo;
-        private ISplitSelectListener mSplitSelectListener;
+        private DesktopSplitSelectListenerImpl mSplitSelectListener;
         private Drawable mAppIcon;
 
         public SplitFromDesktopController(QuickstepLauncher launcher,
@@ -847,21 +847,14 @@ public class SplitSelectStateController {
                     R.dimen.split_placeholder_size);
             mSplitPlaceholderInset = mLauncher.getResources().getDimensionPixelSize(
                     R.dimen.split_placeholder_inset);
-            mSplitSelectListener = new ISplitSelectListener.Stub() {
-                @Override
-                public boolean onRequestSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
-                        int splitPosition, Rect taskBounds) {
-                    MAIN_EXECUTOR.execute(() -> enterSplitSelect(taskInfo, splitPosition,
-                            taskBounds));
-                    return true;
-                }
-            };
+            mSplitSelectListener = new DesktopSplitSelectListenerImpl(this);
             SystemUiProxy.INSTANCE.get(mLauncher).registerSplitSelectListener(mSplitSelectListener);
         }
 
         void onDestroy() {
             SystemUiProxy.INSTANCE.get(mLauncher).unregisterSplitSelectListener(
                     mSplitSelectListener);
+            mSplitSelectListener.release();
             mSplitSelectListener = null;
         }
 
@@ -952,6 +945,37 @@ public class SplitSelectStateController {
                 });
                 anim.buildAnim().start();
             }
+        }
+    }
+
+    /**
+     * Wrapper for the ISplitSelectListener stub to prevent lingering references to the launcher
+     * activity via the controller.
+     */
+    private static class DesktopSplitSelectListenerImpl extends ISplitSelectListener.Stub {
+
+        private SplitFromDesktopController mController;
+
+        DesktopSplitSelectListenerImpl(@NonNull SplitFromDesktopController controller) {
+            mController = controller;
+        }
+
+        /**
+         * Clears any references to the controller.
+         */
+        void release() {
+            mController = null;
+        }
+
+        @Override
+        public boolean onRequestSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
+                int splitPosition, Rect taskBounds) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mController != null) {
+                    mController.enterSplitSelect(taskInfo, splitPosition, taskBounds);
+                }
+            });
+            return true;
         }
     }
 }

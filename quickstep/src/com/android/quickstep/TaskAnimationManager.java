@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 
 import static com.android.launcher3.Flags.enableHandleDelayedGestureCallbacks;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
@@ -44,6 +45,7 @@ import androidx.annotation.UiThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.SystemUiFlagUtils;
@@ -334,6 +336,28 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                 options.setTransientLaunch();
             }
             options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
+
+            // Notify taskbar that we should skip reacting to launcher visibility change to
+            // avoid a jumping taskbar.
+            TaskbarUIController taskbarUIController = containerInterface.getTaskbarController();
+            if (enableScalingRevealHomeAnimation() && taskbarUIController != null) {
+                taskbarUIController.setSkipLauncherVisibilityChange(true);
+
+                mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
+                    @Override
+                    public void onRecentsAnimationCanceled(
+                            @NonNull HashMap<Integer, ThumbnailData> thumbnailDatas) {
+                        taskbarUIController.setSkipLauncherVisibilityChange(false);
+                    }
+
+                    @Override
+                    public void onRecentsAnimationFinished(
+                            @NonNull RecentsAnimationController controller) {
+                        taskbarUIController.setSkipLauncherVisibilityChange(false);
+                    }
+                });
+            }
+
             mRecentsAnimationStartPending = getSystemUiProxy()
                     .startRecentsActivity(intent, options, mCallbacks);
             if (enableHandleDelayedGestureCallbacks()) {

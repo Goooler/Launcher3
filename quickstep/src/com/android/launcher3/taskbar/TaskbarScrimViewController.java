@@ -28,6 +28,7 @@ import android.view.animation.Interpolator;
 import android.view.animation.PathInterpolator;
 
 import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.taskbar.bubbles.BubbleControllers;
 import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.SystemUiProxy;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -86,6 +87,10 @@ public class TaskbarScrimViewController implements TaskbarControllers.LoggableTa
      * Updates the scrim state based on the flags.
      */
     public void updateStateForSysuiFlags(@SystemUiStateFlags long stateFlags, boolean skipAnim) {
+        if (mActivity.isPhoneMode()) {
+            // There is no scrim for the bar in the phone mode.
+            return;
+        }
         if (isBubbleBarEnabled() && DisplayController.isTransientTaskbar(mActivity)) {
             // These scrims aren't used if bubble bar & transient taskbar are active.
             return;
@@ -97,10 +102,20 @@ public class TaskbarScrimViewController implements TaskbarControllers.LoggableTa
     private boolean shouldShowScrim() {
         final boolean bubblesExpanded = (mSysUiStateFlags & SYSUI_STATE_BUBBLES_EXPANDED) != 0;
         boolean isShadeVisible = (mSysUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE) != 0;
+        BubbleControllers bubbleControllers = mActivity.getBubbleControllers();
+        boolean isBubbleControllersPresented = bubbleControllers != null;
+        // when the taskbar is in persistent mode, we hide the task bar icons on bubble bar expand,
+        // which makes the taskbar invisible, so need to check if the bubble bar is not on home
+        // to show the scrim view
+        boolean showScrimForBubbles = bubblesExpanded
+                && !mTaskbarVisible
+                && isBubbleControllersPresented
+                && !DisplayController.isTransientTaskbar(mActivity)
+                && !bubbleControllers.bubbleStashController.isBubblesShowingOnHome();
         return bubblesExpanded && !mControllers.navbarButtonsViewController.isImeVisible()
                 && !isShadeVisible
                 && !mControllers.taskbarStashController.isStashed()
-                && mTaskbarVisible;
+                && (mTaskbarVisible || showScrimForBubbles);
     }
 
     private float getScrimAlpha() {

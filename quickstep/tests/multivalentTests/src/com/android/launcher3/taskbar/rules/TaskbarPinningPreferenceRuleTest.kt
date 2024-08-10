@@ -19,6 +19,7 @@ package com.android.launcher3.taskbar.rules
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.LauncherMultivalentJUnit
+import com.android.launcher3.util.LauncherMultivalentJUnit.EmulatedDevices
 import com.android.launcher3.util.window.WindowManagerProxy
 import com.google.android.apps.nexuslauncher.deviceemulator.TestWindowManagerProxy
 import com.google.common.truth.Truth.assertThat
@@ -28,6 +29,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 
 @RunWith(LauncherMultivalentJUnit::class)
+@EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
 class TaskbarPinningPreferenceRuleTest {
     private val context = TaskbarWindowSandboxContext.create(getInstrumentation().targetContext)
 

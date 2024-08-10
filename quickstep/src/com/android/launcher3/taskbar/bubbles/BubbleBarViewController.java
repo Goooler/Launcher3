@@ -72,6 +72,7 @@ public class BubbleBarViewController {
     private BubbleDragController mBubbleDragController;
     private TaskbarStashController mTaskbarStashController;
     private TaskbarInsetsController mTaskbarInsetsController;
+    private TaskbarViewPropertiesProvider mTaskbarViewPropertiesProvider;
     private View.OnClickListener mBubbleClickListener;
     private View.OnClickListener mBubbleBarClickListener;
     private BubbleView.Controller mBubbleViewController;
@@ -110,13 +111,16 @@ public class BubbleBarViewController {
                 R.dimen.bubblebar_icon_size);
     }
 
-    public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers) {
+    /** Initializes controller. */
+    public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers,
+            TaskbarViewPropertiesProvider taskbarViewPropertiesProvider) {
         mBubbleStashController = bubbleControllers.bubbleStashController;
         mBubbleBarController = bubbleControllers.bubbleBarController;
         mBubbleDragController = bubbleControllers.bubbleDragController;
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
+        mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
                 dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
@@ -348,6 +352,7 @@ public class BubbleBarViewController {
             if (hidden) {
                 mBarView.setAlpha(0);
                 mBarView.setExpanded(false);
+                updatePersistentTaskbar(/* isBubbleBarExpanded = */ false);
             }
             mActivity.bubbleBarVisibilityChanged(!hidden);
         }
@@ -612,6 +617,7 @@ public class BubbleBarViewController {
     public void setExpanded(boolean isExpanded) {
         if (isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
+            updatePersistentTaskbar(isExpanded);
             if (!isExpanded) {
                 mSystemUiProxy.collapseBubbles();
             } else {
@@ -619,6 +625,25 @@ public class BubbleBarViewController {
                 mTaskbarStashController.updateAndAnimateTransientTaskbar(true /* stash */,
                         false /* shouldBubblesFollow */);
             }
+        }
+    }
+
+    private void updatePersistentTaskbar(boolean isBubbleBarExpanded) {
+        if (mBubbleStashController.isTransientTaskBar()) return;
+        boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
+        mTaskbarViewPropertiesProvider
+                .getIconsAlpha()
+                .animateToValue(hideTaskbar ? 0 : 1)
+                .start();
+    }
+
+    /** Return {@code true} if expanded bubble bar would intersect the taskbar. */
+    public boolean isIntersectingTaskbar() {
+        if (mBarView.isExpanding() || mBarView.isExpanded()) {
+            Rect taskbarViewBounds = mTaskbarViewPropertiesProvider.getTaskbarViewBounds();
+            return mBarView.getBubbleBarExpandedBounds().intersect(taskbarViewBounds);
+        } else {
+            return false;
         }
     }
 
@@ -754,5 +779,15 @@ public class BubbleBarViewController {
         } else {
             pw.println("  Bubble bar view is null!");
         }
+    }
+
+    /** Interface for BubbleBarViewController to get the taskbar view properties. */
+    public interface TaskbarViewPropertiesProvider {
+
+        /** Returns the bounds of the taskbar. */
+        Rect getTaskbarViewBounds();
+
+        /** Returns taskbar icons alpha */
+        MultiPropertyFactory<View>.MultiProperty getIconsAlpha();
     }
 }

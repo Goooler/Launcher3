@@ -47,7 +47,6 @@ import android.view.IRecentsAnimationController;
 import android.view.IRecentsAnimationRunner;
 import android.view.IRemoteAnimationRunner;
 import android.view.MotionEvent;
-import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.window.IOnBackInvokedCallback;
@@ -891,6 +890,36 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
             }
         } catch (RemoteException e) {
             Log.w(TAG, "Failed call updateBubbleBarTopOnScreen");
+        }
+    }
+
+    /**
+     * Tells SysUI to show a shortcut bubble.
+     *
+     * @param info the shortcut info used to create or identify the bubble.
+     */
+    public void showShortcutBubble(ShortcutInfo info) {
+        try {
+            if (mBubbles != null) {
+                mBubbles.showShortcutBubble(info);
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Failed call show bubble for shortcut");
+        }
+    }
+
+    /**
+     * Tells SysUI to show a bubble of an app.
+     *
+     * @param intent the intent used to create the bubble.
+     */
+    public void showAppBubble(Intent intent) {
+        try {
+            if (mBubbles != null) {
+                mBubbles.showAppBubble(intent);
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Failed call show bubble for app");
         }
     }
 

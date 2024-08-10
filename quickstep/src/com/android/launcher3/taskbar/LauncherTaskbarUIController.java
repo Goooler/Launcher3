@@ -225,9 +225,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         // Launcher is resumed during the swipe-to-overview gesture under shell-transitions, so
         // avoid updating taskbar state in that situation (when it's non-interactive -- or
         // "background") to avoid premature animations.
-        if (ENABLE_SHELL_TRANSITIONS && isVisible
-                && mLauncher.getStateManager().getState().hasFlag(FLAG_NON_INTERACTIVE)
-                && !mLauncher.getStateManager().getState().isTaskbarAlignedWithHotseat(mLauncher)) {
+        LauncherState state = mLauncher.getStateManager().getState();
+        boolean nonInteractiveState = state.hasFlag(FLAG_NON_INTERACTIVE)
+                && !state.isTaskbarAlignedWithHotseat(mLauncher);
+        if ((ENABLE_SHELL_TRANSITIONS
+                && isVisible
+                && (nonInteractiveState || mSkipLauncherVisibilityChange))) {
             return null;
         }
 

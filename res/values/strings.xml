@@ -215,7 +215,8 @@
     <string name="dismiss_prediction_label">Don\'t suggest app</string>
     <!-- Label for pinning predicted app. -->
     <string name="pin_prediction">Pin Prediction</string>
-
+    <!-- Label for bubbling a launcher item. [CHAR_LIMIT=20] -->
+    <string name="bubble">Bubble</string>
 
     <!-- Permissions: -->
     <skip />

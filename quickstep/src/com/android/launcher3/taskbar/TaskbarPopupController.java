@@ -53,6 +53,7 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.LogUtils;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
@@ -68,6 +69,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     private static final SystemShortcut.Factory<BaseTaskbarContext>
             APP_INFO = SystemShortcut.AppInfo::new;
+
+    private static final SystemShortcut.Factory<BaseTaskbarContext>
+            BUBBLE = SystemShortcut.BubbleShortcut::new;
 
     private final TaskbarActivityContext mContext;
     private final PopupDataProvider mPopupDataProvider;
@@ -182,10 +186,13 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     // Create a Stream of all applicable system shortcuts
     private Stream<SystemShortcut.Factory> getSystemShortcuts() {
         // append split options to APP_INFO shortcut, the order here will reflect in the popup
-        return Stream.concat(
-                Stream.of(APP_INFO),
-                mControllers.uiController.getSplitMenuOptions()
-        );
+        ArrayList<SystemShortcut.Factory> shortcuts = new ArrayList<>();
+        shortcuts.add(APP_INFO);
+        shortcuts.addAll(mControllers.uiController.getSplitMenuOptions().toList());
+        if (com.android.wm.shell.Flags.enableBubbleAnything()) {
+            shortcuts.add(BUBBLE);
+        }
+        return shortcuts.stream();
     }
 
     @Override

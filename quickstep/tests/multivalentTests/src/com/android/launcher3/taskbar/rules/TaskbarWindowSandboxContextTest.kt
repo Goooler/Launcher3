@@ -25,6 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(LauncherMultivalentJUnit::class)
+@LauncherMultivalentJUnit.EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
 class TaskbarWindowSandboxContextTest {
 
     private val context = TaskbarWindowSandboxContext.create(getInstrumentation().targetContext)

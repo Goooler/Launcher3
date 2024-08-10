@@ -15,8 +15,15 @@
  */
 package com.android.launcher3.taskbar.bubbles;
 
+import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_BUBBLE_BAR;
+
+import android.graphics.Rect;
+import android.view.View;
+
 import com.android.launcher3.taskbar.TaskbarControllers;
+import com.android.launcher3.taskbar.bubbles.BubbleBarViewController.TaskbarViewPropertiesProvider;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.RunnableList;
 
 import java.io.PrintWriter;
@@ -79,7 +86,20 @@ public class BubbleControllers {
                 bubbleStashedHandleViewController.orElse(null),
                 taskbarControllers::runAfterInit
         );
-        bubbleBarViewController.init(taskbarControllers, /* bubbleControllers = */ this);
+        bubbleBarViewController.init(taskbarControllers, /* bubbleControllers = */ this,
+                new TaskbarViewPropertiesProvider() {
+                    @Override
+                    public Rect getTaskbarViewBounds() {
+                        return taskbarControllers.taskbarViewController.getIconLayoutBounds();
+                    }
+
+                    @Override
+                    public MultiPropertyFactory<View>.MultiProperty getIconsAlpha() {
+                        return taskbarControllers.taskbarViewController
+                                .getTaskbarIconAlpha()
+                                .get(ALPHA_INDEX_BUBBLE_BAR);
+                    }
+                });
         bubbleDragController.init(/* bubbleControllers = */ this);
         bubbleDismissController.init(/* bubbleControllers = */ this);
         bubbleBarPinController.init(this);

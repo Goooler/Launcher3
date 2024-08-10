@@ -669,8 +669,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         return isShown() && mIconLayoutBounds.contains(xInOurCoordinates, yInOurCoorindates);
     }
 
+    /**
+     * Gets visual bounds of the taskbar view. The visual bounds correspond to the taskbar touch
+     * area, rather than layout placement in the parent view.
+     */
+    public Rect getIconLayoutVisualBounds() {
+        return new Rect(mIconLayoutBounds);
+    }
+
+    /** Gets taskbar layout bounds in parent view. */
     public Rect getIconLayoutBounds() {
-        return mIconLayoutBounds;
+        Rect actualBounds = new Rect(mIconLayoutBounds);
+        actualBounds.top = getTop();
+        actualBounds.bottom = getBottom();
+        return actualBounds;
     }
 
     /**

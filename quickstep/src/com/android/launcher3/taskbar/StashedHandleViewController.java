@@ -212,7 +212,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
      *                                stashed handle to wrap around the hotseat items.
      */
     public Animator createRevealAnimToIsStashed(boolean isStashed, Rect taskbarToHotseatOffsets) {
-        Rect visualBounds = new Rect(mControllers.taskbarViewController.getIconLayoutBounds());
+        Rect visualBounds = mControllers.taskbarViewController.getIconLayoutVisualBounds();
         float startRadius = mStashedHandleRadius;
 
         if (DisplayController.isTransientTaskbar(mActivity)) {

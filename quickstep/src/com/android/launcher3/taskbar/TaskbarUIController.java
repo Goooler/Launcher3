@@ -61,6 +61,8 @@ public class TaskbarUIController {
     // Initialized in init.
     protected TaskbarControllers mControllers;
 
+    protected boolean mSkipLauncherVisibilityChange;
+
     @CallSuper
     protected void init(TaskbarControllers taskbarControllers) {
         mControllers = taskbarControllers;
@@ -417,5 +419,13 @@ public class TaskbarUIController {
      */
     public void setUserIsNotGoingHome(boolean isNotGoingHome) {
         mControllers.taskbarStashController.setUserIsNotGoingHome(isNotGoingHome);
+    }
+
+    /**
+     * Sets whether to prevent taskbar from reacting to launcher visibility during the recents
+     * transition animation.
+     */
+    public void setSkipLauncherVisibilityChange(boolean skip) {
+        mSkipLauncherVisibilityChange = skip;
     }
 }

@@ -34,7 +34,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 
 @RunWith(LauncherMultivalentJUnit::class)
-@EmulatedDevices(["pixelFoldable2023"])
+@EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
 class TaskbarUnitTestRuleTest {
 
     private val context = TaskbarWindowSandboxContext.create(getInstrumentation().targetContext)

@@ -110,7 +110,7 @@ class VoiceInteractionWindowController(val context: TaskbarActivityContext) :
     }
 
     fun setIsVoiceInteractionWindowVisible(visible: Boolean, skipAnim: Boolean) {
-        if (isVoiceInteractionWindowVisible == visible) {
+        if (isVoiceInteractionWindowVisible == visible || context.isPhoneMode) {
             return
         }
         isVoiceInteractionWindowVisible = visible

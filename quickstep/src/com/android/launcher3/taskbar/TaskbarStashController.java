@@ -1022,6 +1022,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /** Called when some system ui state has changed. (See SYSUI_STATE_... in QuickstepContract) */
     public void updateStateForSysuiFlags(long systemUiStateFlags, boolean skipAnim) {
+        if (mActivity.isPhoneMode()) {
+            return;
+        }
+
         long animDuration = TASKBAR_STASH_DURATION;
         long startDelay = 0;
 

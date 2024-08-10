@@ -25,6 +25,7 @@ import android.os.Debug;
 import android.util.Log;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.Launcher;
@@ -38,6 +39,7 @@ import com.android.wm.shell.desktopmode.IDesktopTaskListener;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Controls the visibility of the workspace and the resumed / paused state when desktop mode
@@ -56,7 +58,7 @@ public class DesktopVisibilityController {
     private boolean mGestureInProgress;
 
     @Nullable
-    private IDesktopTaskListener mDesktopTaskListener;
+    private DesktopTaskListenerImpl mDesktopTaskListener;
 
     public DesktopVisibilityController(Launcher launcher) {
         mLauncher = launcher;
@@ -66,24 +68,7 @@ public class DesktopVisibilityController {
      * Register a listener with System UI to receive updates about desktop tasks state
      */
     public void registerSystemUiListener() {
-        mDesktopTaskListener = new IDesktopTaskListener.Stub() {
-            @Override
-            public void onTasksVisibilityChanged(int displayId, int visibleTasksCount) {
-                MAIN_EXECUTOR.execute(() -> {
-                    if (displayId == mLauncher.getDisplayId()) {
-                        if (DEBUG) {
-                            Log.d(TAG, "desktop visible tasks count changed=" + visibleTasksCount);
-                        }
-                        setVisibleDesktopTasksCount(visibleTasksCount);
-                    }
-                });
-            }
-
-            @Override
-            public void onStashedChanged(int displayId, boolean stashed) {
-              Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
-            }
-        };
+        mDesktopTaskListener = new DesktopTaskListenerImpl(this, mLauncher.getDisplayId());
         SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(mDesktopTaskListener);
     }
 
@@ -92,6 +77,7 @@ public class DesktopVisibilityController {
      */
     public void unregisterSystemUiListener() {
         SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(null);
+        mDesktopTaskListener.release();
         mDesktopTaskListener = null;
     }
 
@@ -354,5 +340,44 @@ public class DesktopVisibilityController {
          * @param visible whether Desktop Mode is now visible
          */
         void onDesktopVisibilityChanged(boolean visible);
+    }
+
+    /**
+     * Wrapper for the IDesktopTaskListener stub to prevent lingering references to the launcher
+     * activity via the controller.
+     */
+    private static class DesktopTaskListenerImpl extends IDesktopTaskListener.Stub {
+
+        private DesktopVisibilityController mController;
+        private final int mDisplayId;
+
+        DesktopTaskListenerImpl(@NonNull DesktopVisibilityController controller, int displayId) {
+            mController = controller;
+            mDisplayId = displayId;
+        }
+
+        /**
+         * Clears any references to the controller.
+         */
+        void release() {
+            mController = null;
+        }
+
+        @Override
+        public void onTasksVisibilityChanged(int displayId, int visibleTasksCount) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mController != null && displayId == mDisplayId) {
+                    if (DEBUG) {
+                        Log.d(TAG, "desktop visible tasks count changed=" + visibleTasksCount);
+                    }
+                    mController.setVisibleDesktopTasksCount(visibleTasksCount);
+                }
+            });
+        }
+
+        @Override
+        public void onStashedChanged(int displayId, boolean stashed) {
+            Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
+        }
     }
 }
