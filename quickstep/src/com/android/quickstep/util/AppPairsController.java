@@ -74,6 +74,7 @@ import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosi
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Controller class that handles app pair interactions: saving, modifying, deleting, etc.
@@ -232,8 +233,11 @@ public class AppPairsController {
      *
      * @param cuj Should be an integer from {@link Cuj} or -1 if no CUJ needs to be logged for jank
      *            monitoring
+     * @param callback Called after the app pair launch finishes animating, or null if no method is
+     *                 to be called
      */
-    public void launchAppPair(AppPairIcon appPairIcon, int cuj) {
+    public void launchAppPair(AppPairIcon appPairIcon, int cuj,
+            @Nullable Consumer<Boolean> callback) {
         WorkspaceItemInfo app1 = appPairIcon.getInfo().getFirstApp();
         WorkspaceItemInfo app2 = appPairIcon.getInfo().getSecondApp();
         ComponentKey app1Key = new ComponentKey(app1.getTargetComponent(), app1.user);
@@ -273,9 +277,16 @@ public class AppPairsController {
                     mSplitSelectStateController.setLaunchingIconView(appPairIcon);
 
                     mSplitSelectStateController.launchSplitTasks(
-                            AppPairsController.convertRankToSnapPosition(app1.rank));
+                            AppPairsController.convertRankToSnapPosition(app1.rank), callback);
                 }
         );
+    }
+
+    /**
+     * Launches an app pair but does not specify a callback
+     */
+    public void launchAppPair(AppPairIcon appPairIcon, int cuj) {
+        launchAppPair(appPairIcon, cuj, null);
     }
 
     /**

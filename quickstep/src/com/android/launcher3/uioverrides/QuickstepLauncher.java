@@ -1409,8 +1409,14 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
      * Launches two apps as an app pair.
      */
     public void launchAppPair(AppPairIcon appPairIcon) {
+        // Potentially show the Taskbar education once the app pair launch finishes
         mSplitSelectStateController.getAppPairsController().launchAppPair(appPairIcon,
-                CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_WORKSPACE);
+                CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_WORKSPACE,
+                (success) -> {
+                    if (success && mTaskbarUIController != null) {
+                        mTaskbarUIController.showEduOnAppLaunch();
+                    }
+                });
     }
 
     public boolean canStartHomeSafely() {
