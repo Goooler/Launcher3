@@ -98,7 +98,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.scaleX).isEqualTo(1)
         assertThat(bubbleBarView.scaleY).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         // execute the hide bubble animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
@@ -111,7 +111,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(handle.alpha).isEqualTo(1)
         assertThat(handle.translationY).isEqualTo(0)
         assertThat(bubbleBarView.alpha).isEqualTo(0)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).stashBubbleBarImmediate()
     }
 
@@ -142,7 +142,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.scaleX).isEqualTo(1)
         assertThat(bubbleBarView.scaleY).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         verify(bubbleStashController, atLeastOnce()).updateTaskbarTouchRegion()
 
@@ -155,7 +155,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
     }
 
     @Test
@@ -179,7 +179,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(handleAnimator) { true }
 
         handleAnimator.assertIsRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -189,7 +189,7 @@ class BubbleBarViewAnimatorTest {
 
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).onNewBubbleAnimationInterrupted(any(), any())
 
         // PhysicsAnimatorTestUtils posts the cancellation to the main thread so we need to wait
@@ -230,7 +230,7 @@ class BubbleBarViewAnimatorTest {
             animator.onStashStateChangingWhileAnimating()
         }
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).onNewBubbleAnimationInterrupted(any(), any())
 
         // PhysicsAnimatorTestUtils posts the cancellation to the main thread so we need to wait
@@ -260,12 +260,12 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(handleAnimator) { true }
 
         handleAnimator.assertIsRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
         handleAnimator.cancel()
         handleAnimator.assertIsNotRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(animatorScheduler.delayedBlock).isNull()
     }
 
@@ -296,7 +296,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.scaleX).isEqualTo(1)
         assertThat(bubbleBarView.scaleY).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.isExpanded).isTrue()
 
         // verify there is no hide animation
@@ -326,7 +326,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(handleAnimator) { true }
 
         handleAnimator.assertIsRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -344,7 +344,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(handle.translationY)
             .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
     }
 
     @Test
@@ -368,7 +368,7 @@ class BubbleBarViewAnimatorTest {
         // wait for the animation to end
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -383,7 +383,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(handle.translationY)
             .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
     }
 
     @Test
@@ -410,7 +410,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         barAnimator.assertIsNotRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
 
@@ -421,7 +421,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.alpha).isEqualTo(0)
         assertThat(handle.translationY).isEqualTo(0)
         assertThat(handle.alpha).isEqualTo(1)
@@ -453,7 +453,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         barAnimator.assertIsNotRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
 
@@ -481,14 +481,14 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         barAnimator.assertIsNotRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
@@ -516,7 +516,7 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(bubbleBarAnimator) { true }
 
         bubbleBarAnimator.assertIsRunning()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -531,7 +531,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(animatorScheduler.delayedBlock).isNull()
 
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).showBubbleBarImmediate()
     }
 
@@ -553,7 +553,7 @@ class BubbleBarViewAnimatorTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -565,7 +565,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(animatorScheduler.delayedBlock).isNull()
 
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
     }
 
     @Test
@@ -586,7 +586,7 @@ class BubbleBarViewAnimatorTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         // verify we started animating
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         // advance the animation handler by the duration of the initial lift
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -601,7 +601,7 @@ class BubbleBarViewAnimatorTest {
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         // the bubble bar translation y should be back to its initial value
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
@@ -626,7 +626,7 @@ class BubbleBarViewAnimatorTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         // verify we started animating
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         // advance the animation handler by the duration of the initial lift
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -641,7 +641,7 @@ class BubbleBarViewAnimatorTest {
         // verify there is no hide animation
         assertThat(animatorScheduler.delayedBlock).isNull()
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
@@ -665,7 +665,7 @@ class BubbleBarViewAnimatorTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         // verify we started animating
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         // advance the animation handler by the duration of the initial lift
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -679,7 +679,7 @@ class BubbleBarViewAnimatorTest {
 
         // verify there is a pending hide animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.expandedWhileAnimating()
@@ -691,7 +691,7 @@ class BubbleBarViewAnimatorTest {
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
@@ -715,7 +715,7 @@ class BubbleBarViewAnimatorTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         // verify we started animating
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         // advance the animation handler by the duration of the initial lift
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -729,7 +729,7 @@ class BubbleBarViewAnimatorTest {
 
         // verify there is a pending hide animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
-        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+        assertThat(animator.isAnimating).isTrue()
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.expandedWhileAnimating()
@@ -738,7 +738,7 @@ class BubbleBarViewAnimatorTest {
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
 
-        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()

@@ -43,7 +43,13 @@ constructor(
     private val bubbleBarBounceDistanceInPx =
         bubbleBarView.resources.getDimensionPixelSize(R.dimen.bubblebar_bounce_distance)
 
-    fun hasAnimatingBubble() = animatingBubble != null
+    fun hasAnimation() = animatingBubble != null
+
+    val isAnimating: Boolean
+        get() {
+            val animatingBubble = animatingBubble ?: return false
+            return animatingBubble.state != AnimatingBubble.State.CREATED
+        }
 
     private companion object {
         /** The time to show the flyout. */
@@ -157,7 +163,6 @@ constructor(
     private fun buildHandleToBubbleBarAnimation() = Runnable {
         moveToState(AnimatingBubble.State.ANIMATING_IN)
         // prepare the bubble bar for the animation
-        bubbleBarView.onAnimatingBubbleStarted()
         bubbleBarView.visibility = VISIBLE
         bubbleBarView.alpha = 0f
         bubbleBarView.translationY = 0f
@@ -304,7 +309,6 @@ constructor(
         animator.addEndListener { _, _, _, canceled, _, _, _ ->
             animatingBubble = null
             if (!canceled) bubbleStashController.stashBubbleBarImmediate()
-            bubbleBarView.onAnimatingBubbleCompleted()
             bubbleBarView.relativePivotY = 1f
             bubbleStashController.updateTaskbarTouchRegion()
         }
@@ -330,7 +334,6 @@ constructor(
                 Runnable {
                     animatingBubble = null
                     bubbleStashController.showBubbleBarImmediate()
-                    bubbleBarView.onAnimatingBubbleCompleted()
                     bubbleStashController.updateTaskbarTouchRegion()
                 }
             }
@@ -343,7 +346,6 @@ constructor(
     private fun buildBubbleBarSpringInAnimation() = Runnable {
         moveToState(AnimatingBubble.State.ANIMATING_IN)
         // prepare the bubble bar for the animation
-        bubbleBarView.onAnimatingBubbleStarted()
         bubbleBarView.translationY = bubbleBarView.height.toFloat()
         bubbleBarView.visibility = VISIBLE
         bubbleBarView.alpha = 1f
@@ -382,7 +384,6 @@ constructor(
         val hideAnimation = Runnable {
             animatingBubble = null
             bubbleStashController.showBubbleBarImmediate()
-            bubbleBarView.onAnimatingBubbleCompleted()
             bubbleStashController.updateTaskbarTouchRegion()
         }
         animatingBubble =
@@ -398,7 +399,6 @@ constructor(
      */
     private fun buildBubbleBarBounceAnimation() = Runnable {
         moveToState(AnimatingBubble.State.ANIMATING_IN)
-        bubbleBarView.onAnimatingBubbleStarted()
         val ty = bubbleStashController.bubbleBarTranslationY
 
         val springBackAnimation = PhysicsAnimator.getInstance(bubbleBarView)
@@ -429,7 +429,6 @@ constructor(
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
         val hideAnimation = animatingBubble?.hideAnimation ?: return
         scheduler.cancel(hideAnimation)
-        bubbleBarView.onAnimatingBubbleCompleted()
         bubbleBarView.relativePivotY = 1f
         animatingBubble = null
     }
@@ -440,7 +439,6 @@ constructor(
         scheduler.cancel(hideAnimation)
         animatingBubble = null
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
-        bubbleBarView.onAnimatingBubbleCompleted()
         bubbleBarView.relativePivotY = 1f
         bubbleStashController.onNewBubbleAnimationInterrupted(
             /* isStashed= */ bubbleBarView.alpha == 0f,
@@ -462,7 +460,6 @@ constructor(
         val hideAnimation = animatingBubble?.hideAnimation ?: return
         scheduler.cancel(hideAnimation)
         animatingBubble = null
-        bubbleBarView.onAnimatingBubbleCompleted()
         bubbleBarView.relativePivotY = 1f
         bubbleStashController.showBubbleBarImmediate()
     }
