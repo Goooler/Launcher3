@@ -19,7 +19,6 @@ import android.content.Context
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
-import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
@@ -27,6 +26,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
@@ -86,9 +86,15 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             }
         iconView =
             getOrInflateIconView(R.id.icon).apply {
-                val iconBackground = resources.getDrawable(R.drawable.bg_circle, context.theme)
-                val icon = resources.getDrawable(R.drawable.ic_desktop, context.theme)
-                setIcon(this, LayerDrawable(arrayOf(iconBackground, icon)))
+                setIcon(
+                    this,
+                    ResourcesCompat.getDrawable(
+                        context.resources,
+                        R.drawable.ic_desktop_with_bg,
+                        context.theme
+                    )
+                )
+                setText(resources.getText(R.string.recent_task_option_desktop))
             }
         childCountAtInflation = childCount
     }
@@ -281,6 +287,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         private const val TAG = "DesktopTaskView"
         private const val DEBUG = false
         private const val VIEW_POOL_MAX_SIZE = 10
+
         // As DesktopTaskView is inflated in background, use initialSize=0 to avoid initPool.
         private const val VIEW_POOL_INITIAL_SIZE = 0
         private val ORIGIN = Point(0, 0)

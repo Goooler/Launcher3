@@ -34,7 +34,7 @@ class DesktopSystemShortcut(
     abstractFloatingViewHelper: AbstractFloatingViewHelper
 ) :
     SystemShortcut<RecentsViewContainer>(
-        R.drawable.ic_caption_desktop_button_foreground,
+        R.drawable.ic_desktop,
         R.string.recent_task_option_desktop,
         container,
         taskContainer.itemInfo,
