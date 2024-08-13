@@ -99,7 +99,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"ॲपची जोडी सेव्ह करा"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"स्प्लिट स्क्रीन वापरण्यासाठी दुसऱ्या ॲपवर टॅप करा"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"स्प्लिट स्क्रीन वापरण्यासाठी दुसरे ॲप निवडा"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"रद्द करा"</b></string>
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"रद्द करा"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"स्प्लिट स्क्रीन निवडीतून बाहेर पडा"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"स्प्लिट स्क्रीन वापरण्यासाठी दुसरे ॲप निवडा"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"अ‍ॅप किंवा तुमच्या संस्थेद्वारे ही क्रिया करण्याची अनुमती नाही"</string>
@@ -130,13 +130,10 @@
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"क्विक सेटिंग्ज"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"टास्कबार"</string>
     <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"टास्कबार दाखवलेला आहे"</string>
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_left_title (4242431789851790046) -->
-    <skip />
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_right_title (8219065376188180113) -->
-    <skip />
+    <string name="taskbar_a11y_shown_with_bubbles_left_title" msgid="4242431789851790046">"टास्कबार आणि डावे बबल दाखवले"</string>
+    <string name="taskbar_a11y_shown_with_bubbles_right_title" msgid="8219065376188180113">"टास्कबार आणि उजवे बबल लपवले"</string>
     <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"टास्कबार लपवलेले आहे"</string>
-    <!-- no translation found for taskbar_a11y_hidden_with_bubbles_title (7397395993149508087) -->
-    <skip />
+    <string name="taskbar_a11y_hidden_with_bubbles_title" msgid="7397395993149508087">"टास्कबार आणि बबल लपवले आहेत"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"नेव्हिगेशन बार"</string>
     <string name="always_show_taskbar" msgid="3608801276107751229">"नेहमी टास्कबार दाखवा"</string>
     <string name="change_navigation_mode" msgid="9088393078736808968">"नेव्हिगेशन मोड बदला"</string>

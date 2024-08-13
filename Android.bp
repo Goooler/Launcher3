@@ -231,6 +231,7 @@ android_library {
         "androidx.preference_preference",
         "SystemUISharedLib",
         "//frameworks/libs/systemui:animationlib",
+        "//frameworks/libs/systemui:contextualeducationlib",
         "launcher-testing-shared",
     ],
     srcs: [
@@ -311,6 +312,7 @@ android_library {
         "//frameworks/libs/systemui:iconloader_base",
         "//frameworks/libs/systemui:view_capture",
         "//frameworks/libs/systemui:animationlib",
+        "//frameworks/libs/systemui:contextualeducationlib",
         "SystemUI-statsd",
         "launcher-testing-shared",
         "androidx.lifecycle_lifecycle-common-java8",

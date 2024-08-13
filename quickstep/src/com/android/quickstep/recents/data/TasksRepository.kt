@@ -17,65 +17,104 @@
 package com.android.quickstep.recents.data
 
 import android.graphics.drawable.Drawable
+import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.quickstep.task.thumbnail.data.TaskIconDataSource
 import com.android.quickstep.task.thumbnail.data.TaskThumbnailDataSource
 import com.android.quickstep.util.GroupTask
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TasksRepository(
     private val recentsModel: RecentTasksDataSource,
     private val taskThumbnailDataSource: TaskThumbnailDataSource,
     private val taskIconDataSource: TaskIconDataSource,
+    recentsCoroutineScope: CoroutineScope,
+    private val dispatcherProvider: DispatcherProvider,
 ) : RecentTasksRepository {
     private val groupedTaskData = MutableStateFlow(emptyList<GroupTask>())
-    private val _taskData =
-        groupedTaskData.map { groupTaskList -> groupTaskList.flatMap { it.tasks } }
     private val visibleTaskIds = MutableStateFlow(emptySet<Int>())
     private val thumbnailOverride = MutableStateFlow(mapOf<Int, ThumbnailData>())
 
-    private val taskData: Flow<List<Task>> =
-        combine(_taskData, getThumbnailQueryResults(), getIconQueryResults(), thumbnailOverride) {
-            tasks,
-            thumbnailQueryResults,
-            iconQueryResults,
-            thumbnailOverride ->
-            tasks.forEach { task ->
-                // Add retrieved thumbnails + remove unnecessary thumbnails (e.g. invisible)
-                task.thumbnail =
-                    thumbnailOverride[task.key.id] ?: thumbnailQueryResults[task.key.id]
-
-                // TODO(b/352331675) don't load icons for DesktopTaskView
-                // Add retrieved icons + remove unnecessary icons
-                task.icon = iconQueryResults[task.key.id]?.icon
-                task.titleDescription = iconQueryResults[task.key.id]?.contentDescription
-                task.title = iconQueryResults[task.key.id]?.title
-            }
-            tasks
+    private val taskData =
+        groupedTaskData.map { groupTaskList -> groupTaskList.flatMap { it.tasks } }
+    private val visibleTasks =
+        combine(taskData, visibleTaskIds) { tasks, visibleIds ->
+            tasks.filter { it.key.id in visibleIds }
         }
+
+    private val iconQueryResults: Flow<Map<Int, TaskIconQueryResponse?>> =
+        visibleTasks
+            .map { visibleTasksList -> visibleTasksList.map(::getIconDataRequest) }
+            .flatMapLatest { iconRequestFlows: List<IconDataRequest> ->
+                if (iconRequestFlows.isEmpty()) {
+                    flowOf(emptyMap())
+                } else {
+                    combine(iconRequestFlows) { it.toMap() }
+                }
+            }
+            .distinctUntilChanged()
+
+    private val thumbnailQueryResults: Flow<Map<Int, ThumbnailData?>> =
+        visibleTasks
+            .map { visibleTasksList -> visibleTasksList.map(::getThumbnailDataRequest) }
+            .flatMapLatest { thumbnailRequestFlows: List<ThumbnailDataRequest> ->
+                if (thumbnailRequestFlows.isEmpty()) {
+                    flowOf(emptyMap())
+                } else {
+                    combine(thumbnailRequestFlows) { it.toMap() }
+                }
+            }
+            .distinctUntilChanged()
+
+    private val augmentedTaskData: Flow<List<Task>> =
+        combine(taskData, thumbnailQueryResults, iconQueryResults, thumbnailOverride) {
+                tasks,
+                thumbnailQueryResults,
+                iconQueryResults,
+                thumbnailOverride ->
+                tasks.onEach { task ->
+                    // Add retrieved thumbnails + remove unnecessary thumbnails (e.g. invisible)
+                    task.thumbnail =
+                        thumbnailOverride[task.key.id] ?: thumbnailQueryResults[task.key.id]
+
+                    // TODO(b/352331675) don't load icons for DesktopTaskView
+                    // Add retrieved icons + remove unnecessary icons
+                    val iconQueryResult = iconQueryResults[task.key.id]
+                    task.icon = iconQueryResult?.icon
+                    task.titleDescription = iconQueryResult?.contentDescription
+                    task.title = iconQueryResult?.title
+                }
+            }
+            .flowOn(dispatcherProvider.io)
+            .shareIn(recentsCoroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
 
     override fun getAllTaskData(forceRefresh: Boolean): Flow<List<Task>> {
         if (forceRefresh) {
             recentsModel.getTasks { groupedTaskData.value = it }
         }
-        return taskData
+        return augmentedTaskData
     }
 
     override fun getTaskDataById(taskId: Int): Flow<Task?> =
-        taskData.map { taskList -> taskList.firstOrNull { it.key.id == taskId } }
+        augmentedTaskData.map { taskList -> taskList.firstOrNull { it.key.id == taskId } }
 
     override fun getThumbnailById(taskId: Int): Flow<ThumbnailData?> =
         getTaskDataById(taskId).map { it?.thumbnail }.distinctUntilChangedBy { it?.snapshotId }
@@ -94,41 +133,19 @@ class TasksRepository(
     }
 
     /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
-    private fun getThumbnailDataRequest(task: Task): ThumbnailDataRequest =
-        flow {
-                emit(task.key.id to task.thumbnail)
-                val thumbnailDataResult: ThumbnailData? =
-                    suspendCancellableCoroutine { continuation ->
-                        val cancellableTask =
-                            taskThumbnailDataSource.getThumbnailInBackground(task) {
-                                continuation.resume(it)
-                            }
-                        continuation.invokeOnCancellation { cancellableTask?.cancel() }
-                    }
-                emit(task.key.id to thumbnailDataResult)
+    private fun getThumbnailDataRequest(task: Task): ThumbnailDataRequest = flow {
+        emit(task.key.id to task.thumbnail)
+        val thumbnailDataResult: ThumbnailData? =
+            withContext(dispatcherProvider.main) {
+                suspendCancellableCoroutine { continuation ->
+                    val cancellableTask =
+                        taskThumbnailDataSource.getThumbnailInBackground(task) {
+                            continuation.resume(it)
+                        }
+                    continuation.invokeOnCancellation { cancellableTask?.cancel() }
+                }
             }
-            .distinctUntilChanged()
-
-    /**
-     * This is a Flow that makes a query for thumbnail data to the [taskThumbnailDataSource] for
-     * each visible task. It then collects the responses and returns them in a Map as soon as they
-     * are available.
-     */
-    private fun getThumbnailQueryResults(): Flow<Map<Int, ThumbnailData?>> {
-        val visibleTasks =
-            combine(_taskData, visibleTaskIds) { tasks, visibleIds ->
-                tasks.filter { it.key.id in visibleIds }
-            }
-        val visibleThumbnailDataRequests: Flow<List<ThumbnailDataRequest>> =
-            visibleTasks.map { visibleTasksList -> visibleTasksList.map(::getThumbnailDataRequest) }
-        return visibleThumbnailDataRequests.flatMapLatest {
-            thumbnailRequestFlows: List<ThumbnailDataRequest> ->
-            if (thumbnailRequestFlows.isEmpty()) {
-                flowOf(emptyMap())
-            } else {
-                combine(thumbnailRequestFlows) { it.toMap() }
-            }
-        }
+        emit(task.key.id to thumbnailDataResult)
     }
 
     /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
@@ -136,43 +153,29 @@ class TasksRepository(
         flow {
                 emit(task.key.id to task.getTaskIconQueryResponse())
                 val iconDataResponse: TaskIconQueryResponse? =
-                    suspendCancellableCoroutine { continuation ->
-                        val cancellableTask =
-                            taskIconDataSource.getIconInBackground(task) {
-                                icon,
-                                contentDescription,
-                                title ->
-                                icon.constantState?.let {
-                                    continuation.resume(
-                                        TaskIconQueryResponse(
-                                            it.newDrawable().mutate(),
-                                            contentDescription,
-                                            title
+                    withContext(dispatcherProvider.main) {
+                        suspendCancellableCoroutine { continuation ->
+                            val cancellableTask =
+                                taskIconDataSource.getIconInBackground(task) {
+                                    icon,
+                                    contentDescription,
+                                    title ->
+                                    icon.constantState?.let {
+                                        continuation.resume(
+                                            TaskIconQueryResponse(
+                                                it.newDrawable().mutate(),
+                                                contentDescription,
+                                                title
+                                            )
                                         )
-                                    )
+                                    }
                                 }
-                            }
-                        continuation.invokeOnCancellation { cancellableTask?.cancel() }
+                            continuation.invokeOnCancellation { cancellableTask?.cancel() }
+                        }
                     }
                 emit(task.key.id to iconDataResponse)
             }
             .distinctUntilChanged()
-
-    private fun getIconQueryResults(): Flow<Map<Int, TaskIconQueryResponse?>> {
-        val visibleTasks =
-            combine(_taskData, visibleTaskIds) { tasks, visibleIds ->
-                tasks.filter { it.key.id in visibleIds }
-            }
-        val visibleIconDataRequests: Flow<List<IconDataRequest>> =
-            visibleTasks.map { visibleTasksList -> visibleTasksList.map(::getIconDataRequest) }
-        return visibleIconDataRequests.flatMapLatest { iconRequestFlows: List<IconDataRequest> ->
-            if (iconRequestFlows.isEmpty()) {
-                flowOf(emptyMap())
-            } else {
-                combine(iconRequestFlows) { it.toMap() }
-            }
-        }
-    }
 }
 
 data class TaskIconQueryResponse(

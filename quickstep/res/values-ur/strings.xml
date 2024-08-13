@@ -99,7 +99,8 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"ایپس کے جوڑے کو محفوظ کریں"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"اسپلٹ اسکرین کا استعمال کرنے کیلئے دوسری ایپ پر تھپتھپائیں"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"اسپلٹ اسکرین کے استعمال کیلئے دوسری ایپ منتخب کریں"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"منسوخ کریں"</b></string>
+    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
+    <skip />
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"اسپلٹ اسکرین کے انتخاب سے باہر نکلیں"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"اسپلٹ اسکرین کے استعمال کیلئے دوسری ایپ منتخب کریں"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"ایپ یا آپ کی تنظیم کی جانب سے اس کارروائی کی اجازت نہیں ہے"</string>
@@ -130,13 +131,10 @@
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"فوری ترتیبات"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"ٹاسک بار"</string>
     <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"ٹاشک بار دکھایا گیا"</string>
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_left_title (4242431789851790046) -->
-    <skip />
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_right_title (8219065376188180113) -->
-    <skip />
+    <string name="taskbar_a11y_shown_with_bubbles_left_title" msgid="4242431789851790046">"ٹاسک بار و بلبلے بائیں طرف ہیں"</string>
+    <string name="taskbar_a11y_shown_with_bubbles_right_title" msgid="8219065376188180113">"ٹاسک بار و بلبلے دائیں طرف ہیں"</string>
     <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"ٹاسک بار چھپایا گیا"</string>
-    <!-- no translation found for taskbar_a11y_hidden_with_bubbles_title (7397395993149508087) -->
-    <skip />
+    <string name="taskbar_a11y_hidden_with_bubbles_title" msgid="7397395993149508087">"ٹاسک بار اور بلبلے پوشیدہ ہیں"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"نیویگیشن بار"</string>
     <string name="always_show_taskbar" msgid="3608801276107751229">"ہمیشہ ٹاسک بار دکھائیں"</string>
     <string name="change_navigation_mode" msgid="9088393078736808968">"نیویگیشن موڈ تبدیل کریں"</string>

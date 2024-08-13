@@ -94,7 +94,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                         context.theme
                     )
                 )
-                setText(resources.getText(R.string.recent_task_option_desktop))
+                setText(resources.getText(R.string.recent_task_desktop))
             }
         childCountAtInflation = childCount
     }

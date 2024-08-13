@@ -356,14 +356,6 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         options.setOnAnimationAbortListener(endCallback);
         options.setOnAnimationFinishedListener(endCallback);
 
-        // Prepare taskbar for animation synchronization. This needs to happen here before any
-        // app transition is created.
-        LauncherTaskbarUIController taskbarController = mLauncher.getTaskbarUIController();
-        if (enableScalingRevealHomeAnimation() && taskbarController != null) {
-            taskbarController.setIgnoreInAppFlagForSync(true);
-            onEndCallback.add(() -> taskbarController.setIgnoreInAppFlagForSync(false));
-        }
-
         IBinder cookie = mAppLaunchRunner.supportsReturnTransition()
                 ? ((ContainerAnimationRunner) mAppLaunchRunner).getCookie() : null;
         addLaunchCookie(cookie, (ItemInfo) v.getTag(), options);
@@ -1940,21 +1932,6 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
             if (launcherClosing) {
                 anim.addListener(mForceInvisibleListener);
-            }
-
-            // Syncs the app launch animation and taskbar stash animation (if exists).
-            if (enableScalingRevealHomeAnimation()) {
-                LauncherTaskbarUIController taskbarController = mLauncher.getTaskbarUIController();
-                if (taskbarController != null) {
-                    taskbarController.setIgnoreInAppFlagForSync(false);
-
-                    if (launcherClosing) {
-                        Animator taskbar = taskbarController.createAnimToApp();
-                        if (taskbar != null) {
-                            anim.play(taskbar);
-                        }
-                    }
-                }
             }
 
             result.setAnimation(anim, mLauncher, mOnEndCallback::executeAllAndDestroy,

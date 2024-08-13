@@ -108,6 +108,11 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() {
                         if (task?.canceled == true) {
                             break
                         }
+                        // If activeRv's layout manager has been reset to null on main thread, skip
+                        // the preinflation as we cannot generate correct LayoutParams
+                        if (activeRv.layoutManager == null) {
+                            break
+                        }
                         list.add(
                             adapter.createViewHolder(activeRv, BaseAllAppsAdapter.VIEW_TYPE_ICON)
                         )

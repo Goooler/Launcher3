@@ -99,7 +99,8 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Salva coppia di app"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Tocca un\'altra app per usare lo schermo diviso"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Scegli un\'altra app per usare lo schermo diviso"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"Annulla"</b></string>
+    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
+    <skip />
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Esci dalla selezione dello schermo diviso"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Scegli un\'altra app per usare lo schermo diviso"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"Questa azione non è consentita dall\'app o dall\'organizzazione"</string>

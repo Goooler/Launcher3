@@ -24,9 +24,6 @@ import com.android.launcher3.BuildConfig
 import com.android.launcher3.ui.AbstractLauncherUiTest
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape
 import com.android.launcher3.uioverrides.QuickstepLauncher
-import com.android.launcher3.util.rule.TestStabilityRule
-import com.android.launcher3.util.rule.TestStabilityRule.LOCAL
-import com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
@@ -45,7 +42,6 @@ class TaplTestsOverviewDesktop : AbstractLauncherUiTest<QuickstepLauncher?>() {
         mLauncher.goHome()
     }
 
-    @TestStabilityRule.Stability(flavors = LOCAL or PLATFORM_POSTSUBMIT)
     @Test
     @PortraitLandscape
     fun enterDesktopViaOverviewMenu() {

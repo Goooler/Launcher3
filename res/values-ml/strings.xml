@@ -39,7 +39,7 @@
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"വിജറ്റ് നീക്കാൻ സ്‌പർശിച്ച് പിടിക്കുക."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"വിജറ്റ് നീക്കാൻ ഡബിൾ ടാപ്പ് ചെയ്യൂ, ഹോൾഡ് ചെയ്യൂ അല്ലെങ്കിൽ ഇഷ്‌ടാനുസൃത പ്രവർത്തനങ്ങൾ ഉപയോഗിക്കൂ."</string>
     <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"കൂടുതൽ ഓപ്ഷനുകൾ"</string>
-    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"എല്ലാ വിജറ്റുകളും കാണിക്കൂ"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"എല്ലാ വിജറ്റും കാണിക്കുക"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d വീതിയും %2$d ഉയരവും"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> വിജറ്റ്"</string>
@@ -92,6 +92,8 @@
     <string name="install_drop_target_label" msgid="2539096853673231757">"ഇൻസ്‌റ്റാൾ ചെയ്യുക"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"ആപ്പ് നിർദ്ദേശിക്കേണ്ട"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"പ്രവചനം പിൻ ചെയ്യുക"</string>
+    <!-- no translation found for bubble (3072951361014076670) -->
+    <skip />
     <string name="permlab_install_shortcut" msgid="5632423390354674437">"കുറുക്കുവഴികൾ ഇൻസ്റ്റാളുചെയ്യുക"</string>
     <string name="permdesc_install_shortcut" msgid="923466509822011139">"ഉപയോക്തൃ ഇടപെടൽ ഇല്ലാതെ കുറുക്കുവഴികൾ ചേർക്കാൻ അപ്ലിക്കേഷനെ അനുവദിക്കുന്നു."</string>
     <string name="permlab_read_settings" msgid="5136500343007704955">"ഹോം ക്രമീകരണവും കുറുക്കുവഴികളും വായിക്കുക"</string>

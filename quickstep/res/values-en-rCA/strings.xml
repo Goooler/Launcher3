@@ -99,7 +99,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Save app pair"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Tap another app to use split screen"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Choose another app to use split screen"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"Cancel"</b></string>
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"Cancel"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Exit split screen selection"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Choose another app to use split screen"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"This action isn\'t allowed by the app or your organization"</string>

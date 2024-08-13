@@ -19,6 +19,7 @@ package com.android.quickstep.recents.di
 import android.content.Context
 import android.util.Log
 import android.view.View
+import com.android.launcher3.util.coroutines.ProductionDispatchers
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.data.TasksRepository
@@ -36,6 +37,10 @@ import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 internal typealias RecentsScopeId = String
 
@@ -53,11 +58,20 @@ class RecentsDependencies private constructor(private val appContext: Context) {
     private fun startDefaultScope(appContext: Context) {
         createScope(DEFAULT_SCOPE_ID).apply {
             set(RecentsViewData::class.java.simpleName, RecentsViewData())
+            val recentsCoroutineScope =
+                CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("RecentsView"))
+            set(CoroutineScope::class.java.simpleName, recentsCoroutineScope)
 
             // Create RecentsTaskRepository singleton
             val recentTasksRepository: RecentTasksRepository =
                 with(RecentsModel.INSTANCE.get(appContext)) {
-                    TasksRepository(this, thumbnailCache, iconCache)
+                    TasksRepository(
+                        this,
+                        thumbnailCache,
+                        iconCache,
+                        recentsCoroutineScope,
+                        ProductionDispatchers
+                    )
                 }
             set(RecentTasksRepository::class.java.simpleName, recentTasksRepository)
         }
@@ -137,7 +151,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
             when (modelClass) {
                 RecentTasksRepository::class.java -> {
                     with(RecentsModel.INSTANCE.get(appContext)) {
-                        TasksRepository(this, thumbnailCache, iconCache)
+                        TasksRepository(
+                            this,
+                            thumbnailCache,
+                            iconCache,
+                            get(),
+                            ProductionDispatchers
+                        )
                     }
                 }
                 RecentsViewData::class.java -> RecentsViewData()

@@ -99,7 +99,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"యాప్ పెయిర్‌ను సేవ్ చేయండి"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"స్ప్లిట్ స్క్రీన్ కోసం మరొక యాప్‌ను ట్యాప్ చేయండి"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"స్ప్లిట్ స్క్రీన్‌ను ఉపయోగించడానికి మరొక యాప్ ఎంచుకోండి"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"రద్దు చేయండి"</b></string>
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"రద్దు చేయండి"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"స్ప్లిట్ స్క్రీన్ ఎంపిక నుండి ఎగ్జిట్ అవ్వండి"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"స్ప్లిట్ స్క్రీన్ ఉపయోగానికి మరొక యాప్ ఎంచుకోండి"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"ఈ చర్యను యాప్ గానీ, మీ సంస్థ గానీ అనుమతించవు"</string>

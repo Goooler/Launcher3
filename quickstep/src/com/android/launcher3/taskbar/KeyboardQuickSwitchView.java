@@ -54,6 +54,7 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
+import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 import java.util.HashMap;
@@ -213,9 +214,16 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
                         resources.getString(R.string.quick_switch_desktop),
                         Locale.getDefault()).format(args));
             } else {
+                final boolean firstTaskIsLeftTopTask =
+                        groupTask.mSplitBounds == null
+                        || groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id;
+                final Task leftTopTask = firstTaskIsLeftTopTask
+                        ? groupTask.task1 : groupTask.task2;
+                final Task rightBottomTask = firstTaskIsLeftTopTask
+                        ? groupTask.task2 : groupTask.task1;
                 currentTaskView.setThumbnails(
-                        groupTask.task1,
-                        groupTask.task2,
+                        leftTopTask,
+                        rightBottomTask,
                         updateTasks ? mViewCallbacks::updateThumbnailInBackground : null,
                         updateTasks ? mViewCallbacks::updateIconInBackground : null);
             }
