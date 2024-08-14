@@ -25,16 +25,23 @@ import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.LauncherPrefs.Companion.THEMED_ICONS
 import com.android.launcher3.LauncherPrefs.Companion.get
+import com.android.launcher3.graphics.PreloadIconDrawable
 import com.android.launcher3.icons.BaseIconFactory
 import com.android.launcher3.icons.FastBitmapDrawable
 import com.android.launcher3.icons.UserBadgeDrawable
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.ItemInfo
+import com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ARCHIVED
+import com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE
+import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.ActivityContextWrapper
+import com.android.launcher3.util.Executors
 import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.LauncherLayoutBuilder
 import com.android.launcher3.util.LauncherModelHelper
+import com.android.launcher3.util.TestUtil
 import com.android.launcher3.util.UserIconInfo
+import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -217,6 +224,39 @@ class PreviewItemManagerTest {
         assert(
             !((drawingParams.drawable as FastBitmapDrawable).badge as UserBadgeDrawable).mIsThemed
         )
+    }
+
+    @Test
+    fun `Inactive archived app previews are not drawn as preload icon`() {
+        // Given
+        val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
+        val archivedApp =
+            WorkspaceItemInfo().apply {
+                runtimeStatusFlags = runtimeStatusFlags or FLAG_ARCHIVED
+                runtimeStatusFlags = runtimeStatusFlags and FLAG_INSTALL_SESSION_ACTIVE.inv()
+            }
+        // When
+        previewItemManager.setDrawable(drawingParams, archivedApp)
+        // Then
+        assertThat(drawingParams.drawable).isNotInstanceOf(PreloadIconDrawable::class.java)
+    }
+
+    @Test
+    fun `Actively installing archived app previews are drawn as preload icon`() {
+        // Given
+        val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
+        val archivedApp =
+            WorkspaceItemInfo().apply {
+                runtimeStatusFlags = runtimeStatusFlags or FLAG_ARCHIVED
+                runtimeStatusFlags = runtimeStatusFlags or FLAG_INSTALL_SESSION_ACTIVE
+            }
+        // When
+        TestUtil.runOnExecutorSync(Executors.MAIN_EXECUTOR) {
+            // Run on main thread because preload drawable triggers animator
+            previewItemManager.setDrawable(drawingParams, archivedApp)
+        }
+        // Then
+        assertThat(drawingParams.drawable).isInstanceOf(PreloadIconDrawable::class.java)
     }
 
     private fun profileFlagOp(type: Int) =

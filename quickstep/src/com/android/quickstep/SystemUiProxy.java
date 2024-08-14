@@ -934,6 +934,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
+    /** Tells SysUI to show the expanded view. */
+    public void showExpandedView() {
+        try {
+            if (mBubbles != null) {
+                mBubbles.showExpandedView();
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Failed to call showExpandedView");
+        }
+    }
+
     //
     // Splitscreen
     //
