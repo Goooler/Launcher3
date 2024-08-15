@@ -64,7 +64,6 @@ class BubbleBarViewAnimatorTest {
     private lateinit var bubble: BubbleBarBubble
     private lateinit var bubbleBarView: BubbleBarView
     private lateinit var bubbleStashController: BubbleStashController
-    private val onExpandedNoOp = Runnable {}
 
     @Before
     fun setUp() {
@@ -82,12 +81,7 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -131,12 +125,7 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -179,12 +168,7 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -224,12 +208,7 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -270,12 +249,7 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -304,15 +278,8 @@ class BubbleBarViewAnimatorTest {
         val handleAnimator = PhysicsAnimator.getInstance(handle)
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = true)
@@ -336,7 +303,6 @@ class BubbleBarViewAnimatorTest {
         assertThat(animatorScheduler.delayedBlock).isNull()
 
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -348,15 +314,8 @@ class BubbleBarViewAnimatorTest {
         val handleAnimator = PhysicsAnimator.getInstance(handle)
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -386,7 +345,6 @@ class BubbleBarViewAnimatorTest {
             .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
         assertThat(animator.isAnimating).isFalse()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -398,15 +356,8 @@ class BubbleBarViewAnimatorTest {
         val handleAnimator = PhysicsAnimator.getInstance(handle)
         whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleInForStashed(bubble, isExpanding = false)
@@ -433,7 +384,6 @@ class BubbleBarViewAnimatorTest {
             .isEqualTo(DIFF_BETWEEN_HANDLE_AND_BAR_CENTERS + BAR_TRANSLATION_Y_FOR_TASKBAR)
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_TASKBAR)
         assertThat(animator.isAnimating).isFalse()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -450,12 +400,7 @@ class BubbleBarViewAnimatorTest {
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateToInitialState(bubble, isInApp = true, isExpanding = false)
@@ -497,15 +442,8 @@ class BubbleBarViewAnimatorTest {
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateToInitialState(bubble, isInApp = true, isExpanding = true)
@@ -521,7 +459,6 @@ class BubbleBarViewAnimatorTest {
 
         assertThat(animatorScheduler.delayedBlock).isNull()
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -534,12 +471,7 @@ class BubbleBarViewAnimatorTest {
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateToInitialState(bubble, isInApp = false, isExpanding = false)
@@ -570,15 +502,8 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.bubbleBarTranslationY)
             .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateToInitialState(bubble, isInApp = false, isExpanding = false)
@@ -608,7 +533,6 @@ class BubbleBarViewAnimatorTest {
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -618,15 +542,8 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.bubbleBarTranslationY)
             .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateToInitialState(bubble, isInApp = false, isExpanding = false)
@@ -649,7 +566,6 @@ class BubbleBarViewAnimatorTest {
 
         verifyBubbleBarIsExpandedWithTranslation(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(animator.isAnimating).isFalse()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -662,12 +578,7 @@ class BubbleBarViewAnimatorTest {
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpandedNoOp,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
@@ -706,15 +617,8 @@ class BubbleBarViewAnimatorTest {
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleBarForCollapsed(bubble, isExpanding = true)
@@ -741,7 +645,6 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -753,15 +656,8 @@ class BubbleBarViewAnimatorTest {
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
@@ -799,7 +695,6 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     @Test
@@ -811,15 +706,8 @@ class BubbleBarViewAnimatorTest {
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
-        var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
         val animator =
-            BubbleBarViewAnimator(
-                bubbleBarView,
-                bubbleStashController,
-                onExpanded,
-                animatorScheduler
-            )
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.animateBubbleBarForCollapsed(bubble, isExpanding = false)
@@ -854,7 +742,6 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
         assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
-        assertThat(notifiedExpanded).isTrue()
     }
 
     private fun setUpBubbleBar() {

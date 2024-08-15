@@ -185,10 +185,13 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     // Create a Stream of all applicable system shortcuts
     private Stream<SystemShortcut.Factory> getSystemShortcuts() {
-        // append split options to APP_INFO shortcut, the order here will reflect in the popup
+        // append split options to APP_INFO shortcut if not in Desktop Windowing mode, the order
+        // here will reflect in the popup
         ArrayList<SystemShortcut.Factory> shortcuts = new ArrayList<>();
         shortcuts.add(APP_INFO);
-        shortcuts.addAll(mControllers.uiController.getSplitMenuOptions().toList());
+        if (!mControllers.taskbarRecentAppsController.isInDesktopMode()) {
+            shortcuts.addAll(mControllers.uiController.getSplitMenuOptions().toList());
+        }
         if (com.android.wm.shell.Flags.enableBubbleAnything()) {
             shortcuts.add(BUBBLE);
         }

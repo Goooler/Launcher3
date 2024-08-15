@@ -22,9 +22,9 @@ import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_BOTH
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
+import android.graphics.Rect;
 import android.os.VibrationEffect;
 import android.view.MotionEvent;
-import android.view.View;
 import android.view.animation.Interpolator;
 
 import com.android.app.animation.Interpolators;
@@ -67,7 +67,7 @@ public abstract class TaskViewTouchController<CONTAINER extends Context & Recent
     protected final CONTAINER mContainer;
     private final SingleAxisSwipeDetector mDetector;
     private final RecentsView mRecentsView;
-    private final int[] mTempCords = new int[2];
+    private final Rect mTempRect = new Rect();
     private final boolean mIsRtl;
 
     private AnimatorPlaybackController mCurrentAnimation;
@@ -252,10 +252,8 @@ public abstract class TaskViewTouchController<CONTAINER extends Context & Recent
                     mTaskBeingDragged, maxDuration, currentInterpolator);
 
             // Since the thumbnail is what is filling the screen, based the end displacement on it.
-            View thumbnailView = mTaskBeingDragged.getFirstSnapshotView();
-            mTempCords[1] = orientationHandler.getSecondaryDimension(thumbnailView);
-            dl.getDescendantCoordRelativeToSelf(thumbnailView, mTempCords);
-            mEndDisplacement = secondaryLayerDimension - mTempCords[1];
+            mTaskBeingDragged.getThumbnailBounds(mTempRect, /*relativeToDragLayer=*/true);
+            mEndDisplacement = secondaryLayerDimension - mTempRect.bottom;
         }
         mEndDisplacement *= verticalFactor;
         mCurrentAnimation = pa.createPlaybackController();

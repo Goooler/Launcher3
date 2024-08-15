@@ -242,7 +242,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         }
     }
 
-    override fun launchTaskAnimated(): RunnableList? {
+    private fun launchTaskWithDesktopController(animated: Boolean): RunnableList? {
         val recentsView = recentsView ?: return null
         TestLogging.recordEvent(
             TestProtocol.SEQUENCE_MAIN,
@@ -252,17 +252,23 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val endCallback = RunnableList()
         val desktopController = recentsView.desktopRecentsController
         checkNotNull(desktopController) { "recentsController is null" }
-        desktopController.launchDesktopFromRecents(this) { endCallback.executeAllAndDestroy() }
-        Log.d(TAG, "launchTaskAnimated - launchDesktopFromRecents: ${taskIds.contentToString()}")
+        desktopController.launchDesktopFromRecents(this, animated) {
+            endCallback.executeAllAndDestroy()
+        }
+        Log.d(
+            TAG,
+            "launchTaskAnimated - launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated"
+        )
 
         // Callbacks get run from recentsView for case when recents animation already running
         recentsView.addSideTaskLaunchCallback(endCallback)
         return endCallback
     }
 
+    override fun launchTaskAnimated() = launchTaskWithDesktopController(animated = true)
+
     override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTasks()
-        callback(true)
+        launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
     }
 
     // Desktop tile can't be in split screen
@@ -272,8 +278,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     override fun setOverlayEnabled(overlayEnabled: Boolean) {}
 
     override fun onFullscreenProgressChanged(fullscreenProgress: Float) {
-        // Don't show background while we are transitioning to/from fullscreen
-        backgroundView.visibility = if (fullscreenProgress > 0) INVISIBLE else VISIBLE
+        backgroundView.alpha = 1 - fullscreenProgress
     }
 
     override fun updateCurrentFullscreenParams() {

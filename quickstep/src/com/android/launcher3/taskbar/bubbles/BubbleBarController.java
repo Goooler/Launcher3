@@ -168,10 +168,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
         mBarView = bubbleView; // Need the view for inflating bubble views.
 
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(context);
-
-        if (sBubbleBarEnabled) {
-            mSystemUiProxy.setBubblesListener(this);
-        }
     }
 
     public void onDestroy() {
@@ -197,6 +193,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
             mBubbleBarViewController.setUpdateSelectedBubbleAfterCollapse(
                     key -> setSelectedBubbleInternal(mBubbles.get(key)));
             mBubbleBarViewController.setBoundsChangeListener(this::onBubbleBarBoundsChanged);
+
+            if (sBubbleBarEnabled) {
+                mSystemUiProxy.setBubblesListener(this);
+            }
         });
     }
 
@@ -286,9 +286,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
             RemovedBubble removedBubble = update.removedBubbles.get(0);
             BubbleBarBubble bubbleToRemove = mBubbles.remove(removedBubble.getKey());
             mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
+            boolean showOverflow = update.showOverflowChanged && update.showOverflow;
             if (bubbleToRemove != null) {
                 mBubbleBarViewController.addBubbleAndRemoveBubble(update.addedBubble,
-                        bubbleToRemove, isExpanding, suppressAnimation);
+                        bubbleToRemove, isExpanding, suppressAnimation, showOverflow);
             } else {
                 mBubbleBarViewController.addBubble(update.addedBubble, isExpanding,
                         suppressAnimation);
@@ -493,11 +494,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
     public void animateBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
         MAIN_EXECUTOR.execute(
                 () -> mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation));
-    }
-
-    /** Notifies WMShell to show the expanded view. */
-    void showExpandedView() {
-        mSystemUiProxy.showExpandedView();
     }
 
     //

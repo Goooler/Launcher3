@@ -171,7 +171,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             mTaskRect.set(mFullTaskSize);
             mOrientationState.getOrientationHandler()
                     .setSplitTaskSwipeRect(mDp, mTaskRect, mSplitBounds, mStagePosition);
-            mTaskRect.offset(mTaskRectTranslationX, mTaskRectTranslationY);
         } else if (mIsDesktopTask) {
             // For desktop, tasks can take up only part of the screen size.
             // Full task size represents the whole screen size, but scaled down to fit in recents.
@@ -185,10 +184,19 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             mTaskRect.scale(scale);
             // Ensure the task rect is inside the full task rect
             mTaskRect.offset(mFullTaskSize.left, mFullTaskSize.top);
+
+            Rect taskDimension = new Rect(0, 0, (int) fullscreenTaskDimension.x,
+                    (int) fullscreenTaskDimension.y);
+            mTmpCropRect.set(mThumbnailPosition);
+            if (mTmpCropRect.setIntersect(taskDimension, mThumbnailPosition)) {
+                mTmpCropRect.offset(-mThumbnailPosition.left, -mThumbnailPosition.top);
+            } else {
+                mTmpCropRect.setEmpty();
+            }
         } else {
             mTaskRect.set(mFullTaskSize);
-            mTaskRect.offset(mTaskRectTranslationX, mTaskRectTranslationY);
         }
+        mTaskRect.offset(mTaskRectTranslationX, mTaskRectTranslationY);
     }
 
     /**
@@ -486,10 +494,12 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
                 recentsViewPrimaryTranslation.value);
         applyWindowToHomeRotation(mMatrix);
 
-        // Crop rect is the inverse of thumbnail matrix
-        mTempRectF.set(0, 0, taskWidth, taskHeight);
-        mInversePositionMatrix.mapRect(mTempRectF);
-        mTempRectF.roundOut(mTmpCropRect);
+        if (!mIsDesktopTask) {
+            // Crop rect is the inverse of thumbnail matrix
+            mTempRectF.set(0, 0, taskWidth, taskHeight);
+            mInversePositionMatrix.mapRect(mTempRectF);
+            mTempRectF.roundOut(mTmpCropRect);
+        }
 
         params.setProgress(1f - fullScreenProgress);
         params.applySurfaceParams(surfaceTransaction == null

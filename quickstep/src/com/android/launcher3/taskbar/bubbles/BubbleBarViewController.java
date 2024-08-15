@@ -119,8 +119,7 @@ public class BubbleBarViewController {
         mBubbleDragController = bubbleControllers.bubbleDragController;
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
-        mBubbleBarViewAnimator = new BubbleBarViewAnimator(
-                mBarView, mBubbleStashController, mBubbleBarController::showExpandedView);
+        mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
@@ -497,8 +496,10 @@ public class BubbleBarViewController {
 
     /** Adds a new bubble and removes an old bubble at the same time. */
     public void addBubbleAndRemoveBubble(BubbleBarBubble addedBubble,
-            BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation) {
-        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView());
+            BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation,
+            boolean addOverflowToo) {
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView(),
+                addOverflowToo ? () -> showOverflow(true) : null);
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         addedBubble.getView().setController(mBubbleViewController);
         removedBubble.getView().setController(null);
@@ -532,7 +533,8 @@ public class BubbleBarViewController {
     public void addOverflowAndRemoveBubble(BubbleBarBubble removedBubble) {
         if (mOverflowAdded) return;
         mOverflowAdded = true;
-        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView());
+        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView(),
+                null /* onEndRunnable */);
         mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
         mOverflowBubble.getView().setController(mBubbleViewController);
         removedBubble.getView().setController(null);
@@ -542,7 +544,8 @@ public class BubbleBarViewController {
     public void removeOverflowAndAddBubble(BubbleBarBubble addedBubble) {
         if (!mOverflowAdded) return;
         mOverflowAdded = false;
-        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView());
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView(),
+                null /* onEndRunnable */);
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         addedBubble.getView().setController(mBubbleViewController);
         mOverflowBubble.getView().setController(null);

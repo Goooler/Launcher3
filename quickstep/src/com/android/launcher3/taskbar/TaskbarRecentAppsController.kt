@@ -81,7 +81,7 @@ class TaskbarRecentAppsController(
     private val desktopVisibilityController: DesktopVisibilityController?
         get() = desktopVisibilityControllerProvider()
 
-    private val isInDesktopMode: Boolean
+    val isInDesktopMode: Boolean
         get() = desktopVisibilityController?.areDesktopTasksVisible() ?: false
 
     val runningTaskIds: Set<Int>

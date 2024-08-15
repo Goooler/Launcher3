@@ -36,7 +36,6 @@ class BubbleBarViewAnimator
 constructor(
     private val bubbleBarView: BubbleBarView,
     private val bubbleStashController: BubbleStashController,
-    private val onExpanded: Runnable,
     private val scheduler: Scheduler = HandlerScheduler(bubbleBarView)
 ) {
 
@@ -407,7 +406,7 @@ constructor(
         springBackAnimation.spring(DynamicAnimation.TRANSLATION_Y, ty)
         springBackAnimation.addEndListener { _, _, _, _, _, _, _ ->
             if (animatingBubble?.expand == true) {
-                expandBubbleBar()
+                bubbleBarView.isExpanded = true
                 cancelHideAnimation()
             } else {
                 moveToState(AnimatingBubble.State.IN)
@@ -418,7 +417,7 @@ constructor(
         ObjectAnimator.ofFloat(bubbleBarView, View.TRANSLATION_Y, ty - bubbleBarBounceDistanceInPx)
             .withDuration(BUBBLE_BAR_BOUNCE_ANIMATION_DURATION_MS)
             .withEndAction {
-                if (animatingBubble?.expand == true) expandBubbleBar()
+                if (animatingBubble?.expand == true) bubbleBarView.isExpanded = true
                 springBackAnimation.start()
             }
             .start()
@@ -452,7 +451,7 @@ constructor(
         this.animatingBubble = animatingBubble.copy(expand = true)
         // if we're fully in and waiting to hide, cancel the hide animation and clean up
         if (animatingBubble.state == AnimatingBubble.State.IN) {
-            expandBubbleBar()
+            bubbleBarView.isExpanded = true
             cancelHideAnimation()
         }
     }
@@ -490,11 +489,6 @@ constructor(
         this.animatingBubble = animatingBubble.copy(state = state)
     }
 
-    private fun expandBubbleBar() {
-        bubbleBarView.isExpanded = true
-        onExpanded.run()
-    }
-
     /**
      * Tracks the translation Y of the bubble bar during the animation. When the bubble bar expands
      * as part of the animation, the expansion should start after the bubble bar reaches the peak
@@ -516,7 +510,7 @@ constructor(
             }
             val expand = animatingBubble?.expand ?: false
             if (reachedPeak && expand && !startedExpanding) {
-                expandBubbleBar()
+                bubbleBarView.isExpanded = true
                 startedExpanding = true
             }
             previousTy = ty

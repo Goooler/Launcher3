@@ -267,7 +267,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
         int setupSize = mControllers.taskbarActivityContext.getSetupWindowSize();
         Point p = DimensionUtils.getTaskbarPhoneDimensions(deviceProfile, resources,
-                mContext.isPhoneMode());
+                mContext.isPhoneMode(), mContext.isGestureNav());
         ViewGroup.LayoutParams navButtonsViewLayoutParams = mNavButtonsView.getLayoutParams();
         navButtonsViewLayoutParams.width = p.x;
         if (!mContext.isUserSetupComplete()) {
