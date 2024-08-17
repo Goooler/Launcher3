@@ -86,7 +86,7 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LogUtils;
 import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.wm.shell.draganddrop.DragAndDropConstants;
+import com.android.wm.shell.shared.draganddrop.DragAndDropConstants;
 
 import java.io.PrintWriter;
 import java.util.Arrays;

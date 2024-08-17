@@ -34,9 +34,9 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.wm.shell.animation.Interpolators;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.common.bubbles.BubbleInfo;
+import com.android.wm.shell.shared.animation.Interpolators;
 
 // TODO: (b/276978250) This is will be similar to WMShell's BadgedImageView, it'd be nice to share.
 

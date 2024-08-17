@@ -36,7 +36,7 @@ import com.android.quickstep.util.RecentsOrientedState
 import com.android.quickstep.util.SplitSelectStateController
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper
-import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition
+import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition
 
 /**
  * TaskView that contains and shows thumbnails for not one, BUT TWO(!!) tasks

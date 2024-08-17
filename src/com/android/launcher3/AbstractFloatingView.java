@@ -138,9 +138,6 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public static final int TYPE_TOUCH_CONTROLLER_NO_INTERCEPT = TYPE_ALL & ~TYPE_DISCOVERY_BOUNCE
             & ~TYPE_LISTENER & ~TYPE_TASKBAR_OVERLAYS;
 
-    public static final int TYPE_ALL_EXCEPT_ON_BOARD_POPUP = TYPE_ALL & ~TYPE_ON_BOARD_POPUP
-            & ~TYPE_PIN_IME_POPUP;
-
     protected boolean mIsOpen;
 
     public AbstractFloatingView(Context context, AttributeSet attrs) {

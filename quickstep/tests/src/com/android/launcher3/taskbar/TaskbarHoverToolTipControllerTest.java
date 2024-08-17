@@ -202,7 +202,7 @@ public class TaskbarHoverToolTipControllerTest extends TaskbarBaseTestCase {
         boolean hoverHandled =
                 mTaskbarHoverToolTipController.onHover(mHoverFolderIcon, mMotionEvent);
 
-        assertThat(hoverHandled).isFalse();
+        assertThat(hoverHandled).isTrue();
     }
 
     @Test
@@ -213,7 +213,7 @@ public class TaskbarHoverToolTipControllerTest extends TaskbarBaseTestCase {
         boolean hoverHandled =
                 mTaskbarHoverToolTipController.onHover(mHoverFolderIcon, mMotionEvent);
 
-        assertThat(hoverHandled).isFalse();
+        assertThat(hoverHandled).isTrue();
     }
 
     @Test
