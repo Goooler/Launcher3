@@ -53,6 +53,7 @@ import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_ANIMATION_FINISHED;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_SET;
 import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_CANCELED;
+import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_STARTED;
 import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHED;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
@@ -468,6 +469,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         mGestureState.runOnceAtState(STATE_END_TARGET_ANIMATION_FINISHED
                         | STATE_RECENTS_SCROLLING_FINISHED,
                 this::onSettledOnEndTarget);
+        mGestureState.runOnceAtState(STATE_END_TARGET_SET | STATE_RECENTS_ANIMATION_STARTED,
+                this::onCalculateEndTarget);
 
         mStateCallback.runOnceAtState(STATE_HANDLER_INVALIDATED, this::invalidateHandler);
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_HANDLER_INVALIDATED,
@@ -1152,6 +1155,22 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
     }
 
+    /**
+     * Called if the end target has been set and the recents animation is started.
+     */
+    private void onCalculateEndTarget() {
+        final GestureEndTarget endTarget = mGestureState.getEndTarget();
+
+        switch (endTarget) {
+            case HOME:
+                // Early detach the nav bar if endTarget is determined as HOME
+                if (mRecentsAnimationController != null) {
+                    mRecentsAnimationController.detachNavigationBarFromApp(true);
+                }
+                break;
+        }
+    }
+
     private void onSettledOnEndTarget() {
         // Fast-finish the attaching animation if it's still running.
         maybeUpdateRecentsAttachedState(false);
@@ -1406,10 +1425,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             duration = mContainer != null && mContainer.getDeviceProfile().isTaskbarPresent
                     ? StaggeredWorkspaceAnim.DURATION_TASKBAR_MS
                     : StaggeredWorkspaceAnim.DURATION_MS;
-            // Early detach the nav bar once the endTarget is determined as HOME
-            if (mRecentsAnimationController != null) {
-                mRecentsAnimationController.detachNavigationBarFromApp(true);
-            }
             ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
                     mGestureState.isTrackpadGesture(), GestureType.HOME);
         } else if (endTarget == RECENTS) {

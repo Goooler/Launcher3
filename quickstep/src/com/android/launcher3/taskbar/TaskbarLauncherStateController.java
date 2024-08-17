@@ -433,6 +433,11 @@ public class TaskbarLauncherStateController {
         return animator;
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return isInLauncher() && mLauncherState == LauncherState.NORMAL;
+    }
+
     private Animator onStateChangeApplied(int changedFlags, long duration, boolean start) {
         final boolean isInLauncher = isInLauncher();
         final boolean isIconAlignedWithHotseat = isIconAlignedWithHotseat();
@@ -445,9 +450,8 @@ public class TaskbarLauncherStateController {
         }
         mControllers.bubbleControllers.ifPresent(controllers -> {
             // Show the bubble bar when on launcher home or in overview.
-            boolean onHome = isInLauncher && mLauncherState == LauncherState.NORMAL;
             boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
-            controllers.bubbleStashController.setBubblesShowingOnHome(onHome);
+            controllers.bubbleStashController.setBubblesShowingOnHome(isOnHome());
             controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
         });
 

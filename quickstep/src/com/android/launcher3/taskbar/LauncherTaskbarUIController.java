@@ -138,6 +138,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         mHomeState.removeListener(mVisibilityChangeListener);
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return mTaskbarLauncherStateController.isOnHome();
+    }
+
     private void onInAppDisplayProgressChanged() {
         if (mControllers != null) {
             // Update our shared state so we can restore it if taskbar gets recreated.

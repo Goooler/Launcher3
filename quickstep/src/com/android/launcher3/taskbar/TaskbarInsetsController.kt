@@ -136,14 +136,8 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         val taskbarTouchableHeight = controllers.taskbarStashController.touchableHeight
         val bubblesTouchableHeight =
             bubbleControllers?.bubbleStashController?.getTouchableHeight() ?: 0
-        // add bounds for task bar and bubble bar stash controllers
-        val touchableHeight = max(taskbarTouchableHeight, bubblesTouchableHeight)
-        defaultTouchableRegion.set(
-            0,
-            windowLayoutParams.height - touchableHeight,
-            context.deviceProfile.widthPx,
-            windowLayoutParams.height
-        )
+        // reset touch bounds
+        defaultTouchableRegion.setEmpty()
         if (bubbleControllers != null) {
             val bubbleBarViewController = bubbleControllers.bubbleBarViewController
             val isBubbleBarVisible = bubbleControllers.bubbleStashController.isBubbleBarVisible()
@@ -152,6 +146,15 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             if (isBubbleBarVisible || isAnimatingNewBubble) {
                 defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.bubbleBarBounds)
             }
+        }
+        val taskbarUIController = controllers.uiController as? LauncherTaskbarUIController
+        if (taskbarUIController?.isOnHome != true) {
+            // only add the bars touch region if not on home
+            val touchableHeight = max(taskbarTouchableHeight, bubblesTouchableHeight)
+            val bottom = windowLayoutParams.height
+            val top = bottom - touchableHeight
+            val right = context.deviceProfile.widthPx
+            defaultTouchableRegion.addBoundsToRegion(Rect(/* left= */ 0, top, right, bottom))
         }
 
         // Pre-calculate insets for different providers across different rotations for this gravity
@@ -221,20 +224,20 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             provider.insetsSize = getInsetsForGravityWithCutout(contentHeight, gravity, endRotation)
         } else if (provider.type == mandatorySystemGestures()) {
             if (context.isThreeButtonNav) {
-                provider.insetsSize = getInsetsForGravityWithCutout(contentHeight, gravity,
-                    endRotation)
+                provider.insetsSize =
+                    getInsetsForGravityWithCutout(contentHeight, gravity, endRotation)
             } else {
                 val gestureHeight =
-                        ResourceUtils.getNavbarSize(
+                    ResourceUtils.getNavbarSize(
                         ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE,
-                        context.resources)
-                val isPinnedTaskbar = context.deviceProfile.isTaskbarPresent
-                        && !context.deviceProfile.isTransientTaskbar
-                val mandatoryGestureHeight =
-                        if (isPinnedTaskbar) contentHeight
-                        else gestureHeight
-                provider.insetsSize = getInsetsForGravityWithCutout(mandatoryGestureHeight, gravity,
-                        endRotation)
+                        context.resources
+                    )
+                val isPinnedTaskbar =
+                    context.deviceProfile.isTaskbarPresent &&
+                        !context.deviceProfile.isTransientTaskbar
+                val mandatoryGestureHeight = if (isPinnedTaskbar) contentHeight else gestureHeight
+                provider.insetsSize =
+                    getInsetsForGravityWithCutout(mandatoryGestureHeight, gravity, endRotation)
             }
         } else if (provider.type == tappableElement()) {
             provider.insetsSize = getInsetsForGravity(tappableHeight, gravity)
