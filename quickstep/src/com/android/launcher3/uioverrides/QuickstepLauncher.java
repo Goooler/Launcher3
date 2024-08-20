@@ -729,7 +729,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // Check if there is already an instance of this app running, if so, initiate the split
         // using that.
         mSplitSelectStateController.findLastActiveTasksAndRunCallback(
-                Collections.singletonList(splitSelectSource.itemInfo.getComponentKey()),
+                Collections.singletonList(splitSelectSource.getItemInfo().getComponentKey()),
                 false /* findExactPairMatch */,
                 foundTasks -> {
                     @Nullable Task foundTask = foundTasks[0];
@@ -756,7 +756,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         Rect tempRect = new Rect();
 
         mSplitSelectStateController.setInitialTaskSelect(source.intent,
-                source.position.stagePosition, source.itemInfo, source.splitEvent,
+                source.position.stagePosition, source.getItemInfo(), source.splitEvent,
                 source.alreadyRunningTaskId);
 
         RecentsView recentsView = getOverviewPanel();
@@ -774,6 +774,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         floatingTaskView.setOnClickListener(view ->
                 mSplitSelectStateController.getSplitAnimationController().
                         playAnimPlaceholderToFullscreen(this, view, Optional.empty()));
+        floatingTaskView.setContentDescription(source.getItemInfo().contentDescription);
+
         mSplitSelectStateController.setFirstFloatingTaskView(floatingTaskView);
         anim.addListener(new AnimatorListenerAdapter() {
             @Override

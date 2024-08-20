@@ -274,6 +274,15 @@ public final class OverviewComponentObserver {
         return mActivityInterface;
     }
 
+    /**
+     * Get the current container control helper for managing interactions to the overview activity.
+     *
+     * @return the current container control helper
+     */
+    public BaseContainerInterface<?, ?> getContainerInterface() {
+        return mActivityInterface;
+    }
+
     public void dump(PrintWriter pw) {
         pw.println("OverviewComponentObserver:");
         pw.println("  isDefaultHome=" + mIsDefaultHome);

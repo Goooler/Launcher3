@@ -91,7 +91,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             val iconDrawable: Drawable,
             val fadeWithThumbnail: Boolean,
             val isStagedTask: Boolean,
-            val iconView: View?
+            val iconView: View?,
+            val contentDescription: CharSequence?
         )
     }
 
@@ -112,7 +113,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 splitSelectSource.drawable,
                 fadeWithThumbnail = false,
                 isStagedTask = true,
-                iconView = null
+                iconView = null,
+                splitSelectSource.itemInfo.contentDescription
             )
         } else if (splitSelectStateController.isDismissingFromSplitPair) {
             // Initiating split from overview, but on a split pair
@@ -126,7 +128,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                         drawable,
                         fadeWithThumbnail = true,
                         isStagedTask = true,
-                        iconView = container.iconView.asView()
+                        iconView = container.iconView.asView(),
+                        container.task.titleDescription
                     )
                 }
             }
@@ -145,7 +148,8 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     drawable,
                     fadeWithThumbnail = true,
                     isStagedTask = true,
-                    iconView = it.iconView.asView()
+                    iconView = it.iconView.asView(),
+                    it.task.titleDescription
                 )
             }
         }

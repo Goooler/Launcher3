@@ -428,14 +428,14 @@ public final class LauncherInstrumentation {
                 .getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
-    int getFocusedTaskHeightForTablet() {
-        return getTestInfo(TestProtocol.REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET).getInt(
-                TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    Rect getOverviewTaskSize() {
+        return getTestInfo(TestProtocol.REQUEST_GET_OVERVIEW_TASK_SIZE)
+                .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD, Rect.class);
     }
 
-    Rect getGridTaskRectForTablet() {
-        return ((Rect) getTestInfo(TestProtocol.REQUEST_GET_GRID_TASK_SIZE_RECT_FOR_TABLET)
-                .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD));
+    Rect getOverviewGridTaskSize() {
+        return getTestInfo(TestProtocol.REQUEST_GET_OVERVIEW_GRID_TASK_SIZE)
+                .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD, Rect.class);
     }
 
     int getOverviewPageSpacing() {

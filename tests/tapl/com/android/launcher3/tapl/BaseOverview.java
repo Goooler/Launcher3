@@ -23,6 +23,8 @@ import static com.android.launcher3.tapl.LauncherInstrumentation.log;
 import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH;
+import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 
 import android.graphics.Rect;
 import android.util.Log;
@@ -278,7 +280,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
                     if (mLauncher.isTablet()) {
                         mLauncher.assertTrue("current task is not grid height",
                                 getCurrentTask().getVisibleHeight() == mLauncher
-                                        .getGridTaskRectForTablet().height());
+                                        .getOverviewGridTaskSize().height());
                     }
                     mLauncher.assertTrue("Current task not scrolled off screen",
                             !getCurrentTask().equals(task));
@@ -354,7 +356,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         final List<UiObject2> taskViews = getTasks();
         mLauncher.assertNotEquals("Unable to find a task", 0, taskViews.size());
 
-        final int gridTaskWidth = mLauncher.getGridTaskRectForTablet().width();
+        final int gridTaskWidth = mLauncher.getOverviewGridTaskSize().width();
 
         return taskViews.stream().filter(t -> t.getVisibleBounds().width() == gridTaskWidth).map(
                 t -> new OverviewTask(mLauncher, t, this)).collect(Collectors.toList());
@@ -529,13 +531,17 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             throw new IllegalStateException("Must be run on tablet device.");
         }
         final List<UiObject2> taskViews = getTasks();
-        if (taskViews.size() == 0) {
+        if (taskViews.isEmpty()) {
             return null;
         }
-        int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
+        Rect focusTaskSize = mLauncher.getOverviewTaskSize();
+        testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH, "focusTaskSize: " + focusTaskSize);
+        int focusedTaskHeight = focusTaskSize.height();
         for (UiObject2 task : taskViews) {
             OverviewTask overviewTask = new OverviewTask(mLauncher, task, this);
 
+            testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
+                    "overviewTask.getVisibleHeight(): " + overviewTask.getVisibleHeight());
             if (overviewTask.getVisibleHeight() == focusedTaskHeight) {
                 return overviewTask;
             }

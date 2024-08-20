@@ -156,8 +156,8 @@ public final class OverviewTask {
                 return;
             }
 
-            boolean taskWasFocused = mLauncher.isTablet() && getVisibleHeight() == mLauncher
-                    .getFocusedTaskHeightForTablet();
+            boolean taskWasFocused = mLauncher.isTablet()
+                    && getVisibleHeight() == mLauncher.getOverviewTaskSize().height();
             List<Integer> originalTasksCenterX =
                     getCurrentTasksCenterXList().stream().sorted().toList();
             boolean isClearAllVisibleBeforeDismiss = mOverview.isClearAllVisible();

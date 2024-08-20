@@ -98,14 +98,7 @@ public class TaskbarUIController {
     }
 
     /** Called when an icon is launched. */
-    @CallSuper
-    public void onTaskbarIconLaunched(ItemInfo item) {
-        // When launching from Taskbar, e.g. from Overview, set FLAG_IN_APP immediately instead of
-        // waiting for onPause, to reduce potential visual noise during the app open transition.
-        if (mControllers.taskbarStashController == null) return;
-        mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_APP, true);
-        mControllers.taskbarStashController.applyState();
-    }
+    public void onTaskbarIconLaunched(ItemInfo item) { }
 
     public View getRootView() {
         return mControllers.taskbarActivityContext.getDragLayer();
@@ -232,7 +225,7 @@ public class TaskbarUIController {
         }
 
         recentsView.getSplitSelectController().findLastActiveTasksAndRunCallback(
-                Collections.singletonList(splitSelectSource.itemInfo.getComponentKey()),
+                Collections.singletonList(splitSelectSource.getItemInfo().getComponentKey()),
                 false /* findExactPairMatch */,
                 foundTasks -> {
                     @Nullable Task foundTask = foundTasks[0];
@@ -249,6 +242,13 @@ public class TaskbarUIController {
      * Uses the clicked Taskbar icon to launch a second app for splitscreen.
      */
     public void triggerSecondAppForSplit(ItemInfoWithIcon info, Intent intent, View startingView) {
+        // When launching from Taskbar, e.g. from Overview, set FLAG_IN_APP immediately
+        // to reduce potential visual noise during the app open transition.
+        if (mControllers.taskbarStashController != null) {
+            mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_APP, true);
+            mControllers.taskbarStashController.applyState();
+        }
+
         RecentsView recents = getRecentsView();
         recents.getSplitSelectController().findLastActiveTasksAndRunCallback(
                 Collections.singletonList(info.getComponentKey()),

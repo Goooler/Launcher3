@@ -27,6 +27,7 @@ import android.view.View
 import android.window.TransitionInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.launcher3.apppairs.AppPairIcon
+import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.statehandlers.DepthController
 import com.android.launcher3.statemanager.StateManager
 import com.android.launcher3.taskbar.TaskbarActivityContext
@@ -76,6 +77,7 @@ class SplitAnimationControllerTest {
     private val splitSelectSource: SplitConfigurationOptions.SplitSelectSource = mock()
     private val mockSplitSourceDrawable: Drawable = mock()
     private val mockSplitSourceView: View = mock()
+    private val mockItemInfo: ItemInfo = mock()
 
     private val stateManager: StateManager<*, *> = mock()
     private val depthController: DepthController = mock()
@@ -89,11 +91,13 @@ class SplitAnimationControllerTest {
         whenever(mockTaskContainer.snapshotView).thenReturn(mockSnapshotView)
         whenever(mockTaskContainer.splitAnimationThumbnail).thenReturn(mockBitmap)
         whenever(mockTaskContainer.iconView).thenReturn(mockIconView)
+        whenever(mockTaskContainer.task).thenReturn(mockTask)
         whenever(mockIconView.drawable).thenReturn(mockTaskViewDrawable)
         whenever(mockTaskView.taskContainers).thenReturn(List(1) { mockTaskContainer })
 
         whenever(splitSelectSource.drawable).thenReturn(mockSplitSourceDrawable)
         whenever(splitSelectSource.view).thenReturn(mockSplitSourceView)
+        whenever(splitSelectSource.itemInfo).thenReturn(mockItemInfo)
 
         splitAnimationController = SplitAnimationController(mockSplitSelectStateController)
     }

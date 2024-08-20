@@ -3450,6 +3450,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 mSplitSelectStateController.getSplitAnimationController().
                         playAnimPlaceholderToFullscreen(mContainer, view,
                                 Optional.of(() -> resetFromSplitSelectionState())));
+        firstFloatingTaskView.setContentDescription(splitAnimInitProps.getContentDescription());
 
         // SplitInstructionsView: animate in
         safeRemoveDragLayerView(mSplitSelectStateController.getSplitInstructionsView());
@@ -4883,7 +4884,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         mSplitSelectStateController.setDismissingFromSplitPair(mSplitHiddenTaskView != null
                 && mSplitHiddenTaskView instanceof GroupedTaskView);
         mSplitSelectStateController.setInitialTaskSelect(splitSelectSource.intent,
-                splitSelectSource.position.stagePosition, splitSelectSource.itemInfo,
+                splitSelectSource.position.stagePosition, splitSelectSource.getItemInfo(),
                 splitSelectSource.splitEvent, splitSelectSource.alreadyRunningTaskId);
         updateDesktopTaskVisibility(false /* visible */);
     }

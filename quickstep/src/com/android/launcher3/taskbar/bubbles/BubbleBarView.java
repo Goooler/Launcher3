@@ -1320,7 +1320,7 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /** Returns the child count excluding the overflow if it's present. */
-    private int getBubbleChildCount() {
+    int getBubbleChildCount() {
         return hasOverflow() ? getChildCount() - 1 : getChildCount();
     }
 

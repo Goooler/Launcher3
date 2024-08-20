@@ -211,7 +211,7 @@ public final class SplitConfigurationOptions {
         private Drawable drawable;
         public final Intent intent;
         public final SplitPositionOption position;
-        public final ItemInfo itemInfo;
+        private ItemInfo itemInfo;
         public final StatsLogManager.EventEnum splitEvent;
         /** Represents the taskId of the first app to start in split screen */
         public int alreadyRunningTaskId = INVALID_TASK_ID;
@@ -238,6 +238,10 @@ public final class SplitConfigurationOptions {
 
         public View getView() {
             return view;
+        }
+
+        public ItemInfo getItemInfo() {
+            return itemInfo;
         }
     }
 }

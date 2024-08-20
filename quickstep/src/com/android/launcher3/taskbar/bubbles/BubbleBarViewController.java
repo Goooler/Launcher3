@@ -583,9 +583,8 @@ public class BubbleBarViewController {
     public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
             boolean isUpdate) {
         boolean isInApp = mTaskbarStashController.isInApp();
-        // if this is the first bubble, animate to the initial state. one bubble is the overflow
-        // so check for at most 2 children.
-        if (mBarView.getChildCount() <= 2 && !isUpdate) {
+        // if this is the first bubble, animate to the initial state.
+        if (mBarView.getBubbleChildCount() == 1 && !isUpdate) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
