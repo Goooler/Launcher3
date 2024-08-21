@@ -376,17 +376,14 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mSuggestedWidgetsPackageUserKey = PackageUserKey.fromPackageItemInfo(packageItemInfo);
             final boolean isChangingHeaders = mSelectedHeader == null
                     || !mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey);
-            // If the initial focus view is still focused, it is likely a programmatic header
-            // click.
-            if (mSelectedHeader != null
-                    && !getAccessibilityInitialFocusView().isAccessibilityFocused()) {
-                post(() -> {
-                    mRightPaneScrollView.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
-                    mRightPaneScrollView.performAccessibilityAction(
-                            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
-                });
-            }
             if (isChangingHeaders)  {
+                // If the initial focus view is still focused or widget picker is still opening, it
+                // is likely a programmatic header click.
+                if (mSelectedHeader != null && !mOpenCloseAnimation.getAnimationPlayer().isRunning()
+                        && !getAccessibilityInitialFocusView().isAccessibilityFocused()) {
+                    mRightPaneScrollView.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
+                    focusOnFirstWidgetCell(mWidgetRecommendationsView);
+                }
                 // If switching from another header, unselect any WidgetCells. This is necessary
                 // because we do not clear/recycle the WidgetCells in the recommendations container
                 // when the header is clicked, only when onRecommendationsBound is called. That
@@ -505,9 +502,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             public void onHeaderChanged(@NonNull PackageUserKey selectedHeader) {
                 final boolean isSameHeader = mSelectedHeader != null
                         && mSelectedHeader.equals(selectedHeader);
-                // If the initial focus view is still focused, it is likely a programmatic header
-                // click.
+                // If the initial focus view is still focused or widget picker is still opening, it
+                // is likely a programmatic header click.
                 final boolean isUserClick = mSelectedHeader != null
+                        && !mOpenCloseAnimation.getAnimationPlayer().isRunning()
                         && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
                 final boolean showDefaultWidgets = mWidgetOptionsMenuState != null

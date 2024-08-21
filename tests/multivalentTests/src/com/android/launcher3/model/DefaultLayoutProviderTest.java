@@ -22,11 +22,11 @@ import static com.android.launcher3.util.LauncherModelHelper.TEST_PACKAGE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assume.assumeTrue;
 
-import android.content.Context;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionParams;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
@@ -39,6 +39,7 @@ import com.android.launcher3.util.LauncherModelHelper;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -49,8 +50,10 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class DefaultLayoutProviderTest {
 
+    @Rule public ModelTestRule rule = new ModelTestRule();
+
     private LauncherModelHelper mModelHelper;
-    private Context mTargetContext;
+    private LauncherModelHelper.SandboxModelContext mTargetContext;
 
     @Before
     public void setUp() {
@@ -114,8 +117,10 @@ public class DefaultLayoutProviderTest {
         SessionParams params = new SessionParams(SessionParams.MODE_FULL_INSTALL);
         params.setAppPackageName(pendingAppPkg);
         params.setAppIcon(BitmapInfo.LOW_RES_ICON);
+        params.installerPackageName = ApplicationProvider.getApplicationContext().getPackageName();
 
-        PackageInstaller installer = mTargetContext.getPackageManager().getPackageInstaller();
+        PackageInstaller installer = ApplicationProvider.getApplicationContext().getPackageManager()
+                .getPackageInstaller();
         installer.createSession(params);
 
         writeLayoutAndLoad(new LauncherLayoutBuilder().atWorkspace(0, 1, 0)

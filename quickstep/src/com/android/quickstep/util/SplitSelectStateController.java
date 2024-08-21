@@ -55,7 +55,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.Log;
 import android.util.Pair;
@@ -97,7 +96,6 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.SplitInstructionsView;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
@@ -883,14 +881,17 @@ public class SplitSelectStateController {
             DesktopSplitRecentsAnimationListener listener =
                     new DesktopSplitRecentsAnimationListener(splitPosition, taskBounds);
 
-            MAIN_EXECUTOR.execute(() -> {
-                callbacks.addListener(listener);
-                UI_HELPER_EXECUTOR.execute(
-                        // Transition from app to enter stage split in launcher with
-                        // recents animation.
-                        () -> ActivityManagerWrapper.getInstance().startRecentsActivity(
-                                mOverviewComponentObserver.getOverviewIntent(),
-                                SystemClock.uptimeMillis(), callbacks, null, null));
+            callbacks.addListener(listener);
+            UI_HELPER_EXECUTOR.execute(() -> {
+                // Transition from app to enter stage split in launcher with recents animation
+                final ActivityOptions options = ActivityOptions.makeBasic();
+                options.setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
+                options.setTransientLaunch();
+                SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext())
+                        .startRecentsActivity(
+                                mOverviewComponentObserver.getOverviewIntent(), options,
+                                callbacks);
             });
         }
 

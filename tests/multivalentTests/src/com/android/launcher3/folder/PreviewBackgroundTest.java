@@ -24,15 +24,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import android.testing.AndroidTestingRunner;
-import android.testing.TestableLooper;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.PathInterpolator;
 
+import androidx.test.annotation.UiThreadTest;
 import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.launcher3.CellLayout;
+import com.android.launcher3.util.LauncherMultivalentJUnit;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -41,8 +41,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @SmallTest
-@RunWith(AndroidTestingRunner.class)
-@TestableLooper.RunWithLooper(setAsMainLooper = true)
+@UiThreadTest
+@RunWith(LauncherMultivalentJUnit.class)
 public class PreviewBackgroundTest {
 
     private static final float REST_SCALE = 1f;

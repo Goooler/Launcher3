@@ -97,6 +97,7 @@ import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks;
+import com.android.launcher3.taskbar.bubbles.BubbleControllers;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.testing.shared.TestProtocol;
@@ -109,6 +110,7 @@ import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
+import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
 import com.android.quickstep.inputconsumers.DeviceLockedInputConsumer;
 import com.android.quickstep.inputconsumers.NavHandleLongPressInputConsumer;
 import com.android.quickstep.inputconsumers.OneHandedModeInputConsumer;
@@ -901,11 +903,14 @@ public class TouchInteractionService extends Service {
             boolean isOneHandedModeActive = mDeviceState.isOneHandedModeActive();
             boolean isInSwipeUpTouchRegion = mRotationTouchHelper.isInSwipeUpTouchRegion(event);
             TaskbarActivityContext tac = mTaskbarManager.getCurrentActivityContext();
+            BubbleControllers bubbleControllers = tac != null ? tac.getBubbleControllers() : null;
+            boolean isOnBubbles = bubbleControllers != null
+                    && BubbleBarInputConsumer.isEventOnBubbles(tac, event);
             if (isInSwipeUpTouchRegion && tac != null) {
                 tac.closeKeyboardQuickSwitchView();
             }
             if ((!isOneHandedModeActive && isInSwipeUpTouchRegion)
-                    || isHoverActionWithoutConsumer) {
+                    || isHoverActionWithoutConsumer || isOnBubbles) {
                 reasonString.append(!isOneHandedModeActive && isInSwipeUpTouchRegion
                                 ? "one handed mode is not active and event is in swipe up region"
                                 : "isHoverActionWithoutConsumer == true")
@@ -1085,6 +1090,15 @@ public class TouchInteractionService extends Service {
 
     private InputConsumer newConsumer(
             GestureState previousGestureState, GestureState newGestureState, MotionEvent event) {
+        TaskbarActivityContext tac = mTaskbarManager.getCurrentActivityContext();
+        BubbleControllers bubbleControllers = tac != null ? tac.getBubbleControllers() : null;
+        if (bubbleControllers != null && BubbleBarInputConsumer.isEventOnBubbles(tac, event)) {
+            InputConsumer consumer = new BubbleBarInputConsumer(this, bubbleControllers,
+                    mInputMonitorCompat);
+            logInputConsumerSelectionReason(consumer, newCompoundString(
+                    "event is on bubbles, creating new input consumer"));
+            return consumer;
+        }
         AnimatedFloat progressProxy = mSwipeUpProxyProvider.apply(mGestureState);
         if (progressProxy != null) {
             InputConsumer consumer = new ProgressDelegateInputConsumer(
@@ -1149,7 +1163,6 @@ public class TouchInteractionService extends Service {
             }
 
             // If Taskbar is present, we listen for swipe or cursor hover events to unstash it.
-            TaskbarActivityContext tac = mTaskbarManager.getCurrentActivityContext();
             if (tac != null && !(base instanceof AssistantInputConsumer)) {
                 // Present always on large screen or on small screen w/ flag
                 boolean useTaskbarConsumer = tac.getDeviceProfile().isTaskbarPresent

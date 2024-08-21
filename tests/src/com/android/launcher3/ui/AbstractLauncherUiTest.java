@@ -351,8 +351,6 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     /** Waits for setup wizard to go away. */
     private static void waitForSetupWizardDismissal() {
-        if (!TestStabilityRule.isPresubmit()) return;
-
         if (sFirstTimeWaitingForWizard) {
             try {
                 getUiDevice().executeShellCommand(

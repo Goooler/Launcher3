@@ -32,7 +32,7 @@ import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.same
-import org.mockito.kotlin.verifyZeroInteractions
+import org.mockito.kotlin.verifyNoMoreInteractions
 
 @RunWith(AndroidJUnit4::class)
 class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
@@ -77,8 +77,8 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
         underTest.attachTo(launcher)
 
         verify(workspace).addOnAttachStateChangeListener(same(underTest))
-        verifyZeroInteractions(viewTreeObserver)
-        verifyZeroInteractions(rootView)
+        verifyNoMoreInteractions(viewTreeObserver)
+        verifyNoMoreInteractions(rootView)
     }
 
     @Test
@@ -100,8 +100,8 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
 
         underTest.onViewAttachedToWindow(rootView)
 
-        verifyZeroInteractions(viewTreeObserver)
-        verifyZeroInteractions(rootView)
+        verifyNoMoreInteractions(viewTreeObserver)
+        verifyNoMoreInteractions(rootView)
     }
 
     @Test
@@ -117,10 +117,10 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
     fun run_before_onDraw_noOp() {
         underTest.run()
 
-        verifyZeroInteractions(runnable)
-        verifyZeroInteractions(viewTreeObserver)
-        verifyZeroInteractions(workspace)
-        verifyZeroInteractions(consumer)
+        verifyNoMoreInteractions(runnable)
+        verifyNoMoreInteractions(viewTreeObserver)
+        verifyNoMoreInteractions(workspace)
+        verifyNoMoreInteractions(consumer)
     }
 
     @Test
@@ -148,10 +148,10 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
 
         underTest.run()
 
-        verifyZeroInteractions(runnable)
-        verifyZeroInteractions(viewTreeObserver)
-        verifyZeroInteractions(workspace)
-        verifyZeroInteractions(consumer)
+        verifyNoMoreInteractions(runnable)
+        verifyNoMoreInteractions(viewTreeObserver)
+        verifyNoMoreInteractions(workspace)
+        verifyNoMoreInteractions(consumer)
     }
 
     @Test
@@ -160,7 +160,7 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
 
         verify(runnable).run()
         verify(consumer).accept(underTest)
-        verifyZeroInteractions(workspace)
+        verifyNoMoreInteractions(workspace)
     }
 
     @Test
@@ -179,8 +179,8 @@ class ViewOnDrawExecutorTest<T> where T : View, T : PageIndicator {
     fun cancel_notRun() {
         underTest.cancel()
 
-        verifyZeroInteractions(runnable)
+        verifyNoMoreInteractions(runnable)
         verify(consumer).accept(underTest)
-        verifyZeroInteractions(workspace)
+        verifyNoMoreInteractions(workspace)
     }
 }

@@ -160,7 +160,7 @@ android_library {
 }
 
 filegroup {
-    name: "launcher-testing-helpers",
+    name: "launcher-testing-helpers-multivalent",
     srcs: [
         "src/**/*.java",
         "src/**/*.kt",
@@ -174,8 +174,17 @@ filegroup {
         // Test classes
         "src/**/*Test.java",
         "src/**/*Test.kt",
+        "src/**/RoboApiWrapper.kt",
         "multivalentTests/src/**/*Test.java",
         "multivalentTests/src/**/*Test.kt",
+    ],
+}
+
+filegroup {
+    name: "launcher-testing-helpers",
+    srcs: [
+        ":launcher-testing-helpers-multivalent",
+        "src/**/RoboApiWrapper.kt",
     ],
 }
 
@@ -186,7 +195,7 @@ android_robolectric_test {
         ":launcher3-robo-src",
 
         // Test util classes
-        ":launcher-testing-helpers",
+        ":launcher-testing-helpers-multivalent",
         ":launcher-testing-shared",
     ],
     exclude_srcs: [

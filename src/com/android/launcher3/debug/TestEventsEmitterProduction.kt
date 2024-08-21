@@ -17,6 +17,7 @@
 package com.android.launcher3.debug
 
 import android.content.Context
+import android.util.Log
 import com.android.launcher3.util.MainThreadInitializedObject
 import com.android.launcher3.util.SafeCloseable
 
@@ -50,5 +51,7 @@ class TestEventsEmitterProduction : TestEventEmitter {
 
     override fun close() {}
 
-    override fun sendEvent(event: TestEvent) {}
+    override fun sendEvent(event: TestEvent) {
+        Log.d("TestEventsEmitterProduction", "Event sent ${event.event}")
+    }
 }

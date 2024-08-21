@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Semat"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Bentuk bebas"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"Desktop"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"Desktop"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Tiada item terbaharu"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Tetapan penggunaan apl"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Kosongkan semua"</string>
@@ -68,18 +69,18 @@
     <string name="home_gesture_intro_subtitle" msgid="2632238748497975326">"Leret ke atas dari bahagian bawah skrin. Gerak isyarat ini sentiasa membawa anda ke Skrin utama."</string>
     <string name="home_gesture_spoken_intro_subtitle" msgid="1030987707382031750">"Leret ke atas dengan 2 jari dari bawah skrin. Gerak isyarat ini sentiasa bawa anda ke Skrin utama."</string>
     <string name="home_gesture_tutorial_title" msgid="3126834347496917376">"Pergi ke skrin utama"</string>
-    <string name="home_gesture_tutorial_subtitle" msgid="7245995490408668778">"Leret ke atas dari bahagian bawah skrin anda"</string>
+    <string name="home_gesture_tutorial_subtitle" msgid="7245995490408668778">"Leret ke atas dari bahagian bawah skrin"</string>
     <string name="home_gesture_tutorial_success" msgid="1736295017642244751">"Syabas!"</string>
     <string name="overview_gesture_feedback_swipe_too_far_from_edge" msgid="6402349235265407385">"Pastikan anda meleret ke atas dari sisi bahagian bawah skrin"</string>
     <string name="overview_gesture_feedback_home_detected" msgid="663432226180397138">"Cuba tahan tetingkap untuk tempoh yang lebih lama sebelum melepaskan"</string>
-    <string name="overview_gesture_feedback_wrong_swipe_direction" msgid="1191055451018584958">"Pastikan anda meleret terus ke atas, kemudian menjeda"</string>
+    <string name="overview_gesture_feedback_wrong_swipe_direction" msgid="1191055451018584958">"Pastikan anda meleret lurus ke atas, kemudian berhenti seketika"</string>
     <string name="overview_gesture_feedback_complete_with_follow_up" msgid="3544611727467765026">"Anda sudah belajar cara menggunakan gerak isyarat. Untuk mematikan gerak isyarat, pergi ke Tetapan."</string>
     <string name="overview_gesture_feedback_complete_without_follow_up" msgid="2903050864432331629">"Anda telah melengkapkan gerak isyarat menukar apl"</string>
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"Leret untuk menukar apl"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"Untuk beralih antara apl, leret ke atas dari bahagian bawah skrin anda, tahan, kemudian lepaskan."</string>
     <string name="overview_gesture_spoken_intro_subtitle" msgid="3853371838260201751">"Untuk beralih antara apl, leret ke atas dengan 2 jari dari bawah skrin, tahan, kemudian lepaskan."</string>
     <string name="overview_gesture_tutorial_title" msgid="4125835002668708720">"Beralih antara apl"</string>
-    <string name="overview_gesture_tutorial_subtitle" msgid="5253549754058973071">"Leret ke atas dari bahagian bawah skrin anda, tahan, kemudian lepaskan"</string>
+    <string name="overview_gesture_tutorial_subtitle" msgid="5253549754058973071">"Leret ke atas dari bahagian bawah skrin, tahan, kemudian lepas"</string>
     <string name="overview_gesture_tutorial_success" msgid="1910267697807973076">"Syabas!"</string>
     <string name="gesture_tutorial_confirm_title" msgid="6201516182040074092">"Selesai"</string>
     <string name="gesture_tutorial_action_button_label" msgid="6249846312991332122">"Selesai"</string>

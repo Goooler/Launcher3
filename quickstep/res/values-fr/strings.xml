@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Épingler"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Format libre"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"Ordinateur"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"Ordinateur"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Aucun élément récent"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Paramètres de consommation de l\'application"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Tout effacer"</string>
@@ -99,8 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Enregistrer la paire d\'applis"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Appuyez sur autre appli pour l\'écran partagé"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Sélectionnez une autre appli pour utiliser l\'écran partagé."</string>
-    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
-    <skip />
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"Annuler"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Quitter la sélection de l\'écran partagé"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Sélect. autre appli pour utiliser l\'écran partagé"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"Cette action n\'est pas autorisée par l\'application ou par votre organisation"</string>

@@ -21,6 +21,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageInstaller.SessionInfo
 import android.os.UserHandle
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
@@ -33,14 +34,20 @@ import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.PackageManagerHelper
 import com.android.launcher3.util.PackageUserKey
 import junit.framework.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.spy
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
+@RunWith(AndroidJUnit4::class)
 class FirstScreenBroadcastHelperTest {
+
+    @get:Rule val modelTestRule = ModelTestRule()
+
     private val context = spy(InstrumentationRegistry.getInstrumentation().targetContext)
     private val mockPmHelper = mock<PackageManagerHelper>()
     private val expectedAppPackage = "appPackageExpected"

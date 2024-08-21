@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"הצמדה"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"מצב חופשי"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"במחשב"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"מחשב"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"אין פריטים אחרונים"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"הגדרות שימוש באפליקציה"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"ניקוי הכול"</string>
@@ -72,8 +73,8 @@
     <string name="home_gesture_tutorial_success" msgid="1736295017642244751">"מעולה!"</string>
     <string name="overview_gesture_feedback_swipe_too_far_from_edge" msgid="6402349235265407385">"חשוב להחליק למעלה מהקצה התחתון של המסך"</string>
     <string name="overview_gesture_feedback_home_detected" msgid="663432226180397138">"כדאי לנסות להחזיק את החלון זמן רב יותר לפני שחרור האצבע"</string>
-    <string name="overview_gesture_feedback_wrong_swipe_direction" msgid="1191055451018584958">"חשוב להחליק ישר למעלה ואז להמתין"</string>
-    <string name="overview_gesture_feedback_complete_with_follow_up" msgid="3544611727467765026">"למדת איך להשתמש בתנועות. ניתן להשבית את התנועות ב\'הגדרות\'."</string>
+    <string name="overview_gesture_feedback_wrong_swipe_direction" msgid="1191055451018584958">"חשוב להחליק למעלה בקו ישר ואז לעצור"</string>
+    <string name="overview_gesture_feedback_complete_with_follow_up" msgid="3544611727467765026">"למדת איך להשתמש בתנועות. אפשר להשבית את התנועות ב\'הגדרות\'."</string>
     <string name="overview_gesture_feedback_complete_without_follow_up" msgid="2903050864432331629">"השלמת את תנועת המעבר בין האפליקציות"</string>
     <string name="overview_gesture_intro_title" msgid="2902054412868489378">"יש להחליק כדי לעבור בין אפליקציות"</string>
     <string name="overview_gesture_intro_subtitle" msgid="4968091015637850859">"כדי לעבור בין אפלקציות, יש להחליק למעלה מתחתית המסך, להחזיק ולאחר מכן לשחרר."</string>
@@ -89,7 +90,7 @@
     <string name="gesture_tutorial_step" msgid="1279786122817620968">"מדריך <xliff:g id="CURRENT">%1$d</xliff:g>/<xliff:g id="TOTAL">%2$d</xliff:g>"</string>
     <string name="allset_title" msgid="5021126669778966707">"הכול מוכן!"</string>
     <string name="allset_hint" msgid="459504134589971527">"כדי לחזור לדף הבית, צריך להחליק למעלה"</string>
-    <string name="allset_button_hint" msgid="2395219947744706291">"כדי לעבור אל מסך הבית יש להקיש על הלחצן הראשי"</string>
+    <string name="allset_button_hint" msgid="2395219947744706291">"כדי לעבור אל מסך הבית צריך להקיש על הלחצן הראשי"</string>
     <string name="allset_description_generic" msgid="5385500062202019855">"הכול מוכן ואפשר להתחיל להשתמש ב<xliff:g id="DEVICE">%1$s</xliff:g>"</string>
     <string name="default_device_name" msgid="6660656727127422487">"מכשיר"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"הגדרות הניווט של המערכת"</annotation></string>
@@ -99,8 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"שמירת צמד אפליקציות"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"צריך להקיש על אפליקציה אחרת כדי להשתמש במסך מפוצל"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"כדי להשתמש במסך מפוצל צריך לבחור אפליקציה אחרת"</string>
-    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
-    <skip />
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"ביטול"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"יציאה מתצוגת מסך מפוצל"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"כדי להשתמש במסך מפוצל צריך לבחור אפליקציה אחרת"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"האפליקציה או הארגון שלך אינם מתירים את הפעולה הזאת"</string>

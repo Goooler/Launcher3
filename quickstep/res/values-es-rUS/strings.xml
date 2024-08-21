@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Fijar"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Formato libre"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"Escritorio"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"Computadoras"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"No hay elementos recientes"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Configuración de uso de la app"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Cerrar todo"</string>
@@ -99,8 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Guardar vinculación"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Presiona otra app para usar la pantalla dividida"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Elige otra app para usar la pantalla dividida"</string>
-    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
-    <skip />
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"Cancelar"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Salir de la selección de pantalla dividida"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Elige otra app para usar la pantalla dividida"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"La app o tu organización no permiten realizar esta acción"</string>

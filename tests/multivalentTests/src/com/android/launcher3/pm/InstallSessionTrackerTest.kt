@@ -26,6 +26,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import com.android.launcher3.Flags.FLAG_ENABLE_SUPPORT_FOR_ARCHIVING
+import com.android.launcher3.model.ModelTestRule
 import com.android.launcher3.util.Executors.MODEL_EXECUTOR
 import com.android.launcher3.util.LauncherModelHelper
 import com.android.launcher3.util.PackageUserKey
@@ -35,6 +36,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doNothing
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.spy
 import org.mockito.kotlin.verify
@@ -43,7 +45,9 @@ import org.mockito.kotlin.whenever
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class InstallSessionTrackerTest {
-    @get:Rule val setFlagsRule = SetFlagsRule()
+    @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
+
+    @get:Rule(order = 1) val modelTestRule = ModelTestRule()
 
     private val mockInstallSessionHelper: InstallSessionHelper = mock()
     private val mockCallback: InstallSessionTracker.Callback = mock()
@@ -200,13 +204,9 @@ class InstallSessionTrackerTest {
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.Q)
     fun `register triggers registerPackageInstallerSessionCallback for versions from Q`() {
         // Given
-        whenever(
-                launcherApps.registerPackageInstallerSessionCallback(
-                    MODEL_EXECUTOR,
-                    installSessionTracker
-                )
-            )
-            .then { /* no-op */ }
+        doNothing()
+            .whenever(launcherApps)
+            .registerPackageInstallerSessionCallback(MODEL_EXECUTOR, installSessionTracker)
         // When
         installSessionTracker.register()
         // Then
@@ -218,8 +218,9 @@ class InstallSessionTrackerTest {
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.Q)
     fun `unregister triggers unregisterPackageInstallerSessionCallback for versions from Q`() {
         // Given
-        whenever(launcherApps.unregisterPackageInstallerSessionCallback(installSessionTracker))
-            .then { /* no-op */ }
+        doNothing()
+            .whenever(launcherApps)
+            .unregisterPackageInstallerSessionCallback(installSessionTracker)
         // When
         installSessionTracker.unregister()
         // Then

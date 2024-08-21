@@ -58,7 +58,6 @@ import com.android.quickstep.util.SurfaceTransaction.SurfaceProperties;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.TransformParams.BuilderProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InputMonitorCompat;
 
 import java.util.HashMap;
@@ -278,9 +277,7 @@ public class DeviceLockedInputConsumer implements InputConsumer,
     }
 
     private void endRemoteAnimation() {
-        if (mHomeLaunched) {
-            ActivityManagerWrapper.getInstance().cancelRecentsAnimation(false);
-        } else if (mRecentsAnimationController != null) {
+        if (mRecentsAnimationController != null) {
             mRecentsAnimationController.finishController(
                     false /* toRecents */, null /* callback */, false /* sendUserLeaveHint */);
         }

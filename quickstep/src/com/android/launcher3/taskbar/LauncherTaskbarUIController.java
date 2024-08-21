@@ -289,7 +289,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     public boolean isDraggingItem() {
-        return mControllers.taskbarDragController.isDragging();
+        boolean bubblesDragging = false;
+        if (mControllers.bubbleControllers.isPresent()) {
+            bubblesDragging =
+                    mControllers.bubbleControllers.get().bubbleDragController.isDragging();
+        }
+        return mControllers.taskbarDragController.isDragging() || bubblesDragging;
     }
 
     @Override

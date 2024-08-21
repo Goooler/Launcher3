@@ -1,16 +1,12 @@
 package com.android.quickstep;
 
 import static com.android.launcher3.taskbar.TaskbarThresholdUtils.getFromNavThreshold;
-import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.PointF;
-import android.graphics.Rect;
 import android.os.Bundle;
-import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -18,7 +14,6 @@ import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.testing.TestInformationHandler;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.DisplayController;
-import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.TISBindHelper;
@@ -82,29 +77,10 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
             }
 
             case TestProtocol.REQUEST_GET_OVERVIEW_TASK_SIZE: {
-                Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH, "== REQUEST_GET_OVERVIEW_TASK_SIZE ==");
-                Rect gridSize = new Rect();
-                LauncherActivityInterface.INSTANCE.calculateGridSize(mDeviceProfile, mContext,
-                        gridSize);
-                Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH, "gridSize: " + gridSize);
-                PointF taskDimension = new PointF();
-                LauncherActivityInterface.getTaskDimension(mContext, mDeviceProfile, taskDimension);
-                Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
-                        "taskbarHeight: " + mDeviceProfile.taskbarHeight);
-                Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH, "taskDimension: " + taskDimension);
-                Rect taskSize = new Rect();
-                LauncherActivityInterface.INSTANCE.calculateTaskSize(mContext, mDeviceProfile,
-                        taskSize, RecentsPagedOrientationHandler.PORTRAIT);
-                Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH, "calculateTaskSize: " + taskSize);
                 return getUIProperty(Bundle::putParcelable,
-                        recentsViewContainer -> {
-                            Rect lastComputedTaskSize =
-                                    recentsViewContainer.<RecentsView<?, ?>>getOverviewPanel()
-                                            .getLastComputedTaskSize();
-                            Log.d(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
-                                    "lastComputedTaskSize: " + lastComputedTaskSize);
-                            return lastComputedTaskSize;
-                        },
+                        recentsViewContainer ->
+                                recentsViewContainer.<RecentsView<?, ?>>getOverviewPanel()
+                                        .getLastComputedTaskSize(),
                         this::getRecentsViewContainer);
             }
 

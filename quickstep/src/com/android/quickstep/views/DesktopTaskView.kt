@@ -15,6 +15,7 @@
  */
 package com.android.quickstep.views
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Point
 import android.graphics.PointF
@@ -23,9 +24,9 @@ import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
 import android.util.Log
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
@@ -125,11 +126,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     snapshotView,
                     // Add snapshotView to the front after initial views e.g. icon and
                     // background.
-                    childCountAtInflation,
-                    LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
+                    childCountAtInflation
                 )
                 TaskContainer(
                     this,
@@ -158,28 +155,37 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         }
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val containerWidth = MeasureSpec.getSize(widthMeasureSpec)
-        var containerHeight = MeasureSpec.getSize(heightMeasureSpec)
-        setMeasuredDimension(containerWidth, containerHeight)
-
+    @SuppressLint("RtlHardcoded")
+    override fun updateTaskSize(
+        lastComputedTaskSize: Rect,
+        lastComputedGridTaskSize: Rect,
+        lastComputedCarouselTaskSize: Rect
+    ) {
+        super.updateTaskSize(
+            lastComputedTaskSize,
+            lastComputedGridTaskSize,
+            lastComputedCarouselTaskSize
+        )
         if (taskContainers.isEmpty()) {
             return
         }
 
         val thumbnailTopMarginPx = container.deviceProfile.overviewTaskThumbnailTopMarginPx
-        containerHeight -= thumbnailTopMarginPx
+
+        val containerWidth = layoutParams.width
+        val containerHeight = layoutParams.height - thumbnailTopMarginPx
 
         BaseContainerInterface.getTaskDimension(mContext, container.deviceProfile, tempPointF)
+
         val windowWidth = tempPointF.x.toInt()
         val windowHeight = tempPointF.y.toInt()
         val scaleWidth = containerWidth / windowWidth.toFloat()
         val scaleHeight = containerHeight / windowHeight.toFloat()
+
         if (DEBUG) {
             Log.d(
                 TAG,
-                "onMeasure: container=[$containerWidth,$containerHeight] " +
+                "onMeasure: container=[$containerWidth,$containerHeight]" +
                     "window=[$windowWidth,$windowHeight] scale=[$scaleWidth,$scaleHeight]"
             )
         }
@@ -195,27 +201,26 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                         right = windowWidth / 4
                         bottom = windowHeight / 4
                     }
-            val thumbWidth = (taskSize.width() * scaleWidth).toInt()
-            val thumbHeight = (taskSize.height() * scaleHeight).toInt()
-            it.snapshotView.measure(
-                MeasureSpec.makeMeasureSpec(thumbWidth, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(thumbHeight, MeasureSpec.EXACTLY)
-            )
+            val positionInParent = it.task.positionInParent ?: ORIGIN
 
             // Position the task to the same position as it would be on the desktop
-            val positionInParent = it.task.positionInParent ?: ORIGIN
-            val taskX = (positionInParent.x * scaleWidth).toInt()
-            var taskY = (positionInParent.y * scaleHeight).toInt()
-            // move task down by margin size
-            taskY += thumbnailTopMarginPx
-            it.snapshotView.x = taskX.toFloat()
-            it.snapshotView.y = taskY.toFloat()
+            it.snapshotView.updateLayoutParams<LayoutParams> {
+                gravity = Gravity.LEFT or Gravity.TOP
+                width = (taskSize.width() * scaleWidth).toInt()
+                height = (taskSize.height() * scaleHeight).toInt()
+                leftMargin = (positionInParent.x * scaleWidth).toInt()
+                topMargin =
+                    (positionInParent.y * scaleHeight).toInt() +
+                        container.deviceProfile.overviewTaskThumbnailTopMarginPx
+            }
             if (DEBUG) {
-                Log.d(
-                    TAG,
-                    "onMeasure: task=${it.task.key} thumb=[$thumbWidth,$thumbHeight]" +
-                        " pos=[$taskX,$taskY]"
-                )
+                with(it.snapshotView.layoutParams as LayoutParams) {
+                    Log.d(
+                        TAG,
+                        "onMeasure: task=${it.task.key} size=[$width,$height]" +
+                            " margin=[$leftMargin,$topMargin]"
+                    )
+                }
             }
         }
     }

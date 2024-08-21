@@ -27,6 +27,7 @@ import com.android.launcher3.util.TestUtil.runOnExecutorSync
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.times
@@ -42,6 +43,8 @@ import org.mockito.kotlin.whenever
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class AddWorkspaceItemsTaskTest : AbstractWorkspaceModelTest() {
+
+    @get:Rule val modelTestRule = ModelTestRule()
 
     private lateinit var mDataModelCallbacks: MyCallbacks
 

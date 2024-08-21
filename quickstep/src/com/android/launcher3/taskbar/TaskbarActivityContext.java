@@ -502,6 +502,15 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     /**
+     * Returns {@code true} iff bubble bar is enabled (but not necessarily visible /
+     * containing bubbles).
+     */
+    @Override
+    public boolean isBubbleBarEnabled() {
+        return getBubbleControllers() != null && BubbleBarController.isBubbleBarEnabled();
+    }
+
+    /**
      * Returns if software keyboard is docked or input toolbar is placed at the taskbar area
      */
     public boolean isImeDocked() {

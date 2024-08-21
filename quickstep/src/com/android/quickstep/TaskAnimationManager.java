@@ -112,8 +112,9 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
      */
     public void preloadRecentsAnimation(Intent intent) {
         // Pass null animation handler to indicate this start is for preloading
-        UI_HELPER_EXECUTOR.execute(() -> ActivityManagerWrapper.getInstance()
-                .startRecentsActivity(intent, 0, null, null, null));
+        UI_HELPER_EXECUTOR.execute(() -> {
+            ActivityManagerWrapper.getInstance().preloadRecentsActivity(intent);
+        });
     }
 
     boolean shouldIgnoreMotionEvents() {
@@ -327,63 +328,43 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mCallbacks.addListener(gestureState);
         mCallbacks.addListener(listener);
 
-        if (ENABLE_SHELL_TRANSITIONS) {
-            final ActivityOptions options = ActivityOptions.makeBasic();
-            options.setPendingIntentBackgroundActivityStartMode(
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
-            // Use regular (non-transient) launch for all apps page to control IME.
-            if (!containerInterface.allowAllAppsFromOverview()) {
-                options.setTransientLaunch();
-            }
-            options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
+        final ActivityOptions options = ActivityOptions.makeBasic();
+        options.setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
+        // Use regular (non-transient) launch for all apps page to control IME.
+        if (!containerInterface.allowAllAppsFromOverview()) {
+            options.setTransientLaunch();
+        }
+        options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
 
-            // Notify taskbar that we should skip reacting to launcher visibility change to
-            // avoid a jumping taskbar.
-            TaskbarUIController taskbarUIController = containerInterface.getTaskbarController();
-            if (enableScalingRevealHomeAnimation() && taskbarUIController != null) {
-                taskbarUIController.setSkipLauncherVisibilityChange(true);
+        // Notify taskbar that we should skip reacting to launcher visibility change to
+        // avoid a jumping taskbar.
+        TaskbarUIController taskbarUIController = containerInterface.getTaskbarController();
+        if (enableScalingRevealHomeAnimation() && taskbarUIController != null) {
+            taskbarUIController.setSkipLauncherVisibilityChange(true);
 
-                mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
-                    @Override
-                    public void onRecentsAnimationCanceled(
-                            @NonNull HashMap<Integer, ThumbnailData> thumbnailDatas) {
-                        taskbarUIController.setSkipLauncherVisibilityChange(false);
-                    }
+            mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
+                @Override
+                public void onRecentsAnimationCanceled(
+                        @NonNull HashMap<Integer, ThumbnailData> thumbnailDatas) {
+                    taskbarUIController.setSkipLauncherVisibilityChange(false);
+                }
 
-                    @Override
-                    public void onRecentsAnimationFinished(
-                            @NonNull RecentsAnimationController controller) {
-                        taskbarUIController.setSkipLauncherVisibilityChange(false);
-                    }
-                });
-            }
+                @Override
+                public void onRecentsAnimationFinished(
+                        @NonNull RecentsAnimationController controller) {
+                    taskbarUIController.setSkipLauncherVisibilityChange(false);
+                }
+            });
+        }
 
-            mRecentsAnimationStartPending = getSystemUiProxy()
-                    .startRecentsActivity(intent, options, mCallbacks);
-            if (enableHandleDelayedGestureCallbacks()) {
-                ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                        "TaskAnimationManager.startRecentsAnimation(shell transition path): ")
-                        .append("Setting mRecentsAnimationStartPending = ")
-                        .append(mRecentsAnimationStartPending));
-            }
-        } else {
-            UI_HELPER_EXECUTOR.execute(
-                    () -> ActivityManagerWrapper.getInstance().startRecentsActivity(
-                            intent,
-                            eventTime,
-                            mCallbacks,
-                            result -> {
-                                if (enableHandleDelayedGestureCallbacks()) {
-                                    ActiveGestureLog.INSTANCE.addLog(
-                                            new ActiveGestureLog.CompoundString(
-                                                    "TaskAnimationManager.startRecentsAnimation")
-                                                    .append("(legacy path): Setting ")
-                                                    .append("mRecentsAnimationStartPending = ")
-                                                    .append(result));
-                                }
-                                mRecentsAnimationStartPending = result;
-                            },
-                            MAIN_EXECUTOR.getHandler()));
+        mRecentsAnimationStartPending = getSystemUiProxy()
+                .startRecentsActivity(intent, options, mCallbacks);
+        if (enableHandleDelayedGestureCallbacks()) {
+            ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                    "TaskAnimationManager.startRecentsAnimation: ")
+                    .append("Setting mRecentsAnimationStartPending = ")
+                    .append(mRecentsAnimationStartPending));
         }
         gestureState.setState(STATE_RECENTS_ANIMATION_INITIALIZED);
         return mCallbacks;

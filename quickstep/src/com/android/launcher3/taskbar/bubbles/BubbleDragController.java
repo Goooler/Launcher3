@@ -77,6 +77,8 @@ public class BubbleDragController {
     private BubbleBarPinController mBubbleBarPinController;
     private BubblePinController mBubblePinController;
 
+    private boolean mIsDragging;
+
     public BubbleDragController(TaskbarActivityContext activity) {
         mActivity = activity;
     }
@@ -238,6 +240,16 @@ public class BubbleDragController {
                         getInitialPosition(), mReleasedLocation);
             }
         });
+    }
+
+    /** Whether there is an item being dragged or not. */
+    public boolean isDragging() {
+        return mIsDragging;
+    }
+
+    /** Sets whether something is being dragged or not. */
+    public void setIsDragging(boolean isDragging) {
+        mIsDragging = isDragging;
     }
 
     /**
@@ -436,6 +448,7 @@ public class BubbleDragController {
 
         private void startDragging(@NonNull View view) {
             onDragStart();
+            BubbleDragController.this.setIsDragging(true);
             mActivity.setTaskbarWindowFullscreen(true);
             mAnimator = new BubbleDragAnimator(view);
             mAnimator.animateFocused();
@@ -452,6 +465,7 @@ public class BubbleDragController {
         }
 
         private void stopDragging(@NonNull View view, @NonNull MotionEvent event) {
+            BubbleDragController.this.setIsDragging(false);
             Runnable onComplete = () -> {
                 mActivity.setTaskbarWindowFullscreen(false);
                 cleanUp(view);

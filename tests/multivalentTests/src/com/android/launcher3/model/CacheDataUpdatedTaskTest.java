@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.android.launcher3.model;
 
 import static android.os.Process.myUserHandle;
@@ -11,10 +26,13 @@ import static com.android.launcher3.util.TestUtil.runOnExecutorSync;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.content.pm.PackageInstaller;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
@@ -48,6 +66,9 @@ public class CacheDataUpdatedTaskTest {
 
     @Rule(order = 0)
     public TestRule testStabilityRule = new TestStabilityRule();
+
+    @Rule(order = 1)
+    public ModelTestRule mModelTestRule = new ModelTestRule();
 
     private static final String PENDING_APP_1 = TEST_PACKAGE + ".pending1";
     private static final String PENDING_APP_2 = TEST_PACKAGE + ".pending2";
@@ -128,10 +149,13 @@ public class CacheDataUpdatedTaskTest {
     @Test
     public void testSessionUpdate_updates_pending_apps() {
         // Run on model executor so that no other task runs in the middle.
+        PackageInstaller.SessionInfo sessionInfo = ApplicationProvider.getApplicationContext()
+                        .getPackageManager().getPackageInstaller().getSessionInfo(mSession1);
+        assertNotNull(sessionInfo);
         runOnExecutorSync(MODEL_EXECUTOR, () -> {
             LauncherAppState.getInstance(mContext).getIconCache().updateSessionCache(
                     new PackageUserKey(PENDING_APP_1, myUserHandle()),
-                    mContext.getPackageManager().getPackageInstaller().getSessionInfo(mSession1));
+                    sessionInfo);
 
             // Clear all icons from apps list so that its easy to check what was updated
             allItems().forEach(wi -> wi.bitmap = BitmapInfo.LOW_RES_INFO);

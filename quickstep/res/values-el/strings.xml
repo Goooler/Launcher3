@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Καρφίτσωμα"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Ελεύθερη μορφή"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"Υπολογιστής"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"Υπολογιστής"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Δεν υπάρχουν πρόσφατα στοιχεία"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Ρυθμίσεις χρήσης εφαρμογής"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Διαγραφή όλων"</string>
@@ -90,7 +91,7 @@
     <string name="allset_title" msgid="5021126669778966707">"Όλα έτοιμα!"</string>
     <string name="allset_hint" msgid="459504134589971527">"Σύρετε προς τα επάνω για να μεταβείτε στην αρχική σελίδα"</string>
     <string name="allset_button_hint" msgid="2395219947744706291">"Πατήστε το κουμπί αρχικής οθόνης για να μεταβείτε στην αρχική οθόνη"</string>
-    <string name="allset_description_generic" msgid="5385500062202019855">"Είστε έτοιμοι να ξεκινήσετε να χρησιμοποιείτε το/τη <xliff:g id="DEVICE">%1$s</xliff:g>"</string>
+    <string name="allset_description_generic" msgid="5385500062202019855">"Είστε έτοιμοι να ξεκινήσετε να χρησιμοποιείτε τη <xliff:g id="DEVICE">%1$s</xliff:g>"</string>
     <string name="default_device_name" msgid="6660656727127422487">"συσκευή"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"Ρυθμίσεις πλοήγησης συστήματος"</annotation></string>
     <string name="action_share" msgid="2648470652637092375">"Κοινοποίηση"</string>
@@ -99,8 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Αποθήκ. ζεύγ. εφαρμ."</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Πατήστε άλλη εφαρμογή για διαχωρισμό οθόνης"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Επιλέξτε άλλη εφαρμογή για διαχωρισμό οθόνης"</string>
-    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
-    <skip />
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"Ακύρωση"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Έξοδος από την επιλογή διαχωρισμού οθόνης"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Επιλέξτε άλλη εφαρμογή για διαχωρισμό οθόνης"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"Αυτή η ενέργεια δεν επιτρέπεται από την εφαρμογή ή τον οργανισμό σας."</string>

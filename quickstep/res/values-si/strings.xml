@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"අමුණන්න"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Freeform"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"ඩෙස්ක්ටොපය"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"ඩෙස්ක්ටොපය"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"මෑත අයිතම නැත"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"යෙදුම් භාවිත සැකසීම්"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"සියල්ල හිස් කරන්න"</string>
@@ -99,8 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"යෙදුම් යුගල සුරකින්න"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"බෙදුම් තිරය භාවිතා කිරීමට තවත් යෙදුමක් තට්ටු කරන්න"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"බෙදුම් තිරය භාවිත කිරීමට වෙනත් යෙදුමක් තෝරා ගන්න"</string>
-    <!-- no translation found for toast_split_select_app_cancel (1939025102486630426) -->
-    <skip />
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"අවලංගු කරන්න"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"බෙදීම් තිර තේරීමෙන් පිටවන්න"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"බෙදීම් තිරය භාවිතා කිරීමට වෙනත් යෙදුමක් තෝරා ගන්න"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"මෙම ක්‍රියාව යෙදුම හෝ ඔබේ සංවිධානය මගින් ඉඩ නොදේ"</string>

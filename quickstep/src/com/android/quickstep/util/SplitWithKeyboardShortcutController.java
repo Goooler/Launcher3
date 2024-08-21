@@ -27,9 +27,9 @@ import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITIO
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.ActivityManager;
+import android.app.ActivityOptions;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.os.SystemClock;
 
 import androidx.annotation.BinderThread;
 
@@ -91,12 +91,17 @@ public class SplitWithKeyboardShortcutController {
 
         MAIN_EXECUTOR.execute(() -> {
             callbacks.addListener(listener);
-            UI_HELPER_EXECUTOR.execute(
-                    // Transition from fullscreen app to enter stage split in launcher with
-                    // recents animation.
-                    () -> ActivityManagerWrapper.getInstance().startRecentsActivity(
-                            mOverviewComponentObserver.getOverviewIntent(),
-                            SystemClock.uptimeMillis(), callbacks, null, null));
+            UI_HELPER_EXECUTOR.execute(() -> {
+                // Transition from fullscreen app to enter stage split in launcher with
+                // recents animation
+                final ActivityOptions options = ActivityOptions.makeBasic();
+                options.setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
+                options.setTransientLaunch();
+                SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext())
+                        .startRecentsActivity(mOverviewComponentObserver.getOverviewIntent(),
+                                ActivityOptions.makeBasic(), callbacks);
+            });
         });
     }
 
@@ -110,17 +115,17 @@ public class SplitWithKeyboardShortcutController {
 
         private final boolean mLeftOrTop;
         private final Rect mTempRect = new Rect();
+        private final ActivityManager.RunningTaskInfo mRunningTaskInfo;
 
         private SplitWithKeyboardShortcutRecentsAnimationListener(boolean leftOrTop) {
             mLeftOrTop = leftOrTop;
+            mRunningTaskInfo = ActivityManagerWrapper.getInstance().getRunningTask();
         }
 
         @Override
         public void onRecentsAnimationStart(RecentsAnimationController controller,
                 RecentsAnimationTargets targets) {
-            ActivityManager.RunningTaskInfo runningTaskInfo =
-                    ActivityManagerWrapper.getInstance().getRunningTask();
-            mController.setInitialTaskSelect(runningTaskInfo,
+            mController.setInitialTaskSelect(mRunningTaskInfo,
                     mLeftOrTop ? STAGE_POSITION_TOP_OR_LEFT : STAGE_POSITION_BOTTOM_OR_RIGHT,
                     null /* itemInfo */,
                     mLeftOrTop ? LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_LEFT_TOP
@@ -136,9 +141,9 @@ public class SplitWithKeyboardShortcutController {
             RectF startingTaskRect = new RectF();
             final FloatingTaskView floatingTaskView = FloatingTaskView.getFloatingTaskView(
                     mLauncher, mLauncher.getDragLayer(),
-                    controller.screenshotTask(runningTaskInfo.taskId).getThumbnail(),
+                    controller.screenshotTask(mRunningTaskInfo.taskId).getThumbnail(),
                     null /* icon */, startingTaskRect);
-            Task task = Task.from(new Task.TaskKey(runningTaskInfo), runningTaskInfo,
+            Task task = Task.from(new Task.TaskKey(mRunningTaskInfo), mRunningTaskInfo,
                     false /* isLocked */);
             RecentsModel.INSTANCE.get(mLauncher.getApplicationContext())
                     .getIconCache()

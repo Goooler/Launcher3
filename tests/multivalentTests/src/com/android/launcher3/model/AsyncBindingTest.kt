@@ -64,6 +64,8 @@ class AsyncBindingTest {
 
     @get:Rule val setFlagsRule = SetFlagsRule()
 
+    @get:Rule val modelTestRule = ModelTestRule()
+
     @Spy private var callbacks = MyCallbacks()
     @Mock private lateinit var itemInflater: ItemInflater<*>
 
