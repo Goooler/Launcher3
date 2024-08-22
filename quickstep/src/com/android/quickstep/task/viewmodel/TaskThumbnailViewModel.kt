@@ -19,20 +19,17 @@ package com.android.quickstep.task.viewmodel
 import android.annotation.ColorInt
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.graphics.Matrix
-import android.graphics.Point
 import androidx.core.graphics.ColorUtils
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState
 import com.android.quickstep.recents.viewmodel.RecentsViewData
-import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
 import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
-import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Splash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.systemui.shared.recents.model.Task
 import kotlin.math.max
@@ -55,7 +52,6 @@ class TaskThumbnailViewModel(
     private val tasksRepository: RecentTasksRepository,
     private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase,
     private val splashAlphaUseCase: SplashAlphaUseCase,
-    private val getSplashSizeUseCase: GetSplashSizeUseCase,
 ) {
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
     private val splashProgress = MutableStateFlow(flowOf(0f))
@@ -100,7 +96,7 @@ class TaskThumbnailViewModel(
                     isBackgroundOnly(taskVal) ->
                         BackgroundOnly(taskVal.colorBackground.removeAlpha())
                     isSnapshotSplashState(taskVal) ->
-                        SnapshotSplash(createSnapshotState(taskVal), createSplashState(taskVal))
+                        SnapshotSplash(createSnapshotState(taskVal), taskVal.icon)
                     else -> Uninitialized
                 }
             }
@@ -137,12 +133,6 @@ class TaskThumbnailViewModel(
         val thumbnailData = task.thumbnail
         val bitmap = thumbnailData?.thumbnail!!
         return Snapshot(bitmap, thumbnailData.rotation, task.colorBackground.removeAlpha())
-    }
-
-    private fun createSplashState(task: Task): Splash {
-        val taskIcon = task.icon
-        val size = if (taskIcon == null) Point() else getSplashSizeUseCase.execute(taskIcon)
-        return Splash(taskIcon, size)
     }
 
     @ColorInt private fun Int.removeAlpha(): Int = ColorUtils.setAlphaComponent(this, 0xff)

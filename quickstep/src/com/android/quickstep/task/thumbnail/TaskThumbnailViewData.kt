@@ -21,6 +21,4 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class TaskThumbnailViewData {
     val width = MutableStateFlow(0)
     val height = MutableStateFlow(0)
-    val scaleX = MutableStateFlow(1f)
-    val scaleY = MutableStateFlow(1f)
 }

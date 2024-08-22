@@ -17,7 +17,6 @@
 package com.android.quickstep.task.thumbnail
 
 import android.graphics.Bitmap
-import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.view.Surface
 import androidx.annotation.ColorInt
@@ -31,17 +30,12 @@ sealed class TaskThumbnailUiState {
 
     data class SnapshotSplash(
         val snapshot: Snapshot,
-        val splash: Splash,
+        val splash: Drawable?,
     ) : TaskThumbnailUiState()
 
     data class Snapshot(
         val bitmap: Bitmap,
         @Surface.Rotation val thumbnailRotation: Int,
         @ColorInt val backgroundColor: Int
-    )
-
-    data class Splash(
-        val icon: Drawable?,
-        val size: Point,
     )
 }

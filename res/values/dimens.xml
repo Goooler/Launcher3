@@ -456,6 +456,7 @@
     <!-- Overview placeholder to compile in Launcher3 without Quickstep -->
     <dimen name="task_thumbnail_icon_size">0dp</dimen>
     <dimen name="task_thumbnail_icon_drawable_size">0dp</dimen>
+    <dimen name="task_thumbnail_splash_icon_size">0dp</dimen>
     <dimen name="task_thumbnail_icon_drawable_size_grid">0dp</dimen>
     <dimen name="task_thumbnail_icon_menu_drawable_touch_size">0dp</dimen>
     <dimen name="task_menu_edge_padding">0dp</dimen>

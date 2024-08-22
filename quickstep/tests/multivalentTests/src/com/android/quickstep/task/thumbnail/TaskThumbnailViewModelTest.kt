@@ -21,7 +21,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.view.Surface
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -35,7 +34,6 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
-import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Splash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
@@ -46,10 +44,8 @@ import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
@@ -63,7 +59,6 @@ class TaskThumbnailViewModelTest {
     private val tasksRepository = FakeTasksRepository()
     private val mGetThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
     private val splashAlphaUseCase: SplashAlphaUseCase = mock()
-    private val getSplashSizeUseCase: GetSplashSizeUseCase = mock()
     private val systemUnderTest by lazy {
         TaskThumbnailViewModel(
             recentsViewData,
@@ -72,16 +67,10 @@ class TaskThumbnailViewModelTest {
             tasksRepository,
             mGetThumbnailPositionUseCase,
             splashAlphaUseCase,
-            getSplashSizeUseCase,
         )
     }
 
     private val tasks = (0..5).map(::createTaskWithId)
-
-    @Before
-    fun setUp() {
-        whenever(getSplashSizeUseCase.execute(any())).thenReturn(Point())
-    }
 
     @Test
     fun initialStateIsUninitialized() = runTest {
@@ -120,7 +109,7 @@ class TaskThumbnailViewModelTest {
                         bitmap = expectedThumbnailData.thumbnail!!,
                         thumbnailRotation = Surface.ROTATION_0,
                     ),
-                    Splash(expectedIconData.icon, Point())
+                    expectedIconData.icon
                 )
             )
     }
@@ -215,7 +204,7 @@ class TaskThumbnailViewModelTest {
                         bitmap = expectedThumbnailData.thumbnail!!,
                         thumbnailRotation = Surface.ROTATION_270,
                     ),
-                    Splash(expectedIconData.icon, Point())
+                    expectedIconData.icon
                 )
             )
     }
@@ -241,26 +230,9 @@ class TaskThumbnailViewModelTest {
                         bitmap = expectedThumbnailData.thumbnail!!,
                         thumbnailRotation = Surface.ROTATION_0,
                     ),
-                    Splash(expectedIconData.icon, Point())
+                    expectedIconData.icon
                 )
             )
-    }
-
-    @Test
-    fun bindStoppedTask_thenStateContainsSplashSizeFromUseCase() = runTest {
-        val taskId = 2
-        val expectedSplashSize = Point(100, 150)
-        whenever(getSplashSizeUseCase.execute(any())).thenReturn(expectedSplashSize)
-        val expectedThumbnailData = createThumbnailData(rotation = Surface.ROTATION_270)
-        tasksRepository.seedThumbnailData(mapOf(taskId to expectedThumbnailData))
-        val expectedIconData = createIconData("Task 2")
-        tasksRepository.seedIconData(mapOf(taskId to expectedIconData))
-        tasksRepository.seedTasks(tasks)
-        tasksRepository.setVisibleTasks(listOf(taskId))
-
-        systemUnderTest.bind(taskId)
-        val uiState = systemUnderTest.uiState.first() as SnapshotSplash
-        assertThat(uiState.splash.size).isEqualTo(expectedSplashSize)
     }
 
     @Test

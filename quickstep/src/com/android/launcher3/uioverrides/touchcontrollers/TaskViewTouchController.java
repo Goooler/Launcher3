@@ -181,7 +181,7 @@ public abstract class TaskViewTouchController<CONTAINER extends Context & Recent
                         // - The task is snapped
                         mAllowGoingDown = i == mRecentsView.getCurrentPage()
                                 && DisplayController.getNavigationMode(mContainer).hasGestures
-                                && (!mRecentsView.showAsGrid() || mTaskBeingDragged.isFocusedTask())
+                                && (!mRecentsView.showAsGrid() || mTaskBeingDragged.isLargeTile())
                                 && mRecentsView.isTaskInExpectedScrollPosition(i);
 
                         directionsToDetectScroll = mAllowGoingDown ? DIRECTION_BOTH : upDirection;
@@ -310,7 +310,7 @@ public abstract class TaskViewTouchController<CONTAINER extends Context & Recent
                 // Set mOverrideVelocity to control task dismiss velocity in onDragEnd
                 int velocityDimenId = R.dimen.default_task_dismiss_drag_velocity;
                 if (mRecentsView.showAsGrid()) {
-                    if (mTaskBeingDragged.isFocusedTask()) {
+                    if (mTaskBeingDragged.isLargeTile()) {
                         velocityDimenId =
                                 R.dimen.default_task_dismiss_drag_velocity_grid_focus_task;
                     } else {

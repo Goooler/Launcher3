@@ -191,7 +191,7 @@ public final class DigitalWellBeingToast {
     private @SplitBannerConfig int getSplitBannerConfig() {
         if (mSplitBounds == null
                 || !mContainer.getDeviceProfile().isTablet
-                || mTaskView.isFocusedTask()) {
+                || mTaskView.isLargeTile()) {
             return SPLIT_BANNER_FULLSCREEN;
         }
 

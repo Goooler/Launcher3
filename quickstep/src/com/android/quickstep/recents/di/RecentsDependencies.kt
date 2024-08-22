@@ -27,7 +27,6 @@ import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.GetThumbnailUseCase
 import com.android.quickstep.recents.usecase.SysUiStatusNavFlagsUseCase
 import com.android.quickstep.recents.viewmodel.RecentsViewData
-import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
 import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnailViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
@@ -176,7 +175,6 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         getThumbnailPositionUseCase = inject(),
                         tasksRepository = inject(),
                         splashAlphaUseCase = inject(scopeId),
-                        getSplashSizeUseCase = inject(scopeId),
                     )
                 TaskOverlayViewModel::class.java -> {
                     val task = extras["Task"] as Task
@@ -203,12 +201,6 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         taskThumbnailViewData = inject(scopeId),
                         tasksRepository = inject(),
                         rotationStateRepository = inject(),
-                    )
-                GetSplashSizeUseCase::class.java ->
-                    GetSplashSizeUseCase(
-                        taskThumbnailViewData = inject(scopeId),
-                        taskViewData = inject(scopeId, extras),
-                        deviceProfileRepository = inject(),
                     )
                 else -> {
                     log("Factory for ${modelClass.simpleName} not defined!", Log.ERROR)

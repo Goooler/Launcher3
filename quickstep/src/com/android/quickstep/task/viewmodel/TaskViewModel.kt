@@ -22,8 +22,4 @@ class TaskViewModel(private val taskViewData: TaskViewData) : ViewModel() {
     fun updateScale(scale: Float) {
         taskViewData.scale.value = scale
     }
-
-    fun updateNonGridScale(nonGridScale: Float) {
-        taskViewData.nonGridScale.value = nonGridScale
-    }
 }

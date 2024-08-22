@@ -39,6 +39,6 @@ class RecentsDeviceProfileRepositoryImplTest : FakeInvariantDeviceProfileTest() 
         whenever(recentsViewContainer.deviceProfile).thenReturn(tabletDeviceProfile)
 
         assertThat(systemUnderTest.getRecentsDeviceProfile())
-            .isEqualTo(RecentsDeviceProfile(isLargeScreen = true, widthPx = 1600, heightPx = 2560))
+            .isEqualTo(RecentsDeviceProfile(isLargeScreen = true))
     }
 }

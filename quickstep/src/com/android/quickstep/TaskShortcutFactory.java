@@ -315,12 +315,12 @@ public interface TaskShortcutFactory {
             boolean isTaskSplitNotSupported = !task.isDockable ||
                     (intentFlags & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
             boolean hideForExistingMultiWindow = container.getDeviceProfile().isMultiWindowMode;
-            boolean isFocusedTask = deviceProfile.isTablet && taskView.isFocusedTask();
+            boolean isLargeTile = deviceProfile.isTablet && taskView.isLargeTile();
             boolean isTaskInExpectedScrollPosition =
                     recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
 
             if (notEnoughTasksToSplit || isTaskSplitNotSupported || hideForExistingMultiWindow
-                    || (isFocusedTask && isTaskInExpectedScrollPosition)) {
+                    || (isLargeTile && isTaskInExpectedScrollPosition)) {
                 return null;
             }
 
@@ -340,11 +340,11 @@ public interface TaskShortcutFactory {
             DeviceProfile deviceProfile = container.getDeviceProfile();
             final TaskView taskView = taskContainer.getTaskView();
             final RecentsView recentsView = taskView.getRecentsView();
-            boolean isLargeTileFocusedTask = deviceProfile.isTablet && taskView.isFocusedTask();
+            boolean isLargeTile = deviceProfile.isTablet && taskView.isLargeTile();
             boolean isInExpectedScrollPosition =
                     recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
             boolean shouldShowActionsButtonInstead =
-                    isLargeTileFocusedTask && isInExpectedScrollPosition;
+                    isLargeTile && isInExpectedScrollPosition;
 
             // No "save app pair" menu item if:
             // - we are in 3p launcher

@@ -20,8 +20,6 @@ class FakeRecentsDeviceProfileRepository : RecentsDeviceProfileRepository {
     private var recentsDeviceProfile =
         RecentsDeviceProfile(
             isLargeScreen = false,
-            widthPx = 1080,
-            heightPx = 1920,
         )
 
     override fun getRecentsDeviceProfile() = recentsDeviceProfile

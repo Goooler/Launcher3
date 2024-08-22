@@ -23,6 +23,4 @@ package com.android.quickstep.recents.data
  */
 data class RecentsDeviceProfile(
     val isLargeScreen: Boolean,
-    val widthPx: Int,
-    val heightPx: Int,
 )

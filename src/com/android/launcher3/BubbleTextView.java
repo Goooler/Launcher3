@@ -176,7 +176,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mSkipUserBadge = false;
     @ViewDebug.ExportedProperty(category = "launcher")
-    private boolean mIsIconVisible = true;
+    protected boolean mIsIconVisible = true;
     @ViewDebug.ExportedProperty(category = "launcher")
     private int mTextColor;
     @ViewDebug.ExportedProperty(category = "launcher")

@@ -109,6 +109,9 @@ public class TestStabilityRule implements TestRule {
                     getPackageManager().
                     getPackageInfo(launcherPackageName, 0)
                     .versionName;
+            if (launcherVersion == null) {
+                return LOCAL;
+            }
         } catch (PackageManager.NameNotFoundException e) {
             throw new RuntimeException(e);
         }

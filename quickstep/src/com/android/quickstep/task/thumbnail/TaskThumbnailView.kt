@@ -24,11 +24,9 @@ import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewOutlineProvider
-import android.widget.FrameLayout
-import android.widget.ImageView
 import androidx.annotation.ColorInt
-import androidx.core.view.isVisible
-import androidx.core.view.updateLayoutParams
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.isInvisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
@@ -41,6 +39,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.util.TaskCornerRadius
+import com.android.quickstep.views.FixedSizeImageView
 import com.android.systemui.shared.system.QuickStepContract
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineName
@@ -51,7 +50,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
-class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
+class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
 
     private val viewData: TaskThumbnailViewData by RecentsDependencies.inject(this)
     private val viewModel: TaskThumbnailViewModel by RecentsDependencies.inject(this)
@@ -60,9 +59,9 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
     private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
-    private val thumbnailView: ImageView by lazy { findViewById(R.id.task_thumbnail) }
-    private val splashContainer: FrameLayout by lazy { findViewById(R.id.splash_container) }
-    private val splashIcon: ImageView by lazy { findViewById(R.id.splash_icon) }
+    private val thumbnailView: FixedSizeImageView by lazy { findViewById(R.id.task_thumbnail) }
+    private val splashBackground: View by lazy { findViewById(R.id.splash_background) }
+    private val splashIcon: FixedSizeImageView by lazy { findViewById(R.id.splash_icon) }
 
     private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
@@ -107,7 +106,10 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             .onEach { dimProgress -> scrimView.alpha = dimProgress }
             .launchIn(viewAttachedScope)
         viewModel.splashAlpha
-            .onEach { splashAlpha -> splashContainer.alpha = splashAlpha }
+            .onEach { splashAlpha ->
+                splashBackground.alpha = splashAlpha
+                splashIcon.alpha = splashAlpha
+            }
             .launchIn(viewAttachedScope)
         viewModel.cornerRadiusProgress.onEach { invalidateOutline() }.launchIn(viewAttachedScope)
         viewModel.inheritedScale
@@ -152,15 +154,13 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     override fun setScaleX(scaleX: Float) {
         super.setScaleX(scaleX)
-        viewData.scaleX.value = scaleX
-        // Splash icon should ignore scale
+        // Splash icon should ignore scale on TTV
         splashIcon.scaleX = 1 / scaleX
     }
 
     override fun setScaleY(scaleY: Float) {
         super.setScaleY(scaleY)
-        viewData.scaleY.value = scaleY
-        // Splash icon should ignore scale
+        // Splash icon should ignore scale on TTV
         splashIcon.scaleY = 1 / scaleY
     }
 
@@ -173,9 +173,10 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     private fun resetViews() {
-        liveTileView.isVisible = false
-        thumbnailView.isVisible = false
-        splashContainer.alpha = 0f
+        liveTileView.isInvisible = true
+        thumbnailView.isInvisible = true
+        splashBackground.alpha = 0f
+        splashIcon.alpha = 0f
         scrimView.alpha = 0f
         setBackgroundColor(Color.BLACK)
     }
@@ -185,25 +186,20 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     private fun drawLiveWindow() {
-        liveTileView.isVisible = true
+        liveTileView.isInvisible = false
     }
 
     private fun drawSnapshotSplash(snapshotSplash: SnapshotSplash) {
         drawSnapshot(snapshotSplash.snapshot)
 
-        splashContainer.isVisible = true
-        splashContainer.setBackgroundColor(snapshotSplash.snapshot.backgroundColor)
-        splashIcon.setImageDrawable(snapshotSplash.splash.icon)
-        splashIcon.updateLayoutParams<LayoutParams> {
-            width = snapshotSplash.splash.size.x
-            height = snapshotSplash.splash.size.y
-        }
+        splashBackground.setBackgroundColor(snapshotSplash.snapshot.backgroundColor)
+        splashIcon.setImageDrawable(snapshotSplash.splash)
     }
 
     private fun drawSnapshot(snapshot: Snapshot) {
         drawBackground(snapshot.backgroundColor)
         thumbnailView.setImageBitmap(snapshot.bitmap)
-        thumbnailView.isVisible = true
+        thumbnailView.isInvisible = false
         setImageMatrix()
     }
 

@@ -49,6 +49,7 @@ import com.android.launcher3.Flags.enableCursorHoverStates
 import com.android.launcher3.Flags.enableFocusOutline
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.Flags.enableHoverOfChildElementsInTaskview
+import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
 import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
@@ -108,7 +109,7 @@ constructor(
     defStyleRes: Int = 0,
     focusBorderAnimator: BorderAnimator? = null,
     hoverBorderAnimator: BorderAnimator? = null,
-    type: TaskViewType = TaskViewType.SINGLE
+    private val type: TaskViewType = TaskViewType.SINGLE,
 ) : FrameLayout(context, attrs), ViewPool.Reusable {
     /**
      * Used in conjunction with [onTaskListVisibilityChanged], providing more granularity on which
@@ -133,13 +134,15 @@ constructor(
 
     val isGridTask: Boolean
         /** Returns whether the task is part of overview grid and not being focused. */
-        get() = container.deviceProfile.isTablet && !isFocusedTask
+        get() = container.deviceProfile.isTablet && !isLargeTile
 
     val isRunningTask: Boolean
         get() = this === recentsView?.runningTaskView
 
-    val isFocusedTask: Boolean
-        get() = this === recentsView?.focusedTaskView
+    val isLargeTile: Boolean
+        get() =
+            this == recentsView?.focusedTaskView ||
+                (enableLargeDesktopWindowingTile() && type == TaskViewType.DESKTOP)
 
     val taskCornerRadius: Float
         get() = currentFullscreenParams.cornerRadius
@@ -290,9 +293,6 @@ constructor(
         set(value) {
             field = value
             applyScale()
-            if (enableRefactorTaskThumbnail()) {
-                taskViewModel.updateNonGridScale(value)
-            }
         }
 
     private var dismissScale = 1f
@@ -521,7 +521,7 @@ constructor(
     public override fun onFocusChanged(
         gainFocus: Boolean,
         direction: Int,
-        previouslyFocusedRect: Rect?
+        previouslyFocusedRect: Rect?,
     ) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
         if (borderEnabled) {
@@ -682,7 +682,7 @@ constructor(
     open fun bind(
         task: Task,
         orientedState: RecentsOrientedState,
-        taskOverlayFactory: TaskOverlayFactory
+        taskOverlayFactory: TaskOverlayFactory,
     ) {
 
         cancelPendingLoadTasks()
@@ -707,7 +707,7 @@ constructor(
         @IdRes iconViewId: Int,
         @IdRes showWindowViewId: Int,
         @StagePosition stagePosition: Int,
-        taskOverlayFactory: TaskOverlayFactory
+        taskOverlayFactory: TaskOverlayFactory,
     ): TaskContainer {
         val thumbnailViewDeprecated: TaskThumbnailViewDeprecated = findViewById(thumbnailViewId)!!
         val snapshotView =
@@ -777,7 +777,7 @@ constructor(
     open fun updateTaskSize(
         lastComputedTaskSize: Rect,
         lastComputedGridTaskSize: Rect,
-        lastComputedCarouselTaskSize: Rect
+        lastComputedCarouselTaskSize: Rect,
     ) {
         val thumbnailPadding = container.deviceProfile.overviewTaskThumbnailTopMarginPx
         val taskWidth = lastComputedTaskSize.width()
@@ -789,9 +789,10 @@ constructor(
         if (container.deviceProfile.isTablet) {
             val boxWidth: Int
             val boxHeight: Int
-            if (isFocusedTask) {
-                // Task will be focused and should use focused task size. Use focusTaskRatio
-                // that is associated with the original orientation of the focused task.
+
+            // Focused task and Desktop tasks should use focusTaskRatio that is associated
+            // with the original orientation of the focused task.
+            if (isLargeTile) {
                 boxWidth = taskWidth
                 boxHeight = taskHeight
             } else {
@@ -1334,7 +1335,7 @@ constructor(
     private fun computeAndSetIconTouchDelegate(
         view: TaskViewIcon,
         tempCenterCoordinates: FloatArray,
-        transformingTouchDelegate: TransformingTouchDelegate
+        transformingTouchDelegate: TransformingTouchDelegate,
     ) {
         val viewHalfWidth = view.width / 2f
         val viewHalfHeight = view.height / 2f

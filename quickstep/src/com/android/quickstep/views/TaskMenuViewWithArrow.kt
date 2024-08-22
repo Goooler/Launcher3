@@ -99,7 +99,7 @@ class TaskMenuViewWithArrow<T> : ArrowPopup<T> where T : RecentsViewContainer, T
     private var optionMeasuredHeight = 0
     private val arrowHorizontalPadding: Int
         get() =
-            if (taskView.isFocusedTask)
+            if (taskView.isLargeTile)
                 resources.getDimensionPixelSize(R.dimen.task_menu_horizontal_padding)
             else 0
 

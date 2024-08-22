@@ -27,8 +27,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-/** Helper for [RecentsView] to interact with coroutine. */
-class RecentsViewHelper(private val recentsViewModel: RecentsViewModel) {
+/** Helper for [RecentsView] to interact with the [RecentsViewModel]. */
+class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
     private lateinit var viewAttachedScope: CoroutineScope
 
     fun onAttachedToWindow() {
@@ -43,7 +43,7 @@ class RecentsViewHelper(private val recentsViewModel: RecentsViewModel) {
     fun switchToScreenshot(
         taskView: TaskView,
         recentsAnimationController: RecentsAnimationController,
-        onFinishRunnable: Runnable
+        onFinishRunnable: Runnable,
     ) {
         val updatedThumbnails =
             taskView.taskContainers.associate {
@@ -55,7 +55,7 @@ class RecentsViewHelper(private val recentsViewModel: RecentsViewModel) {
     fun switchToScreenshot(
         taskView: TaskView,
         updatedThumbnails: Map<Int, ThumbnailData>?,
-        onFinishRunnable: Runnable
+        onFinishRunnable: Runnable,
     ) {
         // Update recentsViewModel and apply the thumbnailOverride ASAP, before waiting inside
         // viewAttachedScope.

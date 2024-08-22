@@ -26,7 +26,5 @@ class RecentsDeviceProfileRepositoryImpl(private val container: RecentsViewConta
     RecentsDeviceProfileRepository {
 
     override fun getRecentsDeviceProfile() =
-        with(container.deviceProfile) {
-            RecentsDeviceProfile(isLargeScreen = isTablet, widthPx = widthPx, heightPx = heightPx)
-        }
+        with(container.deviceProfile) { RecentsDeviceProfile(isLargeScreen = isTablet) }
 }

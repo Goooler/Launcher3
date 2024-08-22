@@ -175,8 +175,9 @@ public class FloatingIconView extends FrameLayout implements
                 mLauncher.getDeviceProfile(), taskViewDrawAlpha);
 
         if (mFadeOutView != null) {
-            // The alpha goes from 1 to 0 when progress is 0 and 0.33 respectively.
-            mFadeOutView.setAlpha(1 - Math.min(1f, mapToRange(progress, 0, 0.33f, 0, 1, LINEAR)));
+            // The alpha goes from 1 to 0 when progress is 0 and 0.15 respectively.
+            // This value minimizes view display time while still allowing the view to fade out.
+            mFadeOutView.setAlpha(1 - Math.min(1f, mapToRange(progress, 0, 0.15f, 0, 1, LINEAR)));
         }
     }
 
