@@ -59,6 +59,7 @@ import android.os.UserHandle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.SurfaceControl;
+import android.view.View;
 import android.window.IRemoteTransitionFinishedCallback;
 import android.window.RemoteTransition;
 import android.window.RemoteTransitionStub;
@@ -148,9 +149,10 @@ public class SplitSelectStateController {
 
     /**
      * Should be a constant from {@link com.android.internal.jank.Cuj} or -1, does not need to be
-     * set for all launches.
+     * set for all launches. Used in conjunction with {@link #mLaunchingViewCuj} below.
      */
     private int mLaunchCuj = -1;
+    private View mLaunchingViewCuj;
 
     private FloatingTaskView mFirstFloatingTaskView;
     private SplitInstructionsView mSplitInstructionsView;
@@ -650,7 +652,12 @@ public class SplitSelectStateController {
         return mSplitAnimationController;
     }
 
-    public void setLaunchingCuj(int launchCuj) {
+    /**
+     * Set params to invoke a trace session for the given view and CUJ when we begin animating the
+     * split launch AFTER we get a response from Shell.
+     */
+    public void setLaunchingCuj(View launchingView, int launchCuj) {
+        mLaunchingViewCuj = launchingView;
         mLaunchCuj = launchCuj;
     }
 
@@ -688,6 +695,9 @@ public class SplitSelectStateController {
                         && mLaunchingTaskView.getRecentsView() != null
                         && mLaunchingTaskView.getRecentsView().isTaskViewVisible(
                         mLaunchingTaskView);
+                if (mLaunchingViewCuj != null && mLaunchCuj != -1) {
+                    InteractionJankMonitorWrapper.begin(mLaunchingViewCuj, mLaunchCuj);
+                }
                 mSplitAnimationController.playSplitLaunchAnimation(
                         shouldLaunchFromTaskView ? mLaunchingTaskView : null,
                         mLaunchingIconView,
@@ -750,6 +760,7 @@ public class SplitSelectStateController {
             InteractionJankMonitorWrapper.end(mLaunchCuj);
         }
         mLaunchCuj = -1;
+        mLaunchingViewCuj = null;
 
         if (mSessionInstanceIds != null) {
             mStatsLogManager.logger()

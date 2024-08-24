@@ -242,8 +242,7 @@ public class AppPairsController {
         WorkspaceItemInfo app2 = appPairIcon.getInfo().getSecondApp();
         ComponentKey app1Key = new ComponentKey(app1.getTargetComponent(), app1.user);
         ComponentKey app2Key = new ComponentKey(app2.getTargetComponent(), app2.user);
-        mSplitSelectStateController.setLaunchingCuj(cuj);
-        InteractionJankMonitorWrapper.begin(appPairIcon, cuj);
+        mSplitSelectStateController.setLaunchingCuj(appPairIcon, cuj);
 
         mSplitSelectStateController.findLastActiveTasksAndRunCallback(
                 Arrays.asList(app1Key, app2Key),
