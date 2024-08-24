@@ -146,6 +146,7 @@ public class TaskbarLauncherStateController {
     private MultiProperty mIconAlphaForHome;
     private QuickstepLauncher mLauncher;
 
+    private boolean mIsDestroyed = false;
     private Integer mPrevState;
     private int mState;
     private LauncherState mLauncherState = LauncherState.NORMAL;
@@ -256,6 +257,7 @@ public class TaskbarLauncherStateController {
     }
 
     public void onDestroy() {
+        mIsDestroyed = true;
         mCanSyncViews = false;
 
         mIconAlignment.finishAnimation();
@@ -407,7 +409,7 @@ public class TaskbarLauncherStateController {
     }
 
     public Animator applyState(long duration, boolean start) {
-        if (mControllers.taskbarActivityContext.isDestroyed()) {
+        if (mIsDestroyed) {
             return null;
         }
         Animator animator = null;
@@ -753,7 +755,7 @@ public class TaskbarLauncherStateController {
     }
 
     private void updateIconAlphaForHome(float alpha) {
-        if (mControllers.taskbarActivityContext.isDestroyed()) {
+        if (mIsDestroyed) {
             return;
         }
         mIconAlphaForHome.setValue(alpha);

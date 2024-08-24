@@ -3273,12 +3273,12 @@ public abstract class RecentsView<
             longRowWidth = largeTaskWidthAndSpacing;
         }
 
-        if (longRowWidth < mLastComputedGridSize.width()) {
-            mClearAllShortTotalWidthTranslation =
-                    (mIsRtl
-                            ? mLastComputedTaskSize.right
-                            : deviceProfile.widthPx - mLastComputedTaskSize.left)
-                            - longRowWidth - deviceProfile.overviewGridSideMargin;
+        // If first task is not in the expected position (mLastComputedTaskSize) and being too close
+        // to ClearAllButton, then apply extra translation to ClearAllButton.
+        int firstTaskStart = mLastComputedGridSize.left + longRowWidth;
+        int expectedFirstTaskStart = mLastComputedTaskSize.right;
+        if (firstTaskStart < expectedFirstTaskStart) {
+            mClearAllShortTotalWidthTranslation = expectedFirstTaskStart - firstTaskStart;
             clearAllShortTotalWidthTranslation = mIsRtl
                     ? -mClearAllShortTotalWidthTranslation : mClearAllShortTotalWidthTranslation;
             if (snappedTaskRowWidth == longRowWidth) {

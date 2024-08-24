@@ -290,10 +290,10 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     protected void updateRecyclerViewVisibility(AdapterHolder adapterHolder) {
         // The first item is always an empty space entry. Look for any more items.
         boolean isWidgetAvailable = adapterHolder.mWidgetsListAdapter.hasVisibleEntries();
-        adapterHolder.mWidgetsRecyclerView.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
 
         if (adapterHolder.mAdapterType == AdapterHolder.SEARCH) {
             mNoWidgetsView.setText(R.string.no_search_results);
+            adapterHolder.mWidgetsRecyclerView.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
         } else if (adapterHolder.mAdapterType == AdapterHolder.WORK
                 && mUserCache.getUserProfiles().stream()
                 .filter(userHandle -> mUserCache.getUserInfo(userHandle).isWork())
@@ -556,6 +556,8 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mNoWidgetsView.setVisibility(GONE);
         } else {
             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.setVisibility(GONE);
+            mAdapters.get(getCurrentAdapterHolderType()).mWidgetsRecyclerView.setVisibility(
+                    VISIBLE);
             // Visibility of recommended widgets, recycler views and headers are handled in methods
             // below.
             post(this::onRecommendedWidgetsBound);

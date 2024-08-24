@@ -209,7 +209,10 @@ public class LoaderTask implements Runnable {
                 mApp.getContext().getContentResolver(),
                 "launcher_broadcast_installed_apps",
                 /* def= */ 0);
-        if (launcherBroadcastInstalledApps == 1 && mIsRestoreFromBackup) {
+        boolean shouldAttachArchivingExtras = mIsRestoreFromBackup
+                && (launcherBroadcastInstalledApps == 1
+                        || Flags.enableFirstScreenBroadcastArchivingExtras());
+        if (shouldAttachArchivingExtras) {
             List<FirstScreenBroadcastModel> broadcastModels =
                     FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
                             mPmHelper,

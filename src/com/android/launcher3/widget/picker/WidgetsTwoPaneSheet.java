@@ -461,6 +461,13 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         if (!isWidgetAvailable) {
             mRightPane.removeAllViews();
             mRightPane.addView(mNoWidgetsView);
+            // with no widgets message, no header is selected on left
+            if (mSuggestedWidgetsPackageUserKey != null
+                    && mSuggestedWidgetsPackageUserKey.equals(mSelectedHeader)
+                    && mSuggestedWidgetsHeader != null) {
+                mSuggestedWidgetsHeader.setExpanded(false);
+            }
+            mSelectedHeader = null;
         }
         super.updateRecyclerViewVisibility(adapterHolder);
     }

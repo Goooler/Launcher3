@@ -108,8 +108,14 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private long mAllAppsButtonTouchDelayMs;
     private boolean mAllAppsTouchTriggered;
 
-    // Only non-null when device supports having an All Apps button.
+    // Only non-null when device supports having an All Apps button, or Recent Apps.
     private @Nullable IconButtonView mTaskbarDivider;
+
+    /**
+     * Whether the divider is between Hotseat icons and Recents,
+     * instead of between All Apps button and Hotseat.
+     */
+    private boolean mAddedDividerForRecents;
 
     private final View mQsb;
 
@@ -340,7 +346,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     protected void updateHotseatItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
         int nextViewIndex = 0;
         int numViewsAnimated = 0;
-        boolean addedDividerForRecents = false;
+        mAddedDividerForRecents = false;
 
         if (mAllAppsButton != null) {
             removeView(mAllAppsButton);
@@ -435,7 +441,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         if (mTaskbarDivider != null && !recentTasks.isEmpty()) {
             addView(mTaskbarDivider, nextViewIndex++);
-            addedDividerForRecents = true;
+            mAddedDividerForRecents = true;
         }
 
         // Add Recent/Running icons.
@@ -499,10 +505,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
 
         if (mAllAppsButton != null) {
-            addView(mAllAppsButton, mIsRtl ? getChildCount() : 0);
+            addView(mAllAppsButton, mIsRtl ? hotseatItemInfos.length : 0);
 
             // If there are no recent tasks, add divider after All Apps (unless it's the only view).
-            if (!addedDividerForRecents && mTaskbarDivider != null && getChildCount() > 1) {
+            if (!mAddedDividerForRecents && mTaskbarDivider != null && getChildCount() > 1) {
                 addView(mTaskbarDivider, mIsRtl ? (getChildCount() - 1) : 1);
             }
         }
@@ -731,6 +737,14 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     @Nullable
     public View getTaskbarDividerView() {
         return mTaskbarDivider;
+    }
+
+    /**
+     * Returns whether the divider is between Hotseat icons and Recents,
+     * instead of between All Apps button and Hotseat.
+     */
+    public boolean isDividerForRecents() {
+        return mAddedDividerForRecents;
     }
 
     /**

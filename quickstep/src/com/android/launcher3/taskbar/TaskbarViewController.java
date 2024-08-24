@@ -100,6 +100,12 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_BUBBLE_BAR = 7;
     private static final int NUM_ALPHA_CHANNELS = 8;
 
+    /** Only used for animation purposes, to position the divider between two item indices. */
+    public static final float DIVIDER_VIEW_POSITION_OFFSET = 0.5f;
+
+    /** Used if an unexpected edge case is hit in {@link #getPositionInHotseat}. */
+    private static final float ERROR_POSITION_IN_HOTSEAT_NOT_FOUND = -100;
+
     private static boolean sEnableModelLoadingForTests = true;
 
     private final TaskbarActivityContext mActivity;
@@ -741,17 +747,22 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 ? mTransientTaskbarDp.taskbarBottomMargin
                 : mPersistentTaskbarDp.taskbarBottomMargin;
 
+        int firstRecentTaskIndex = -1;
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
             boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonView();
             boolean isTaskbarDividerView = child == mTaskbarView.getTaskbarDividerView();
+            boolean isRecentTask = child.getTag() instanceof GroupTask;
+            // TODO(b/343522351): show recents on the home screen.
+            final boolean isRecentsInHotseat = false;
             if (!mIsHotseatIconOnTopWhenAligned) {
                 // When going to home, the EMPHASIZED interpolator in TaskbarLauncherStateController
                 // plays iconAlignment to 1 really fast, therefore moving the fading towards the end
                 // to avoid icons disappearing rather than fading out visually.
                 setter.setViewAlpha(child, 0, Interpolators.clampToProgress(LINEAR, 0.8f, 1f));
             } else if ((isAllAppsButton && !FeatureFlags.ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.get())
-                    || (isTaskbarDividerView && enableTaskbarPinning())) {
+                    || (isTaskbarDividerView && enableTaskbarPinning())
+                    || (isRecentTask && !isRecentsInHotseat)) {
                 if (!isToHome
                         && mIsHotseatIconOnTopWhenAligned
                         && mIsStashed) {
@@ -812,25 +823,17 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 continue;
             }
 
-            float positionInHotseat;
-            if (isAllAppsButton) {
-                // Note that there is no All Apps button in the hotseat,
-                // this position is only used as its convenient for animation purposes.
-                positionInHotseat = Utilities.isRtl(child.getResources())
-                        ? taskbarDp.numShownHotseatIcons
-                        : -1;
-            }  else if (isTaskbarDividerView) {
-                // Note that there is no taskbar divider view in the hotseat,
-                // this position is only used as its convenient for animation purposes.
-                positionInHotseat = Utilities.isRtl(child.getResources())
-                        ? taskbarDp.numShownHotseatIcons - 0.5f
-                        : -0.5f;
-            } else if (child.getTag() instanceof ItemInfo) {
-                positionInHotseat = ((ItemInfo) child.getTag()).screenId;
-            } else {
-                Log.w(TAG, "Unsupported view found in createIconAlignmentController, v=" + child);
-                continue;
+            int recentTaskIndex = -1;
+            if (isRecentTask) {
+                if (firstRecentTaskIndex < 0) {
+                    firstRecentTaskIndex = i;
+                }
+                recentTaskIndex = i - firstRecentTaskIndex;
             }
+            float positionInHotseat = getPositionInHotseat(taskbarDp.numShownHotseatIcons, child,
+                    mIsRtl, isAllAppsButton, isTaskbarDividerView,
+                    mTaskbarView.isDividerForRecents(), recentTaskIndex);
+            if (positionInHotseat == ERROR_POSITION_IN_HOTSEAT_NOT_FOUND) continue;
 
             float hotseatAdjustedBorderSpace =
                     launcherDp.getHotseatAdjustedBorderSpaceForBubbleBar(child.getContext());
@@ -864,6 +867,58 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         AnimatorPlaybackController controller = setter.createPlaybackController();
         mOnControllerPreCreateCallback = () -> controller.setPlayFraction(0);
         return controller;
+    }
+
+    /**
+     * Returns the index of the given child relative to its position in hotseat.
+     * Examples:
+     * -1 is the item before the first hotseat item.
+     * -0.5 is between those (e.g. for the divider).
+     * {@link #ERROR_POSITION_IN_HOTSEAT_NOT_FOUND} if there's no calculation relative to hotseat.
+     */
+    @VisibleForTesting
+    float getPositionInHotseat(int numShownHotseatIcons, View child, boolean isRtl,
+            boolean isAllAppsButton, boolean isTaskbarDividerView, boolean isDividerForRecents,
+            int recentTaskIndex) {
+        float positionInHotseat;
+        // Note that there is no All Apps button in the hotseat,
+        // this position is only used as it's convenient for animation purposes.
+        float allAppsButtonPositionInHotseat = isRtl
+                // Right after all hotseat items.
+                // [HHHHHH]|[>A<]
+                ? numShownHotseatIcons
+                // Right before all hotseat items.
+                // [>A<]|[HHHHHH]
+                : -1;
+        // Note that there are no recent tasks in the hotseat,
+        // this position is only used as it's convenient for animation purposes.
+        float firstRecentTaskPositionInHotseat = isRtl
+                // After all hotseat icons and All Apps button.
+                // [HHHHHH][A]|[>R<R]
+                ? numShownHotseatIcons + 1
+                // Right after all hotseat items.
+                // [A][HHHHHH]|[>R<R]
+                : numShownHotseatIcons;
+        if (isAllAppsButton) {
+            positionInHotseat = allAppsButtonPositionInHotseat;
+        }  else if (isTaskbarDividerView) {
+            // Note that there is no taskbar divider view in the hotseat,
+            // this position is only used as it's convenient for animation purposes.
+            float relativePosition = isDividerForRecents
+                    ? firstRecentTaskPositionInHotseat
+                    : allAppsButtonPositionInHotseat;
+            positionInHotseat = relativePosition > 0
+                    ? relativePosition - DIVIDER_VIEW_POSITION_OFFSET
+                    : relativePosition + DIVIDER_VIEW_POSITION_OFFSET;
+        } else if (child.getTag() instanceof ItemInfo) {
+            positionInHotseat = ((ItemInfo) child.getTag()).screenId;
+        } else if (recentTaskIndex >= 0) {
+            positionInHotseat = firstRecentTaskPositionInHotseat + recentTaskIndex;
+        } else {
+            Log.w(TAG, "Unsupported view found in createIconAlignmentController, v=" + child);
+            return ERROR_POSITION_IN_HOTSEAT_NOT_FOUND;
+        }
+        return positionInHotseat;
     }
 
     private boolean bubbleBarHasBubbles() {
@@ -950,7 +1005,6 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 "ALPHA_INDEX_RECENTS_DISABLED",
                 "ALPHA_INDEX_NOTIFICATION_EXPANDED",
                 "ALPHA_INDEX_ASSISTANT_INVOKED",
-                "ALPHA_INDEX_IME_BUTTON_NAV",
                 "ALPHA_INDEX_SMALL_SCREEN");
 
         mModelCallbacks.dumpLogs(prefix + "\t", pw);

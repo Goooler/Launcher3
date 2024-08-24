@@ -1043,12 +1043,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     /** Applies the given progress level to the this icon's progress bar. */
     @Nullable
     public PreloadIconDrawable applyProgressLevel() {
-        if (!(getTag() instanceof ItemInfoWithIcon)
+        if (!(getTag() instanceof ItemInfoWithIcon info)
                 || ((ItemInfoWithIcon) getTag()).isInactiveArchive()) {
             return null;
         }
 
-        ItemInfoWithIcon info = (ItemInfoWithIcon) getTag();
         int progressLevel = info.getProgressLevel();
         if (progressLevel >= 100) {
             setContentDescription(info.contentDescription != null
@@ -1068,6 +1067,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             } else {
                 preloadIconDrawable = makePreloadIcon();
                 setIcon(preloadIconDrawable);
+                if (info.isArchived() && Flags.useNewIconForArchivedApps()) {
+                    // reapply text without cloud icon as soon as unarchiving is triggered
+                    applyLabel(info);
+                }
             }
             return preloadIconDrawable;
         }
