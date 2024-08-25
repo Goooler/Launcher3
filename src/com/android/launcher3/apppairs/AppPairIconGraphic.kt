@@ -19,123 +19,124 @@ package com.android.launcher3.apppairs
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Rect
-import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.Gravity
 import android.widget.FrameLayout
+import androidx.annotation.OpenForTesting
 import com.android.launcher3.DeviceProfile
+import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener
+import com.android.launcher3.icons.BitmapInfo
+import com.android.launcher3.model.data.AppPairInfo
+import com.android.launcher3.util.Themes
+import com.android.launcher3.views.ActivityContext
 
 /**
  * A FrameLayout marking the area on an [AppPairIcon] where the visual icon will be drawn. One of
  * two child UI elements on an [AppPairIcon], along with a BubbleTextView holding the text title.
  */
-class AppPairIconGraphic @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    FrameLayout(context, attrs) {
-    companion object {
-        // Design specs -- the below ratios are in relation to the size of a standard app icon.
-        private const val OUTER_PADDING_SCALE = 1 / 30f
-        private const val INNER_PADDING_SCALE = 1 / 24f
-        private const val MEMBER_ICON_SCALE = 11 / 30f
-        private const val CENTER_CHANNEL_SCALE = 1 / 30f
-        private const val BIG_RADIUS_SCALE = 1 / 5f
-        private const val SMALL_RADIUS_SCALE = 1 / 15f
-    }
+@OpenForTesting
+open class AppPairIconGraphic
+@JvmOverloads
+constructor(context: Context, attrs: AttributeSet? = null) :
+    FrameLayout(context, attrs), OnDeviceProfileChangeListener {
+    private val TAG = "AppPairIconGraphic"
 
-    // App pair icons are slightly smaller than regular icons, so we pad the icon by this much on
-    // each side.
-    private var outerPadding = 0f
-    // Inside of the icon, the two member apps are padded by this much.
-    private var innerPadding = 0f
-    // The colored background (two rectangles in a square area) is this big.
-    private var backgroundSize = 0f
-    // The two member apps have icons that are this big (in diameter).
-    private var memberIconSize = 0f
-    // The size of the center channel.
-    var centerChannelSize = 0f
-    // The large outer radius of the background rectangles.
-    var bigRadius = 0f
-    // The small inner radius of the background rectangles.
-    var smallRadius = 0f
-    // The app pairs icon appears differently in portrait and landscape.
-    var isLeftRightSplit = false
+    companion object {
+        /** Composes a drawable for this icon, consisting of a background and 2 app icons. */
+        @JvmStatic
+        fun composeDrawable(
+            appPairInfo: AppPairInfo,
+            p: AppPairIconDrawingParams
+        ): AppPairIconDrawable {
+            // Generate new icons, using themed flag if needed.
+            val flags = if (Themes.isThemedIconEnabled(p.context)) BitmapInfo.FLAG_THEMED else 0
+            val appIcon1 = appPairInfo.getFirstApp().newIcon(p.context, flags)
+            val appIcon2 = appPairInfo.getSecondApp().newIcon(p.context, flags)
+            appIcon1.setBounds(0, 0, p.memberIconSize.toInt(), p.memberIconSize.toInt())
+            appIcon2.setBounds(0, 0, p.memberIconSize.toInt(), p.memberIconSize.toInt())
+
+            // If icons are unlaunchable due to screen size, manually override disabled appearance.
+            // (otherwise, leave disabled state alone; icons will naturally inherit the app's state)
+            val (isApp1Launchable, isApp2Launchable) = appPairInfo.isLaunchable(p.context)
+            if (!isApp1Launchable) appIcon1.setIsDisabled(true)
+            if (!isApp2Launchable) appIcon2.setIsDisabled(true)
+
+            // Create icon drawable.
+            val fullIconDrawable = AppPairIconDrawable(p, appIcon1, appIcon2)
+            fullIconDrawable.setBounds(0, 0, p.iconSize, p.iconSize)
+
+            return fullIconDrawable
+        }
+    }
 
     private lateinit var parentIcon: AppPairIcon
-    private lateinit var appPairBackground: Drawable
-    private lateinit var appIcon1: Drawable
-    private lateinit var appIcon2: Drawable
+    private lateinit var drawParams: AppPairIconDrawingParams
+    lateinit var drawable: AppPairIconDrawable
 
-    fun init(grid: DeviceProfile, icon: AppPairIcon) {
-        // Calculate device-specific measurements
-        val defaultIconSize = grid.iconSizePx
-        outerPadding = OUTER_PADDING_SCALE * defaultIconSize
-        innerPadding = INNER_PADDING_SCALE * defaultIconSize
-        backgroundSize = defaultIconSize - outerPadding * 2
-        memberIconSize = MEMBER_ICON_SCALE * defaultIconSize
-        centerChannelSize = CENTER_CHANNEL_SCALE * defaultIconSize
-        bigRadius = BIG_RADIUS_SCALE * defaultIconSize
-        smallRadius = SMALL_RADIUS_SCALE * defaultIconSize
-        isLeftRightSplit = grid.isLeftRightSplit
+    fun init(icon: AppPairIcon, container: Int) {
         parentIcon = icon
-
-        appPairBackground = AppPairIconBackground(context, this)
-        appPairBackground.setBounds(0, 0, backgroundSize.toInt(), backgroundSize.toInt())
-        appIcon1 = parentIcon.info.contents[0].newIcon(context)
-        appIcon2 = parentIcon.info.contents[1].newIcon(context)
-        appIcon1.setBounds(0, 0, memberIconSize.toInt(), memberIconSize.toInt())
-        appIcon2.setBounds(0, 0, memberIconSize.toInt(), memberIconSize.toInt())
-    }
-
-    /** Gets this icon graphic's bounds, with respect to the parent icon's coordinate system. */
-    fun getIconBounds(outBounds: Rect) {
-        outBounds.set(0, 0, backgroundSize.toInt(), backgroundSize.toInt())
-        outBounds.offset(
-            // x-coordinate in parent's coordinate system
-            ((parentIcon.width - backgroundSize) / 2).toInt(),
-            // y-coordinate in parent's coordinate system
-            parentIcon.paddingTop + outerPadding.toInt()
-        )
-    }
-
-    override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
+        drawParams = AppPairIconDrawingParams(context, container)
+        drawable = composeDrawable(icon.info, drawParams)
 
         // Center the drawable area in the larger icon canvas
         val lp: LayoutParams = layoutParams as LayoutParams
         lp.gravity = Gravity.CENTER_HORIZONTAL
-        lp.topMargin = outerPadding.toInt()
-        lp.height = backgroundSize.toInt()
-        lp.width = backgroundSize.toInt()
+        lp.height = drawParams.iconSize
+        lp.width = drawParams.iconSize
         layoutParams = lp
+    }
 
-        // Draw background
-        appPairBackground.draw(canvas)
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        getActivityContext().addOnDeviceProfileChangeListener(this)
+    }
 
-        // Draw first icon
-        canvas.save()
-        // The app icons are placed differently depending on device orientation.
-        if (isLeftRightSplit) {
-            canvas.translate(innerPadding, height / 2f - memberIconSize / 2f)
-        } else {
-            canvas.translate(width / 2f - memberIconSize / 2f, innerPadding)
-        }
-        appIcon1.draw(canvas)
-        canvas.restore()
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        getActivityContext().removeOnDeviceProfileChangeListener(this)
+    }
 
-        // Draw second icon
-        canvas.save()
-        // The app icons are placed differently depending on device orientation.
-        if (isLeftRightSplit) {
-            canvas.translate(
-                width - (innerPadding + memberIconSize),
-                height / 2f - memberIconSize / 2f
-            )
-        } else {
-            canvas.translate(
-                width / 2f - memberIconSize / 2f,
-                height - (innerPadding + memberIconSize)
-            )
-        }
-        appIcon2.draw(canvas)
-        canvas.restore()
+    private fun getActivityContext(): ActivityContext {
+        return ActivityContext.lookupContext(context)
+    }
+
+    /** When device profile changes, update orientation */
+    override fun onDeviceProfileChanged(dp: DeviceProfile) {
+        drawParams.updateOrientation(dp)
+        redraw()
+    }
+
+    /**
+     * When the icon is temporary moved to a different colored surface, update the background color.
+     * Calling this method with [null] reverts the icon back to its default color.
+     */
+    fun onTemporaryContainerChange(newContainer: Int?) {
+        drawParams.updateBgColor(newContainer ?: parentIcon.container)
+        redraw()
+    }
+
+    /**
+     * Gets this icon graphic's visual bounds, with respect to the parent icon's coordinate system.
+     */
+    fun getIconBounds(outBounds: Rect) {
+        outBounds.set(0, 0, drawParams.backgroundSize.toInt(), drawParams.backgroundSize.toInt())
+        outBounds.offset(
+            // x-coordinate in parent's coordinate system
+            ((parentIcon.width - drawParams.backgroundSize) / 2).toInt(),
+            // y-coordinate in parent's coordinate system
+            (parentIcon.paddingTop + drawParams.standardIconPadding + drawParams.outerPadding)
+                .toInt()
+        )
+    }
+
+    /** Updates the icon drawable and redraws it */
+    fun redraw() {
+        drawable = composeDrawable(parentIcon.info, drawParams)
+        invalidate()
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        drawable.draw(canvas)
     }
 }

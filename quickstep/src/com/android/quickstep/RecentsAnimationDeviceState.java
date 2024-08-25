@@ -19,11 +19,9 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.view.Display.DEFAULT_DISPLAY;
 
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_SLOP_PERCENTAGE;
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.DisplayController.CHANGE_ROTATION;
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
 import static com.android.launcher3.util.NavigationMode.THREE_BUTTONS;
 import static com.android.launcher3.util.SettingsCache.ONE_HANDED_ENABLED;
@@ -35,6 +33,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_MAGNIFICATION_OVERLAP;
@@ -55,18 +54,13 @@ import android.net.Uri;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.provider.Settings;
-import android.util.Log;
-import android.view.ISystemGestureExclusionListener;
-import android.view.IWindowManager;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
-import android.view.WindowManagerGlobal;
 
-import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
@@ -75,6 +69,8 @@ import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.SettingsCache;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.util.GestureExclusionManager;
+import com.android.quickstep.util.GestureExclusionManager.ExclusionListener;
 import com.android.quickstep.util.NavBarPosition;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
@@ -88,7 +84,7 @@ import java.util.ArrayList;
 /**
  * Manages the state of the system during a swipe up gesture.
  */
-public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
+public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, ExclusionListener {
 
     private static final String TAG = "RecentsAnimationDeviceState";
 
@@ -101,25 +97,9 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
     private final Context mContext;
     private final DisplayController mDisplayController;
 
-    private final IWindowManager mIWindowManager;
+    private final GestureExclusionManager mExclusionManager;
 
-    @VisibleForTesting
-    final ISystemGestureExclusionListener mGestureExclusionListener =
-            new ISystemGestureExclusionListener.Stub() {
-                @BinderThread
-                @Override
-                public void onSystemGestureExclusionChanged(int displayId,
-                        Region systemGestureExclusionRegion, Region unrestrictedOrNull) {
-                    if (displayId != DEFAULT_DISPLAY) {
-                        return;
-                    }
-                    // Assignments are atomic, it should be safe on binder thread. Also we don't
-                    // think systemGestureExclusionRegion can be null but just in case, don't
-                    // let mExclusionRegion be null.
-                    mExclusionRegion = systemGestureExclusionRegion != null
-                            ? systemGestureExclusionRegion : new Region();
-                }
-            };
+
     private final RotationTouchHelper mRotationTouchHelper;
     private final TaskStackChangeListener mPipListener;
     // Cache for better performance since it doesn't change at runtime.
@@ -140,22 +120,23 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
     private boolean mIsSwipeToNotificationEnabled;
     private final boolean mIsOneHandedModeSupported;
     private boolean mPipIsActive;
+    private boolean mIsPredictiveBackToHomeInProgress;
 
     private int mGestureBlockingTaskId = -1;
-    private @NonNull Region mExclusionRegion = new Region();
+    private @NonNull Region mExclusionRegion = GestureExclusionManager.EMPTY_REGION;
     private boolean mExclusionListenerRegistered;
 
     public RecentsAnimationDeviceState(Context context) {
-        this(context, false, WindowManagerGlobal.getWindowManagerService());
+        this(context, false, GestureExclusionManager.INSTANCE);
     }
 
     public RecentsAnimationDeviceState(Context context, boolean isInstanceForTouches) {
-        this(context, isInstanceForTouches, WindowManagerGlobal.getWindowManagerService());
+        this(context, isInstanceForTouches, GestureExclusionManager.INSTANCE);
     }
 
     @VisibleForTesting
-    RecentsAnimationDeviceState(Context context, IWindowManager windowManager) {
-        this(context, false, windowManager);
+    RecentsAnimationDeviceState(Context context, GestureExclusionManager exclusionManager) {
+        this(context, false, exclusionManager);
     }
 
     /**
@@ -164,10 +145,10 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
      */
     RecentsAnimationDeviceState(
             Context context, boolean isInstanceForTouches,
-            IWindowManager windowManager) {
+            GestureExclusionManager exclusionManager) {
         mContext = context;
         mDisplayController = DisplayController.INSTANCE.get(context);
-        mIWindowManager = windowManager;
+        mExclusionManager = exclusionManager;
         mIsOneHandedModeSupported = SystemProperties.getBoolean(SUPPORT_ONE_HANDED_MODE, false);
         mRotationTouchHelper = RotationTouchHelper.INSTANCE.get(context);
         if (isInstanceForTouches) {
@@ -278,43 +259,33 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
         }
     }
 
-    /**
-     * Registers {@link mGestureExclusionListener} for getting exclusion rect changes. Note that we
-     * make binder call on {@link UI_HELPER_EXECUTOR} to avoid jank.
-     */
-    public void registerExclusionListener() {
-        UI_HELPER_EXECUTOR.execute(() -> {
-            if (mExclusionListenerRegistered) {
-                return;
-            }
-            try {
-                mIWindowManager.registerSystemGestureExclusionListener(
-                        mGestureExclusionListener, DEFAULT_DISPLAY);
-                mExclusionListenerRegistered = true;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Failed to register window manager callbacks", e);
-            }
-        });
+    @Override
+    public void onGestureExclusionChanged(@Nullable Region exclusionRegion,
+            @Nullable Region unrestrictedOrNull) {
+        mExclusionRegion = exclusionRegion != null
+                ? exclusionRegion : GestureExclusionManager.EMPTY_REGION;
     }
 
     /**
-     * Unregisters {@link mGestureExclusionListener} if previously registered. We make binder call
-     * on same {@link UI_HELPER_EXECUTOR} as in {@link #registerExclusionListener()} so that
-     * read/write {@link mExclusionListenerRegistered} field is thread safe.
+     * Registers itself for getting exclusion rect changes.
+     */
+    public void registerExclusionListener() {
+        if (mExclusionListenerRegistered) {
+            return;
+        }
+        mExclusionManager.addListener(this);
+        mExclusionListenerRegistered = true;
+    }
+
+    /**
+     * Unregisters itself as gesture exclusion listener if previously registered.
      */
     public void unregisterExclusionListener() {
-        UI_HELPER_EXECUTOR.execute(() -> {
-            if (!mExclusionListenerRegistered) {
-                return;
-            }
-            try {
-                mIWindowManager.unregisterSystemGestureExclusionListener(
-                        mGestureExclusionListener, DEFAULT_DISPLAY);
-                mExclusionListenerRegistered = false;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Failed to unregister window manager callbacks", e);
-            }
-        });
+        if (!mExclusionListenerRegistered) {
+            return;
+        }
+        mExclusionManager.removeListener(this);
+        mExclusionListenerRegistered = false;
     }
 
     public void onOneHandedModeChanged(int newGesturalHeight) {
@@ -393,6 +364,20 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
     }
 
     /**
+     * Sets the flag that indicates whether a predictive back-to-home animation is in progress
+     */
+    public void setPredictiveBackToHomeInProgress(boolean isInProgress) {
+        mIsPredictiveBackToHomeInProgress = isInProgress;
+    }
+
+    /**
+     * @return whether a predictive back-to-home animation is currently in progress
+     */
+    public boolean isPredictiveBackToHomeInProgress() {
+        return mIsPredictiveBackToHomeInProgress;
+    }
+
+    /**
      * @return whether SystemUI is in a state where we can start a system gesture.
      */
     public boolean canStartSystemGesture() {
@@ -414,7 +399,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
                 && (mSystemUiStateFlags & SYSUI_STATE_MAGNIFICATION_OVERLAP) == 0
                 && ((mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
                         || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0)
-                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0;
+                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0
+                && (mSystemUiStateFlags & SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION) == 0;
     }
 
     /**
@@ -517,10 +503,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
      *         This is only used for quickswitch, and not swipe up.
      */
     public boolean isInExclusionRegion(MotionEvent event) {
-        // mExclusionRegion can change on binder thread, use a local instance here.
-        Region exclusionRegion = mExclusionRegion;
         return mMode == NO_BUTTON
-                && exclusionRegion.contains((int) event.getX(), (int) event.getY());
+                && mExclusionRegion.contains((int) event.getX(), (int) event.getY());
     }
 
     /**
@@ -608,7 +592,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
 
         if (FeatureFlags.CUSTOM_LPNH_THRESHOLDS.get()) {
             float customSlopMultiplier =
-                    LauncherPrefs.get(mContext).get(LONG_PRESS_NAV_HANDLE_SLOP_PERCENTAGE) / 100f;
+                    FeatureFlags.LPNH_SLOP_PERCENTAGE.get() / 100f;
             return customSlopMultiplier * slopMultiplier * touchSlop;
         } else {
             return slopMultiplier * touchSlop;
@@ -642,6 +626,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener {
         pw.println("  deferredGestureRegion=" + mDeferredGestureRegion.getBounds());
         pw.println("  exclusionRegion=" + mExclusionRegion.getBounds());
         pw.println("  pipIsActive=" + mPipIsActive);
+        pw.println("  predictiveBackToHomeInProgress=" + mIsPredictiveBackToHomeInProgress);
         mRotationTouchHelper.dump(pw);
     }
 }

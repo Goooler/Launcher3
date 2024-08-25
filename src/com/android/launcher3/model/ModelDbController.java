@@ -15,10 +15,15 @@
  */
 package com.android.launcher3.model;
 
+import static android.provider.BaseColumns._ID;
 import static android.util.Base64.NO_PADDING;
 import static android.util.Base64.NO_WRAP;
 
 import static com.android.launcher3.DefaultLayoutParser.RES_PARTNER_DEFAULT_LAYOUT;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
+import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.LauncherSettings.Favorites.addTableToDb;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_KEY;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_LABEL;
@@ -48,6 +53,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.util.Xml;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.AutoInstallsLayout;
@@ -62,6 +68,8 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.backuprestore.LauncherRestoreEventLogger;
+import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.provider.LauncherDbUtils;
@@ -261,8 +269,12 @@ public class ModelDbController {
     /**
      * Migrates the DB if needed. If the migration failed, it clears the DB.
      */
-    public void tryMigrateDB() {
+    public void tryMigrateDB(@Nullable LauncherRestoreEventLogger restoreEventLogger) {
+
         if (!migrateGridIfNeeded()) {
+            if (restoreEventLogger != null) {
+                sendMetricsForFailedMigration(restoreEventLogger, getDb());
+            }
             FileLog.d(TAG, "Migration failed: resetting launcher database");
             createEmptyDB();
             LauncherPrefs.get(mContext).putSync(
@@ -300,8 +312,12 @@ public class ModelDbController {
         mOpenHelper = (mContext instanceof SandboxContext) ? oldHelper
                 : createDatabaseHelper(true /* forMigration */);
         try {
-            return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, idp, mOpenHelper,
-                   oldHelper.getWritableDatabase());
+            // This is the current grid we have, given by the mContext
+            DeviceGridState srcDeviceState = new DeviceGridState(mContext);
+            // This is the state we want to migrate to that is given by the idp
+            DeviceGridState destDeviceState = new DeviceGridState(idp);
+            return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, srcDeviceState,
+                    destDeviceState, mOpenHelper, oldHelper.getWritableDatabase());
         } catch (Exception e) {
             FileLog.e(TAG, "Failed to migrate grid", e);
             return false;
@@ -309,6 +325,30 @@ public class ModelDbController {
             if (mOpenHelper != oldHelper) {
                 oldHelper.close();
             }
+        }
+    }
+
+    /**
+     * In case of migration failure, report metrics for the count of each itemType in the DB.
+     * @param restoreEventLogger logger used to report Launcher restore metrics
+     */
+    private void sendMetricsForFailedMigration(LauncherRestoreEventLogger restoreEventLogger,
+            SQLiteDatabase db) {
+        try (Cursor cursor = db.rawQuery(
+                "SELECT itemType, COUNT(*) AS count FROM favorites GROUP BY itemType",
+                null
+        )) {
+            if (cursor.moveToFirst()) {
+                do {
+                    restoreEventLogger.logFavoritesItemsRestoreFailed(
+                            cursor.getInt(cursor.getColumnIndexOrThrow(ITEM_TYPE)),
+                            cursor.getInt(cursor.getColumnIndexOrThrow("count")),
+                            RestoreError.GRID_MIGRATION_FAILURE
+                    );
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            FileLog.e(TAG, "sendMetricsForFailedDb: Error reading from database", e);
         }
     }
 
@@ -349,6 +389,68 @@ public class ModelDbController {
             }
             t.commit();
             return folderIds;
+        } catch (SQLException ex) {
+            Log.e(TAG, ex.getMessage(), ex);
+            return new IntArray();
+        }
+    }
+
+    /**
+     * Deletes any app pair that doesn't contain 2 member apps from the DB.
+     * @return Ids of deleted app pairs.
+     */
+    @WorkerThread
+    public IntArray deleteBadAppPairs() {
+        createDbIfNotExists();
+
+        SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+        try (SQLiteTransaction t = new SQLiteTransaction(db)) {
+            // Select all entries with ITEM_TYPE = ITEM_TYPE_APP_PAIR whose id does not appear
+            // exactly twice in the CONTAINER column.
+            String selection =
+                    ITEM_TYPE + " = " + ITEM_TYPE_APP_PAIR
+                            + " AND " + _ID +  " NOT IN"
+                            + " (SELECT " + CONTAINER + " FROM " + TABLE_NAME
+                            + " GROUP BY " + CONTAINER + " HAVING COUNT(*) = 2)";
+
+            IntArray appPairIds = LauncherDbUtils.queryIntArray(false, db, TABLE_NAME,
+                    _ID, selection, null, null);
+            if (!appPairIds.isEmpty()) {
+                db.delete(TABLE_NAME, Utilities.createDbSelectionQuery(
+                        _ID, appPairIds), null);
+            }
+            t.commit();
+            return appPairIds;
+        } catch (SQLException ex) {
+            Log.e(TAG, ex.getMessage(), ex);
+            return new IntArray();
+        }
+    }
+
+    /**
+     * Deletes any app with a container id that doesn't exist.
+     * @return Ids of deleted apps.
+     */
+    @WorkerThread
+    public IntArray deleteUnparentedApps() {
+        createDbIfNotExists();
+
+        SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+        try (SQLiteTransaction t = new SQLiteTransaction(db)) {
+            // Select all entries whose container id does not appear in the database.
+            String selection =
+                    CONTAINER + " >= 0"
+                            + " AND " + CONTAINER + " NOT IN"
+                            + " (SELECT " + _ID + " FROM " + TABLE_NAME + ")";
+
+            IntArray appIds = LauncherDbUtils.queryIntArray(false, db, TABLE_NAME,
+                    _ID, selection, null, null);
+            if (!appIds.isEmpty()) {
+                db.delete(TABLE_NAME, Utilities.createDbSelectionQuery(
+                        _ID, appIds), null);
+            }
+            t.commit();
+            return appIds;
         } catch (SQLException ex) {
             Log.e(TAG, ex.getMessage(), ex);
             return new IntArray();
@@ -426,7 +528,7 @@ public class ModelDbController {
             LauncherWidgetHolder widgetHolder) {
         ContentResolver cr = mContext.getContentResolver();
         String blobHandlerDigest = Settings.Secure.getString(cr, LAYOUT_DIGEST_KEY);
-        if (Utilities.ATLEAST_R && !TextUtils.isEmpty(blobHandlerDigest)) {
+        if (!TextUtils.isEmpty(blobHandlerDigest)) {
             BlobStoreManager blobManager = mContext.getSystemService(BlobStoreManager.class);
             try (InputStream in = new ParcelFileDescriptor.AutoCloseInputStream(
                     blobManager.openBlob(BlobHandle.createWithSha256(

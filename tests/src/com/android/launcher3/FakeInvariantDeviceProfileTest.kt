@@ -18,6 +18,10 @@ package com.android.launcher3
 import android.content.Context
 import android.graphics.PointF
 import android.graphics.Rect
+import android.platform.test.rule.AllowedDevices
+import android.platform.test.rule.DeviceProduct
+import android.platform.test.rule.IgnoreLimit
+import android.platform.test.rule.LimitDevicesRule
 import android.util.SparseArray
 import androidx.test.core.app.ApplicationProvider
 import com.android.launcher3.DeviceProfile.DEFAULT_DIMENSION_PROVIDER
@@ -27,6 +31,7 @@ import com.android.launcher3.util.WindowBounds
 import java.io.PrintWriter
 import java.io.StringWriter
 import org.junit.Before
+import org.junit.Rule
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
@@ -37,6 +42,8 @@ import org.mockito.kotlin.whenever
  *
  * For an implementation that creates InvariantDeviceProfile, use [AbstractDeviceProfileTest]
  */
+@AllowedDevices(allowed = [DeviceProduct.CF_PHONE])
+@IgnoreLimit(ignoreLimit = BuildConfig.IS_STUDIO_BUILD)
 abstract class FakeInvariantDeviceProfileTest {
 
     protected var context: Context? = null
@@ -48,6 +55,8 @@ abstract class FakeInvariantDeviceProfileTest {
     protected var useTwoPanels: Boolean = false
     protected var isGestureMode: Boolean = true
     protected var isTransientTaskbar: Boolean = true
+
+    @Rule @JvmField val limitDevicesRule = LimitDevicesRule()
 
     @Before
     fun setUp() {
@@ -148,7 +157,6 @@ abstract class FakeInvariantDeviceProfileTest {
 
                 numDatabaseHotseatIcons = 4
 
-                hotseatColumnSpan = IntArray(4) { 4 }
                 hotseatBarBottomSpace = FloatArray(4) { 48f }
                 hotseatQsbSpace = FloatArray(4) { 36f }
 
@@ -231,7 +239,6 @@ abstract class FakeInvariantDeviceProfileTest {
 
                 numDatabaseHotseatIcons = 6
 
-                hotseatColumnSpan = intArrayOf(6, 4, 6, 6)
                 hotseatBarBottomSpace = floatArrayOf(36f, 40f, 36f, 36f)
                 hotseatQsbSpace = FloatArray(4) { 32f }
 
@@ -250,8 +257,10 @@ abstract class FakeInvariantDeviceProfileTest {
     }
 
     protected fun initializeVarsForTwoPanel(
-        isLandscape: Boolean = false,
-        isGestureMode: Boolean = true
+            isLandscape: Boolean = false,
+            isGestureMode: Boolean = true,
+            rows: Int = 4,
+            cols: Int = 4,
     ) {
         val (x, y) = if (isLandscape) Pair(2208, 1840) else Pair(1840, 2208)
 
@@ -267,9 +276,9 @@ abstract class FakeInvariantDeviceProfileTest {
 
         inv =
             InvariantDeviceProfile().apply {
-                numRows = 4
-                numColumns = 4
-                numSearchContainerColumns = 4
+                numRows = rows
+                numColumns = cols
+                numSearchContainerColumns = cols
 
                 iconSize = floatArrayOf(60f, 52f, 52f, 60f)
                 iconTextSize = floatArrayOf(14f, 14f, 12f, 14f)
@@ -310,7 +319,6 @@ abstract class FakeInvariantDeviceProfileTest {
 
                 numDatabaseHotseatIcons = 6
 
-                hotseatColumnSpan = IntArray(4) { 6 }
                 hotseatBarBottomSpace = floatArrayOf(48f, 48f, 36f, 20f)
                 hotseatQsbSpace = floatArrayOf(36f, 36f, 36f, 28f)
 

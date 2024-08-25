@@ -22,7 +22,6 @@ import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionInfo;
 import android.content.pm.PackageManager;
-import android.os.Process;
 import android.os.UserHandle;
 import android.text.TextUtils;
 
@@ -30,6 +29,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.SessionCommitReceiver;
 import com.android.launcher3.Utilities;
@@ -51,6 +51,7 @@ import java.util.Objects;
 /**
  * Utility class to tracking install sessions
  */
+@SuppressWarnings("NewApi")
 public class InstallSessionHelper {
 
     @NonNull
@@ -129,7 +130,7 @@ public class InstallSessionHelper {
     public SessionInfo getActiveSessionInfo(UserHandle user, String pkg) {
         for (SessionInfo info : getAllVerifiedSessions()) {
             boolean match = pkg.equals(info.getAppPackageName());
-            if (Utilities.ATLEAST_Q && !user.equals(getUserHandle(info))) {
+            if (!user.equals(getUserHandle(info))) {
                 match = false;
             }
             if (match) {
@@ -177,9 +178,8 @@ public class InstallSessionHelper {
 
     @NonNull
     public List<SessionInfo> getAllVerifiedSessions() {
-        List<SessionInfo> list = new ArrayList<>(Utilities.ATLEAST_Q
-                ? Objects.requireNonNull(mLauncherApps).getAllPackageInstallerSessions()
-                : mInstaller.getAllSessions());
+        List<SessionInfo> list = new ArrayList<>(
+                Objects.requireNonNull(mLauncherApps).getAllPackageInstallerSessions());
         Iterator<SessionInfo> it = list.iterator();
         while (it.hasNext()) {
             if (verify(it.next()) == null) {
@@ -212,14 +212,19 @@ public class InstallSessionHelper {
      */
     @WorkerThread
     void tryQueuePromiseAppIcon(@Nullable final PackageInstaller.SessionInfo sessionInfo) {
-        if (SessionCommitReceiver.isEnabled(mAppContext)
+        if (sessionInfo != null
+                && SessionCommitReceiver.isEnabled(mAppContext, getUserHandle(sessionInfo))
                 && verifySessionInfo(sessionInfo)
                 && !promiseIconAddedForId(sessionInfo.getSessionId())) {
-            FileLog.d(LOG, "Adding package name to install queue: "
-                    + sessionInfo.getAppPackageName());
+            // In case of unarchival, we do not want to add a workspace promise icon if one is
+            // not already present. For general app installations however, we do support it.
+            if (!Flags.enableSupportForArchiving() || !sessionInfo.isUnarchival()) {
+                FileLog.d(LOG, "Adding package name to install queue: "
+                        + sessionInfo.getAppPackageName());
 
-            ItemInstallQueue.INSTANCE.get(mAppContext)
-                    .queueItem(sessionInfo.getAppPackageName(), getUserHandle(sessionInfo));
+                ItemInstallQueue.INSTANCE.get(mAppContext)
+                        .queueItem(sessionInfo.getAppPackageName(), getUserHandle(sessionInfo));
+            }
 
             getPromiseIconIds().add(sessionInfo.getSessionId());
             updatePromiseIconPrefs();
@@ -227,6 +232,12 @@ public class InstallSessionHelper {
     }
 
     public boolean verifySessionInfo(@Nullable final PackageInstaller.SessionInfo sessionInfo) {
+        // For archived apps we always want to show promise icons and the checks below don't apply.
+        if (Flags.enableSupportForArchiving() && sessionInfo != null
+                && sessionInfo.isUnarchival()) {
+            return true;
+        }
+
         return verify(sessionInfo) != null
                 && sessionInfo.getInstallReason() == PackageManager.INSTALL_REASON_USER
                 && sessionInfo.getAppIcon() != null
@@ -244,6 +255,6 @@ public class InstallSessionHelper {
     }
 
     public static UserHandle getUserHandle(@NonNull final SessionInfo info) {
-        return Utilities.ATLEAST_Q ? info.getUser() : Process.myUserHandle();
+        return info.getUser();
     }
 }

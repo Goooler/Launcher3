@@ -40,7 +40,6 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.popup.PopupDataProvider;
-import com.android.launcher3.popup.PopupLiveUpdateHandler;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.splitscreen.SplitShortcut;
@@ -117,9 +116,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
                 }
             } else if (info instanceof FolderInfo && v instanceof FolderIcon) {
                 FolderInfo fi = (FolderInfo) info;
-                if (fi.contents.stream().anyMatch(matcher)) {
+                if (fi.anyMatch(matcher)) {
                     FolderDotInfo folderDotInfo = new FolderDotInfo();
-                    for (WorkspaceItemInfo si : fi.contents) {
+                    for (ItemInfo si : fi.getContents()) {
                         folderDotInfo.addDotInfo(mPopupDataProvider.getDotInfoForItem(si));
                     }
                     ((FolderIcon) v).setDotInfo(folderDotInfo);
@@ -166,13 +165,6 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
                     R.layout.popup_container, context.getDragLayer(), false);
         container.populateAndShowRows(icon, deepShortcutCount, systemShortcuts);
 
-        container.addOnAttachStateChangeListener(
-                new PopupLiveUpdateHandler<BaseTaskbarContext>(context, container) {
-                    @Override
-                    protected void showPopupContainerForIcon(BubbleTextView originalIcon) {
-                        showForIcon(originalIcon);
-                    }
-                });
         // TODO (b/198438631): configure for taskbar/context
         container.setPopupItemDragHandler(new TaskbarPopupItemDragHandler());
         mControllers.taskbarDragController.addDragListener(container);

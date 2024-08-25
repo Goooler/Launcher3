@@ -34,6 +34,7 @@ import android.graphics.drawable.Drawable;
 import android.os.UserHandle;
 import android.view.View;
 
+import com.android.internal.jank.Cuj;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
@@ -42,6 +43,8 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.IconCache;
+import com.android.launcher3.model.data.AppPairInfo;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.quickstep.views.FloatingTaskView;
@@ -122,11 +125,16 @@ public class SplitToWorkspaceController {
             intent = appInfo.intent;
             user = appInfo.user;
             bitmapInfo = appInfo.bitmap;
+        } else if (tag instanceof AppPairInfo) {
+            // Prompt the user to select something else by wiggling the instructions view
+            mController.getSplitInstructionsView().goBoing();
+            return true;
         } else {
+            // Use Launcher's default click handler
             return false;
         }
 
-        mController.setSecondTask(intent, user);
+        mController.setSecondTask(intent, user, (ItemInfo) tag);
 
         startWorkspaceAnimation(view, null /*bitmap*/, bitmapInfo.newIcon(mLauncher));
         return true;
@@ -155,6 +163,9 @@ public class SplitToWorkspaceController {
                 new RectF(firstTaskStartingBounds), firstTaskEndingBounds,
                 false /* fadeWithThumbnail */, true /* isStagedTask */);
 
+        View backingScrim = recentsView.getSplitSelectController().getSplitAnimationController()
+                .addScrimBehindAnim(pendingAnimation, mLauncher, view.getContext());
+
         FloatingTaskView secondFloatingTaskView = FloatingTaskView.getFloatingTaskView(mLauncher,
                 view, bitmap, icon, secondTaskStartingBounds);
         secondFloatingTaskView.setAlpha(1);
@@ -165,6 +176,11 @@ public class SplitToWorkspaceController {
             private boolean mIsCancelled = false;
 
             @Override
+            public void onAnimationStart(Animator animation) {
+                mController.launchSplitTasks(aBoolean -> cleanUp());
+            }
+
+            @Override
             public void onAnimationCancel(Animator animation) {
                 mIsCancelled = true;
                 cleanUp();
@@ -173,15 +189,14 @@ public class SplitToWorkspaceController {
             @Override
             public void onAnimationEnd(Animator animation) {
                 if (!mIsCancelled) {
-                    mController.launchSplitTasks(aBoolean -> cleanUp());
-                    InteractionJankMonitorWrapper.end(
-                            InteractionJankMonitorWrapper.CUJ_SPLIT_SCREEN_ENTER);
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_SPLIT_SCREEN_ENTER);
                 }
             }
 
             private void cleanUp() {
                 mLauncher.getDragLayer().removeView(firstFloatingTaskView);
                 mLauncher.getDragLayer().removeView(secondFloatingTaskView);
+                mLauncher.getDragLayer().removeView(backingScrim);
                 mController.getSplitAnimationController().removeSplitInstructionsView(mLauncher);
                 mController.resetState();
             }

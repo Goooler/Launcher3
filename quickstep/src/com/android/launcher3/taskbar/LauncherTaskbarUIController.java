@@ -16,17 +16,16 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR_TRANSITION_DURATION;
+import static com.android.launcher3.config.FeatureFlags.enableSplitContextually;
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
+import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
-import android.os.RemoteException;
-import android.util.Log;
-import android.view.TaskTransitionSpec;
-import android.view.WindowManagerGlobal;
+import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,19 +33,21 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
-import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.taskbar.bubbles.BubbleBarController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
+import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.util.GroupTask;
+import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
@@ -123,7 +124,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         mLauncher.setTaskbarUIController(null);
         mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
-        updateTaskTransitionSpec(true);
     }
 
     private void onInAppDisplayProgressChanged() {
@@ -171,6 +171,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     /**
      * Should be called from onResume() and onPause(), and animates the Taskbar accordingly.
      */
+    @Override
     public void onLauncherVisibilityChanged(boolean isVisible) {
         onLauncherVisibilityChanged(isVisible, false /* fromInit */);
     }
@@ -199,8 +200,21 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             return null;
         }
 
+        DesktopVisibilityController desktopController =
+                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+        final boolean onDesktop =
+                isDesktopModeSupported()
+                        && desktopController != null
+                        && desktopController.areFreeformTasksVisible();
+        if (onDesktop) {
+            isVisible = false;
+        }
+
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        return mTaskbarLauncherStateController.applyState(fromInit ? 0 : duration, startAnimation);
+        if (fromInit) {
+            duration = 0;
+        }
+        return mTaskbarLauncherStateController.applyState(duration, startAnimation);
     }
 
     @Override
@@ -231,6 +245,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.createAnimToLauncher(toState, callbacks, duration);
     }
 
+    public void updateTaskbarLauncherStateGoingHome() {
+        mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, true);
+        mTaskbarLauncherStateController.applyState();
+    }
+
     public boolean isDraggingItem() {
         return mControllers.taskbarDragController.isDragging();
     }
@@ -243,26 +262,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     private void onStashedInAppChanged(DeviceProfile deviceProfile) {
         boolean taskbarStashedInApps = mControllers.taskbarStashController.isStashedInApp();
         deviceProfile.isTaskbarPresentInApps = !taskbarStashedInApps;
-        updateTaskTransitionSpec(taskbarStashedInApps);
-    }
-
-    private void updateTaskTransitionSpec(boolean taskbarIsHidden) {
-        try {
-            if (taskbarIsHidden) {
-                // Clear custom task transition settings when the taskbar is stashed
-                WindowManagerGlobal.getWindowManagerService().clearTaskTransitionSpec();
-            } else {
-                // Adjust task transition spec to account for taskbar being visible
-                WindowManagerGlobal.getWindowManagerService().setTaskTransitionSpec(
-                        new TaskTransitionSpec(
-                                mLauncher.getColor(R.color.taskbar_background)));
-            }
-        } catch (RemoteException e) {
-            // This shouldn't happen but if it does task animations won't look good until the
-            // taskbar stashing state is changed.
-            Log.e(TAG, "Failed to update task transition spec to account for new taskbar state",
-                    e);
-        }
     }
 
     /**
@@ -270,6 +269,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public void showEduOnAppLaunch() {
         if (!shouldShowEduOnAppLaunch()) {
+            // Called in case the edu finishes and search edu is still pending
+            mControllers.taskbarEduTooltipController.maybeShowSearchEdu();
             return;
         }
 
@@ -281,6 +282,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         // Transient swipe EDU tooltip.
         mControllers.taskbarEduTooltipController.maybeShowSwipeEdu();
+    }
+
+    /** Will make the next onRecentsAnimationFinished() animation a no-op. */
+    public void setSkipNextRecentsAnimEnd() {
+        mTaskbarLauncherStateController.setSkipNextRecentsAnimEnd();
     }
 
     /**
@@ -385,18 +391,32 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
+    protected boolean canToggleHomeAllApps() {
+        return mLauncher.isResumed()
+                && !mTaskbarLauncherStateController.isInOverview()
+                && !mLauncher.areFreeformTasksVisible();
+    }
+
+    @Override
     public RecentsView getRecentsView() {
         return mLauncher.getOverviewPanel();
     }
 
     @Override
-    public void launchSplitTasks(@NonNull GroupTask groupTask) {
-        mLauncher.launchSplitTasks(groupTask);
+    public void launchSplitTasks(
+            @NonNull GroupTask groupTask, @Nullable RemoteTransition remoteTransition) {
+        mLauncher.launchSplitTasks(groupTask, remoteTransition);
     }
 
     @Override
     protected void onIconLayoutBoundsChanged() {
         mTaskbarLauncherStateController.resetIconAlignment();
+    }
+
+    @Nullable
+    @Override
+    protected TISBindHelper getTISBindHelper() {
+        return mLauncher.getTISBindHelper();
     }
 
     @Override

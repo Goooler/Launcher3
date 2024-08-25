@@ -16,8 +16,6 @@
 
 package com.android.quickstep.util;
 
-import static com.android.systemui.shared.system.InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_PIP;
-
 import android.animation.Animator;
 import android.animation.RectEvaluator;
 import android.content.ComponentName;
@@ -35,6 +33,7 @@ import android.window.PictureInPictureSurfaceTransaction;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.internal.jank.Cuj;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.icons.IconProvider;
 import com.android.quickstep.TaskAnimationManager;
@@ -113,7 +112,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             @NonNull ActivityInfo activityInfo,
             int appIconSizePx,
             @NonNull SurfaceControl leash,
-            @Nullable Rect sourceRectHint,
+            @NonNull Rect sourceRectHint,
             @NonNull Rect appBounds,
             @NonNull Matrix homeToWindowPositionMap,
             @NonNull RectF startBounds,
@@ -136,22 +135,25 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         mDestinationBoundsTransformed.set(destinationBoundsTransformed);
         mSurfaceTransactionHelper = new PipSurfaceTransactionHelper(cornerRadius, shadowRadius);
 
-        if (sourceRectHint != null && (sourceRectHint.width() < destinationBounds.width()
-                || sourceRectHint.height() < destinationBounds.height())) {
+        String reasonForCreateOverlay = null; // For debugging purpose.
+        if (sourceRectHint.isEmpty()) {
+            reasonForCreateOverlay = "Source rect hint is empty";
+        } else if (sourceRectHint.width() < destinationBounds.width()
+                || sourceRectHint.height() < destinationBounds.height()) {
             // This is a situation in which the source hint rect on at least one axis is smaller
             // than the destination bounds, which presents a problem because we would have to scale
             // up that axis to fit the bounds. So instead, just fallback to the non-source hint
             // animation in this case.
-            sourceRectHint = null;
-        }
-
-        if (sourceRectHint != null && !appBounds.contains(sourceRectHint)) {
+            reasonForCreateOverlay = "Source rect hint is too small " + sourceRectHint;
+            sourceRectHint.setEmpty();
+        } else if (!appBounds.contains(sourceRectHint)) {
             // This is a situation in which the source hint rect is outside the app bounds, so it is
             // not a valid rectangle to use for cropping app surface
-            sourceRectHint = null;
+            sourceRectHint.setEmpty();
+            reasonForCreateOverlay = "Source rect hint exceeds display bounds " + sourceRectHint;
         }
 
-        if (sourceRectHint == null) {
+        if (sourceRectHint.isEmpty()) {
             mSourceRectHint.setEmpty();
             mSourceHintRectInsets = null;
 
@@ -163,6 +165,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
                     new IconProvider(context).getIcon(mActivityInfo), appIconSizePx);
             final SurfaceControl.Transaction tx = new SurfaceControl.Transaction();
             mPipContentOverlay.attach(tx, mLeash);
+            Log.d(TAG, getContentOverlay() + " is created: " + reasonForCreateOverlay);
         } else {
             mSourceRectHint.set(sourceRectHint);
             mSourceHintRectInsets = new Rect(sourceRectHint.left - appBounds.left,
@@ -174,19 +177,19 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         addAnimatorListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
-                InteractionJankMonitorWrapper.begin(view, CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.begin(view, Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
                 super.onAnimationStart(animation);
             }
 
             @Override
             public void onAnimationCancel(Animator animation) {
                 super.onAnimationCancel(animation);
-                InteractionJankMonitorWrapper.cancel(CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
             }
 
             @Override
             public void onAnimationSuccess(Animator animator) {
-                InteractionJankMonitorWrapper.end(CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
             }
 
             @Override
@@ -267,6 +270,10 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
     public Rect getAppBounds() {
         return mAppBounds;
+    }
+
+    public Rect getSourceRectHint() {
+        return mSourceRectHint;
     }
 
     @Nullable

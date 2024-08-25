@@ -66,7 +66,7 @@ public class CellLayoutBoard implements Comparable<CellLayoutBoard> {
     }
 
     public CellLayoutBoard(int width, int height) {
-        mWidget = new char[width + 1][height + 1];
+        mWidget = new char[width][height];
         this.mWidth = width;
         this.mHeight = height;
         for (int x = 0; x < mWidget.length; x++) {
@@ -197,6 +197,19 @@ public class CellLayoutBoard implements Comparable<CellLayoutBoard> {
             return type;
         }
         return 'z';
+    }
+
+    /**
+     * Check if the given area is empty.
+     */
+    public boolean isEmpty(int x, int y, int spanX, int spanY) {
+        for (int xi = x; xi < x + spanX; xi++) {
+            for (int yi = y; yi < y + spanY; yi++) {
+                if (mWidget[xi][yi] == CellType.IGNORE) continue;
+                if (mWidget[xi][yi] != CellType.EMPTY) return false;
+            }
+        }
+        return true;
     }
 
     public void addWidget(int x, int y, int spanX, int spanY, char type) {
@@ -371,8 +384,8 @@ public class CellLayoutBoard implements Comparable<CellLayoutBoard> {
         s.append("\n");
         maxX = Math.min(maxX, mWidget.length);
         maxY = Math.min(maxY, mWidget[0].length);
-        for (int y = 0; y <= maxY; y++) {
-            for (int x = 0; x <= maxX; x++) {
+        for (int y = 0; y < maxY; y++) {
+            for (int x = 0; x < maxX; x++) {
                 s.append(mWidget[x][y]);
             }
             s.append('\n');

@@ -17,7 +17,6 @@ package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
-import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
@@ -149,6 +148,7 @@ public class TaskbarLauncherStateController {
     private Integer mPrevState;
     private int mState;
     private LauncherState mLauncherState = LauncherState.NORMAL;
+    private boolean mSkipNextRecentsAnimEnd;
 
     // Time when FLAG_TASKBAR_HIDDEN was last cleared, SystemClock.elapsedRealtime (milliseconds).
     private long mLastUnlockTimeMs = 0;
@@ -206,13 +206,7 @@ public class TaskbarLauncherStateController {
                     mLauncherState = finalState;
                     updateStateForFlag(FLAG_LAUNCHER_IN_STATE_TRANSITION, false);
                     applyState();
-                    boolean disallowLongClick =
-                            FeatureFlags.enableSplitContextually()
-                                    ? mLauncher.isSplitSelectionEnabled()
-                                    : finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
-                    com.android.launcher3.taskbar.Utilities.setOverviewDragState(
-                            mControllers, finalState.disallowTaskbarGlobalDrag(),
-                            disallowLongClick, finalState.allowTaskbarInitialSplitSelection());
+                    updateOverviewDragState(finalState);
                 }
             };
 
@@ -223,8 +217,7 @@ public class TaskbarLauncherStateController {
     public void onStateTransitionCompletedAfterSwipeToHome(LauncherState finalState) {
         // TODO(b/279514548) Cleans up bad state that can occur when user interacts with
         // taskbar on top of transparent activity.
-        if (!FeatureFlags.enableHomeTransitionListener()
-                && (finalState == LauncherState.NORMAL)
+        if ((finalState == LauncherState.NORMAL)
                 && mLauncher.hasBeenResumed()) {
             updateStateForFlag(FLAG_VISIBLE, true);
             applyState();
@@ -258,6 +251,7 @@ public class TaskbarLauncherStateController {
 
         mCanSyncViews = true;
         mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
+        updateOverviewDragState(mLauncherState);
     }
 
     public void onDestroy() {
@@ -299,12 +293,16 @@ public class TaskbarLauncherStateController {
 
         if (mTaskBarRecentsAnimationListener != null) {
             mTaskBarRecentsAnimationListener.endGestureStateOverride(
-                    !mLauncher.isInState(LauncherState.OVERVIEW));
+                    !mLauncher.isInState(LauncherState.OVERVIEW), false /*canceled*/);
         }
         mTaskBarRecentsAnimationListener = new TaskBarRecentsAnimationListener(callbacks);
         callbacks.addListener(mTaskBarRecentsAnimationListener);
         ((RecentsView) mLauncher.getOverviewPanel()).setTaskLaunchListener(() ->
-                mTaskBarRecentsAnimationListener.endGestureStateOverride(true));
+                mTaskBarRecentsAnimationListener.endGestureStateOverride(true, false /*canceled*/));
+
+        ((RecentsView) mLauncher.getOverviewPanel()).setTaskLaunchCancelledRunnable(() -> {
+            updateStateForUserFinishedToApp(false /* finishedToApp */);
+        });
         return animatorSet;
     }
 
@@ -321,12 +319,17 @@ public class TaskbarLauncherStateController {
         mShouldDelayLauncherStateAnim = shouldDelayLauncherStateAnim;
     }
 
+    /** Will make the next onRecentsAnimationFinished() a no-op. */
+    public void setSkipNextRecentsAnimEnd() {
+        mSkipNextRecentsAnimEnd = true;
+    }
+
     /** SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values. */
     public void updateStateForSysuiFlags(int systemUiStateFlags) {
         updateStateForSysuiFlags(systemUiStateFlags, /* applyState */ true);
     }
 
-    private  void updateStateForSysuiFlags(int systemUiStateFlags, boolean applyState) {
+    private void updateStateForSysuiFlags(int systemUiStateFlags, boolean applyState) {
         final boolean prevIsAwake = hasAnyFlag(FLAG_AWAKE);
         final boolean currIsAwake = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_AWAKE);
 
@@ -353,6 +356,21 @@ public class TaskbarLauncherStateController {
         if (applyState) {
             applyState();
         }
+    }
+
+    /**
+     * Updates overview drag state on various controllers based on {@link #mLauncherState}.
+     *
+     * @param launcherState The current state launcher is in
+     */
+    private void updateOverviewDragState(LauncherState launcherState) {
+        boolean disallowLongClick =
+                FeatureFlags.enableSplitContextually()
+                        ? mLauncher.isSplitSelectionActive()
+                        : launcherState == LauncherState.OVERVIEW_SPLIT_SELECT;
+        com.android.launcher3.taskbar.Utilities.setOverviewDragState(
+                mControllers, launcherState.disallowTaskbarGlobalDrag(),
+                disallowLongClick, launcherState.allowTaskbarInitialSplitSelection());
     }
 
     /**
@@ -734,7 +752,7 @@ public class TaskbarLauncherStateController {
         }
         mIconAlphaForHome.setValue(alpha);
         boolean hotseatVisible = alpha == 0
-                || isPhoneMode(mLauncher.getDeviceProfile())
+                || mControllers.taskbarActivityContext.isPhoneMode()
                 || (!mControllers.uiController.isHotseatIconOnTopWhenAligned()
                 && mIconAlignment.value > 0);
         /*
@@ -758,32 +776,54 @@ public class TaskbarLauncherStateController {
         @Override
         public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
             boolean isInOverview = mLauncher.isInState(LauncherState.OVERVIEW);
-            endGestureStateOverride(!isInOverview);
+            endGestureStateOverride(!isInOverview, true /*canceled*/);
         }
 
         @Override
         public void onRecentsAnimationFinished(RecentsAnimationController controller) {
-            endGestureStateOverride(!controller.getFinishTargetIsLauncher());
+            endGestureStateOverride(!controller.getFinishTargetIsLauncher(), false /*canceled*/);
         }
 
-        private void endGestureStateOverride(boolean finishedToApp) {
+        /**
+         * Handles whatever cleanup is needed after the recents animation is completed.
+         * NOTE: If {@link #mSkipNextRecentsAnimEnd} is set and we're coming from a non-cancelled
+         * path, this will not call {@link #updateStateForUserFinishedToApp(boolean)}
+         *
+         * @param finishedToApp {@code true} if the recents animation finished to showing an app and
+         *                      not workspace or overview
+         * @param canceled {@code true} if the recents animation was canceled instead of finishing
+         *                 to completion
+         */
+        private void endGestureStateOverride(boolean finishedToApp, boolean canceled) {
             mCallbacks.removeListener(this);
             mTaskBarRecentsAnimationListener = null;
             ((RecentsView) mLauncher.getOverviewPanel()).setTaskLaunchListener(null);
 
-            // Update the visible state immediately to ensure a seamless handoff
-            boolean launcherVisible = !finishedToApp;
-            updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, false);
-            updateStateForFlag(FLAG_VISIBLE, launcherVisible);
-            applyState();
-
-            TaskbarStashController controller = mControllers.taskbarStashController;
-            if (DEBUG) {
-                Log.d(TAG, "endGestureStateOverride - FLAG_IN_APP: " + finishedToApp);
+            if (mSkipNextRecentsAnimEnd && !canceled) {
+                mSkipNextRecentsAnimEnd = false;
+                return;
             }
-            controller.updateStateForFlag(FLAG_IN_APP, finishedToApp);
-            controller.applyState();
+            updateStateForUserFinishedToApp(finishedToApp);
         }
+    }
+
+    /**
+     * Updates the visible state immediately to ensure a seamless handoff.
+     * @param finishedToApp True iff user is in an app.
+     */
+    private void updateStateForUserFinishedToApp(boolean finishedToApp) {
+        // Update the visible state immediately to ensure a seamless handoff
+        boolean launcherVisible = !finishedToApp;
+        updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, false);
+        updateStateForFlag(FLAG_VISIBLE, launcherVisible);
+        applyState();
+
+        TaskbarStashController controller = mControllers.taskbarStashController;
+        if (DEBUG) {
+            Log.d(TAG, "endGestureStateOverride - FLAG_IN_APP: " + finishedToApp);
+        }
+        controller.updateStateForFlag(FLAG_IN_APP, finishedToApp);
+        controller.applyState();
     }
 
     private static String getStateString(int flags) {

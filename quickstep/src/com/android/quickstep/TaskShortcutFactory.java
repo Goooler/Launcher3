@@ -47,9 +47,9 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.popup.SystemShortcut.AppInfo;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
@@ -134,8 +134,9 @@ public interface TaskShortcutFactory {
     class SaveAppPairSystemShortcut extends SystemShortcut<BaseDraggingActivity> {
         private final GroupedTaskView mTaskView;
 
-        public SaveAppPairSystemShortcut(BaseDraggingActivity activity, GroupedTaskView taskView) {
-            super(R.drawable.ic_save_app_pair, R.string.save_app_pair, activity,
+        public SaveAppPairSystemShortcut(BaseDraggingActivity activity, GroupedTaskView taskView,
+                int iconResId) {
+            super(iconResId, R.string.save_app_pair, activity,
                     taskView.getItemInfo(), taskView);
             mTaskView = taskView;
         }
@@ -281,7 +282,7 @@ public interface TaskShortcutFactory {
             final int intentFlags = task.key.baseIntent.getFlags();
             final TaskView taskView = taskContainer.getTaskView();
             final RecentsView recentsView = taskView.getRecentsView();
-            final PagedOrientationHandler orientationHandler =
+            final RecentsPagedOrientationHandler orientationHandler =
                     recentsView.getPagedOrientationHandler();
 
             boolean notEnoughTasksToSplit =
@@ -311,14 +312,32 @@ public interface TaskShortcutFactory {
         @Override
         public List<SystemShortcut> getShortcuts(BaseDraggingActivity activity,
                 TaskIdAttributeContainer taskContainer) {
+            DeviceProfile deviceProfile = activity.getDeviceProfile();
             final TaskView taskView = taskContainer.getTaskView();
+            final RecentsView recentsView = taskView.getRecentsView();
+            boolean isLargeTileFocusedTask = deviceProfile.isTablet && taskView.isFocusedTask();
+            boolean isInExpectedScrollPosition =
+                    recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
+            boolean shouldShowActionsButtonInstead =
+                    isLargeTileFocusedTask && isInExpectedScrollPosition;
 
-            if (!FeatureFlags.enableAppPairs() || !taskView.containsMultipleTasks()) {
+            // No "save app pair" menu item if:
+            // - we are in 3p launcher
+            // - the Overview Actions Button should be visible
+            // - the task view is not a valid save-able split pair
+            if (!recentsView.supportsAppPairs()
+                    || shouldShowActionsButtonInstead
+                    || !recentsView.getSplitSelectController().getAppPairsController()
+                            .canSaveAppPair(taskView)) {
                 return null;
             }
 
+            int iconResId = deviceProfile.isLeftRightSplit
+                    ? R.drawable.ic_save_app_pair_left_right
+                    : R.drawable.ic_save_app_pair_up_down;
+
             return Collections.singletonList(
-                    new SaveAppPairSystemShortcut(activity, (GroupedTaskView) taskView));
+                    new SaveAppPairSystemShortcut(activity, (GroupedTaskView) taskView, iconResId));
         }
 
         @Override

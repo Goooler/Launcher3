@@ -52,6 +52,7 @@
         <item name="workspaceAmbientShadowColor">#40000000</item>
         <item name="workspaceKeyShadowColor">#89000000</item>
         <item name="widgetsTheme">@style/WidgetContainerTheme</item>
+        <item name="focusOutlineColor">@color/material_color_on_secondary_container</item>
         <item name="folderPaginationColor">@color/folder_pagination_color_light</item>
         <item name="folderPreviewColor">@color/folder_preview_light</item>
         <item name="folderBackgroundColor">@color/folder_background_light</item>
@@ -59,6 +60,7 @@
         <item name="isFolderDarkText">true</item>
         <item name="folderTextColor">@color/folder_text_color_light</item>
         <item name="folderHintTextColor">@color/folder_hint_text_color_light</item>
+        <item name="appPairSurfaceInFolder">@color/material_color_surface_container_lowest</item>
         <item name="loadingIconColor">#CCFFFFFF</item>
         <item name="iconOnlyShortcutColor">?android:attr/textColorSecondary</item>
         <item name="eduHalfSheetBGColor">?android:attr/colorAccent</item>
@@ -170,6 +172,7 @@
         <item name="isFolderDarkText">false</item>
         <item name="folderTextColor">@color/folder_text_color_dark</item>
         <item name="folderHintTextColor">@color/folder_hint_text_color_dark</item>
+        <item name="appPairSurfaceInFolder">@color/material_color_surface_container_lowest</item>
         <item name="isMainColorDark">true</item>
         <item name="loadingIconColor">#99FFFFFF</item>
         <item name="iconOnlyShortcutColor">#B3FFFFFF</item>
@@ -440,5 +443,6 @@
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/material_color_on_surface</item>
         <item name="android:fontFamily">google-sans-text-medium</item>
+        <item name="android:ellipsize">end</item>
     </style>
 </resources>

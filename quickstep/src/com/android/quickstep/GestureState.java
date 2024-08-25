@@ -29,9 +29,7 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_HOME;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_NEW_TASK;
 
-import android.annotation.TargetApi;
 import android.content.Intent;
-import android.os.Build;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 
@@ -58,7 +56,6 @@ import java.util.function.Predicate;
  * Manages the state for an active system gesture, listens for events from the system and Launcher,
  * and fires events when the states change.
  */
-@TargetApi(Build.VERSION_CODES.R)
 public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationListener {
 
     final Predicate<RemoteAnimationTarget> mLastStartedTaskIdPredicate = new Predicate<>() {
@@ -519,13 +516,14 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
         return mSwipeUpStartTimeMs;
     }
 
-    public void dump(PrintWriter pw) {
-        pw.println("GestureState:");
-        pw.println("  gestureID=" + mGestureId);
-        pw.println("  runningTask=" + mRunningTask);
-        pw.println("  endTarget=" + mEndTarget);
-        pw.println("  lastAppearedTaskTargetId=" + Arrays.toString(mLastAppearedTaskTargets));
-        pw.println("  lastStartedTaskId=" + Arrays.toString(mLastStartedTaskId));
-        pw.println("  isRecentsAnimationRunning=" + isRecentsAnimationRunning());
+    public void dump(String prefix, PrintWriter pw) {
+        pw.println(prefix + "GestureState:");
+        pw.println(prefix + "\tgestureID=" + mGestureId);
+        pw.println(prefix + "\trunningTask=" + mRunningTask);
+        pw.println(prefix + "\tendTarget=" + mEndTarget);
+        pw.println(prefix + "\tlastAppearedTaskTargetId="
+                + Arrays.toString(mLastAppearedTaskTargets));
+        pw.println(prefix + "\tlastStartedTaskId=" + Arrays.toString(mLastStartedTaskId));
+        pw.println(prefix + "\tisRecentsAnimationRunning=" + isRecentsAnimationRunning());
     }
 }
