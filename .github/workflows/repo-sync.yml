@@ -22,7 +22,7 @@ jobs:
         uses: repo-sync/github-sync@v2
         with:
           source_repo: "https://android.googlesource.com/platform/packages/apps/Launcher3"
-          source_branch: "*"
-          destination_branch: "*"
+          source_branch: "main"
+          destination_branch: "main"
           sync_tags: "true"
           github_token: ${{ secrets.GITHUB_TOKEN }}
