@@ -82,7 +82,6 @@ import com.android.wm.shell.back.IBackAnimation;
 import com.android.wm.shell.bubbles.IBubbles;
 import com.android.wm.shell.bubbles.IBubblesListener;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
-import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.common.pip.IPip;
 import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.desktopmode.IDesktopMode;
@@ -91,16 +90,18 @@ import com.android.wm.shell.draganddrop.IDragAndDrop;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.recents.IRecentTasks;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
+import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
+import com.android.wm.shell.shared.split.SplitBounds;
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.splitscreen.ISplitScreen;
 import com.android.wm.shell.splitscreen.ISplitScreenListener;
 import com.android.wm.shell.splitscreen.ISplitSelectListener;
 import com.android.wm.shell.startingsurface.IStartingWindow;
 import com.android.wm.shell.startingsurface.IStartingWindowListener;
-import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -934,6 +935,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
+    /** Tells SysUI to show the expanded view. */
+    public void showExpandedView() {
+        try {
+            if (mBubbles != null) {
+                mBubbles.showExpandedView();
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Failed to call showExpandedView");
+        }
+    }
+
     //
     // Splitscreen
     //
@@ -1517,7 +1529,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
                 // Aidl bundles need to explicitly set class loader
                 // https://developer.android.com/guide/components/aidl#Bundles
                 if (extras != null) {
-                    extras.setClassLoader(getClass().getClassLoader());
+                    extras.setClassLoader(SplitBounds.class.getClassLoader());
                 }
                 listener.onAnimationStart(new RecentsAnimationControllerCompat(controller), apps,
                         wallpapers, homeContentInsets, minimizedHomeBounds, extras);

@@ -150,6 +150,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private Runnable mOnControllerPreCreateCallback = NO_OP;
 
     // Stored here as signals to determine if the mIconAlignController needs to be recreated.
+    private boolean mIsIconAlignedWithHotseat;
     private boolean mIsHotseatIconOnTopWhenAligned;
     private boolean mIsStashed;
 
@@ -687,15 +688,17 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
             mIconAlignControllerLazy = null;
             return;
         }
-
         boolean isHotseatIconOnTopWhenAligned =
                 mControllers.uiController.isHotseatIconOnTopWhenAligned();
+        boolean isIconAlignedWithHotseat = mControllers.uiController.isIconAlignedWithHotseat();
         boolean isStashed = mControllers.taskbarStashController.isStashed();
-        // Re-create animation when mIsHotseatIconOnTopWhenAligned or mIsStashed changes.
+        // Re-create animation when any of these values change.
         if (mIconAlignControllerLazy == null
                 || mIsHotseatIconOnTopWhenAligned != isHotseatIconOnTopWhenAligned
+                || mIsIconAlignedWithHotseat != isIconAlignedWithHotseat
                 || mIsStashed != isStashed) {
             mIsHotseatIconOnTopWhenAligned = isHotseatIconOnTopWhenAligned;
+            mIsIconAlignedWithHotseat = isIconAlignedWithHotseat;
             mIsStashed = isStashed;
             mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
         }

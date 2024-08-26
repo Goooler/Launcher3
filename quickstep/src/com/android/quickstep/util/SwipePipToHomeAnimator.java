@@ -39,7 +39,7 @@ import com.android.launcher3.icons.IconProvider;
 import com.android.quickstep.TaskAnimationManager;
 import com.android.systemui.shared.pip.PipSurfaceTransactionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.pip.PipContentOverlay;
+import com.android.wm.shell.shared.pip.PipContentOverlay;
 
 /**
  * Subclass of {@link RectFSpringAnim} that animates an Activity to PiP (picture-in-picture) window

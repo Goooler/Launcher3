@@ -39,7 +39,7 @@ import com.android.launcher3.util.LooperExecutor;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.TaskViewType;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.wm.shell.util.GroupedRecentTaskInfo;
+import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 
 import org.junit.Before;
 import org.junit.Test;

@@ -496,6 +496,11 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 () -> mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation));
     }
 
+    /** Notifies WMShell to show the expanded view. */
+    void showExpandedView() {
+        mSystemUiProxy.showExpandedView();
+    }
+
     //
     // Loading data for the bubbles
     //

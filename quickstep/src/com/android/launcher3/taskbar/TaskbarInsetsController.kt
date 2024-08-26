@@ -56,7 +56,6 @@ import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Executors
 import java.io.PrintWriter
 import kotlin.jvm.optionals.getOrNull
-import kotlin.math.max
 
 /** Handles the insets that Taskbar provides to underlying apps and the IME. */
 class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTaskbarController {
@@ -106,7 +105,8 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
     }
 
     fun onTaskbarOrBubblebarWindowHeightOrInsetsChanged() {
-        val tappableHeight = controllers.taskbarStashController.tappableHeightToReportToApps
+        val taskbarStashController = controllers.taskbarStashController
+        val tappableHeight = taskbarStashController.tappableHeightToReportToApps
         // We only report tappableElement height for unstashed, persistent taskbar,
         // which is also when we draw the rounded corners above taskbar.
         val insetsRoundedCornerFlag =
@@ -133,7 +133,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         }
 
         val bubbleControllers = controllers.bubbleControllers.getOrNull()
-        val taskbarTouchableHeight = controllers.taskbarStashController.touchableHeight
+        val taskbarTouchableHeight = taskbarStashController.touchableHeight
         val bubblesTouchableHeight =
             bubbleControllers?.bubbleStashController?.getTouchableHeight() ?: 0
         // reset touch bounds
@@ -147,12 +147,10 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.bubbleBarBounds)
             }
         }
-        val taskbarUIController = controllers.uiController as? LauncherTaskbarUIController
-        if (taskbarUIController?.isOnHome != true) {
-            // only add the bars touch region if not on home
-            val touchableHeight = max(taskbarTouchableHeight, bubblesTouchableHeight)
+        if (taskbarStashController.isInApp || taskbarStashController.isInOverview) {
+            // only add the taskbar touch region if not on home
             val bottom = windowLayoutParams.height
-            val top = bottom - touchableHeight
+            val top = bottom - taskbarTouchableHeight
             val right = context.deviceProfile.widthPx
             defaultTouchableRegion.addBoundsToRegion(Rect(/* left= */ 0, top, right, bottom))
         }

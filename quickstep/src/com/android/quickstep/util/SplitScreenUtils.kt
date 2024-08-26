@@ -17,14 +17,13 @@
 package com.android.quickstep.util
 
 import android.util.Log
-import android.view.WindowManager
 import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import android.window.TransitionInfo.FLAG_FIRST_CUSTOM
 import com.android.launcher3.util.SplitConfigurationOptions
-import com.android.wm.shell.util.SplitBounds
+import com.android.wm.shell.shared.split.SplitBounds
 import java.lang.IllegalStateException
 
 class SplitScreenUtils {

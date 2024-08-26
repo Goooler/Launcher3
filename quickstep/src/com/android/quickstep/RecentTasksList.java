@@ -20,7 +20,7 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
-import static com.android.wm.shell.util.GroupedRecentTaskInfo.TYPE_FREEFORM;
+import static com.android.wm.shell.shared.GroupedRecentTaskInfo.TYPE_FREEFORM;
 
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
@@ -40,8 +40,8 @@ import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
-import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;

@@ -30,7 +30,7 @@ import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.views.DesktopTaskView
-import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource
+import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
 import java.util.function.Consumer
 
 /** Manage recents related operations with desktop tasks */

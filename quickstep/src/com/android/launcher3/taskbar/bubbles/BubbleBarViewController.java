@@ -119,7 +119,8 @@ public class BubbleBarViewController {
         mBubbleDragController = bubbleControllers.bubbleDragController;
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
-        mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
+        mBubbleBarViewAnimator = new BubbleBarViewAnimator(
+                mBarView, mBubbleStashController, mBubbleBarController::showExpandedView);
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(

@@ -244,7 +244,7 @@ public class BubbleBarView extends FrameLayout {
                     if (mIsBarExpanded && mSelectedBubbleView != null) {
                         mSelectedBubbleView.markSeen();
                     }
-                    updateWidth();
+                    updateLayoutParams();
                 },
                 /* onUpdate= */ animator -> {
                     updateBubblesLayoutProperties(mBubbleBarLocation);
@@ -733,7 +733,7 @@ public class BubbleBarView extends FrameLayout {
 
                 @Override
                 public void onAnimationEnd() {
-                    updateWidth();
+                    updateLayoutParams();
                     mBubbleAnimator = null;
                 }
 
@@ -791,7 +791,7 @@ public class BubbleBarView extends FrameLayout {
             @Override
             public void onAnimationEnd() {
                 removeView(removedBubble);
-                updateWidth();
+                updateLayoutParams();
                 mBubbleAnimator = null;
                 if (onEndRunnable != null) {
                     onEndRunnable.run();
@@ -823,7 +823,7 @@ public class BubbleBarView extends FrameLayout {
     @Override
     public void addView(View child, int index, ViewGroup.LayoutParams params) {
         super.addView(child, index, params);
-        updateWidth();
+        updateLayoutParams();
         updateBubbleAccessibilityStates();
         updateContentDescription();
     }
@@ -887,7 +887,7 @@ public class BubbleBarView extends FrameLayout {
             mSelectedBubbleView = null;
             mBubbleBarBackground.showArrow(false);
         }
-        updateWidth();
+        updateLayoutParams();
         updateBubbleAccessibilityStates();
         updateContentDescription();
         mDismissedByDragBubbleView = null;
@@ -935,12 +935,6 @@ public class BubbleBarView extends FrameLayout {
                 bubbleView.hideDot();
             }
         }
-    }
-
-    private void updateWidth() {
-        LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
-        lp.width = (int) (mIsBarExpanded ? expandedWidth() : collapsedWidth());
-        setLayoutParams(lp);
     }
 
     private void updateLayoutParams() {

@@ -17,7 +17,7 @@
 package com.android.quickstep;
 
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
-import static com.android.wm.shell.util.SplitBounds.KEY_EXTRA_SPLIT_BOUNDS;
+import static com.android.wm.shell.shared.split.SplitBounds.KEY_EXTRA_SPLIT_BOUNDS;
 
 import android.app.WindowConfiguration;
 import android.content.Context;
@@ -33,7 +33,7 @@ import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
-import com.android.wm.shell.util.SplitBounds;
+import com.android.wm.shell.shared.split.SplitBounds;
 
 import java.util.ArrayList;
 import java.util.Arrays;

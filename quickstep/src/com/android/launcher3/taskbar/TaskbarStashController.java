@@ -424,6 +424,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         return hasAnyFlag(FLAGS_IN_APP);
     }
 
+    /** Returns whether the taskbar is currently in overview screen. */
+    public boolean isInOverview() {
+        return hasAnyFlag(FLAG_IN_OVERVIEW);
+    }
+
     /**
      * Returns the height that taskbar will be touchable.
      */

@@ -277,7 +277,7 @@ public class DeviceLockedInputConsumer implements InputConsumer,
     }
 
     private void endRemoteAnimation() {
-        if (mRecentsAnimationController != null) {
+        if (!mHomeLaunched && mRecentsAnimationController != null) {
             mRecentsAnimationController.finishController(
                     false /* toRecents */, null /* callback */, false /* sendUserLeaveHint */);
         }
