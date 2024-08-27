@@ -332,3 +332,10 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "letter_fast_scroller"
+    namespace: "launcher"
+    description: "Change fast scroller to a lettered list"
+    bug: "358673724"
+}

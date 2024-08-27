@@ -27,6 +27,7 @@ import android.animation.AnimatorSet;
 import android.content.Context;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.util.Log;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.RemoteAnimationTarget;
 
@@ -196,6 +197,7 @@ public class LauncherAnimationRunner extends RemoteAnimationRunnerCompat {
                 if (skipFirstFrame) {
                     // Because t=0 has the app icon in its original spot, we can skip the
                     // first frame and have the same movement one frame earlier.
+                    Log.d("b/311077782", "LauncherAnimationRunner.setAnimation");
                     mAnimator.setCurrentPlayTime(
                             Math.min(getSingleFrameMs(context), mAnimator.getTotalDuration()));
                 }

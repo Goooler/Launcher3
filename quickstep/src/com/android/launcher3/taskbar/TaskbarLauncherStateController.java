@@ -23,6 +23,7 @@ import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HO
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_COMMUNAL_HUB_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK;
 import static com.android.systemui.shared.system.QuickStepContract.WAKEFULNESS_AWAKE;
@@ -351,8 +352,10 @@ public class TaskbarLauncherStateController {
         // interactive dreams, AoD, screen off. Since the SYSUI_STATE_DEVICE_DREAMING only kicks in
         // when the device is asleep, the second condition extends ensures that the transition from
         // and to the WAKEFULNESS_ASLEEP state also hide the taskbar, and improves the taskbar
-        // hide/reveal animation timings.
-        boolean isTaskbarHidden = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_DEVICE_DREAMING)
+        // hide/reveal animation timings. The Taskbar can show when dreaming if the glanceable hub
+        // is showing on top.
+        boolean isTaskbarHidden = (hasAnyFlag(systemUiStateFlags, SYSUI_STATE_DEVICE_DREAMING)
+                && !hasAnyFlag(systemUiStateFlags, SYSUI_STATE_COMMUNAL_HUB_SHOWING))
                 || (systemUiStateFlags & SYSUI_STATE_WAKEFULNESS_MASK) != WAKEFULNESS_AWAKE;
         updateStateForFlag(FLAG_TASKBAR_HIDDEN, isTaskbarHidden);
 

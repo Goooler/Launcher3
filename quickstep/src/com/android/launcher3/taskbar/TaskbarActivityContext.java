@@ -186,6 +186,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     private final WindowManager mWindowManager;
     private DeviceProfile mDeviceProfile;
     private WindowManager.LayoutParams mWindowLayoutParams;
+    private WindowManager.LayoutParams mLastUpdatedLayoutParams;
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
     private int mLastRequestedNonFullscreenSize;
@@ -442,6 +443,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mImeDrawsImeNavBar = getBoolByName(IME_DRAWS_IME_NAV_BAR_RES_NAME, getResources(), false);
         mLastRequestedNonFullscreenSize = getDefaultTaskbarWindowSize();
         mWindowLayoutParams = createAllWindowParams();
+        mLastUpdatedLayoutParams = new WindowManager.LayoutParams();
 
         // Initialize controllers after all are constructed.
         mControllers.init(sharedState);
@@ -1727,6 +1729,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     void notifyUpdateLayoutParams() {
         if (mDragLayer.isAttachedToWindow()) {
+            // Copy the current windowLayoutParams to mLastUpdatedLayoutParams and compare the diff.
+            // If there is no change, we will skip the call to updateViewLayout.
+            int changes = mLastUpdatedLayoutParams.copyFrom(mWindowLayoutParams);
+            if (changes == 0) {
+                return;
+            }
             if (enableTaskbarNoRecreate()) {
                 mWindowManager.updateViewLayout(mDragLayer.getRootView(), mWindowLayoutParams);
             } else {

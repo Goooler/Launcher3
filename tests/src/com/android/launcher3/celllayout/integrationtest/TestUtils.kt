@@ -21,6 +21,7 @@ import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import com.android.launcher3.CellLayout
+import com.android.launcher3.Utilities
 import com.android.launcher3.Workspace
 import com.android.launcher3.util.CellAndSpan
 import com.android.launcher3.widget.LauncherAppWidgetHostView
@@ -54,7 +55,7 @@ object TestUtils {
         return view as LauncherAppWidgetHostView
     }
 
-    fun getCellTopLeftRelativeToCellLayout(
+    fun getCellTopLeftRelativeToWorkspace(
         workspace: Workspace<*>,
         cellAndSpan: CellAndSpan
     ): Point {
@@ -67,6 +68,8 @@ object TestUtils {
             cellAndSpan.spanY,
             target
         )
-        return Point(target.left, target.top)
+        val point = floatArrayOf(target.left.toFloat(), target.top.toFloat())
+        Utilities.getDescendantCoordRelativeToAncestor(cellLayout, workspace, point, false)
+        return Point(point[0].toInt(), point[1].toInt())
     }
 }

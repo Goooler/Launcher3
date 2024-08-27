@@ -773,6 +773,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         addAnimationStartListeners(anim);
         // Because t=0 has the folder match the folder icon, we can skip the
         // first frame and have the same movement one frame earlier.
+        Log.d("b/311077782", "Folder.animateOpen");
         anim.setCurrentPlayTime(Math.min(getSingleFrameMs(getContext()), anim.getTotalDuration()));
         anim.start();
 

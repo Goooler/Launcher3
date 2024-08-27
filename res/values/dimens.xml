@@ -81,6 +81,11 @@
     <dimen name="fastscroll_popup_text_size">32dp</dimen>
     <dimen name="fastscroll_popup_margin">19dp</dimen>
 
+    <dimen name="fastscroll_list_letter_size">5dp</dimen>
+    <dimen name="fastscroll_list_letter_text_size">14sp</dimen>
+    <dimen name="fastscroll_list_letter_end_margin">-10dp</dimen>
+    <dimen name="bg_letter_list_text_size">20sp</dimen>
+
     <!--
       Fast scroller draws the content horizontally centered. The end of the track should be
       aligned at the end of the container.
