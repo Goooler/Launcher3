@@ -48,6 +48,7 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
@@ -246,7 +247,9 @@ public class TaskbarLauncherStateController {
 
         resetIconAlignment();
 
-        mLauncher.getStateManager().addStateListener(mStateListener);
+        if (!mControllers.taskbarActivityContext.isPhoneMode()) {
+            mLauncher.getStateManager().addStateListener(mStateListener);
+        }
         mLauncherState = launcher.getStateManager().getState();
         updateStateForSysuiFlags(sysuiStateFlags, /*applyState*/ false);
 
@@ -412,7 +415,7 @@ public class TaskbarLauncherStateController {
     }
 
     public Animator applyState(long duration, boolean start) {
-        if (mIsDestroyed) {
+        if (mIsDestroyed || mControllers.taskbarActivityContext.isPhoneMode()) {
             return null;
         }
         Animator animator = null;
@@ -588,6 +591,12 @@ public class TaskbarLauncherStateController {
         }
 
         float cornerRoundness = isInLauncher ? 0 : 1;
+
+        if (DisplayController.isInDesktopMode(mLauncher) && mControllers.getSharedState() != null) {
+            cornerRoundness =
+                    mControllers.taskbarDesktopModeController.getTaskbarCornerRoundness(
+                            mControllers.getSharedState().showCornerRadiusInDesktopMode);
+        }
 
         // Don't animate if corner roundness has reached desired value.
         if (mTaskbarCornerRoundness.isAnimating()
@@ -861,7 +870,8 @@ public class TaskbarLauncherStateController {
                 "%s\tmTaskbarBackgroundAlpha=%.2f", prefix, mTaskbarBackgroundAlpha.value));
         pw.println(String.format(
                 "%s\tmIconAlphaForHome=%.2f", prefix, mIconAlphaForHome.getValue()));
-        pw.println(String.format("%s\tmPrevState=%s", prefix, getStateString(mPrevState)));
+        pw.println(String.format("%s\tmPrevState=%s", prefix,
+                mPrevState == null ? null : getStateString(mPrevState)));
         pw.println(String.format("%s\tmState=%s", prefix, getStateString(mState)));
         pw.println(String.format("%s\tmLauncherState=%s", prefix, mLauncherState));
         pw.println(String.format(

@@ -316,6 +316,7 @@ flag {
     description: "Menu in Taskbar with options to launch and manage multiple instances of the same app"
     bug: "355237285"
 }
+
 flag {
     name: "navigate_to_child_preference"
     namespace: "launcher"
@@ -338,4 +339,24 @@ flag {
     namespace: "launcher"
     description: "Change fast scroller to a lettered list"
     bug: "358673724"
+}
+
+flag {
+    name: "enable_desktop_task_alpha_animation"
+    namespace: "launcher"
+    description: "Enables the animation of the desktop task's background view"
+    bug: "320307666"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "ignore_three_finger_trackpad_for_nav_handle_long_press"
+    namespace: "launcher"
+    description: "Ignore three finger trackpad event for nav handle long press"
+    bug: "342143522"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

@@ -27,7 +27,7 @@ java_defaults {
         "android.os.flags-aconfig-java",
         "android.appwidget.flags-aconfig-java",
         "com.android.window.flags.window-aconfig-java",
-    ]
+    ],
 }
 
 // Common source files used to build launcher (java and kotlin)
@@ -153,7 +153,7 @@ launcher_compose_java_defaults {
     soong_config_variables: {
         release_enable_compose_in_launcher: {
             srcs: [
-                ":launcher-compose-enabled-src"
+                ":launcher-compose-enabled-src",
             ],
 
             // Compose dependencies
@@ -166,7 +166,7 @@ launcher_compose_java_defaults {
             // in compose/launcher3/facade/disabled/.
             conditions_default: {
                 srcs: [
-                    ":launcher-compose-disabled-src"
+                    ":launcher-compose-disabled-src",
                 ],
                 static_libs: [],
             },
@@ -179,7 +179,7 @@ quickstep_compose_java_defaults {
     soong_config_variables: {
         release_enable_compose_in_launcher: {
             srcs: [
-                ":launcher-quickstep-compose-enabled-src"
+                ":launcher-quickstep-compose-enabled-src",
             ],
 
             // Compose dependencies
@@ -192,7 +192,7 @@ quickstep_compose_java_defaults {
             // in compose/quickstep/facade/disabled/.
             conditions_default: {
                 srcs: [
-                    ":launcher-quickstep-compose-disabled-src"
+                    ":launcher-quickstep-compose-disabled-src",
                 ],
                 static_libs: [],
             },
@@ -322,6 +322,8 @@ android_library {
         "kotlinx_coroutines",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
+        "dagger2",
+        "jsr330",
 
     ],
     manifest: "AndroidManifest-common.xml",
@@ -357,6 +359,7 @@ android_app {
     sdk_version: "current",
     min_sdk_version: min_launcher3_sdk_version,
     target_sdk_version: "current",
+    plugins: ["dagger2-compiler"],
     privileged: true,
     system_ext_specific: true,
 
@@ -392,6 +395,7 @@ android_library {
         "lottie",
         "SystemUISharedLib",
         "SettingsLibSettingsTheme",
+        "dagger2",
     ],
     manifest: "quickstep/AndroidManifest.xml",
     min_sdk_version: "current",
@@ -421,7 +425,10 @@ android_library {
         "QuickstepResLib",
         "androidx.room_room-runtime",
     ],
-    plugins: ["androidx.room_room-compiler-plugin"],
+    plugins: [
+        "androidx.room_room-compiler-plugin",
+        "dagger2-compiler",
+    ],
     manifest: "quickstep/AndroidManifest.xml",
     additional_manifests: [
         "go/AndroidManifest.xml",
@@ -437,7 +444,7 @@ android_library {
     name: "Launcher3QuickStepLib",
     defaults: [
         "launcher_compose_defaults",
-        "quickstep_compose_defaults"
+        "quickstep_compose_defaults",
     ],
     srcs: [
         ":launcher-src",
@@ -458,6 +465,7 @@ android_library {
     ],
     manifest: "quickstep/AndroidManifest.xml",
     platform_apis: true,
+    plugins: ["dagger2-compiler"],
     min_sdk_version: "current",
     // TODO(b/319712088): re-enable use_resource_processor
     use_resource_processor: false,
@@ -500,7 +508,6 @@ android_app {
 
 }
 
-
 // Build rule for Launcher3 Go app with quickstep for Android Go devices.
 // Note that the following two rules are exactly same, and should
 // eventually be merged into a single target
@@ -540,6 +547,7 @@ android_app {
         include_filter: ["com.android.launcher3.*"],
     },
 }
+
 android_app {
     name: "Launcher3QuickStepGo",
     static_libs: ["Launcher3GoLib"],

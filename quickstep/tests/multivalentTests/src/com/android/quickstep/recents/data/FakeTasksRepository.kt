@@ -28,7 +28,6 @@ class FakeTasksRepository : RecentTasksRepository {
     private var taskIconDataMap: Map<Int, TaskIconQueryResponse> = emptyMap()
     private var tasks: MutableStateFlow<List<Task>> = MutableStateFlow(emptyList())
     private var visibleTasks: MutableStateFlow<List<Int>> = MutableStateFlow(emptyList())
-    private var thumbnailOverrideMap: Map<Int, ThumbnailData> = emptyMap()
 
     override fun getAllTaskData(forceRefresh: Boolean): Flow<List<Task>> = tasks
 
@@ -39,7 +38,7 @@ class FakeTasksRepository : RecentTasksRepository {
             .map { taskList ->
                 val task = taskList.firstOrNull { it.key.id == taskId } ?: return@map null
                 Task(task).apply {
-                    thumbnail = thumbnailOverrideMap[taskId] ?: task.thumbnail
+                    thumbnail = task.thumbnail
                     icon = task.icon
                     titleDescription = task.titleDescription
                     title = task.title
@@ -62,16 +61,6 @@ class FakeTasksRepository : RecentTasksRepository {
                     }
                 }
             }
-        setThumbnailOverrideInternal(thumbnailOverrideMap)
-    }
-
-    override fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
-        setThumbnailOverrideInternal(thumbnailOverride)
-    }
-
-    private fun setThumbnailOverrideInternal(thumbnailOverride: Map<Int, ThumbnailData>) {
-        thumbnailOverrideMap =
-            thumbnailOverride.filterKeys(this.visibleTasks.value::contains).toMap()
     }
 
     fun seedTasks(tasks: List<Task>) {

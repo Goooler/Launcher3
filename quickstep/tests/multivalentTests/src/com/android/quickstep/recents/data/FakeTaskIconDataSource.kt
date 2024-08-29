@@ -27,7 +27,8 @@ import org.mockito.kotlin.whenever
 
 class FakeTaskIconDataSource : TaskIconDataSource {
 
-    val taskIdToDrawable: Map<Int, Drawable> = (0..10).associateWith { mockCopyableDrawable() }
+    val taskIdToDrawable: MutableMap<Int, Drawable> =
+        (0..10).associateWith { mockCopyableDrawable() }.toMutableMap()
 
     val taskIdToUpdatingTask: MutableMap<Int, () -> Unit> = mutableMapOf()
     var shouldLoadSynchronously: Boolean = true
@@ -52,15 +53,17 @@ class FakeTaskIconDataSource : TaskIconDataSource {
         return null
     }
 
-    private fun mockCopyableDrawable(): Drawable {
-        val mutableDrawable = mock<Drawable>()
-        val immutableDrawable =
-            mock<Drawable>().apply { whenever(mutate()).thenReturn(mutableDrawable) }
-        val constantState =
-            mock<Drawable.ConstantState>().apply {
-                whenever(newDrawable()).thenReturn(immutableDrawable)
-            }
-        return mutableDrawable.apply { whenever(this.constantState).thenReturn(constantState) }
+    companion object {
+        fun mockCopyableDrawable(): Drawable {
+            val mutableDrawable = mock<Drawable>()
+            val immutableDrawable =
+                mock<Drawable>().apply { whenever(mutate()).thenReturn(mutableDrawable) }
+            val constantState =
+                mock<Drawable.ConstantState>().apply {
+                    whenever(newDrawable()).thenReturn(immutableDrawable)
+                }
+            return mutableDrawable.apply { whenever(this.constantState).thenReturn(constantState) }
+        }
     }
 }
 

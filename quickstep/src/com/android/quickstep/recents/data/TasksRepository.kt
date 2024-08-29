@@ -18,6 +18,8 @@ package com.android.quickstep.recents.data
 
 import android.graphics.drawable.Drawable
 import com.android.launcher3.util.coroutines.DispatcherProvider
+import com.android.quickstep.recents.data.TaskVisualsChangedDelegate.TaskIconChangedCallback
+import com.android.quickstep.recents.data.TaskVisualsChangedDelegate.TaskThumbnailChangedCallback
 import com.android.quickstep.task.thumbnail.data.TaskIconDataSource
 import com.android.quickstep.task.thumbnail.data.TaskThumbnailDataSource
 import com.android.quickstep.util.GroupTask
@@ -26,18 +28,20 @@ import com.android.systemui.shared.recents.model.ThumbnailData
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
@@ -46,12 +50,12 @@ class TasksRepository(
     private val recentsModel: RecentTasksDataSource,
     private val taskThumbnailDataSource: TaskThumbnailDataSource,
     private val taskIconDataSource: TaskIconDataSource,
+    private val taskVisualsChangedDelegate: TaskVisualsChangedDelegate,
     recentsCoroutineScope: CoroutineScope,
     private val dispatcherProvider: DispatcherProvider,
 ) : RecentTasksRepository {
     private val groupedTaskData = MutableStateFlow(emptyList<GroupTask>())
     private val visibleTaskIds = MutableStateFlow(emptySet<Int>())
-    private val thumbnailOverride = MutableStateFlow(mapOf<Int, ThumbnailData>())
 
     private val taskData =
         groupedTaskData.map { groupTaskList -> groupTaskList.flatMap { it.tasks } }
@@ -85,15 +89,13 @@ class TasksRepository(
             .distinctUntilChanged()
 
     private val augmentedTaskData: Flow<List<Task>> =
-        combine(taskData, thumbnailQueryResults, iconQueryResults, thumbnailOverride) {
+        combine(taskData, thumbnailQueryResults, iconQueryResults) {
                 tasks,
                 thumbnailQueryResults,
-                iconQueryResults,
-                thumbnailOverride ->
+                iconQueryResults ->
                 tasks.onEach { task ->
                     // Add retrieved thumbnails + remove unnecessary thumbnails (e.g. invisible)
-                    task.thumbnail =
-                        thumbnailOverride[task.key.id] ?: thumbnailQueryResults[task.key.id]
+                    task.thumbnail = thumbnailQueryResults[task.key.id]
 
                     // TODO(b/352331675) don't load icons for DesktopTaskView
                     // Add retrieved icons + remove unnecessary icons
@@ -121,61 +123,76 @@ class TasksRepository(
 
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         this.visibleTaskIds.value = visibleTaskIdList.toSet()
-        addOrUpdateThumbnailOverride(emptyMap())
-    }
-
-    override fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
-        this.thumbnailOverride.value =
-            this.thumbnailOverride.value
-                .toMutableMap()
-                .apply { putAll(thumbnailOverride) }
-                .filterKeys(this.visibleTaskIds.value::contains)
     }
 
     /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
-    private fun getThumbnailDataRequest(task: Task): ThumbnailDataRequest = flow {
-        emit(task.key.id to task.thumbnail)
-        val thumbnailDataResult: ThumbnailData? =
-            withContext(dispatcherProvider.main) {
-                suspendCancellableCoroutine { continuation ->
-                    val cancellableTask =
-                        taskThumbnailDataSource.getThumbnailInBackground(task) {
-                            continuation.resume(it)
-                        }
-                    continuation.invokeOnCancellation { cancellableTask?.cancel() }
+    private fun getThumbnailDataRequest(task: Task): ThumbnailDataRequest = callbackFlow {
+        trySend(task.key.id to task.thumbnail)
+        trySend(task.key.id to getThumbnailFromDataSource(task))
+
+        val callback =
+            object : TaskThumbnailChangedCallback {
+                override fun onTaskThumbnailChanged(thumbnailData: ThumbnailData?) {
+                    trySend(task.key.id to thumbnailData)
+                }
+
+                override fun onHighResLoadingStateChanged() {
+                    launch { trySend(task.key.id to getThumbnailFromDataSource(task)) }
                 }
             }
-        emit(task.key.id to thumbnailDataResult)
+        taskVisualsChangedDelegate.registerTaskThumbnailChangedCallback(task.key, callback)
+        awaitClose { taskVisualsChangedDelegate.unregisterTaskThumbnailChangedCallback(task.key) }
     }
 
-    /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
+    /** Flow wrapper for [TaskIconDataSource.getIconInBackground] api */
     private fun getIconDataRequest(task: Task): IconDataRequest =
-        flow {
-                emit(task.key.id to task.getTaskIconQueryResponse())
-                val iconDataResponse: TaskIconQueryResponse? =
-                    withContext(dispatcherProvider.main) {
-                        suspendCancellableCoroutine { continuation ->
-                            val cancellableTask =
-                                taskIconDataSource.getIconInBackground(task) {
-                                    icon,
-                                    contentDescription,
-                                    title ->
-                                    icon.constantState?.let {
-                                        continuation.resume(
-                                            TaskIconQueryResponse(
-                                                it.newDrawable().mutate(),
-                                                contentDescription,
-                                                title
-                                            )
-                                        )
-                                    }
-                                }
-                            continuation.invokeOnCancellation { cancellableTask?.cancel() }
+        callbackFlow {
+                trySend(task.key.id to task.getTaskIconQueryResponse())
+                trySend(task.key.id to getIconFromDataSource(task))
+
+                val callback =
+                    object : TaskIconChangedCallback {
+                        override fun onTaskIconChanged() {
+                            launch { trySend(task.key.id to getIconFromDataSource(task)) }
                         }
                     }
-                emit(task.key.id to iconDataResponse)
+                taskVisualsChangedDelegate.registerTaskIconChangedCallback(task.key, callback)
+                awaitClose {
+                    taskVisualsChangedDelegate.unregisterTaskIconChangedCallback(task.key)
+                }
             }
             .distinctUntilChanged()
+
+    private suspend fun getThumbnailFromDataSource(task: Task) =
+        withContext(dispatcherProvider.main) {
+            suspendCancellableCoroutine { continuation ->
+                val cancellableTask =
+                    taskThumbnailDataSource.getThumbnailInBackground(task) {
+                        continuation.resume(it)
+                    }
+                continuation.invokeOnCancellation { cancellableTask?.cancel() }
+            }
+        }
+
+    private suspend fun getIconFromDataSource(task: Task) =
+        withContext(dispatcherProvider.main) {
+            suspendCancellableCoroutine { continuation ->
+                val cancellableTask =
+                    taskIconDataSource.getIconInBackground(task) { icon, contentDescription, title
+                        ->
+                        icon.constantState?.let {
+                            continuation.resume(
+                                TaskIconQueryResponse(
+                                    it.newDrawable().mutate(),
+                                    contentDescription,
+                                    title
+                                )
+                            )
+                        }
+                    }
+                continuation.invokeOnCancellation { cancellableTask?.cancel() }
+            }
+        }
 }
 
 data class TaskIconQueryResponse(

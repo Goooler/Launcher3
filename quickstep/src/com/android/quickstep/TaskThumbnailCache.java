@@ -27,6 +27,7 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.R;
 import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.Preconditions;
+import com.android.quickstep.recents.data.HighResLoadingStateNotifier;
 import com.android.quickstep.task.thumbnail.data.TaskThumbnailDataSource;
 import com.android.quickstep.util.TaskKeyByLastActiveTimeCache;
 import com.android.quickstep.util.TaskKeyCache;
@@ -48,7 +49,7 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
     private final boolean mEnableTaskSnapshotPreloading;
     private final Context mContext;
 
-    public static class HighResLoadingState {
+    public static class HighResLoadingState implements HighResLoadingStateNotifier {
         private boolean mForceHighResThumbnails;
         private boolean mVisible;
         private boolean mFlingingFast;
@@ -65,11 +66,13 @@ public class TaskThumbnailCache implements TaskThumbnailDataSource {
             mForceHighResThumbnails = !supportsLowResThumbnails();
         }
 
-        public void addCallback(HighResLoadingStateChangedCallback callback) {
+        @Override
+        public void addCallback(@NonNull HighResLoadingStateChangedCallback callback) {
             mCallbacks.add(callback);
         }
 
-        public void removeCallback(HighResLoadingStateChangedCallback callback) {
+        @Override
+        public void removeCallback(@NonNull HighResLoadingStateChangedCallback callback) {
             mCallbacks.remove(callback);
         }
 

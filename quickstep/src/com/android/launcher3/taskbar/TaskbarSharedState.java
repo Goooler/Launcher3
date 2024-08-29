@@ -102,5 +102,8 @@ public class TaskbarSharedState {
 
     // To track if taskbar was stashed / unstashed between configuration changes (which recreates
     // the task bar).
-    public Boolean taskbarWasStashedAuto = true;
+    public boolean taskbarWasStashedAuto = true;
+
+    // should show corner radius on persistent taskbar when in desktop mode.
+    public boolean showCornerRadiusInDesktopMode = false;
 }

@@ -36,10 +36,10 @@ import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.SystemUiProxy;
 import com.android.wm.shell.desktopmode.IDesktopTaskListener;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Executor;
 
 /**
  * Controls the visibility of the workspace and the resumed / paused state when desktop mode
@@ -51,6 +51,7 @@ public class DesktopVisibilityController {
     private static final boolean DEBUG = false;
     private final Launcher mLauncher;
     private final Set<DesktopVisibilityListener> mDesktopVisibilityListeners = new HashSet<>();
+    private final Set<TaskbarDesktopModeListener> mTaskbarDesktopModeListeners = new HashSet<>();
 
     private int mVisibleDesktopTasksCount;
     private boolean mInOverviewState;
@@ -108,6 +109,16 @@ public class DesktopVisibilityController {
     /** Removes a previously registered Desktop Mode visibility listener. */
     public void unregisterDesktopVisibilityListener(DesktopVisibilityListener listener) {
         mDesktopVisibilityListeners.remove(listener);
+    }
+
+    /** Registers a listener for Taskbar changes in Desktop Mode. */
+    public void registerTaskbarDesktopModeListener(TaskbarDesktopModeListener listener) {
+        mTaskbarDesktopModeListeners.add(listener);
+    }
+
+    /** Removes a previously registered listener for Taskbar changes in Desktop Mode. */
+    public void unregisterTaskbarDesktopModeListener(TaskbarDesktopModeListener listener) {
+        mTaskbarDesktopModeListeners.remove(listener);
     }
 
     /**
@@ -199,6 +210,16 @@ public class DesktopVisibilityController {
             listener.onDesktopVisibilityChanged(areDesktopTasksVisible);
         }
         DisplayController.handleInfoChangeForDesktopMode(mLauncher);
+    }
+
+    private void notifyTaskbarDesktopModeListeners(boolean doesAnyTaskRequireTaskbarRounding) {
+        if (DEBUG) {
+            Log.d(TAG, "notifyTaskbarDesktopModeListeners: doesAnyTaskRequireTaskbarRounding="
+                    + doesAnyTaskRequireTaskbarRounding);
+        }
+        for (TaskbarDesktopModeListener listener : mTaskbarDesktopModeListeners) {
+            listener.onTaskbarCornerRoundingUpdate(doesAnyTaskRequireTaskbarRounding);
+        }
     }
 
     /**
@@ -377,7 +398,29 @@ public class DesktopVisibilityController {
 
         @Override
         public void onStashedChanged(int displayId, boolean stashed) {
-            Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
+            Log.w(TAG, "DesktopTaskListenerImpl: onStashedChanged is deprecated");
         }
+
+        @Override
+        public void onTaskbarCornerRoundingUpdate(boolean doesAnyTaskRequireTaskbarRounding) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mController != null && DesktopModeStatus.useRoundedCorners()) {
+                    Log.d(TAG, "DesktopTaskListenerImpl: doesAnyTaskRequireTaskbarRounding= "
+                            + doesAnyTaskRequireTaskbarRounding);
+                    mController.notifyTaskbarDesktopModeListeners(
+                            doesAnyTaskRequireTaskbarRounding);
+                }
+            });
+        }
+    }
+
+    /** A listener for Taskbar in Desktop Mode. */
+    public interface TaskbarDesktopModeListener {
+        /**
+         * Callback for when task is resized in desktop mode.
+         *
+         * @param doesAnyTaskRequireTaskbarRounding whether task requires taskbar corner roundness.
+         */
+        void onTaskbarCornerRoundingUpdate(boolean doesAnyTaskRequireTaskbarRounding);
     }
 }

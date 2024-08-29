@@ -17,14 +17,23 @@ package com.android.launcher3;
 
 import android.app.Application;
 
+import com.android.launcher3.dagger.DaggerLauncherAppComponent;
+import com.android.launcher3.dagger.LauncherBaseAppComponent;
+
 /**
  * Main application class for Launcher
  */
 public class LauncherApplication extends Application {
 
+    private LauncherBaseAppComponent mAppComponent;
     @Override
     public void onCreate() {
         super.onCreate();
         MainProcessInitializer.initialize(this);
+        mAppComponent = DaggerLauncherAppComponent.builder().build();
+    }
+
+    public LauncherBaseAppComponent getAppComponent() {
+        return mAppComponent;
     }
 }

@@ -19,7 +19,7 @@ package com.android.quickstep.recents.data
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
-import android.view.Surface
+import android.graphics.drawable.Drawable
 import com.android.launcher3.util.TestDispatcherProvider
 import com.android.quickstep.task.thumbnail.TaskThumbnailViewModelTest
 import com.android.quickstep.util.DesktopTask
@@ -29,6 +29,9 @@ import com.android.systemui.shared.recents.model.ThumbnailData
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -48,6 +51,10 @@ class TasksRepositoryTest {
     private val recentsModel = FakeRecentTasksDataSource()
     private val taskThumbnailDataSource = FakeTaskThumbnailDataSource()
     private val taskIconDataSource = FakeTaskIconDataSource()
+    private val taskVisualsChangeNotifier = FakeTaskVisualsChangeNotifier()
+    private val highResLoadingStateNotifier = FakeHighResLoadingStateNotifier()
+    private val taskVisualsChangedDelegate =
+        TaskVisualsChangedDelegateImpl(taskVisualsChangeNotifier, highResLoadingStateNotifier)
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(dispatcher)
@@ -56,6 +63,7 @@ class TasksRepositoryTest {
             recentsModel,
             taskThumbnailDataSource,
             taskIconDataSource,
+            taskVisualsChangedDelegate,
             testScope.backgroundScope,
             TestDispatcherProvider(dispatcher)
         )
@@ -203,87 +211,81 @@ class TasksRepositoryTest {
         }
 
     @Test
-    fun addThumbnailOverrideOverrideThumbnails() =
+    fun onTaskThumbnailChanged_setsNewThumbnailDataOnTask() =
         testScope.runTest {
             recentsModel.seedTasks(defaultTaskList)
-            val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
-            val thumbnailOverride2 = createThumbnailData()
-            systemUnderTest.getAllTaskData(forceRefresh = true)
-
-            systemUnderTest.setVisibleTasks(listOf(1, 2))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
-
-            assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail).isEqualTo(bitmap1)
-            assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail)
-                .isEqualTo(thumbnailOverride2.thumbnail)
-        }
-
-    @Test
-    fun addThumbnailOverrideMultipleOverrides() =
-        testScope.runTest {
-            recentsModel.seedTasks(defaultTaskList)
-            val thumbnailOverride1 = createThumbnailData()
-            val thumbnailOverride2 = createThumbnailData()
-            val thumbnailOverride3 = createThumbnailData()
-            systemUnderTest.getAllTaskData(forceRefresh = true)
-
-            systemUnderTest.setVisibleTasks(listOf(1, 2))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(1 to thumbnailOverride1))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride3))
-
-            assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail)
-                .isEqualTo(thumbnailOverride1.thumbnail)
-            assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail)
-                .isEqualTo(thumbnailOverride3.thumbnail)
-        }
-
-    @Test
-    fun addThumbnailOverrideClearedWhenTaskBecomeInvisible() =
-        testScope.runTest {
-            recentsModel.seedTasks(defaultTaskList)
-            val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
-            val thumbnailOverride1 = createThumbnailData()
-            val thumbnailOverride2 = createThumbnailData()
-            systemUnderTest.getAllTaskData(forceRefresh = true)
-
-            systemUnderTest.setVisibleTasks(listOf(1, 2))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(1 to thumbnailOverride1))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride2))
-            // Making task 2 invisible and visible again should clear the override
-            systemUnderTest.setVisibleTasks(listOf(1))
-            systemUnderTest.setVisibleTasks(listOf(1, 2))
-
-            assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail)
-                .isEqualTo(thumbnailOverride1.thumbnail)
-            assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
-        }
-
-    @Test
-    fun addThumbnailOverrideDoesNotOverrideInvisibleTasks() =
-        testScope.runTest {
-            recentsModel.seedTasks(defaultTaskList)
-            val bitmap1 = taskThumbnailDataSource.taskIdToBitmap[1]
-            val bitmap2 = taskThumbnailDataSource.taskIdToBitmap[2]
-            val thumbnailOverride = createThumbnailData()
             systemUnderTest.getAllTaskData(forceRefresh = true)
 
             systemUnderTest.setVisibleTasks(listOf(1))
-            systemUnderTest.addOrUpdateThumbnailOverride(mapOf(2 to thumbnailOverride))
-            systemUnderTest.setVisibleTasks(listOf(1, 2))
 
-            assertThat(systemUnderTest.getThumbnailById(1).first()!!.thumbnail).isEqualTo(bitmap1)
-            assertThat(systemUnderTest.getThumbnailById(2).first()!!.thumbnail).isEqualTo(bitmap2)
+            val expectedThumbnailData = createThumbnailData()
+            val expectedPreviousBitmap = taskThumbnailDataSource.taskIdToBitmap[1]
+            val taskDataFlow = systemUnderTest.getTaskDataById(1)
+
+            val task1ThumbnailValues = mutableListOf<ThumbnailData?>()
+            testScope.backgroundScope.launch {
+                taskDataFlow.map { it?.thumbnail }.toList(task1ThumbnailValues)
+            }
+            taskVisualsChangedDelegate.onTaskThumbnailChanged(1, expectedThumbnailData)
+
+            assertThat(task1ThumbnailValues[1]!!.thumbnail).isEqualTo(expectedPreviousBitmap)
+            assertThat(task1ThumbnailValues.last()).isEqualTo(expectedThumbnailData)
+        }
+
+    @Test
+    fun onHighResLoadingStateChanged_setsNewThumbnailDataOnTask() =
+        testScope.runTest {
+            recentsModel.seedTasks(defaultTaskList)
+            systemUnderTest.getAllTaskData(forceRefresh = true)
+
+            systemUnderTest.setVisibleTasks(listOf(1))
+
+            val expectedBitmap = mock<Bitmap>()
+            val expectedPreviousBitmap = taskThumbnailDataSource.taskIdToBitmap[1]
+            val taskDataFlow = systemUnderTest.getTaskDataById(1)
+
+            val task1ThumbnailValues = mutableListOf<Bitmap?>()
+            testScope.backgroundScope.launch {
+                taskDataFlow.map { it?.thumbnail?.thumbnail }.toList(task1ThumbnailValues)
+            }
+            taskThumbnailDataSource.taskIdToBitmap[1] = expectedBitmap
+            taskVisualsChangedDelegate.onHighResLoadingStateChanged(true)
+
+            assertThat(task1ThumbnailValues[1]).isEqualTo(expectedPreviousBitmap)
+            assertThat(task1ThumbnailValues.last()).isEqualTo(expectedBitmap)
+        }
+
+    @Test
+    fun onTaskIconChanged_setsNewIconOnTask() =
+        testScope.runTest {
+            recentsModel.seedTasks(defaultTaskList)
+            systemUnderTest.getAllTaskData(forceRefresh = true)
+
+            systemUnderTest.setVisibleTasks(listOf(1))
+
+            val expectedIcon = FakeTaskIconDataSource.mockCopyableDrawable()
+            val expectedPreviousIcon = taskIconDataSource.taskIdToDrawable[1]
+            val taskDataFlow = systemUnderTest.getTaskDataById(1)
+
+            val task1IconValues = mutableListOf<Drawable?>()
+            testScope.backgroundScope.launch {
+                taskDataFlow.map { it?.icon }.toList(task1IconValues)
+            }
+            taskIconDataSource.taskIdToDrawable[1] = expectedIcon
+            taskVisualsChangedDelegate.onTaskIconChanged(1)
+
+            assertThat(task1IconValues[1]).isEqualTo(expectedPreviousIcon)
+            assertThat(task1IconValues.last()).isEqualTo(expectedIcon)
         }
 
     private fun createTaskWithId(taskId: Int) =
         Task(Task.TaskKey(taskId, 0, Intent(), ComponentName("", ""), 0, 2000))
 
-    private fun createThumbnailData(rotation: Int = Surface.ROTATION_0): ThumbnailData {
+    private fun createThumbnailData(): ThumbnailData {
         val bitmap = mock<Bitmap>()
         whenever(bitmap.width).thenReturn(TaskThumbnailViewModelTest.THUMBNAIL_WIDTH)
         whenever(bitmap.height).thenReturn(TaskThumbnailViewModelTest.THUMBNAIL_HEIGHT)
 
-        return ThumbnailData(thumbnail = bitmap, rotation = rotation)
+        return ThumbnailData(thumbnail = bitmap)
     }
 }

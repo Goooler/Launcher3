@@ -63,7 +63,6 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.Region.Op;
-import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.PaintDrawable;
 import android.graphics.drawable.RotateDrawable;
@@ -74,8 +73,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnAttachStateChangeListener;
-import android.view.View.OnClickListener;
-import android.view.View.OnHoverListener;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
@@ -106,7 +103,6 @@ import com.android.launcher3.views.BaseDragLayer;
 import com.android.systemui.shared.navigationbar.KeyButtonRipple;
 import com.android.systemui.shared.rotation.FloatingRotationButton;
 import com.android.systemui.shared.rotation.RotationButton;
-import com.android.systemui.shared.rotation.RotationButtonController;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -304,8 +300,13 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                         .get(ALPHA_INDEX_SMALL_SCREEN),
                 flags -> (flags & FLAG_SMALL_SCREEN) == 0));
 
-        mPropertyHolders.add(new StatePropertyHolder(mControllers.taskbarDragLayerController
-                .getKeyguardBgTaskbar(), flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0));
+        if (!mContext.isPhoneMode()) {
+            mPropertyHolders.add(new StatePropertyHolder(mControllers.taskbarDragLayerController
+                    .getKeyguardBgTaskbar(), flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0));
+        }
+
+        // Start at 1 because relevant flags are unset at init.
+        mOnBackgroundNavButtonColorOverrideMultiplier.value = 1;
 
         // Force nav buttons (specifically back button) to be visible during setup wizard.
         boolean isInSetup = !mContext.isUserSetupComplete();
@@ -317,39 +318,41 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         // - IME is showing (add separate translation for IME)
         // - VoiceInteractionWindow (assistant) is showing
         // - Keyboard shortcuts helper is showing
-        int flagsToRemoveTranslation = FLAG_NOTIFICATION_SHADE_EXPANDED | FLAG_IME_VISIBLE
-                | FLAG_VOICE_INTERACTION_WINDOW_SHOWING | FLAG_KEYBOARD_SHORTCUT_HELPER_SHOWING;
-        mPropertyHolders.add(new StatePropertyHolder(mNavButtonInAppDisplayProgressForSysui,
-                flags -> (flags & flagsToRemoveTranslation) != 0, AnimatedFloat.VALUE,
-                1, 0));
-        // Center nav buttons in new height for IME.
-        float transForIme = (mContext.getDeviceProfile().taskbarHeight
-                - mControllers.taskbarInsetsController.getTaskbarHeightForIme()) / 2f;
-        // For gesture nav, nav buttons only show for IME anyway so keep them translated down.
-        float defaultButtonTransY = alwaysShowButtons ? 0 : transForIme;
-        mPropertyHolders.add(new StatePropertyHolder(mTaskbarNavButtonTranslationYForIme,
-                flags -> (flags & FLAG_IME_VISIBLE) != 0 && !isInKidsMode, AnimatedFloat.VALUE,
-                transForIme, defaultButtonTransY));
+        if (!mContext.isPhoneMode()) {
+            int flagsToRemoveTranslation = FLAG_NOTIFICATION_SHADE_EXPANDED | FLAG_IME_VISIBLE
+                    | FLAG_VOICE_INTERACTION_WINDOW_SHOWING | FLAG_KEYBOARD_SHORTCUT_HELPER_SHOWING;
+            mPropertyHolders.add(new StatePropertyHolder(mNavButtonInAppDisplayProgressForSysui,
+                    flags -> (flags & flagsToRemoveTranslation) != 0, AnimatedFloat.VALUE,
+                    1, 0));
+            // Center nav buttons in new height for IME.
+            float transForIme = (mContext.getDeviceProfile().taskbarHeight
+                    - mControllers.taskbarInsetsController.getTaskbarHeightForIme()) / 2f;
+            // For gesture nav, nav buttons only show for IME anyway so keep them translated down.
+            float defaultButtonTransY = alwaysShowButtons ? 0 : transForIme;
+            mPropertyHolders.add(new StatePropertyHolder(mTaskbarNavButtonTranslationYForIme,
+                    flags -> (flags & FLAG_IME_VISIBLE) != 0 && !isInKidsMode, AnimatedFloat.VALUE,
+                    transForIme, defaultButtonTransY));
 
-        // Start at 1 because relevant flags are unset at init.
-        mOnBackgroundNavButtonColorOverrideMultiplier.value = 1;
-        mPropertyHolders.add(new StatePropertyHolder(
-                mOnBackgroundNavButtonColorOverrideMultiplier,
-                flags -> (flags & FLAGS_ON_BACKGROUND_COLOR_OVERRIDE_DISABLED) == 0));
+            mPropertyHolders.add(new StatePropertyHolder(
+                    mOnBackgroundNavButtonColorOverrideMultiplier,
+                    flags -> (flags & FLAGS_ON_BACKGROUND_COLOR_OVERRIDE_DISABLED) == 0));
 
-        mPropertyHolders.add(new StatePropertyHolder(
-                mSlideInViewVisibleNavButtonColorOverride,
-                flags -> (flags & FLAG_SLIDE_IN_VIEW_VISIBLE) != 0));
+            mPropertyHolders.add(new StatePropertyHolder(
+                    mSlideInViewVisibleNavButtonColorOverride,
+                    flags -> (flags & FLAG_SLIDE_IN_VIEW_VISIBLE) != 0));
+        }
 
         if (alwaysShowButtons) {
             initButtons(mNavButtonContainer, mEndContextualContainer,
                     mControllers.navButtonController);
             updateButtonLayoutSpacing();
-            updateStateForFlag(FLAG_SMALL_SCREEN, mContext.isPhoneButtonNavMode());
+            updateStateForFlag(FLAG_SMALL_SCREEN, mContext.isPhoneMode());
 
-            mPropertyHolders.add(new StatePropertyHolder(
-                    mControllers.taskbarDragLayerController.getNavbarBackgroundAlpha(),
-                    flags -> (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0));
+            if (!mContext.isPhoneMode()) {
+                mPropertyHolders.add(new StatePropertyHolder(
+                        mControllers.taskbarDragLayerController.getNavbarBackgroundAlpha(),
+                        flags -> (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0));
+            }
         } else if (!mIsImeRenderingNavButtons) {
             View imeDownButton = addButton(R.drawable.ic_sysbar_back, BUTTON_BACK,
                     mStartContextualContainer, mControllers.navButtonController, R.id.back);
@@ -711,7 +714,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private void applyState() {
         int count = mPropertyHolders.size();
         for (int i = 0; i < count; i++) {
-            mPropertyHolders.get(i).setState(mState);
+            mPropertyHolders.get(i).setState(mState, mContext.isGestureNav());
         }
     }
 
@@ -1177,83 +1180,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         }
     }
 
-    private class RotationButtonImpl implements RotationButton {
-
-        private final ImageView mButton;
-        private AnimatedVectorDrawable mImageDrawable;
-
-        RotationButtonImpl(ImageView button) {
-            mButton = button;
-        }
-
-        @Override
-        public void setRotationButtonController(RotationButtonController rotationButtonController) {
-            // TODO(b/187754252) UI polish, different icons based on light/dark context, etc
-            mImageDrawable = (AnimatedVectorDrawable) mButton.getContext()
-                    .getDrawable(rotationButtonController.getIconResId());
-            mButton.setImageDrawable(mImageDrawable);
-            mButton.setContentDescription(mButton.getResources()
-                    .getString(R.string.accessibility_rotate_button));
-            mImageDrawable.setCallback(mButton);
-        }
-
-        @Override
-        public View getCurrentView() {
-            return mButton;
-        }
-
-        @Override
-        public boolean show() {
-            mButton.setVisibility(View.VISIBLE);
-            mState |= FLAG_ROTATION_BUTTON_VISIBLE;
-            applyState();
-            return true;
-        }
-
-        @Override
-        public boolean hide() {
-            mButton.setVisibility(View.GONE);
-            mState &= ~FLAG_ROTATION_BUTTON_VISIBLE;
-            applyState();
-            return true;
-        }
-
-        @Override
-        public boolean isVisible() {
-            return mButton.getVisibility() == View.VISIBLE;
-        }
-
-        @Override
-        public void updateIcon(int lightIconColor, int darkIconColor) {
-            // TODO(b/187754252): UI Polish
-        }
-
-        @Override
-        public void setOnClickListener(OnClickListener onClickListener) {
-            mButton.setOnClickListener(onClickListener);
-        }
-
-        @Override
-        public void setOnHoverListener(OnHoverListener onHoverListener) {
-            mButton.setOnHoverListener(onHoverListener);
-        }
-
-        @Override
-        public AnimatedVectorDrawable getImageDrawable() {
-            return mImageDrawable;
-        }
-
-        @Override
-        public void setDarkIntensity(float darkIntensity) {
-            // TODO(b/187754252) UI polish
-        }
-
-        @Override
-        public boolean acceptRotationProposal() {
-            return mButton.isAttachedToWindow();
-        }
-    }
-
     private static class StatePropertyHolder {
 
         private final float mEnabledValue, mDisabledValue;
@@ -1284,13 +1210,16 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             mAnimator = ObjectAnimator.ofFloat(target, property, enabledValue, disabledValue);
         }
 
-        public void setState(int flags) {
+        public void setState(int flags, boolean skipAnimation) {
             boolean isEnabled = mEnableCondition.test(flags);
             if (mIsEnabled != isEnabled) {
                 mIsEnabled = isEnabled;
                 mAnimator.cancel();
                 mAnimator.setFloatValues(mIsEnabled ? mEnabledValue : mDisabledValue);
                 mAnimator.start();
+                if (skipAnimation) {
+                    mAnimator.end();
+                }
             }
         }
 

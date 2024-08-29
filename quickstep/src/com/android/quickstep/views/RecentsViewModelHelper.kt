@@ -68,8 +68,4 @@ class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
             ViewUtils.postFrameDrawn(taskView, onFinishRunnable)
         }
     }
-
-    fun onTaskThumbnailChanged(taskId: Int, thumbnailData: ThumbnailData) {
-        recentsViewModel.addOrUpdateThumbnailOverride(mapOf(taskId to thumbnailData))
-    }
 }

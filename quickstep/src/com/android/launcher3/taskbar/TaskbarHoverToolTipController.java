@@ -50,6 +50,7 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
     private final View mHoverView;
     private final ArrowTipView mHoverToolTipView;
     private final String mToolTipText;
+    private final int mYOffset;
 
     public TaskbarHoverToolTipController(TaskbarActivityContext activity, TaskbarView taskbarView,
             View hoverView) {
@@ -79,6 +80,8 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
         mHoverToolTipView.findViewById(R.id.text).setPadding(horizontalPadding, verticalPadding,
                 horizontalPadding, verticalPadding);
         mHoverToolTipView.setAlpha(0);
+        mYOffset = arrowContextWrapper.getResources().getDimensionPixelSize(
+                R.dimen.taskbar_tooltip_y_offset);
 
         AnimatorSet hoverOpenAnimator = new AnimatorSet();
         ObjectAnimator alphaOpenAnimator = ObjectAnimator.ofFloat(mHoverToolTipView, ALPHA, 0f, 1f);
@@ -89,7 +92,7 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
         mHoverToolTipView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                     mHoverToolTipView.setPivotY(bottom);
-                    mHoverToolTipView.setY(mTaskbarView.getTop() - (bottom - top));
+                    mHoverToolTipView.setY(mTaskbarView.getTop() - mYOffset - (bottom - top));
                 });
     }
 
@@ -121,6 +124,6 @@ public class TaskbarHoverToolTipController implements View.OnHoverListener {
         }
         Rect iconViewBounds = Utilities.getViewBounds(mHoverView);
         mHoverToolTipView.showAtLocation(mToolTipText, iconViewBounds.centerX(),
-                mTaskbarView.getTop(), /* shouldAutoClose= */ false);
+                mTaskbarView.getTop() - mYOffset, /* shouldAutoClose= */ false);
     }
 }

@@ -70,44 +70,6 @@ class RecentsViewModelTest {
         assertThat(thumbnailDataFlow2.first()).isNull()
     }
 
-    @Test
-    fun thumbnailOverrideWaitAndReset() = runTest {
-        val thumbnailData1 = createThumbnailData().apply { snapshotId = 1 }
-        val thumbnailData2 = createThumbnailData().apply { snapshotId = 2 }
-        tasksRepository.seedTasks(tasks)
-        tasksRepository.seedThumbnailData(mapOf(1 to thumbnailData1, 2 to thumbnailData2))
-
-        val thumbnailDataFlow1 = tasksRepository.getThumbnailById(1)
-        val thumbnailDataFlow2 = tasksRepository.getThumbnailById(2)
-
-        systemUnderTest.refreshAllTaskData()
-        systemUnderTest.updateVisibleTasks(listOf(1, 2))
-
-        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
-        assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
-
-        systemUnderTest.setRunningTaskShowScreenshot(true)
-        val thumbnailOverride = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
-        systemUnderTest.addOrUpdateThumbnailOverride(thumbnailOverride)
-
-        systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
-        val expectedUpdate = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
-        systemUnderTest.waitForThumbnailsToUpdate(expectedUpdate)
-
-        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
-        assertThat(thumbnailDataFlow2.first()?.snapshotId).isEqualTo(3)
-
-        systemUnderTest.onReset()
-
-        assertThat(thumbnailDataFlow1.first()).isNull()
-        assertThat(thumbnailDataFlow2.first()).isNull()
-
-        systemUnderTest.updateVisibleTasks(listOf(1, 2))
-
-        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
-        assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
-    }
-
     private fun createTaskWithId(taskId: Int) =
         Task(Task.TaskKey(taskId, 0, Intent(), ComponentName("", ""), 0, 2000)).apply {
             colorBackground = Color.argb(taskId, taskId, taskId, taskId)

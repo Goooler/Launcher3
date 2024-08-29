@@ -248,7 +248,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        if (fromInit) {
+        if (fromInit || mControllers == null) {
             duration = 0;
         }
         return mTaskbarLauncherStateController.applyState(duration, startAnimation);

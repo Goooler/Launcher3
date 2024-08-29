@@ -734,11 +734,18 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void maybeUpdateRecentsAttachedState() {
-        maybeUpdateRecentsAttachedState(true /* animate */);
+        maybeUpdateRecentsAttachedState(/* animate= */ true);
     }
 
     protected void maybeUpdateRecentsAttachedState(boolean animate) {
-        maybeUpdateRecentsAttachedState(animate, false /* moveRunningTask */);
+        maybeUpdateRecentsAttachedState(animate, /* moveRunningTask= */ false);
+    }
+
+    protected void maybeUpdateRecentsAttachedState(boolean animate, boolean moveRunningTask) {
+        maybeUpdateRecentsAttachedState(
+                animate,
+                moveRunningTask,
+                mRecentsView != null && mRecentsView.shouldUpdateRunningTaskAlpha());
     }
 
     /**
@@ -749,8 +756,10 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
      * Note this method has no effect unless the navigation mode is NO_BUTTON.
      * @param animate whether to animate when attaching RecentsView
      * @param moveRunningTask whether to move running task to front when attaching
+     * @param updateRunningTaskAlpha Whether to update the running task's attached alpha
      */
-    private void maybeUpdateRecentsAttachedState(boolean animate, boolean moveRunningTask) {
+    private void maybeUpdateRecentsAttachedState(
+            boolean animate, boolean moveRunningTask, boolean updateRunningTaskAlpha) {
         if ((!mDeviceState.isFullyGesturalNavMode() && !mGestureState.isTrackpadGesture())
                 || mRecentsView == null) {
             return;
@@ -781,7 +790,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // TaskView jumping to new position as we move the tasks.
             mRecentsView.moveRunningTaskToFront();
         }
-        mAnimationFactory.setRecentsAttachedToAppWindow(recentsAttachedToAppWindow, animate);
+        mAnimationFactory.setRecentsAttachedToAppWindow(
+                recentsAttachedToAppWindow, animate, updateRunningTaskAlpha);
 
         // Reapply window transform throughout the attach animation, as the animation affects how
         // much the window is bound by overscroll (vs moving freely).
