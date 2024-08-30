@@ -257,7 +257,7 @@ class DigitalWellBeingToast(
         task: Task,
         appUsageLimitTimeMs: Long,
         appRemainingTimeMs: Long
-    ): String =
+    ): String? =
         if (appUsageLimitTimeMs >= 0 && appRemainingTimeMs >= 0)
             container
                 .asContext()

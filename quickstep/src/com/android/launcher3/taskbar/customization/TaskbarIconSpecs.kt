@@ -19,10 +19,11 @@ package com.android.launcher3.taskbar.customization
 /** Taskbar Icon Specs */
 object TaskbarIconSpecs {
 
-    val iconSize40dp = TaskbarIconSize(40)
-    val iconSize44dp = TaskbarIconSize(44)
-    val iconSize48dp = TaskbarIconSize(48)
-    val iconSize52dp = TaskbarIconSize(52)
+    // Mapping of visual icon size to icon specs value http://b/235886078
+    val iconSize40dp = TaskbarIconSize(44)
+    val iconSize44dp = TaskbarIconSize(48)
+    val iconSize48dp = TaskbarIconSize(52)
+    val iconSize52dp = TaskbarIconSize(57)
 
     val transientTaskbarIconSizes = arrayOf(iconSize44dp, iconSize48dp, iconSize52dp)
 

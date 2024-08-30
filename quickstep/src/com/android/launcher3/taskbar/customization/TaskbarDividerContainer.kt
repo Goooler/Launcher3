@@ -18,13 +18,15 @@ package com.android.launcher3.taskbar.customization
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color.TRANSPARENT
 import android.util.AttributeSet
 import android.view.LayoutInflater
-import android.widget.LinearLayout
 import androidx.core.view.setPadding
 import com.android.launcher3.R
 import com.android.launcher3.Utilities.dpToPx
 import com.android.launcher3.taskbar.TaskbarActivityContext
+import com.android.launcher3.taskbar.TaskbarViewCallbacks
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.IconButtonView
 
@@ -35,31 +37,30 @@ constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
-) : LinearLayout(context, attrs), TaskbarContainer {
-
-    private val taskbarDivider: IconButtonView =
-        LayoutInflater.from(context).inflate(R.layout.taskbar_divider, this, false)
-            as IconButtonView
+) : IconButtonView(context, attrs), TaskbarContainer {
     private val activityContext: TaskbarActivityContext = ActivityContext.lookupContext(context)
 
     override val spaceNeeded: Int
         get() {
-            return dpToPx(activityContext.taskbarSpecsEvaluator!!.taskbarIconSize.size.toFloat())
+            return dpToPx(activityContext.taskbarSpecsEvaluator.taskbarIconSize.size.toFloat())
         }
 
     init {
+        LayoutInflater.from(context).inflate(R.layout.taskbar_divider, null, false)
         setUpIcon()
     }
 
     @SuppressLint("UseCompatLoadingForDrawables")
     fun setUpIcon() {
+        backgroundTintList = ColorStateList.valueOf(TRANSPARENT)
         val drawable = resources.getDrawable(R.drawable.taskbar_divider_button)
-        val padding = activityContext.taskbarSpecsEvaluator!!.taskbarIconPadding
+        setIconDrawable(drawable)
+        setPadding(dpToPx(activityContext.taskbarSpecsEvaluator.taskbarIconPadding.toFloat()))
+    }
 
-        taskbarDivider.setIconDrawable(drawable)
-        taskbarDivider.setPadding(padding)
-
-        // TODO(b/356465292):: add click listeners in future cl
-        addView(taskbarDivider)
+    @SuppressLint("ClickableViewAccessibility")
+    fun setUpCallbacks(callbacks: TaskbarViewCallbacks) {
+        setOnLongClickListener(callbacks.taskbarDividerLongClickListener)
+        setOnTouchListener(callbacks.taskbarDividerRightClickListener)
     }
 }

@@ -51,7 +51,7 @@ public class TaskbarViewCallbacks {
     }
 
     /** Trigger All Apps button click action. */
-    protected void triggerAllAppsButtonClick(View v) {
+    public void triggerAllAppsButtonClick(View v) {
         InteractionJankMonitorWrapper.begin(v, Cuj.CUJ_LAUNCHER_OPEN_ALL_APPS,
                 /* tag= */ "TASKBAR_BUTTON");
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP);
@@ -59,7 +59,7 @@ public class TaskbarViewCallbacks {
     }
 
     /** Trigger All Apps button long click action. */
-    protected void triggerAllAppsButtonLongClick() {
+    public void triggerAllAppsButtonLongClick() {
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS);
     }
 
@@ -72,6 +72,11 @@ public class TaskbarViewCallbacks {
             mControllers.taskbarPinningController.showPinningView(v);
             return true;
         };
+    }
+
+    /** Check to see if we support long press on taskbar divider */
+    public boolean supportsDividerLongPress() {
+        return !mActivity.isThreeButtonNav();
     }
 
     public View.OnTouchListener getTaskbarDividerRightClickListener() {

@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar.allapps;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
-import static com.android.launcher3.Flags.enablePredictiveBackGesture;
 import static com.android.launcher3.touch.AllAppsSwipeController.ALL_APPS_FADE_MANUAL;
 import static com.android.launcher3.touch.AllAppsSwipeController.SCRIM_FADE_MANUAL;
 
@@ -193,14 +192,12 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         mActivityContext.addOnDeviceProfileChangeListener(this);
-        if (enablePredictiveBackGesture()) {
-            mAppsView.getAppsRecyclerViewContainer().setOutlineProvider(mViewOutlineProvider);
-            mAppsView.getAppsRecyclerViewContainer().setClipToOutline(true);
-            OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
-            if (dispatcher != null) {
-                dispatcher.registerOnBackInvokedCallback(
-                        OnBackInvokedDispatcher.PRIORITY_DEFAULT, this);
-            }
+        mAppsView.getAppsRecyclerViewContainer().setOutlineProvider(mViewOutlineProvider);
+        mAppsView.getAppsRecyclerViewContainer().setClipToOutline(true);
+        OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
+        if (dispatcher != null) {
+            dispatcher.registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, this);
         }
     }
 
@@ -208,13 +205,11 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mActivityContext.removeOnDeviceProfileChangeListener(this);
-        if (enablePredictiveBackGesture()) {
-            mAppsView.getAppsRecyclerViewContainer().setOutlineProvider(null);
-            mAppsView.getAppsRecyclerViewContainer().setClipToOutline(false);
-            OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
-            if (dispatcher != null) {
-                dispatcher.unregisterOnBackInvokedCallback(this);
-            }
+        mAppsView.getAppsRecyclerViewContainer().setOutlineProvider(null);
+        mAppsView.getAppsRecyclerViewContainer().setClipToOutline(false);
+        OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
+        if (dispatcher != null) {
+            dispatcher.unregisterOnBackInvokedCallback(this);
         }
     }
 

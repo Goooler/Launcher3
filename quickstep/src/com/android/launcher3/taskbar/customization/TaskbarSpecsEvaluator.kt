@@ -25,14 +25,14 @@ class TaskbarSpecsEvaluator(
     numRows: Int = taskbarActivityContext.deviceProfile.inv.numRows,
     numColumns: Int = taskbarActivityContext.deviceProfile.inv.numColumns,
 ) {
-    var taskbarIconSize: TaskbarIconSize = getIconSizeByGrid(numRows, numColumns)
+    var taskbarIconSize: TaskbarIconSize = getIconSizeByGrid(numColumns, numRows)
 
     // TODO(b/341146605) : initialize it to taskbar container in later cl.
     private var taskbarContainer: List<TaskbarContainer> = emptyList()
 
     val taskbarIconPadding: Int =
-        if (TaskbarIconSpecs.minimumTaskbarIconTouchSize.size > taskbarIconSize.size) {
-            (TaskbarIconSpecs.minimumTaskbarIconTouchSize.size - taskbarIconSize.size) / 2
+        if (TaskbarIconSpecs.iconSize52dp.size > taskbarIconSize.size) {
+            (TaskbarIconSpecs.iconSize52dp.size - taskbarIconSize.size) / 2
         } else {
             0
         }
@@ -44,10 +44,10 @@ class TaskbarSpecsEvaluator(
             TaskbarIconSpecs.defaultPersistentIconMargin
         }
 
-    fun getIconSizeByGrid(row: Int, column: Int): TaskbarIconSize {
+    fun getIconSizeByGrid(columns: Int, rows: Int): TaskbarIconSize {
         return if (taskbarFeatureEvaluator.isTransient) {
             TaskbarIconSpecs.transientTaskbarIconSizeByGridSize.getOrDefault(
-                TransientTaskbarIconSizeKey(row, column, taskbarFeatureEvaluator.isLandscape),
+                TransientTaskbarIconSizeKey(columns, rows, taskbarFeatureEvaluator.isLandscape),
                 TaskbarIconSpecs.defaultTransientIconSize,
             )
         } else {
@@ -102,6 +102,6 @@ class TaskbarSpecsEvaluator(
 
 data class TaskbarIconSize(val size: Int)
 
-data class TransientTaskbarIconSizeKey(val row: Int, val column: Int, val isLandscape: Boolean)
+data class TransientTaskbarIconSizeKey(val columns: Int, val rows: Int, val isLandscape: Boolean)
 
 data class TaskbarIconMarginSize(val size: Int)
