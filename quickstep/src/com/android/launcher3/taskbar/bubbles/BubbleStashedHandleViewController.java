@@ -37,9 +37,9 @@ import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
-import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.animation.PhysicsAnimator;
+import com.android.wm.shell.shared.handles.RegionSamplingHelper;
 
 /**
  * Handles properties/data collection, then passes the results to our stashed handle View to render.

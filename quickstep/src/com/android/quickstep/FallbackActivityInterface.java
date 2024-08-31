@@ -133,12 +133,6 @@ public final class FallbackActivityInterface extends
     }
 
     @Override
-    public boolean allowMinimizeSplitScreen() {
-        // TODO: Remove this once b/77875376 is fixed
-        return false;
-    }
-
-    @Override
     public boolean allowAllAppsFromOverview() {
         return false;
     }

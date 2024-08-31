@@ -60,9 +60,8 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 
 public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAnimationListener {
-    public static final boolean ENABLE_SHELL_TRANSITIONS = true;
-    public static final boolean SHELL_TRANSITIONS_ROTATION = ENABLE_SHELL_TRANSITIONS
-            && SystemProperties.getBoolean("persist.wm.debug.shell_transit_rotate", false);
+    public static final boolean SHELL_TRANSITIONS_ROTATION =
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit_rotate", false);
 
     private final Context mCtx;
     private RecentsAnimationController mController;
@@ -160,8 +159,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         final BaseContainerInterface containerInterface = gestureState.getContainerInterface();
         mLastGestureState = gestureState;
-        RecentsAnimationCallbacks newCallbacks = new RecentsAnimationCallbacks(
-                getSystemUiProxy(), containerInterface.allowMinimizeSplitScreen());
+        RecentsAnimationCallbacks newCallbacks = new RecentsAnimationCallbacks(getSystemUiProxy());
         mCallbacks = newCallbacks;
         mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
             @Override
@@ -191,7 +189,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                 }
                 mLastGestureState.updateLastAppearedTaskTargets(mLastAppearedTaskTargets);
 
-                if (ENABLE_SHELL_TRANSITIONS && mTargets.hasRecents
+                if (mTargets.hasRecents
                         // The filtered (MODE_CLOSING) targets only contain 1 home activity.
                         && mTargets.apps.length == 1
                         && mTargets.apps[0].windowConfiguration.getActivityType()

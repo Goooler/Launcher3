@@ -41,6 +41,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.quickstep.TouchInteractionService.TISBinder;
 import com.android.quickstep.interaction.TutorialController.TutorialType;
+import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.TISBindHelper;
 
 import java.util.ArrayList;
@@ -54,8 +55,6 @@ public class GestureSandboxActivity extends FragmentActivity {
     static final String KEY_TUTORIAL_TYPE = "tutorial_type";
     static final String KEY_GESTURE_COMPLETE = "gesture_complete";
     static final String KEY_USE_TUTORIAL_MENU = "use_tutorial_menu";
-    public static final double SQUARE_ASPECT_RATIO_BOTTOM_BOUND = 0.95;
-    public static final double SQUARE_ASPECT_RATIO_UPPER_BOUND = 1.05;
 
     @Nullable private TutorialType[] mTutorialSteps;
     private GestureSandboxFragment mCurrentFragment;
@@ -170,10 +169,7 @@ public class GestureSandboxActivity extends FragmentActivity {
                 getApplicationContext()).getDeviceProfile(this);
         if (deviceProfile.isTablet) {
             // The tutorial will work in either orientation if the height and width are similar
-            boolean isAspectRatioSquare =
-                    deviceProfile.aspectRatio > SQUARE_ASPECT_RATIO_BOTTOM_BOUND
-                            && deviceProfile.aspectRatio < SQUARE_ASPECT_RATIO_UPPER_BOUND;
-            boolean showRotationPrompt = !isAspectRatioSquare
+            boolean showRotationPrompt = !LayoutUtils.isAspectRatioSquare(deviceProfile.aspectRatio)
                     && getResources().getConfiguration().orientation
                     == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 

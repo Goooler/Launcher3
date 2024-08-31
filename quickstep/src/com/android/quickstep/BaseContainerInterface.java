@@ -68,8 +68,6 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
 
     public abstract void onAssistantVisibilityChanged(float assistantVisibility);
 
-    public abstract boolean allowMinimizeSplitScreen();
-
     public abstract boolean isResumed();
 
     public abstract boolean isStarted();

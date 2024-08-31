@@ -54,17 +54,14 @@ public class RecentsAnimationCallbacks implements
 
     private final Set<RecentsAnimationListener> mListeners = new ArraySet<>();
     private final SystemUiProxy mSystemUiProxy;
-    private final boolean mAllowMinimizeSplitScreen;
 
     // TODO(141886704): Remove these references when they are no longer needed
     private RecentsAnimationController mController;
 
     private boolean mCancelled;
 
-    public RecentsAnimationCallbacks(SystemUiProxy systemUiProxy,
-            boolean allowMinimizeSplitScreen) {
+    public RecentsAnimationCallbacks(SystemUiProxy systemUiProxy) {
         mSystemUiProxy = systemUiProxy;
-        mAllowMinimizeSplitScreen = allowMinimizeSplitScreen;
     }
 
     @UiThread
@@ -122,7 +119,7 @@ public class RecentsAnimationCallbacks implements
         }
 
         mController = new RecentsAnimationController(animationController,
-                mAllowMinimizeSplitScreen, this::onAnimationFinished);
+                this::onAnimationFinished);
         if (mCancelled) {
             Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(),
                     mController::finishAnimationToApp);
@@ -219,7 +216,6 @@ public class RecentsAnimationCallbacks implements
     public void dump(String prefix, PrintWriter pw) {
         pw.println(prefix + "RecentsAnimationCallbacks:");
 
-        pw.println(prefix + "\tmAllowMinimizeSplitScreen=" + mAllowMinimizeSplitScreen);
         pw.println(prefix + "\tmCancelled=" + mCancelled);
     }
 

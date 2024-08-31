@@ -17,7 +17,6 @@ package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -107,8 +106,7 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     public boolean isTaskbarAlignedWithHotseat(Launcher launcher) {
-        if (ENABLE_SHELL_TRANSITIONS) return false;
-        return super.isTaskbarAlignedWithHotseat(launcher);
+        return false;
     }
 
     @Override

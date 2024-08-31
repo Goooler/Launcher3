@@ -886,8 +886,7 @@ public class SplitSelectStateController {
                 Log.w(TAG, "Package not found: " + packageName, e);
             }
             RecentsAnimationCallbacks callbacks = new RecentsAnimationCallbacks(
-                    SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext()),
-                    false /* allowMinimizeSplitScreen */);
+                    SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext()));
 
             DesktopSplitRecentsAnimationListener listener =
                     new DesktopSplitRecentsAnimationListener(splitPosition, taskBounds);

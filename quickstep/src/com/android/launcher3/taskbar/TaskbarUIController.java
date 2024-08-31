@@ -20,7 +20,6 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
-import static com.android.quickstep.OverviewCommandHelper.TYPE_HIDE;
 
 import android.content.Intent;
 import android.graphics.drawable.BitmapDrawable;
@@ -40,6 +39,7 @@ import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.quickstep.OverviewCommandHelper;
+import com.android.quickstep.OverviewCommandHelper.CommandType;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
@@ -394,7 +394,7 @@ public class TaskbarUIController {
         if (overviewCommandHelper == null) {
             return;
         }
-        overviewCommandHelper.addCommand(TYPE_HIDE);
+        overviewCommandHelper.addCommand(CommandType.HIDE);
     }
 
     /**

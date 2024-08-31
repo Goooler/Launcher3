@@ -77,6 +77,10 @@
         <item name="materialColorError">@color/system_error_light</item>
     </style>
 
+    <style name="DynamicColorsBaseLauncherTheme.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
 
     <style name="LauncherTheme" parent="@style/DynamicColorsBaseLauncherTheme">
         <item name="android:textColorSecondary">#DE000000</item>

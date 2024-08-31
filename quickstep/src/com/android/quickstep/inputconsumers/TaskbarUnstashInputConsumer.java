@@ -46,6 +46,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.InputConsumer;
 import com.android.quickstep.OverviewCommandHelper;
+import com.android.quickstep.OverviewCommandHelper.CommandType;
 import com.android.systemui.shared.system.InputMonitorCompat;
 
 /**
@@ -200,7 +201,7 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
                         break;
                     case MotionEvent.ACTION_BUTTON_RELEASE:
                         if (isStashedTaskbarHovered) {
-                            mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_HOME);
+                            mOverviewCommandHelper.addCommand(CommandType.HOME);
                         }
                         break;
                 }

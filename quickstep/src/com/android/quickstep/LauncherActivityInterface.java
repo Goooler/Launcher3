@@ -271,11 +271,6 @@ public final class LauncherActivityInterface extends
     }
 
     @Override
-    public boolean allowMinimizeSplitScreen() {
-        return true;
-    }
-
-    @Override
     public boolean allowAllAppsFromOverview() {
         return FeatureFlags.ENABLE_ALL_APPS_FROM_OVERVIEW.get()
                 // If floating search bar would not show in overview, don't allow all apps gesture.

@@ -205,7 +205,7 @@
         <item name="android:textColor">?attr/tutorialSubtitle</item>
     </style>
 
-    <style name="AllSetTheme" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+    <style name="AllSetTheme" parent="@style/DynamicColorsBaseLauncherTheme.NoActionBar">
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:enforceNavigationBarContrast">false</item>
@@ -272,8 +272,20 @@
         <item name="lineHeight">20sp</item>
     </style>
 
+    <style name="KeyboardQuickSwitchText.LargeText" parent="KeyboardQuickSwitchText">
+        <item name="android:textSize">32sp</item>
+    </style>
+
     <style name="KeyboardQuickSwitchText.OnBackground" parent="KeyboardQuickSwitchText">
         <item name="android:textColor">?attr/materialColorOnSurface</item>
+    </style>
+
+    <style name="KeyboardQuickSwitchText.OnTaskView" parent="KeyboardQuickSwitchText">
+        <item name="android:requiresFadingEdge">horizontal</item>
+        <item name="android:fadeScrollbars">false</item>
+        <item name="android:fadingEdgeLength">20dp</item>
+        <item name="android:ellipsize">none</item>
+        <item name="android:singleLine">true</item>
     </style>
 
     <style name="GestureTutorialActivity" parent="@style/AppTheme">

@@ -1473,8 +1473,9 @@ public class BubbleBarView extends FrameLayout {
         pw.println("BubbleBarView state:");
         pw.println("  visibility: " + getVisibility());
         pw.println("  alpha: " + getAlpha());
-        pw.println("  translation Y: " + getTranslationY());
-        pw.println("  bubbles in bar (childCount = " + getChildCount() + ")");
+        pw.println("  translationY: " + getTranslationY());
+        pw.println("  childCount: " + getChildCount());
+        pw.println("  hasOverflow:  " + hasOverflow());
         for (BubbleView bubbleView: getBubbles()) {
             BubbleBarItem bubble = bubbleView.getBubble();
             String key = bubble == null ? "null" : bubble.getKey();

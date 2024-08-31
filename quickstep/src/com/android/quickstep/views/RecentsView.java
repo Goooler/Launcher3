@@ -3058,14 +3058,15 @@ public abstract class RecentsView<
     }
 
     private void setRunningTaskViewShowScreenshot(boolean showScreenshot) {
+        setRunningTaskViewShowScreenshot(showScreenshot, /*updatedThumbnails=*/null);
+    }
+
+    private void setRunningTaskViewShowScreenshot(boolean showScreenshot,
+            @Nullable Map<Integer, ThumbnailData> updatedThumbnails) {
         mRunningTaskShowScreenshot = showScreenshot;
         TaskView runningTaskView = getRunningTaskView();
         if (runningTaskView != null) {
-            runningTaskView.setShouldShowScreenshot(mRunningTaskShowScreenshot);
-            if (!enableRefactorTaskThumbnail()) {
-                runningTaskView.getTaskContainers().forEach(
-                        taskContainer -> taskContainer.getThumbnailViewDeprecated().refresh());
-            }
+            runningTaskView.setShouldShowScreenshot(mRunningTaskShowScreenshot, updatedThumbnails);
         }
         if (enableRefactorTaskThumbnail()) {
             mRecentsViewModel.setRunningTaskShowScreenshot(showScreenshot);
@@ -6154,20 +6155,12 @@ public abstract class RecentsView<
             return;
         }
 
+        Map<Integer, ThumbnailData> updatedThumbnails = mRecentsViewUtils.screenshotTasks(taskView,
+                mRecentsAnimationController);
         if (enableRefactorTaskThumbnail()) {
-            mHelper.switchToScreenshot(taskView, mRecentsAnimationController, onFinishRunnable);
+            mHelper.switchToScreenshot(taskView, updatedThumbnails, onFinishRunnable);
         } else {
-            setRunningTaskViewShowScreenshot(true);
-            for (TaskContainer container : taskView.getTaskContainers()) {
-                ThumbnailData thumbnailData =
-                        mRecentsAnimationController.screenshotTask(container.getTask().key.id);
-                TaskThumbnailViewDeprecated thumbnailView = container.getThumbnailViewDeprecated();
-                if (thumbnailData != null) {
-                    thumbnailView.setThumbnail(container.getTask(), thumbnailData);
-                } else {
-                    thumbnailView.refresh();
-                }
-            }
+            setRunningTaskViewShowScreenshot(true, updatedThumbnails);
             ViewUtils.postFrameDrawn(taskView, onFinishRunnable);
         }
     }
@@ -6186,8 +6179,7 @@ public abstract class RecentsView<
             if (enableRefactorTaskThumbnail()) {
                 mHelper.switchToScreenshot(taskView, thumbnailDatas, onFinishRunnable);
             } else {
-                taskView.setShouldShowScreenshot(true);
-                taskView.refreshThumbnails(thumbnailDatas);
+                taskView.setShouldShowScreenshot(true, thumbnailDatas);
                 ViewUtils.postFrameDrawn(taskView, onFinishRunnable);
             }
         } else {

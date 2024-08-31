@@ -109,6 +109,7 @@ import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
+import com.android.quickstep.OverviewCommandHelper.CommandType;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
 import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
@@ -246,7 +247,7 @@ public class TouchInteractionService extends Service {
                     return;
                 }
                 TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
-                tis.mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_TOGGLE);
+                tis.mOverviewCommandHelper.addCommand(CommandType.TOGGLE);
             });
         }
 
@@ -256,10 +257,9 @@ public class TouchInteractionService extends Service {
             executeForTouchInteractionService(tis -> {
                 if (triggeredFromAltTab) {
                     TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
-                    tis.mOverviewCommandHelper.addCommand(
-                            OverviewCommandHelper.TYPE_KEYBOARD_INPUT);
+                    tis.mOverviewCommandHelper.addCommand(CommandType.KEYBOARD_INPUT);
                 } else {
-                    tis.mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_SHOW);
+                    tis.mOverviewCommandHelper.addCommand(CommandType.SHOW);
                 }
             });
         }
@@ -270,7 +270,7 @@ public class TouchInteractionService extends Service {
             executeForTouchInteractionService(tis -> {
                 if (triggeredFromAltTab && !triggeredFromHomeKey) {
                     // onOverviewShownFromAltTab hides the overview and ends at the target app
-                    tis.mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_HIDE);
+                    tis.mOverviewCommandHelper.addCommand(CommandType.HIDE);
                 }
             });
         }
@@ -595,12 +595,12 @@ public class TouchInteractionService extends Service {
     private final TaskbarNavButtonCallbacks mNavCallbacks = new TaskbarNavButtonCallbacks() {
         @Override
         public void onNavigateHome() {
-            mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_HOME);
+            mOverviewCommandHelper.addCommand(CommandType.HOME);
         }
 
         @Override
         public void onToggleOverview() {
-            mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_TOGGLE);
+            mOverviewCommandHelper.addCommand(CommandType.TOGGLE);
         }
     };
 

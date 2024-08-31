@@ -59,8 +59,6 @@ public class TaskAnimationManagerTest {
 
     @Test
     public void startRecentsActivity_allowBackgroundLaunch() {
-        assumeTrue(TaskAnimationManager.ENABLE_SHELL_TRANSITIONS);
-
         final LauncherActivityInterface activityInterface = mock(LauncherActivityInterface.class);
         final GestureState gestureState = mock(GestureState.class);
         final RecentsAnimationCallbacks.RecentsAnimationListener listener =

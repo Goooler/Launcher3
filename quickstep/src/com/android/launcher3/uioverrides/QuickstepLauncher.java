@@ -498,10 +498,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
         if (started) {
             DeviceProfile profile = getDeviceProfile();
-            boolean willUserBeActive =
-                    (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
-                    && (willUserBeActive || isUserActive())
+                    && isUserActive()
                     && !profile.isVerticalBarLayout()
                     && !mIsOverlayVisible;
             SystemUiProxy.INSTANCE.get(this)
@@ -1269,10 +1267,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                 return ObjectWrapper.wrap(NO_MATCHING_ID);
         }
         return ObjectWrapper.wrap(new Integer(info.id));
-    }
-
-    public void setHintUserWillBeActive() {
-        addActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
     }
 
     @Override

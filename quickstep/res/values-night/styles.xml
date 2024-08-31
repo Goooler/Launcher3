@@ -14,16 +14,7 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<resources
-    xmlns:androidprv="http://schemas.android.com/apk/prv/res/android">
-
-    <style name="AllSetTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-    </style>
+<resources>
 
     <style name="TextAppearance.GestureTutorial.MainTitle.Home"
         parent="TextAppearance.GestureTutorial.MainTitle">

@@ -107,9 +107,6 @@ public class LauncherSwipeHandlerV2 extends
                 || !mContainer.getDesktopVisibilityController().areDesktopTasksVisible());
 
         mContainer.getRootView().setForceHideBackArrow(true);
-        if (!TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
-            mContainer.setHintUserWillBeActive();
-        }
 
         if (!canUseWorkspaceView || appCanEnterPip || mIsSwipeForSplit) {
             return new LauncherHomeAnimationFactory() {

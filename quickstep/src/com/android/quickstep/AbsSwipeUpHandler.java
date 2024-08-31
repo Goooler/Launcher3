@@ -949,7 +949,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // We will handle the sysui flags based on the centermost task view.
             mRecentsAnimationController.setUseLauncherSystemBarFlags(swipeUpThresholdPassed
                     ||  (quickswitchThresholdPassed && centermostTaskFlags != 0));
-            mRecentsAnimationController.setSplitScreenMinimized(mContext, swipeUpThresholdPassed);
             // Provide a hint to WM the direction that we will be settling in case the animation
             // needs to be canceled
             mRecentsAnimationController.setWillFinishToHome(swipeUpThresholdPassed);
@@ -1767,8 +1766,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
 
     private int calculateWindowRotation(RemoteAnimationTarget runningTaskTarget,
             RecentsOrientedState orientationState) {
-        if (runningTaskTarget.rotationChange != 0
-                && TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+        if (runningTaskTarget.rotationChange != 0) {
             return Math.abs(runningTaskTarget.rotationChange) == ROTATION_90
                     ? ROTATION_270 : ROTATION_90;
         } else {

@@ -379,12 +379,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     }
 
     @Override
-    public void setIconVisible(boolean visible) {
-        setForceHideRing(!visible);
-        super.setIconVisible(visible);
-    }
-
-    private void setForceHideRing(boolean forceHideRing) {
+    public void setForceHideRing(boolean forceHideRing) {
         if (mForceHideRing == forceHideRing) {
             return;
         }
@@ -417,7 +412,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
 
     private void drawEffect(Canvas canvas) {
         // Don't draw ring effect if item is about to be dragged or if the icon is not visible.
-        if (mDrawForDrag || !mIsIconVisible) {
+        if (mDrawForDrag || !mIsIconVisible || mForceHideRing) {
             return;
         }
         mIconRingPaint.setColor(RING_SHADOW_COLOR);

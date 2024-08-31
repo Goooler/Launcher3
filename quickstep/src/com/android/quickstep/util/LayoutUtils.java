@@ -28,6 +28,8 @@ import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 
 public class LayoutUtils {
 
+    private static final float SQUARE_ASPECT_RATIO_TOLERANCE = 0.05f;
+
     /**
      * The height for the swipe up motion
      */
@@ -60,5 +62,14 @@ public class LayoutUtils {
                 setViewEnabled(((ViewGroup) view).getChildAt(i), enabled);
             }
         }
+    }
+
+    /**
+     * Returns true iff the device's aspect ratio is within
+     * {@link LayoutUtils#SQUARE_ASPECT_RATIO_TOLERANCE} of 1:1
+     */
+    public static boolean isAspectRatioSquare(float aspectRatio) {
+        return Float.compare(aspectRatio, 1f - SQUARE_ASPECT_RATIO_TOLERANCE) >= 0
+                && Float.compare(aspectRatio, 1f + SQUARE_ASPECT_RATIO_TOLERANCE) <= 0;
     }
 }

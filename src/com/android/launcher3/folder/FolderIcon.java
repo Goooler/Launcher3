@@ -83,7 +83,7 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.IconLabelDotView;
+import com.android.launcher3.views.FloatingIconViewCompanion;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.util.ArrayList;
@@ -93,7 +93,7 @@ import java.util.function.Predicate;
 /**
  * An icon that can appear on in the workspace representing an {@link Folder}.
  */
-public class FolderIcon extends FrameLayout implements FolderListener, IconLabelDotView,
+public class FolderIcon extends FrameLayout implements FolderListener, FloatingIconViewCompanion,
         DraggableView, Reorderable {
 
     private final MultiTranslateDelegate mTranslateDelegate = new MultiTranslateDelegate(this);

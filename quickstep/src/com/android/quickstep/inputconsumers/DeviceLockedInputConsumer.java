@@ -24,7 +24,6 @@ import static com.android.launcher3.util.VelocityUtils.PX_PER_MS;
 import static com.android.quickstep.AbsSwipeUpHandler.MIN_PROGRESS_FOR_OVERVIEW;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.quickstep.util.ActiveGestureLog.INTENT_EXTRA_LOG_TRACE_ID;
 
 import android.animation.Animator;
@@ -212,15 +211,13 @@ public class DeviceLockedInputConsumer implements InputConsumer,
                         // This will come back and cancel the interaction.
                         startHomeIntentSafely(mContext, mGestureState.getHomeIntent(), null, TAG);
                         mHomeLaunched = true;
-                    } else if (ENABLE_SHELL_TRANSITIONS) {
-                        if (mTaskAnimationManager.getCurrentCallbacks() != null) {
-                            if (mRecentsAnimationController != null) {
-                                finishRecentsAnimationForShell(dismissTask);
-                            } else {
-                                // the transition of recents animation hasn't started, wait for it
-                                mCancelWhenRecentsStart = true;
-                                mDismissTask = dismissTask;
-                            }
+                    } else if (mTaskAnimationManager.getCurrentCallbacks() != null) {
+                        if (mRecentsAnimationController != null) {
+                            finishRecentsAnimationForShell(dismissTask);
+                        } else {
+                            // the transition of recents animation hasn't started, wait for it
+                            mCancelWhenRecentsStart = true;
+                            mDismissTask = dismissTask;
                         }
                     }
                     mStateCallback.setState(STATE_HANDLER_INVALIDATED);

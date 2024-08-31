@@ -17,9 +17,11 @@
 package com.android.quickstep.util
 
 import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
+import com.android.quickstep.RecentsAnimationController
 import com.android.quickstep.views.DesktopTaskView
 import com.android.quickstep.views.TaskView
 import com.android.quickstep.views.TaskViewType
+import com.android.systemui.shared.recents.model.ThumbnailData
 
 /**
  * Helper class for [com.android.quickstep.views.RecentsView]. This util class contains refactored
@@ -68,4 +70,12 @@ class RecentsViewUtils {
             if (taskView?.isLargeTile == true) taskView else null
         }
     }
+
+    fun screenshotTasks(
+        taskView: TaskView,
+        recentsAnimationController: RecentsAnimationController
+    ): Map<Int, ThumbnailData> =
+        taskView.taskContainers.associate {
+            it.task.key.id to recentsAnimationController.screenshotTask(it.task.key.id)
+        }
 }

@@ -19,7 +19,6 @@ import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.animation.Animator;
@@ -232,9 +231,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         LauncherState state = mLauncher.getStateManager().getState();
         boolean nonInteractiveState = state.hasFlag(FLAG_NON_INTERACTIVE)
                 && !state.isTaskbarAlignedWithHotseat(mLauncher);
-        if ((ENABLE_SHELL_TRANSITIONS
-                && isVisible
-                && (nonInteractiveState || mSkipLauncherVisibilityChange))) {
+        if (isVisible && (nonInteractiveState || mSkipLauncherVisibilityChange)) {
             return null;
         }
 

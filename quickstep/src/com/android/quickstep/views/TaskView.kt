@@ -79,7 +79,6 @@ import com.android.launcher3.util.rects.set
 import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
-import com.android.quickstep.TaskAnimationManager
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
@@ -408,6 +407,7 @@ constructor(
 
     protected var shouldShowScreenshot = false
         get() = !isRunningTask || field
+        private set
 
     /** Enable or disable showing border on hover and focus change */
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
@@ -974,7 +974,13 @@ constructor(
         iconView.setText(text)
     }
 
-    open fun refreshThumbnails(thumbnailDatas: Map<Int, ThumbnailData?>?) {
+    @JvmOverloads
+    open fun setShouldShowScreenshot(
+        shouldShowScreenshot: Boolean,
+        thumbnailDatas: Map<Int, ThumbnailData?>? = null
+    ) {
+        if (this.shouldShowScreenshot == shouldShowScreenshot) return
+        this.shouldShowScreenshot = shouldShowScreenshot
         if (enableRefactorTaskThumbnail()) {
             return
         }
@@ -1041,14 +1047,12 @@ constructor(
                 // triggered by QuickstepTransitionManager.AppLaunchAnimationRunner.
                 return RunnableList().also { recentsView.addSideTaskLaunchCallback(it) }
             }
-            if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
-                // If the recents transition is running (ie. in live tile mode), then the start
-                // of a new task will merge into the existing transition and it currently will
-                // not be run independently, so we need to rely on the onTaskAppeared() call
-                // for the new task to trigger the side launch callback to flush this runnable
-                // list (which is usually flushed when the app launch animation finishes)
-                recentsView.addSideTaskLaunchCallback(opts.onEndCallback)
-            }
+            // If the recents transition is running (ie. in live tile mode), then the start
+            // of a new task will merge into the existing transition and it currently will
+            // not be run independently, so we need to rely on the onTaskAppeared() call
+            // for the new task to trigger the side launch callback to flush this runnable
+            // list (which is usually flushed when the app launch animation finishes)
+            recentsView.addSideTaskLaunchCallback(opts.onEndCallback)
             return opts.onEndCallback
         } else {
             notifyTaskLaunchFailed()

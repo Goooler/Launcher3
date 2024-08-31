@@ -41,8 +41,8 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.NavHandle;
-import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.handles.RegionSamplingHelper;
 
 import java.io.PrintWriter;
 

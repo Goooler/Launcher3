@@ -50,8 +50,10 @@ import kotlin.Unit;
 public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
 
     private static final float THUMBNAIL_BLUR_RADIUS = 1f;
+    private static final int INVALID_BORDER_RADIUS = -1;
 
     @ColorInt private final int mBorderColor;
+    @ColorInt private final int mBorderRadius;
 
     @Nullable private BorderAnimator mBorderAnimator;
 
@@ -87,6 +89,8 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
 
         mBorderColor = ta.getColor(
                 R.styleable.TaskView_focusBorderColor, DEFAULT_BORDER_COLOR);
+        mBorderRadius = ta.getDimensionPixelSize(
+                R.styleable.TaskView_focusBorderRadius, INVALID_BORDER_RADIUS);
         ta.recycle();
     }
 
@@ -103,8 +107,10 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
 
         Preconditions.assertNotNull(mContent);
         mBorderAnimator = BorderAnimator.createScalingBorderAnimator(
-                /* borderRadiusPx= */ resources.getDimensionPixelSize(
-                        R.dimen.keyboard_quick_switch_task_view_radius),
+                /* borderRadiusPx= */ mBorderRadius != INVALID_BORDER_RADIUS
+                        ? mBorderRadius
+                        : resources.getDimensionPixelSize(
+                                R.dimen.keyboard_quick_switch_task_view_radius),
                 /* borderWidthPx= */ resources.getDimensionPixelSize(
                                 R.dimen.keyboard_quick_switch_border_width),
                 /* boundsBuilder= */ bounds -> {

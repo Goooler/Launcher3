@@ -793,6 +793,7 @@ public class BubbleBarViewController {
         pw.println("  mShouldShowEducation: " + mShouldShowEducation);
         pw.println("  mBubbleBarTranslationY.value: " + mBubbleBarTranslationY.value);
         pw.println("  mBubbleBarSwipeUpTranslationY: " + mBubbleBarSwipeUpTranslationY);
+        pw.println("  mOverflowAdded: " + mOverflowAdded);
         if (mBarView != null) {
             mBarView.dump(pw);
         } else {
