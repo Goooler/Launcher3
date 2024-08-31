@@ -97,6 +97,7 @@ import android.window.PictureInPictureSurfaceTransaction;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.jank.Cuj;
 import com.android.internal.util.LatencyTracker;
@@ -170,10 +171,12 @@ import java.util.function.Consumer;
 /**
  * Handles the navigation gestures when Launcher is the default home activity.
  */
-public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
-        Q extends RecentsView, S extends BaseState<S>>
-        extends SwipeUpAnimationLogic implements OnApplyWindowInsetsListener,
-        RecentsAnimationCallbacks.RecentsAnimationListener {
+public abstract class AbsSwipeUpHandler<
+        RECENTS_CONTAINER extends Context & RecentsViewContainer,
+        RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>,
+        STATE extends BaseState<STATE>>
+        extends SwipeUpAnimationLogic
+        implements OnApplyWindowInsetsListener, RecentsAnimationCallbacks.RecentsAnimationListener {
     private static final String TAG = "AbsSwipeUpHandler";
 
     private static final ArrayList<String> STATE_NAMES = new ArrayList<>();
@@ -181,7 +184,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     // Fraction of the scroll and transform animation in which the current task fades out
     private static final float KQS_TASK_FADE_ANIMATION_FRACTION = 0.4f;
 
-    protected final BaseContainerInterface<S, T> mContainerInterface;
+    protected final BaseContainerInterface<STATE, RECENTS_CONTAINER> mContainerInterface;
     protected final InputConsumerProxy mInputConsumerProxy;
     protected final ActivityInitListener mActivityInitListener;
     // Callbacks to be made once the recents animation starts
@@ -192,8 +195,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     protected @Nullable RecentsAnimationController mRecentsAnimationController;
     protected @Nullable RecentsAnimationController mDeferredCleanupRecentsAnimationController;
     protected RecentsAnimationTargets mRecentsAnimationTargets;
-    protected @Nullable T mContainer;
-    protected @Nullable Q mRecentsView;
+    protected @Nullable RECENTS_CONTAINER mContainer;
+    protected @Nullable RECENTS_VIEW mRecentsView;
     protected Runnable mGestureEndCallback;
     protected MultiStateCallback mStateCallback;
     protected boolean mCanceled;
@@ -486,11 +489,11 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             return false;
         }
 
-        T createdContainer = (T) mContainerInterface.getCreatedContainer();
+        RECENTS_CONTAINER createdContainer = mContainerInterface.getCreatedContainer();
         if (createdContainer != null) {
             initTransitionEndpoints(createdContainer.getDeviceProfile());
         }
-        final T container = (T) mContainerInterface.getCreatedContainer();
+        final RECENTS_CONTAINER container = mContainerInterface.getCreatedContainer();
         if (mContainer == container) {
             return true;
         }
@@ -564,7 +567,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void onLauncherStart() {
-        final T container = (T) mContainerInterface.getCreatedContainer();
+        final RECENTS_CONTAINER container = mContainerInterface.getCreatedContainer();
         if (container == null || mContainer != container) {
             return;
         }
@@ -1096,7 +1099,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
      */
     @UiThread
     private void notifyGestureStarted() {
-        final T curActivity = mContainer;
+        final RECENTS_CONTAINER curActivity = mContainer;
         if (curActivity != null) {
             // Once the gesture starts, we can no longer transition home through the button, so
             // reset the force override of the activity visibility
@@ -1167,7 +1170,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     /**
      * Called if the end target has been set and the recents animation is started.
      */
-    private void onCalculateEndTarget() {
+    @VisibleForTesting
+    protected void onCalculateEndTarget() {
         final GestureEndTarget endTarget = mGestureState.getEndTarget();
 
         switch (endTarget) {
@@ -1180,7 +1184,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
     }
 
-    private void onSettledOnEndTarget() {
+    @VisibleForTesting
+    protected void onSettledOnEndTarget() {
         // Fast-finish the attaching animation if it's still running.
         maybeUpdateRecentsAttachedState(false);
         final GestureEndTarget endTarget = mGestureState.getEndTarget();
@@ -1416,7 +1421,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             }
         }
         Interpolator interpolator;
-        S state = mContainerInterface.stateFromGestureEndTarget(endTarget);
+        STATE state = mContainerInterface.stateFromGestureEndTarget(endTarget);
         if (isKeyboardTaskFocusPending()) {
             interpolator = EMPHASIZED;
         } else if (state.displayOverviewTasksAsGrid(mDp)) {
@@ -2497,7 +2502,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void animateSplashScreenExit(
-            @NonNull T activity,
+            @NonNull RECENTS_CONTAINER activity,
             @NonNull RemoteAnimationTarget[] appearedTaskTargets,
             @NonNull RemoteAnimationTarget[] animatingTargets) {
         ViewGroup splashView = activity.getDragLayer();

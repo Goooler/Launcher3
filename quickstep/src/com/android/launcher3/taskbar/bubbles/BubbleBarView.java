@@ -1303,7 +1303,10 @@ public class BubbleBarView extends FrameLayout {
         return totalIconSize + totalSpace + horizontalPadding;
     }
 
-    private float collapsedWidth() {
+    /**
+     * Get width of the bubble bar if it is collapsed
+     */
+    float collapsedWidth() {
         final int bubbleChildCount = getBubbleChildCount();
         final float horizontalPadding = 2 * mBubbleBarPadding;
         // If there are more than 2 bubbles, the first 2 should be visible when collapsed,

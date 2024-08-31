@@ -870,7 +870,7 @@ class BubbleBarViewAnimatorTest {
             bubbleBarView.addView(overflowView)
 
             val bubbleInfo =
-                BubbleInfo("key", 0, null, null, 0, context.packageName, null, null, false)
+                BubbleInfo("key", 0, null, null, 0, context.packageName, null, null, false, true)
             bubbleView =
                 inflater.inflate(R.layout.bubblebar_item_view, bubbleBarView, false) as BubbleView
             bubble =

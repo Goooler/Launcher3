@@ -251,7 +251,7 @@ class PersistentBubbleStashControllerTest {
 
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
         whenever(bubbleBarViewController.bubbleBarTranslationY).thenReturn(translationY)
-        whenever(bubbleBarViewController.bubbleBarScale).thenReturn(scale)
+        whenever(bubbleBarViewController.bubbleBarScaleY).thenReturn(scale)
         whenever(bubbleBarViewController.bubbleBarAlpha).thenReturn(alpha)
         whenever(bubbleBarViewController.bubbleBarCollapsedHeight).thenReturn(BUBBLE_BAR_HEIGHT)
     }

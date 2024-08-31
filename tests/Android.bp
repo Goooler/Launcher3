@@ -127,9 +127,9 @@ android_test {
         "com_android_launcher3_flags_lib",
     ],
     libs: [
-        "android.test.base",
-        "android.test.runner",
-        "android.test.mock",
+        "android.test.base.stubs.system",
+        "android.test.runner.stubs.system",
+        "android.test.mock.stubs.system",
     ],
     // Libraries used by mockito inline extended
     jni_libs: [
@@ -229,9 +229,9 @@ android_robolectric_test {
         "android.appwidget.flags-aconfig-java",
     ],
     libs: [
-        "android.test.runner",
-        "android.test.base",
-        "android.test.mock",
+        "android.test.runner.stubs.system",
+        "android.test.base.stubs.system",
+        "android.test.mock.stubs.system",
         "truth",
     ],
     instrumentation_for: "Launcher3",

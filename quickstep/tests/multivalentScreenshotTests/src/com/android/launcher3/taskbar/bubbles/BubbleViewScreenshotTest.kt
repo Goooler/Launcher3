@@ -99,7 +99,7 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
         val flags =
             if (suppressNotification) Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION else 0
         val bubbleInfo =
-            BubbleInfo("key", flags, null, null, 0, context.packageName, null, null, false)
+            BubbleInfo("key", flags, null, null, 0, context.packageName, null, null, false, true)
         val bubbleView = inflater.inflate(R.layout.bubblebar_item_view, null) as BubbleView
         val dotPath =
             PathParser.createPathFromPathData(

@@ -171,6 +171,10 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
     }
 
     private void updateBackgroundAlpha() {
+        if (mActivity.isPhoneMode()) {
+            return;
+        }
+
         final float bgNavbar = mBgNavbar.value;
         final float bgTaskbar = mBgTaskbar.value * mKeyguardBgTaskbar.value
                 * mNotificationShadeBgTaskbar.value * mImeBgTaskbar.value

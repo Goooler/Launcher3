@@ -338,7 +338,7 @@ class OverviewCommandHelper(
             taskAnimationManager.notifyRecentsAnimationState(recentAnimListener)
         } else {
             val intent =
-                Intent(interactionHandler.launchIntent)
+                Intent(interactionHandler.getLaunchIntent())
                     .putExtra(ActiveGestureLog.INTENT_EXTRA_LOG_TRACE_ID, gestureState.gestureId)
             command.setAnimationCallbacks(
                 taskAnimationManager.startRecentsAnimation(gestureState, intent, interactionHandler)

@@ -283,7 +283,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             TaskbarHotseatDimensionsProvider dimensionsProvider =
                     new DeviceProfileDimensionsProviderAdapter(this);
             BubbleStashController bubbleStashController = isTransientTaskbar
-                    ? new TransientBubbleStashController(dimensionsProvider, getResources())
+                    ? new TransientBubbleStashController(dimensionsProvider, this)
                     : new PersistentBubbleStashController(dimensionsProvider);
             bubbleControllersOptional = Optional.of(new BubbleControllers(
                     new BubbleBarController(this, bubbleBarView),

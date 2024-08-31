@@ -80,12 +80,15 @@ public class BubbleBarViewController {
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
-    private final AnimatedFloat mBubbleBarScale = new AnimatedFloat(this::updateScale);
+    private final AnimatedFloat mBubbleBarScaleX = new AnimatedFloat(this::updateScaleX);
+    private final AnimatedFloat mBubbleBarScaleY = new AnimatedFloat(this::updateScaleY);
     private final AnimatedFloat mBubbleBarTranslationY = new AnimatedFloat(
             this::updateTranslationY);
 
     // Modified when swipe up is happening on the bubble bar or task bar.
     private float mBubbleBarSwipeUpTranslationY;
+    // Modified when bubble bar is springing back into the stash handle.
+    private float mBubbleBarStashTranslationY;
 
     // Whether the bar is hidden for a sysui state.
     private boolean mHiddenForSysui;
@@ -125,7 +128,7 @@ public class BubbleBarViewController {
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
                 dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
-        mBubbleBarScale.updateValue(1f);
+        mBubbleBarScaleY.updateValue(1f);
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
@@ -255,16 +258,45 @@ public class BubbleBarViewController {
         return mBubbleBarAlpha;
     }
 
-    public AnimatedFloat getBubbleBarScale() {
-        return mBubbleBarScale;
+    public AnimatedFloat getBubbleBarScaleX() {
+        return mBubbleBarScaleX;
+    }
+
+    public AnimatedFloat getBubbleBarScaleY() {
+        return mBubbleBarScaleY;
     }
 
     public AnimatedFloat getBubbleBarTranslationY() {
         return mBubbleBarTranslationY;
     }
 
+    public float getBubbleBarCollapsedWidth() {
+        return mBarView.collapsedWidth();
+    }
+
     public float getBubbleBarCollapsedHeight() {
         return mBarView.getBubbleBarCollapsedHeight();
+    }
+
+    /**
+     * @see BubbleBarView#getRelativePivotX()
+     */
+    public float getBubbleBarRelativePivotX() {
+        return mBarView.getRelativePivotX();
+    }
+
+    /**
+     * @see BubbleBarView#getRelativePivotY()
+     */
+    public float getBubbleBarRelativePivotY() {
+        return mBarView.getRelativePivotY();
+    }
+
+    /**
+     * @see BubbleBarView#setRelativePivot(float, float)
+     */
+    public void setBubbleBarRelativePivot(float x, float y) {
+        mBarView.setRelativePivot(x, y);
     }
 
     /**
@@ -284,6 +316,14 @@ public class BubbleBarViewController {
      */
     public BubbleBarLocation getBubbleBarLocation() {
         return mBarView.getBubbleBarLocation();
+    }
+
+    /**
+     * @return {@code true} if bubble bar is on the left edge of the screen, {@code false} if on
+     * the right
+     */
+    public boolean isBubbleBarOnLeft() {
+        return mBarView.getBubbleBarLocation().isOnLeft(mBarView.isLayoutRtl());
     }
 
     /**
@@ -474,17 +514,24 @@ public class BubbleBarViewController {
         updateTranslationY();
     }
 
-    private void updateTranslationY() {
-        mBarView.setTranslationY(mBubbleBarTranslationY.value
-                + mBubbleBarSwipeUpTranslationY);
+    /**
+     * Sets the translation of the bubble bar during the stash animation.
+     */
+    public void setTranslationYForStash(float transY) {
+        mBubbleBarStashTranslationY = transY;
+        updateTranslationY();
     }
 
-    /**
-     * Applies scale properties for the entire bubble bar.
-     */
-    private void updateScale() {
-        float scale = mBubbleBarScale.value;
+    private void updateTranslationY() {
+        mBarView.setTranslationY(mBubbleBarTranslationY.value + mBubbleBarSwipeUpTranslationY
+                + mBubbleBarStashTranslationY);
+    }
+
+    private void updateScaleX(float scale) {
         mBarView.setScaleX(scale);
+    }
+
+    private void updateScaleY(float scale) {
         mBarView.setScaleY(scale);
     }
 

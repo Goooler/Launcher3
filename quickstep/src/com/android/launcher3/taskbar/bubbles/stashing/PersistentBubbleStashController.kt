@@ -116,7 +116,7 @@ class PersistentBubbleStashController(
         bubbleBarTranslationYAnimator = bubbleBarViewController.bubbleBarTranslationY
         // bubble bar has only alpha property, getting it at index 0
         bubbleBarAlphaAnimator = bubbleBarViewController.bubbleBarAlpha.get(/* index= */ 0)
-        bubbleBarScaleAnimator = bubbleBarViewController.bubbleBarScale
+        bubbleBarScaleAnimator = bubbleBarViewController.bubbleBarScaleY
     }
 
     private fun animateAfterUnlock() {

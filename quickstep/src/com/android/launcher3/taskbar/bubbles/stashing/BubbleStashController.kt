@@ -179,10 +179,10 @@ interface BubbleStashController {
         /** How long to stash/unstash. */
         const val BAR_STASH_DURATION = InsetsController.ANIMATION_DURATION_RESIZE.toLong()
 
+        const val BAR_STASH_ALPHA_DURATION = 50L
+        const val BAR_STASH_ALPHA_DELAY = 33L
+
         /** How long to translate Y coordinate of the BubbleBar. */
         const val BAR_TRANSLATION_DURATION = 300L
-
-        /** The scale bubble bar animates to when being stashed. */
-        const val STASHED_BAR_SCALE = 0.5f
     }
 }

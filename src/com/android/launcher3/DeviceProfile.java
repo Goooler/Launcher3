@@ -316,6 +316,74 @@ public class DeviceProfile {
     // DragController
     public int flingToDeleteThresholdVelocity;
 
+    /** Used only as an alternative to mocking when null values cannot be used. */
+    @VisibleForTesting
+    public DeviceProfile() {
+        inv = null;
+        mInfo = null;
+        mMetrics = null;
+        mIconSizeSteps = null;
+        isTablet = false;
+        isPhone = false;
+        transposeLayoutWithOrientation = false;
+        isMultiDisplay = false;
+        isTwoPanels = false;
+        isPredictiveBackSwipe = false;
+        isQsbInline = false;
+        isLandscape = false;
+        isMultiWindowMode = false;
+        isGestureMode = false;
+        isLeftRightSplit = false;
+        windowX = 0;
+        windowY = 0;
+        widthPx = 0;
+        heightPx = 0;
+        availableWidthPx = 0;
+        availableHeightPx = 0;
+        rotationHint = 0;
+        aspectRatio = 1;
+        mIsScalableGrid = false;
+        mTypeIndex = 0;
+        mIsResponsiveGrid = false;
+        desiredWorkspaceHorizontalMarginOriginalPx = 0;
+        edgeMarginPx = 0;
+        workspaceContentScale = 0;
+        workspaceSpringLoadedMinNextPageVisiblePx = 0;
+        extraSpace = 0;
+        workspacePageIndicatorHeight = 0;
+        mWorkspacePageIndicatorOverlapWorkspace = 0;
+        numFolderRows = 0;
+        numFolderColumns = 0;
+        folderLabelTextScale = 0;
+        areNavButtonsInline = false;
+        mHotseatBarEdgePaddingPx = 0;
+        mHotseatBarWorkspaceSpacePx = 0;
+        hotseatQsbWidth = 0;
+        hotseatQsbHeight = 0;
+        hotseatQsbVisualHeight = 0;
+        hotseatQsbShadowHeight = 0;
+        hotseatBorderSpace = 0;
+        mMinHotseatIconSpacePx = 0;
+        mMinHotseatQsbWidthPx = 0;
+        mMaxHotseatIconSpacePx = 0;
+        inlineNavButtonsEndSpacingPx = 0;
+        mBubbleBarSpaceThresholdPx = 0;
+        numShownAllAppsColumns = 0;
+        overviewActionsHeight = 0;
+        overviewActionsTopMarginPx = 0;
+        overviewActionsButtonSpacing = 0;
+        mViewScaleProvider = null;
+        mDotRendererWorkSpace = null;
+        mDotRendererAllApps = null;
+        taskbarHeight = 0;
+        stashedTaskbarHeight = 0;
+        taskbarBottomMargin = 0;
+        taskbarIconSize = 0;
+        mTransientTaskbarClaimedSpace = 0;
+        startAlignTaskbar = false;
+        isTransientTaskbar = false;
+    }
+
     /** TODO: Once we fully migrate to staged split, remove "isMultiWindowMode" */
     DeviceProfile(Context context, InvariantDeviceProfile inv, Info info, WindowBounds windowBounds,
             SparseArray<DotRenderer> dotRendererCache, boolean isMultiWindowMode,

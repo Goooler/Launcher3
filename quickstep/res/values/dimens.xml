@@ -437,6 +437,7 @@
     <dimen name="bubblebar_stashed_handle_width">55dp</dimen>
     <dimen name="bubblebar_stashed_size">@dimen/transient_taskbar_stashed_height</dimen>
     <dimen name="bubblebar_stashed_handle_height">@dimen/taskbar_stashed_handle_height</dimen>
+    <dimen name="bubblebar_stashed_handle_spring_velocity_dp_per_s">@dimen/transient_taskbar_stash_spring_velocity_dp_per_s</dimen>
     <!-- this is a pointer height minus 1dp to ensure the pointer overlaps with the bubblebar
     background appropriately when close to the rounded corner -->
     <dimen name="bubblebar_pointer_visible_size">9dp</dimen>

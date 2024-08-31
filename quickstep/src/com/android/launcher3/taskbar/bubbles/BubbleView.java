@@ -237,7 +237,11 @@ public class BubbleView extends ConstraintLayout {
         mBubble = bubble;
         mIcon = bubble.getIcon();
         updateBubbleIcon();
-        mAppIcon.setImageBitmap(bubble.getBadge());
+        if (bubble.getInfo().showAppBadge()) {
+            mAppIcon.setImageBitmap(bubble.getBadge());
+        } else {
+            mAppIcon.setVisibility(GONE);
+        }
         mDotColor = bubble.getDotColor();
         mDotRenderer = new DotRenderer(mBubbleSize, bubble.getDotPath(), DEFAULT_PATH_SIZE);
         String contentDesc = bubble.getInfo().getTitle();
@@ -302,8 +306,10 @@ public class BubbleView extends ConstraintLayout {
     }
 
     void setBadgeScale(float fraction) {
-        mAppIcon.setScaleX(fraction);
-        mAppIcon.setScaleY(fraction);
+        if (mAppIcon.getVisibility() == VISIBLE) {
+            mAppIcon.setScaleX(fraction);
+            mAppIcon.setScaleY(fraction);
+        }
     }
 
     boolean hasUnseenContent() {
