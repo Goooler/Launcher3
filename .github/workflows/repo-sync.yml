@@ -17,12 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-      - name: repo-sync
-        uses: repo-sync/github-sync@v2
-        with:
-          source_repo: "https://android.googlesource.com/platform/packages/apps/Launcher3"
-          source_branch: "main"
-          destination_branch: "main"
-          sync_tags: "true"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Delete all remote tags
+        run:
+          git tag -l | xargs -n 1 git push --delete origin
