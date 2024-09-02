@@ -27,8 +27,8 @@ import androidx.annotation.Nullable;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.wm.shell.common.bubbles.BaseBubblePinController.LocationChangeListener;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BaseBubblePinController.LocationChangeListener;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
  * Controls bubble bar drag interactions.

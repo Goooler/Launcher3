@@ -51,7 +51,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.launcher3.shortcuts.ShortcutRequest;
-import com.android.wm.shell.common.bubbles.BubbleInfo;
+import com.android.wm.shell.shared.bubbles.BubbleInfo;
 
 /**
  * Loads the necessary info to populate / present a bubble (name, icon, shortcut).

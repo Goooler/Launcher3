@@ -25,7 +25,7 @@ import android.util.PathParser
 import android.view.LayoutInflater
 import androidx.test.core.app.ApplicationProvider
 import com.android.launcher3.R
-import com.android.wm.shell.common.bubbles.BubbleInfo
+import com.android.wm.shell.shared.bubbles.BubbleInfo
 import com.google.android.apps.nexuslauncher.imagecomparison.goldenpathmanager.ViewScreenshotGoldenPathManager
 import org.junit.Rule
 import org.junit.Test

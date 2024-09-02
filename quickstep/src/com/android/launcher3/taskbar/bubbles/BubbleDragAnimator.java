@@ -29,8 +29,8 @@ import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 
 import com.android.launcher3.R;
-import com.android.wm.shell.common.bubbles.DismissCircleView;
-import com.android.wm.shell.common.bubbles.DismissView;
+import com.android.wm.shell.shared.bubbles.DismissCircleView;
+import com.android.wm.shell.shared.bubbles.DismissView;
 import com.android.wm.shell.shared.animation.PhysicsAnimator;
 
 /**

@@ -28,7 +28,7 @@ import androidx.annotation.Nullable;
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
  * Callbacks for {@link TaskbarView} to interact with its controller.

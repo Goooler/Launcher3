@@ -40,8 +40,8 @@ import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Comp
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.ControllersAfterInitAction
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.TaskbarHotseatDimensionsProvider
 import com.android.launcher3.util.MultiPropertyFactory
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import kotlin.math.max
 
 class TransientBubbleStashController(

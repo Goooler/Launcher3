@@ -37,9 +37,9 @@ import com.android.launcher3.taskbar.bubbles.BubbleBarOverflow
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleView
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
-import com.android.wm.shell.common.bubbles.BubbleInfo
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
+import com.android.wm.shell.shared.bubbles.BubbleInfo
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule

@@ -66,7 +66,7 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.util.List;
 import java.util.function.Predicate;

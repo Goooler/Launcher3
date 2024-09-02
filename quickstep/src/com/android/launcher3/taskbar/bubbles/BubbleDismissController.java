@@ -29,7 +29,7 @@ import androidx.dynamicanimation.animation.DynamicAnimation;
 import com.android.launcher3.R;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarDragLayer;
-import com.android.wm.shell.common.bubbles.DismissView;
+import com.android.wm.shell.shared.bubbles.DismissView;
 import com.android.wm.shell.shared.magnetictarget.MagnetizedObject;
 
 /**

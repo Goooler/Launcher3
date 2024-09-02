@@ -41,10 +41,10 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.bubbles.IBubblesListener;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
-import com.android.wm.shell.common.bubbles.BubbleBarUpdate;
-import com.android.wm.shell.common.bubbles.BubbleInfo;
-import com.android.wm.shell.common.bubbles.RemovedBubble;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
+import com.android.wm.shell.shared.bubbles.BubbleInfo;
+import com.android.wm.shell.shared.bubbles.RemovedBubble;
 
 import java.util.ArrayList;
 import java.util.List;

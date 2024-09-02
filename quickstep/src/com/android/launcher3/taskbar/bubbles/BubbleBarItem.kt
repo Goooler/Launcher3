@@ -17,7 +17,7 @@ package com.android.launcher3.taskbar.bubbles
 
 import android.graphics.Bitmap
 import android.graphics.Path
-import com.android.wm.shell.common.bubbles.BubbleInfo
+import com.android.wm.shell.shared.bubbles.BubbleInfo
 
 /** An entity in the bubble bar. */
 sealed class BubbleBarItem(open var key: String, open var view: BubbleView)
