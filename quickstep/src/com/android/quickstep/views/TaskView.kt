@@ -702,6 +702,7 @@ constructor(
                     R.id.snapshot,
                     R.id.icon,
                     R.id.show_windows,
+                    R.id.digital_wellbeing_toast,
                     STAGE_POSITION_UNDEFINED,
                     taskOverlayFactory
                 )
@@ -715,6 +716,7 @@ constructor(
         @IdRes thumbnailViewId: Int,
         @IdRes iconViewId: Int,
         @IdRes showWindowViewId: Int,
+        @IdRes digitalWellbeingBannerId: Int,
         @StagePosition stagePosition: Int,
         taskOverlayFactory: TaskOverlayFactory,
     ): TaskContainer {
@@ -730,6 +732,7 @@ constructor(
                 thumbnailViewDeprecated
             }
         val iconView = getOrInflateIconView(iconViewId)
+        val digitalWellBeingToast = findViewById<DigitalWellBeingToast>(digitalWellbeingBannerId)!!
         return TaskContainer(
             this,
             task,
@@ -737,7 +740,7 @@ constructor(
             iconView,
             TransformingTouchDelegate(iconView.asView()),
             stagePosition,
-            DigitalWellBeingToast(container, this),
+            digitalWellBeingToast,
             findViewById(showWindowViewId)!!,
             taskOverlayFactory
         )
@@ -775,7 +778,7 @@ constructor(
     protected open fun setThumbnailOrientation(orientationState: RecentsOrientedState) {
         taskContainers.forEach {
             it.overlay.updateOrientationState(orientationState)
-            it.digitalWellBeingToast?.initialize(it.task)
+            it.digitalWellBeingToast?.initialize()
         }
     }
 
@@ -827,10 +830,8 @@ constructor(
         } else {
             nonGridScale = 1f
             boxTranslationY = 0f
-            expectedWidth = if (enableOverviewIconMenu()) taskWidth else LayoutParams.MATCH_PARENT
-            expectedHeight =
-                if (enableOverviewIconMenu()) taskHeight + thumbnailPadding
-                else LayoutParams.MATCH_PARENT
+            expectedWidth = taskWidth
+            expectedHeight = taskHeight + thumbnailPadding
         }
         this.nonGridScale = nonGridScale
         this.boxTranslationY = boxTranslationY
@@ -847,6 +848,7 @@ constructor(
         taskContainers[0].snapshotView.updateLayoutParams<LayoutParams> {
             topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
         }
+        taskContainers.forEach { it.digitalWellBeingToast?.setupLayout() }
     }
 
     /** Returns the thumbnail's bounds, optionally relative to the screen. */
@@ -939,7 +941,7 @@ constructor(
         if (enableOverviewIconMenu()) {
             setText(taskContainer.iconView, taskContainer.task.title)
         }
-        taskContainer.digitalWellBeingToast?.initialize(taskContainer.task)
+        taskContainer.digitalWellBeingToast?.initialize()
     }
 
     protected open fun onIconUnloaded(taskContainer: TaskContainer) {
@@ -1444,7 +1446,7 @@ constructor(
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
-            it.digitalWellBeingToast?.setBannerColorTint(tintColor, amount)
+            it.digitalWellBeingToast?.setColorTint(tintColor, amount)
         }
     }
 
@@ -1458,7 +1460,7 @@ constructor(
         taskContainers.forEach {
             if (visibility == VISIBLE || it.task.key.id == taskId) {
                 it.snapshotView.visibility = visibility
-                it.digitalWellBeingToast?.setBannerVisibility(visibility)
+                it.digitalWellBeingToast?.visibility = visibility
                 it.showWindowsView?.visibility = visibility
                 it.overlay.setVisibility(visibility)
             }
@@ -1660,6 +1662,12 @@ constructor(
 
     private fun MotionEvent.isWithinThumbnailBounds(): Boolean {
         return thumbnailBounds.contains(x.toInt(), y.toInt())
+    }
+
+    override fun addChildrenForAccessibility(outChildren: ArrayList<View>) {
+        (if (isLayoutRtl) taskContainers.reversed() else taskContainers).forEach {
+            it.addChildForAccessibility(outChildren)
+        }
     }
 
     companion object {

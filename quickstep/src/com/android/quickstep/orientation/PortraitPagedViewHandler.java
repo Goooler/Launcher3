@@ -243,54 +243,54 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     }
 
     @Override
-    public Pair<Float, Float> getDwbLayoutTranslations(int taskViewWidth,
-            int taskViewHeight, SplitBounds splitBounds, DeviceProfile deviceProfile,
-            View[] thumbnailViews, int desiredTaskId, View banner) {
-        float translationX = 0;
-        float translationY = 0;
+    public void updateDwbBannerLayout(int taskViewWidth, int taskViewHeight,
+            boolean isGroupedTaskView, @NonNull DeviceProfile deviceProfile,
+            int snapshotViewWidth, int snapshotViewHeight, @NonNull View banner) {
         FrameLayout.LayoutParams bannerParams = (FrameLayout.LayoutParams) banner.getLayoutParams();
         banner.setPivotX(0);
         banner.setPivotY(0);
         banner.setRotation(getDegreesRotated());
-        if (splitBounds == null) {
-            // Single, fullscreen case
+        if (isGroupedTaskView) {
+            bannerParams.gravity =
+                    BOTTOM | (deviceProfile.isLeftRightSplit ? START : CENTER_HORIZONTAL);
+            bannerParams.width = snapshotViewWidth;
+        } else {
             bannerParams.width = MATCH_PARENT;
             bannerParams.gravity = BOTTOM | CENTER_HORIZONTAL;
-            return new Pair<>(translationX, translationY);
         }
+        banner.setLayoutParams(bannerParams);
+    }
 
-        bannerParams.gravity =
-                BOTTOM | (deviceProfile.isLeftRightSplit ? START : CENTER_HORIZONTAL);
-
-        // Set correct width
-        if (desiredTaskId == splitBounds.leftTopTaskId) {
-            bannerParams.width = thumbnailViews[0].getMeasuredWidth();
-        } else {
-            bannerParams.width = thumbnailViews[1].getMeasuredWidth();
-        }
-
-        // Set translations
-        if (deviceProfile.isLeftRightSplit) {
-            if (desiredTaskId == splitBounds.rightBottomTaskId) {
-                float leftTopTaskPercent = splitBounds.appsStackedVertically
-                        ? splitBounds.topTaskPercent
-                        : splitBounds.leftTaskPercent;
-                float dividerThicknessPercent = splitBounds.appsStackedVertically
-                        ? splitBounds.dividerHeightPercent
-                        : splitBounds.dividerWidthPercent;
-                translationX = ((taskViewWidth * leftTopTaskPercent)
-                        + (taskViewWidth * dividerThicknessPercent));
-            }
-        } else {
-            if (desiredTaskId == splitBounds.leftTopTaskId) {
-                FrameLayout.LayoutParams snapshotParams =
-                        (FrameLayout.LayoutParams) thumbnailViews[0]
-                                .getLayoutParams();
-                float bottomRightTaskPlusDividerPercent = splitBounds.appsStackedVertically
-                        ? (1f - splitBounds.topTaskPercent)
-                        : (1f - splitBounds.leftTaskPercent);
-                translationY = -((taskViewHeight - snapshotParams.topMargin)
-                        * bottomRightTaskPlusDividerPercent);
+    @NonNull
+    @Override
+    public Pair<Float, Float> getDwbBannerTranslations(int taskViewWidth,
+            int taskViewHeight, SplitBounds splitBounds, @NonNull DeviceProfile deviceProfile,
+            @NonNull View[] thumbnailViews, int desiredTaskId, @NonNull View banner) {
+        float translationX = 0;
+        float translationY = 0;
+        if (splitBounds != null) {
+            if (deviceProfile.isLeftRightSplit) {
+                if (desiredTaskId == splitBounds.rightBottomTaskId) {
+                    float leftTopTaskPercent = splitBounds.appsStackedVertically
+                            ? splitBounds.topTaskPercent
+                            : splitBounds.leftTaskPercent;
+                    float dividerThicknessPercent = splitBounds.appsStackedVertically
+                            ? splitBounds.dividerHeightPercent
+                            : splitBounds.dividerWidthPercent;
+                    translationX = ((taskViewWidth * leftTopTaskPercent)
+                            + (taskViewWidth * dividerThicknessPercent));
+                }
+            } else {
+                if (desiredTaskId == splitBounds.leftTopTaskId) {
+                    FrameLayout.LayoutParams snapshotParams =
+                            (FrameLayout.LayoutParams) thumbnailViews[0]
+                                    .getLayoutParams();
+                    float bottomRightTaskPlusDividerPercent = splitBounds.appsStackedVertically
+                            ? (1f - splitBounds.topTaskPercent)
+                            : (1f - splitBounds.leftTaskPercent);
+                    translationY = -((taskViewHeight - snapshotParams.topMargin)
+                            * bottomRightTaskPlusDividerPercent);
+                }
             }
         }
         return new Pair<>(translationX, translationY);

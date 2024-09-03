@@ -73,4 +73,12 @@
         android:inflatedId="@id/bottomRight_icon"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content" />
+
+    <include layout="@layout/digital_wellbeing_toast"
+        android:id="@+id/digital_wellbeing_toast"
+        android:visibility="invisible"/>
+
+    <include layout="@layout/digital_wellbeing_toast"
+        android:id="@+id/bottomRight_digital_wellbeing_toast"
+        android:visibility="invisible"/>
 </com.android.quickstep.views.GroupedTaskView>

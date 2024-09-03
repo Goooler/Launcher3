@@ -146,6 +146,7 @@ class TaskContainer(
             }
 
     fun bind() {
+        digitalWellBeingToast?.bind(task, taskView, snapshotView, stagePosition)
         if (enableRefactorTaskThumbnail()) {
             bindThumbnailView()
         } else {
@@ -169,6 +170,20 @@ class TaskContainer(
     fun setOverlayEnabled(enabled: Boolean) {
         if (!enableRefactorTaskThumbnail()) {
             thumbnailViewDeprecated.setOverlayEnabled(enabled)
+        }
+    }
+
+    fun addChildForAccessibility(outChildren: ArrayList<View>) {
+        addAccessibleChildToList(iconView.asView(), outChildren)
+        addAccessibleChildToList(snapshotView, outChildren)
+        showWindowsView?.let { addAccessibleChildToList(it, outChildren) }
+    }
+
+    private fun addAccessibleChildToList(view: View, outChildren: ArrayList<View>) {
+        if (view.includeForAccessibility()) {
+            outChildren.add(view)
+        } else {
+            view.addChildrenForAccessibility(outChildren)
         }
     }
 }

@@ -15,8 +15,10 @@
  */
 package com.android.quickstep.views
 
+import android.annotation.SuppressLint
 import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.LauncherApps.AppUsageLimit
@@ -27,46 +29,58 @@ import android.icu.util.Measure
 import android.icu.util.MeasureUnit
 import android.os.UserHandle
 import android.provider.Settings
+import android.util.AttributeSet
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup.MarginLayoutParams
 import android.view.ViewOutlineProvider
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.core.util.component1
 import androidx.core.util.component2
-import androidx.core.view.updateLayoutParams
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SplitConfigurationOptions
+import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT
+import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+import com.android.launcher3.util.SplitConfigurationOptions.StagePosition
 import com.android.quickstep.TaskUtils
 import com.android.systemui.shared.recents.model.Task
 import java.time.Duration
 import java.util.Locale
 
-class DigitalWellBeingToast(
-    private val container: RecentsViewContainer,
-    private val taskView: TaskView
-) {
-    private val launcherApps: LauncherApps? =
-        container.asContext().getSystemService(LauncherApps::class.java)
+@SuppressLint("AppCompatCustomView")
+class DigitalWellBeingToast
+@JvmOverloads
+constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
+    defStyleRes: Int = 0
+) : TextView(context, attrs, defStyleAttr, defStyleRes) {
+    private val recentsViewContainer =
+        RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
+
+    private val launcherApps: LauncherApps? = context.getSystemService(LauncherApps::class.java)
 
     private val bannerHeight =
-        container
-            .asContext()
-            .resources
-            .getDimensionPixelSize(R.dimen.digital_wellbeing_toast_height)
+        context.resources.getDimensionPixelSize(R.dimen.digital_wellbeing_toast_height)
 
     private lateinit var task: Task
+    private lateinit var taskView: TaskView
+    private lateinit var snapshotView: View
+    @StagePosition private var stagePosition = STAGE_POSITION_UNDEFINED
 
     private var appRemainingTimeMs: Long = 0
-    private var banner: View? = null
-    private var oldBannerOutlineProvider: ViewOutlineProvider? = null
     private var splitOffsetTranslationY = 0f
-    private var splitOffsetTranslationX = 0f
+        set(value) {
+            if (field != value) {
+                field = value
+                updateTranslationY()
+            }
+        }
 
     private var isDestroyed = false
 
@@ -76,65 +90,63 @@ class DigitalWellBeingToast(
         set(value) {
             if (field != value) {
                 field = value
-                banner?.let {
-                    updateTranslationY()
-                    it.invalidateOutline()
-                }
+                updateTranslationY()
             }
         }
 
+    init {
+        setOnClickListener(::openAppUsageSettings)
+        outlineProvider =
+            object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    BACKGROUND.getOutline(view, outline)
+                    val verticalTranslation = splitOffsetTranslationY - translationY
+                    outline.offset(0, Math.round(verticalTranslation))
+                }
+            }
+        clipToOutline = true
+    }
+
     private fun setNoLimit() {
         hasLimit = false
-        taskView.contentDescription = task.titleDescription
-        replaceBanner(null)
+        setContentDescription(appUsageLimitTimeMs = -1, appRemainingTimeMs = -1)
+        visibility = INVISIBLE
         appRemainingTimeMs = -1
     }
 
     private fun setLimit(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
         this.appRemainingTimeMs = appRemainingTimeMs
         hasLimit = true
-        val toast =
-            container.viewCache
-                .getView<TextView>(
-                    R.layout.digital_wellbeing_toast,
-                    container.asContext(),
-                    taskView
-                )
-                .apply {
-                    text =
-                        Utilities.prefixTextWithIcon(
-                            container.asContext(),
-                            R.drawable.ic_hourglass_top,
-                            getBannerText()
-                        )
-                    setOnClickListener(::openAppUsageSettings)
-                }
-        replaceBanner(toast)
-
-        taskView.contentDescription =
-            getContentDescriptionForTask(task, appUsageLimitTimeMs, appRemainingTimeMs)
+        text = Utilities.prefixTextWithIcon(context, R.drawable.ic_hourglass_top, getBannerText())
+        visibility = VISIBLE
+        setContentDescription(appUsageLimitTimeMs, appRemainingTimeMs)
     }
 
-    fun initialize(task: Task) {
+    private fun setContentDescription(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
+        val contentDescription =
+            getContentDescriptionForTask(task, appUsageLimitTimeMs, appRemainingTimeMs)
+        snapshotView.contentDescription = contentDescription
+    }
+
+    fun initialize() {
         check(!isDestroyed) { "Cannot re-initialize a destroyed toast" }
-        this.task = task
+        setupTranslations()
         Executors.ORDERED_BG_EXECUTOR.execute {
             var usageLimit: AppUsageLimit? = null
             try {
                 usageLimit =
                     launcherApps?.getAppUsageLimit(
-                        this.task.topComponent.packageName,
-                        UserHandle.of(this.task.key.userId)
+                        task.topComponent.packageName,
+                        UserHandle.of(task.key.userId)
                     )
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing digital well being toast", e)
             }
             val appUsageLimitTimeMs = usageLimit?.totalUsageLimit ?: -1
             val appRemainingTimeMs = usageLimit?.usageRemaining ?: -1
+
             taskView.post {
-                if (isDestroyed) {
-                    return@post
-                }
+                if (isDestroyed) return@post
                 if (appUsageLimitTimeMs < 0 || appRemainingTimeMs < 0) {
                     setNoLimit()
                 } else {
@@ -144,20 +156,36 @@ class DigitalWellBeingToast(
         }
     }
 
-    /** Mark the DWB toast as destroyed and remove banner from TaskView. */
+    /** Bind the DWB toast to its dependencies. */
+    fun bind(
+        task: Task,
+        taskView: TaskView,
+        snapshotView: View,
+        @StagePosition stagePosition: Int
+    ) {
+        this.task = task
+        this.taskView = taskView
+        this.snapshotView = snapshotView
+        this.stagePosition = stagePosition
+        isDestroyed = false
+    }
+
+    /** Mark the DWB toast as destroyed and hide it. */
     fun destroy() {
+        visibility = INVISIBLE
         isDestroyed = true
-        taskView.post { replaceBanner(null) }
     }
 
     private fun getSplitBannerConfig(): SplitBannerConfig {
         val splitBounds = splitBounds
         return when {
-            splitBounds == null || !container.deviceProfile.isTablet || taskView.isLargeTile ->
-                SplitBannerConfig.SPLIT_BANNER_FULLSCREEN
+            splitBounds == null ||
+                !recentsViewContainer.deviceProfile.isTablet ||
+                taskView.isLargeTile -> SplitBannerConfig.SPLIT_BANNER_FULLSCREEN
             // For portrait grid only height of task changes, not width. So we keep the text the
             // same
-            !container.deviceProfile.isLeftRightSplit -> SplitBannerConfig.SPLIT_GRID_BANNER_LARGE
+            !recentsViewContainer.deviceProfile.isLeftRightSplit ->
+                SplitBannerConfig.SPLIT_GRID_BANNER_LARGE
             // For landscape grid, for 30% width we only show icon, otherwise show icon and time
             task.key.id == splitBounds.leftTopTaskId ->
                 if (splitBounds.leftTaskPercent < THRESHOLD_LEFT_ICON_ONLY)
@@ -193,8 +221,7 @@ class DigitalWellBeingToast(
                 MeasureFormat.getInstance(Locale.getDefault(), MeasureFormat.FormatWidth.WIDE)
                     .formatMeasures(Measure(minutes, MeasureUnit.MINUTE))
             // Use a specific string for usage less than one minute but non-zero.
-            duration > Duration.ZERO ->
-                container.asContext().getString(durationLessThanOneMinuteStringId)
+            duration > Duration.ZERO -> context.getString(durationLessThanOneMinuteStringId)
             // Otherwise, return 0-minute string.
             else ->
                 MeasureFormat.getInstance(Locale.getDefault(), MeasureFormat.FormatWidth.WIDE)
@@ -208,6 +235,7 @@ class DigitalWellBeingToast(
      * [.SPLIT_BANNER_FULLSCREEN]
      */
     @JvmOverloads
+    @VisibleForTesting
     fun getBannerText(
         remainingTime: Long = appRemainingTimeMs,
         forContentDesc: Boolean = false
@@ -226,7 +254,7 @@ class DigitalWellBeingToast(
         val splitBannerConfig = getSplitBannerConfig()
         return when {
             forContentDesc || splitBannerConfig == SplitBannerConfig.SPLIT_BANNER_FULLSCREEN ->
-                container.asContext().getString(R.string.time_left_for_app, readableDuration)
+                context.getString(R.string.time_left_for_app, readableDuration)
             // show no text
             splitBannerConfig == SplitBannerConfig.SPLIT_GRID_BANNER_SMALL -> ""
             // SPLIT_GRID_BANNER_LARGE only show time
@@ -241,7 +269,7 @@ class DigitalWellBeingToast(
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         try {
             val options = ActivityOptions.makeScaleUpAnimation(view, 0, 0, view.width, view.height)
-            container.asContext().startActivity(intent, options.toBundle())
+            context.startActivity(intent, options.toBundle())
 
             // TODO: add WW logging on the app usage settings click.
         } catch (e: ActivityNotFoundException) {
@@ -259,99 +287,77 @@ class DigitalWellBeingToast(
         appRemainingTimeMs: Long
     ): String? =
         if (appUsageLimitTimeMs >= 0 && appRemainingTimeMs >= 0)
-            container
-                .asContext()
-                .getString(
-                    R.string.task_contents_description_with_remaining_time,
-                    task.titleDescription,
-                    getBannerText(appRemainingTimeMs, true /* forContentDesc */)
-                )
+            context.getString(
+                R.string.task_contents_description_with_remaining_time,
+                task.titleDescription,
+                getBannerText(appRemainingTimeMs, true /* forContentDesc */)
+            )
         else task.titleDescription
 
-    private fun replaceBanner(view: View?) {
-        resetOldBanner()
-        setBanner(view)
-    }
-
-    private fun resetOldBanner() {
-        val banner = banner ?: return
-        banner.outlineProvider = oldBannerOutlineProvider
-        taskView.removeView(banner)
-        banner.setOnClickListener(null)
-        container.viewCache.recycleView(R.layout.digital_wellbeing_toast, banner)
-    }
-
-    private fun setBanner(banner: View?) {
-        this.banner = banner
-        if (banner != null && taskView.recentsView != null) {
-            setupAndAddBanner()
-            setBannerOutline()
+    fun setupLayout() {
+        val snapshotWidth: Int
+        val snapshotHeight: Int
+        val splitBounds = splitBounds
+        if (splitBounds == null) {
+            snapshotWidth = taskView.layoutParams.width
+            snapshotHeight =
+                taskView.layoutParams.height -
+                    recentsViewContainer.deviceProfile.overviewTaskThumbnailTopMarginPx
+        } else {
+            val groupedTaskSize =
+                taskView.pagedOrientationHandler.getGroupedTaskViewSizes(
+                    recentsViewContainer.deviceProfile,
+                    splitBounds,
+                    taskView.layoutParams.width,
+                    taskView.layoutParams.height
+                )
+            if (stagePosition == STAGE_POSITION_TOP_OR_LEFT) {
+                snapshotWidth = groupedTaskSize.first.x
+                snapshotHeight = groupedTaskSize.first.y
+            } else {
+                snapshotWidth = groupedTaskSize.second.x
+                snapshotHeight = groupedTaskSize.second.y
+            }
         }
+        taskView.pagedOrientationHandler.updateDwbBannerLayout(
+            taskView.layoutParams.width,
+            taskView.layoutParams.height,
+            taskView is GroupedTaskView,
+            recentsViewContainer.deviceProfile,
+            snapshotWidth,
+            snapshotHeight,
+            this
+        )
     }
 
-    private fun setupAndAddBanner() {
-        val banner = banner ?: return
-        banner.updateLayoutParams<FrameLayout.LayoutParams> {
-            bottomMargin =
-                (taskView.firstSnapshotView.layoutParams as MarginLayoutParams).bottomMargin
-        }
+    private fun setupTranslations() {
         val (translationX, translationY) =
-            taskView.pagedOrientationHandler.getDwbLayoutTranslations(
-                taskView.measuredWidth,
-                taskView.measuredHeight,
+            taskView.pagedOrientationHandler.getDwbBannerTranslations(
+                taskView.layoutParams.width,
+                taskView.layoutParams.height,
                 splitBounds,
-                container.deviceProfile,
+                recentsViewContainer.deviceProfile,
                 taskView.snapshotViews,
                 task.key.id,
-                banner
+                this
             )
-        splitOffsetTranslationX = translationX
-        splitOffsetTranslationY = translationY
-        updateTranslationY()
-        updateTranslationX()
-        taskView.addView(banner)
-    }
-
-    private fun setBannerOutline() {
-        val banner = banner ?: return
-        // TODO(b\273367585) to investigate why mBanner.getOutlineProvider() can be null
-        val oldBannerOutlineProvider =
-            if (banner.outlineProvider != null) banner.outlineProvider
-            else ViewOutlineProvider.BACKGROUND
-        this.oldBannerOutlineProvider = oldBannerOutlineProvider
-
-        banner.outlineProvider =
-            object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    oldBannerOutlineProvider.getOutline(view, outline)
-                    val verticalTranslation = -view.translationY + splitOffsetTranslationY
-                    outline.offset(0, Math.round(verticalTranslation))
-                }
-            }
-        banner.clipToOutline = true
+        this.translationX = translationX
+        this.splitOffsetTranslationY = translationY
     }
 
     private fun updateTranslationY() {
-        banner?.translationY = bannerOffsetPercentage * bannerHeight + splitOffsetTranslationY
+        translationY = bannerOffsetPercentage * bannerHeight + splitOffsetTranslationY
+        invalidateOutline()
     }
 
-    private fun updateTranslationX() {
-        banner?.translationX = splitOffsetTranslationX
-    }
-
-    fun setBannerColorTint(color: Int, amount: Float) {
-        val banner = banner ?: return
+    fun setColorTint(color: Int, amount: Float) {
         if (amount == 0f) {
-            banner.setLayerType(View.LAYER_TYPE_NONE, null)
+            setLayerType(View.LAYER_TYPE_NONE, null)
         }
         val layerPaint = Paint()
         layerPaint.setColorFilter(Utilities.makeColorTintingColorFilter(color, amount))
-        banner.setLayerType(View.LAYER_TYPE_HARDWARE, layerPaint)
-        banner.setLayerPaint(layerPaint)
-    }
-
-    fun setBannerVisibility(visibility: Int) {
-        banner?.visibility = visibility
+        setLayerType(View.LAYER_TYPE_HARDWARE, layerPaint)
+        setLayerPaint(layerPaint)
     }
 
     private fun getAccessibilityActionId(): Int =
@@ -361,9 +367,8 @@ class DigitalWellBeingToast(
 
     fun getDWBAccessibilityAction(): AccessibilityNodeInfo.AccessibilityAction? {
         if (!hasLimit) return null
-        val context = container.asContext()
         val label =
-            if ((taskView.containsMultipleTasks()))
+            if (taskView.containsMultipleTasks())
                 context.getString(
                     R.string.split_app_usage_settings,
                     TaskUtils.getTitle(context, task)

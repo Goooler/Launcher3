@@ -152,12 +152,12 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * How long to delay the icon/stash handle alpha.
      */
-    private static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
+    public static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
 
     /**
      * How long the icon/stash handle alpha animation plays.
      */
-    private static final long TASKBAR_STASH_ALPHA_DURATION = 50;
+    public static final long TASKBAR_STASH_ALPHA_DURATION = 50;
 
     /**
      * How long to delay the icon/stash handle alpha for the home to app taskbar animation.
