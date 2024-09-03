@@ -16,18 +16,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Fetch tags from upstream repository
         run: |
           git remote add upstream https://android.googlesource.com/platform/packages/apps/Launcher3
           git fetch upstream --tags
       - name: Push matching tags to the remote
         run: |
-          # Match tags like android-14.0.0_r66.
-          for tag in $(git tag -l "android-[0-9]*.[0-9]*.[0-9]*_r[0-9]*"); do
-            # If the tag doesn't exist in the remote repository, push it.
-            if ! git ls-remote --exit-code origin "refs/tags/$tag" &>/dev/null; then
-              git push origin "refs/tags/$tag"
-            fi
-          done
+          # Match tags like android-14.0.0_r66 and push them.
+          git tag | grep 'android-[0-9]*.[0-9]*.[0-9]*_r[0-9]*' | xargs --no-run-if-empty git push origin
