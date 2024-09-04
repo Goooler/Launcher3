@@ -25,7 +25,6 @@
     <attr name="popupColorPrimary" format="color" />
     <attr name="popupColorSecondary" format="color" />
     <attr name="popupColorTertiary" format="color" />
-    <attr name="popupColorBackground" format="color" />
     <attr name="popupTextColor" format="color" />
     <attr name="popupShadeFirst" format="color" />
     <attr name="popupShadeSecond" format="color" />

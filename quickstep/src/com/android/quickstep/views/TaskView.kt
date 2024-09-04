@@ -1042,7 +1042,10 @@ constructor(
                 ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED
             )
             val recentsView = recentsView ?: return null
-            if (recentsView.runningTaskViewId != -1) {
+            if (
+                recentsView.runningTaskViewId != -1 &&
+                    recentsView.mRecentsAnimationController != null
+            ) {
                 recentsView.onTaskLaunchedInLiveTileMode()
 
                 // Return a fresh callback in the live tile case, so that it's not accidentally

@@ -96,10 +96,10 @@ class OverviewCommandHelper(
 
     fun canStartHomeSafely(): Boolean = commandQueue.isEmpty() || commandQueue.first().type == HOME
 
-    /** Clear pending commands from the queue */
+    /** Clear pending or completed commands from the queue */
     fun clearPendingCommands() {
         Log.d(TAG, "clearing pending commands: $commandQueue")
-        commandQueue.clear()
+        commandQueue.removeAll { it.status != CommandStatus.PROCESSING }
     }
 
     /**
