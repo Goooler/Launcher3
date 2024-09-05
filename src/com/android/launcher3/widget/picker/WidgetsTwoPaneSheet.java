@@ -27,6 +27,7 @@ import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUti
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Process;
+import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -342,14 +343,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 false);
         mSuggestedWidgetsHeader.setExpanded(true);
 
-        PackageItemInfo packageItemInfo = new PackageItemInfo(
+        PackageItemInfo packageItemInfo = new HighresPackageItemInfo(
                 /* packageName= */ SUGGESTIONS_PACKAGE_NAME,
-                Process.myUserHandle()) {
-            @Override
-            public boolean usingLowResIcon() {
-                return false;
-            }
-        };
+                Process.myUserHandle());
         String suggestionsHeaderTitle = getContext().getString(
                 R.string.suggested_widgets_header_title);
         String suggestionsRightPaneTitle = getContext().getString(
@@ -663,5 +659,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
          * <p>If true, shows all widgets; else shows the default widgets.</p>
          */
         public boolean showAllWidgets = false;
+    }
+
+    private static class HighresPackageItemInfo extends PackageItemInfo {
+        HighresPackageItemInfo(String packageName, UserHandle user) {
+            super(packageName, user);
+        }
+
+        @Override
+        public boolean usingLowResIcon() {
+            return false;
+        }
     }
 }

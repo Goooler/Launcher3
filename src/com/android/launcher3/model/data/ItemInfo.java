@@ -51,6 +51,7 @@ import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logger.LauncherAtom.AllAppsContainer;
+import com.android.launcher3.logger.LauncherAtom.Attribute;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logger.LauncherAtom.PredictionContainer;
 import com.android.launcher3.logger.LauncherAtom.SettingsContainer;
@@ -67,6 +68,9 @@ import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.UserIconInfo;
 import com.android.systemui.shared.system.SysUiStatsLog;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -186,6 +190,12 @@ public class ItemInfo {
 
     @NonNull
     public UserHandle user;
+
+    @NonNull
+    private ExtendedContainers mExtendedContainers = ExtendedContainers.getDefaultInstance();
+
+    @NonNull
+    private List<Attribute> mAttributeList = Collections.EMPTY_LIST;
 
     public ItemInfo() {
         user = Process.myUserHandle();
@@ -433,6 +443,7 @@ public class ItemInfo {
         UserCache.INSTANCE.executeIfCreated(cache ->
                 itemBuilder.setUserType(getUserType(cache.getUserInfo(user))));
         itemBuilder.setRank(rank);
+        itemBuilder.addAllItemAttributes(mAttributeList);
         return itemBuilder;
     }
 
@@ -491,7 +502,7 @@ public class ItemInfo {
             default:
                 if (container <= EXTENDED_CONTAINERS) {
                     return ContainerInfo.newBuilder()
-                            .setExtendedContainers(getExtendedContainer())
+                            .setExtendedContainers(mExtendedContainers)
                             .build();
                 }
         }
@@ -499,12 +510,21 @@ public class ItemInfo {
     }
 
     /**
-     * Returns non-AOSP container wrapped by {@link ExtendedContainers} object. Should be overridden
-     * by build variants.
+     * Sets extra container info wrapped by {@link ExtendedContainers} object.
      */
-    @NonNull
-    protected ExtendedContainers getExtendedContainer() {
-        return ExtendedContainers.getDefaultInstance();
+    public void setExtendedContainers(@NonNull ExtendedContainers extendedContainers) {
+        mExtendedContainers = extendedContainers;
+    }
+
+    /**
+     * Adds extra attributes to be added during logs
+     */
+    public void addLogAttributes(List<LauncherAtom.Attribute> attributeList) {
+        if (mAttributeList.isEmpty()) {
+            mAttributeList = new ArrayList<>(attributeList);
+        } else {
+            mAttributeList.addAll(attributeList);
+        }
     }
 
     /**

@@ -74,7 +74,8 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             TYPE_TASKBAR_ALL_APPS,
             TYPE_ADD_TO_HOME_CONFIRMATION,
             TYPE_TASKBAR_OVERLAY_PROXY,
-            TYPE_TASKBAR_PINNING_POPUP
+            TYPE_TASKBAR_PINNING_POPUP,
+            TYPE_PIN_IME_POPUP
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FloatingViewType {}

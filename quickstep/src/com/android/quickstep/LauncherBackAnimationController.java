@@ -341,7 +341,9 @@ public class LauncherBackAnimationController {
         mTransaction
                 .setColor(mScrimLayer, colorComponents)
                 .setAlpha(mScrimLayer, mScrimAlpha)
-                .show(mScrimLayer);
+                .show(mScrimLayer)
+                // Ensure the scrim layer occludes opening task & wallpaper
+                .setLayer(mScrimLayer, 1000);
     }
 
     void removeScrimLayer() {
