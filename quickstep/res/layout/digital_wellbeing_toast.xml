@@ -27,4 +27,5 @@
     android:textColor="?attr/materialColorOnSecondaryFixed"
     android:textSize="14sp"
     android:autoSizeTextType="uniform"
-    android:autoSizeMaxTextSize="14sp"/>
+    android:autoSizeMaxTextSize="14sp"
+    android:visibility="gone"/>

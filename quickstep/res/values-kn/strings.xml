@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"ಟಾಸ್ಕ್‌ಬಾರ್ ಡಿವೈಡರ್"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ಮೇಲಿನ/ಎಡಭಾಗಕ್ಕೆ ಸರಿಸಿ"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"ಕೆಳಗಿನ/ಬಲಭಾಗಕ್ಕೆ ಸರಿಸಿ"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{ಇನ್ನೂ # ಆ್ಯಪ್ ಅನ್ನು ತೋರಿಸಿ.}one{ಇನ್ನೂ # ಆ್ಯಪ್‌ಗಳನ್ನು ತೋರಿಸಿ.}other{ಇನ್ನೂ # ಆ್ಯಪ್‌ಗಳನ್ನು ತೋರಿಸಿ.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# ಡೆಸ್ಕ್‌ಟಾಪ್ ಆ್ಯಪ್ ತೋರಿಸಿ.}one{# ಡೆಸ್ಕ್‌ಟಾಪ್ ಆ್ಯಪ್‌ಗಳನ್ನು ತೋರಿಸಿ.}other{# ಡೆಸ್ಕ್‌ಟಾಪ್ ಆ್ಯಪ್‌ಗಳನ್ನು ತೋರಿಸಿ.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{ಹೆಚ್ಚಿನ ಆ್ಯಪ್‌}one{ಹೆಚ್ಚಿನ ಆ್ಯಪ್‌ಗಳು}other{ಹೆಚ್ಚಿನ ಆ್ಯಪ್‌ಗಳು}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"ಡೆಸ್ಕ್‌ಟಾಪ್"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> ಮತ್ತು <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"ಬಬಲ್"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"ಓವರ್‌ಫ್ಲೋ"</string>

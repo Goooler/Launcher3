@@ -91,8 +91,8 @@
     <string name="allset_title" msgid="5021126669778966707">"Todo listo"</string>
     <string name="allset_hint" msgid="459504134589971527">"Pasa o dedo cara arriba para ir á pantalla de inicio"</string>
     <string name="allset_button_hint" msgid="2395219947744706291">"Toca o botón de inicio para ir á pantalla de inicio"</string>
-    <string name="allset_description_generic" msgid="5385500062202019855">"<xliff:g id="DEVICE">%1$s</xliff:g> xa está dispoñible para comezar a utilizar"</string>
-    <string name="default_device_name" msgid="6660656727127422487">"dispositivo"</string>
+    <string name="allset_description_generic" msgid="5385500062202019855">"<xliff:g id="DEVICE">%1$s</xliff:g> dispoñible para comezar a utilizar"</string>
+    <string name="default_device_name" msgid="6660656727127422487">"Dispositivo"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"Configuración da navegación do sistema"</annotation></string>
     <string name="action_share" msgid="2648470652637092375">"Compartir"</string>
     <string name="action_screenshot" msgid="8171125848358142917">"Facer captura"</string>
@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"Divisor da Barra de tarefas"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Mover á parte superior ou á esquerda"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Mover á parte inferior ou á dereita"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Mostrar # aplicación máis.}other{Mostrar # aplicacións máis.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{Mostrar # aplicación para ordenadores.}other{Mostrar # aplicacións para ordenadores.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{aplicación máis}other{aplicacións máis}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"Escritorio"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> e <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"Burbulla"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"Menú adicional"</string>

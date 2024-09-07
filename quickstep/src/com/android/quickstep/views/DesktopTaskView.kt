@@ -262,7 +262,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         }
         Log.d(
             TAG,
-            "launchTaskAnimated - launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated"
+            "launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated"
         )
 
         // Callbacks get run from recentsView for case when recents animation already running
@@ -270,11 +270,12 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         return endCallback
     }
 
-    override fun launchTaskAnimated() = launchTaskWithDesktopController(animated = true)
+    override fun launchAsStaticTile() = launchTaskWithDesktopController(animated = true)
 
-    override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
-    }
+    override fun launchWithoutAnimation(
+        isQuickSwitch: Boolean,
+        callback: (launched: Boolean) -> Unit
+    ) = launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
 
     // Desktop tile can't be in split screen
     override fun confirmSecondSplitSelectApp(): Boolean = false

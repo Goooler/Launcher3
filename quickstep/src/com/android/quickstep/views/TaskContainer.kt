@@ -177,6 +177,7 @@ class TaskContainer(
         addAccessibleChildToList(iconView.asView(), outChildren)
         addAccessibleChildToList(snapshotView, outChildren)
         showWindowsView?.let { addAccessibleChildToList(it, outChildren) }
+        digitalWellBeingToast?.let { addAccessibleChildToList(it, outChildren) }
     }
 
     private fun addAccessibleChildToList(view: View, outChildren: ArrayList<View>) {

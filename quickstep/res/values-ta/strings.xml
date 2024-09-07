@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"செயல் பட்டிப் பிரிப்பான்"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"மேலே/இடதுபுறம் நகர்த்தும்"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"கீழே/வலதுபுறம் நகர்த்தும்"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{மேலும் # ஆப்ஸைக் காட்டு.}other{மேலும் # ஆப்ஸைக் காட்டு.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# டெஸ்க்டாப் ஆப்ஸைக் காட்டு.}other{# டெஸ்க்டாப் ஆப்ஸைக் காட்டு.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{கூடுதல் ஆப்ஸ்}other{கூடுதல் ஆப்ஸ்}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"டெஸ்க்டாப்"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> மற்றும் <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"குமிழ்"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"கூடுதல் விருப்பங்களைக் காட்டும்"</string>

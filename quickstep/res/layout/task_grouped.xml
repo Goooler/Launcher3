@@ -75,10 +75,8 @@
         android:layout_width="wrap_content" />
 
     <include layout="@layout/digital_wellbeing_toast"
-        android:id="@+id/digital_wellbeing_toast"
-        android:visibility="invisible"/>
+        android:id="@+id/digital_wellbeing_toast"/>
 
     <include layout="@layout/digital_wellbeing_toast"
-        android:id="@+id/bottomRight_digital_wellbeing_toast"
-        android:visibility="invisible"/>
+        android:id="@+id/bottomRight_digital_wellbeing_toast"/>
 </com.android.quickstep.views.GroupedTaskView>

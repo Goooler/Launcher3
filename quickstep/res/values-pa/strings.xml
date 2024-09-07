@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"ਟਾਸਕਬਾਰ ਵਿਭਾਜਕ"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ਸਿਖਰਲੇ/ਖੱਬੇ ਪਾਸੇ ਲੈ ਕੇ ਜਾਓ"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"ਹੇਠਾਂ/ਸੱਜੇ ਪਾਸੇ ਲੈ ਕੇ ਜਾਓ"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{# ਹੋਰ ਐਪ ਦਿਖਾਓ।}one{# ਹੋਰ ਐਪ ਦਿਖਾਓ।}other{# ਹੋਰ ਐਪਾਂ ਦਿਖਾਓ।}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# ਡੈਸਕਟਾਪ ਐਪ ਦਿਖਾਓ।}one{# ਡੈਸਕਟਾਪ ਐਪ ਦਿਖਾਓ।}other{# ਡੈਸਕਟਾਪ ਐਪਾਂ ਦਿਖਾਓ।}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{ਹੋਰ ਐਪ}one{ਹੋਰ ਐਪ}other{ਹੋਰ ਐਪਾਂ}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"ਡੈਸਕਟਾਪ"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> ਅਤੇ <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"ਬਬਲ"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"ਓਵਰਫ਼ਲੋ"</string>

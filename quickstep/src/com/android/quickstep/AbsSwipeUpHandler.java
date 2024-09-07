@@ -2370,7 +2370,7 @@ public abstract class AbsSwipeUpHandler<
                     ActiveGestureLog.INSTANCE.trackEvent(EXPECTING_TASK_APPEARED);
                 }
                 ActiveGestureLog.INSTANCE.addLog(nextTaskLog);
-                nextTask.launchTask(success -> {
+                nextTask.launchWithoutAnimation(true, success -> {
                     resultCallback.accept(success);
                     if (success) {
                         if (hasTaskPreviouslyAppeared) {
@@ -2383,7 +2383,7 @@ public abstract class AbsSwipeUpHandler<
                         }
                     }
                     return Unit.INSTANCE;
-                }, true /* freezeTaskList */);
+                }  /* freezeTaskList */);
             } else {
                 mContainerInterface.onLaunchTaskFailed();
                 Toast.makeText(mContext, R.string.activity_not_available, LENGTH_SHORT).show();

@@ -535,6 +535,18 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
             int parentWidth, int parentHeight, SplitBounds splitBoundsConfig,
             DeviceProfile dp, boolean isRtl) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
+
+        FrameLayout.LayoutParams primaryParams =
+                (FrameLayout.LayoutParams) primarySnapshot.getLayoutParams();
+        FrameLayout.LayoutParams secondaryParams =
+                (FrameLayout.LayoutParams) secondarySnapshot.getLayoutParams();
+
+        // Reset margin and translations that aren't used in this method, but are used in other
+        // `RecentsPagedOrientationHandler` variants.
+        secondaryParams.topMargin = 0;
+        primaryParams.topMargin = spaceAboveSnapshot;
+        primarySnapshot.setTranslationY(0);
+
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
         float dividerScale = splitBoundsConfig.appsStackedVertically
                 ? splitBoundsConfig.dividerHeightPercent
@@ -552,24 +564,14 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
                 secondarySnapshot.setTranslationX(translationX);
                 primarySnapshot.setTranslationX(0);
             }
-            secondarySnapshot.setTranslationY(spaceAboveSnapshot);
 
-            // Reset unused translations
-            primarySnapshot.setTranslationY(0);
+            secondarySnapshot.setTranslationY(spaceAboveSnapshot);
         } else {
             float finalDividerHeight = Math.round(totalThumbnailHeight * dividerScale);
             float translationY = taskViewSizes.first.y + spaceAboveSnapshot + finalDividerHeight;
             secondarySnapshot.setTranslationY(translationY);
 
-            FrameLayout.LayoutParams primaryParams =
-                    (FrameLayout.LayoutParams) primarySnapshot.getLayoutParams();
-            FrameLayout.LayoutParams secondaryParams =
-                    (FrameLayout.LayoutParams) secondarySnapshot.getLayoutParams();
-            secondaryParams.topMargin = 0;
-            primaryParams.topMargin = spaceAboveSnapshot;
-
-            // Reset unused translations
-            primarySnapshot.setTranslationY(0);
+            // Reset unused translations.
             secondarySnapshot.setTranslationX(0);
             primarySnapshot.setTranslationX(0);
         }

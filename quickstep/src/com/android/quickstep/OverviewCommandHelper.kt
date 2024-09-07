@@ -25,16 +25,26 @@ import android.util.Log
 import android.view.View
 import androidx.annotation.BinderThread
 import androidx.annotation.UiThread
+import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.Cuj
+import com.android.launcher3.Flags.enableOverviewCommandHelperTimeout
 import com.android.launcher3.PagedView
 import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.logger.LauncherAtom
 import com.android.launcher3.logging.StatsLogManager
-import com.android.launcher3.logging.StatsLogManager.LauncherEvent.*
+import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_3_BUTTON
+import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_KEYBOARD_QUICK_SWITCH
+import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_KEYBOARD_SHORTCUT
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.RunnableList
+import com.android.launcher3.util.coroutines.DispatcherProvider
+import com.android.launcher3.util.coroutines.ProductionDispatchers
 import com.android.quickstep.OverviewCommandHelper.CommandInfo.CommandStatus
-import com.android.quickstep.OverviewCommandHelper.CommandType.*
+import com.android.quickstep.OverviewCommandHelper.CommandType.HIDE
+import com.android.quickstep.OverviewCommandHelper.CommandType.HOME
+import com.android.quickstep.OverviewCommandHelper.CommandType.KEYBOARD_INPUT
+import com.android.quickstep.OverviewCommandHelper.CommandType.SHOW
+import com.android.quickstep.OverviewCommandHelper.CommandType.TOGGLE
 import com.android.quickstep.util.ActiveGestureLog
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
@@ -43,13 +53,25 @@ import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper
 import java.io.PrintWriter
 import java.util.concurrent.ConcurrentLinkedDeque
+import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 
 /** Helper class to handle various atomic commands for switching between Overview. */
-class OverviewCommandHelper(
+class OverviewCommandHelper
+@JvmOverloads
+constructor(
     private val touchInteractionService: TouchInteractionService,
     private val overviewComponentObserver: OverviewComponentObserver,
-    private val taskAnimationManager: TaskAnimationManager
+    private val taskAnimationManager: TaskAnimationManager,
+    private val dispatcherProvider: DispatcherProvider = ProductionDispatchers,
 ) {
+    private val coroutineScope = CoroutineScope(SupervisorJob() + dispatcherProvider.default)
+
     private val commandQueue = ConcurrentLinkedDeque<CommandInfo>()
 
     /**
@@ -79,10 +101,10 @@ class OverviewCommandHelper(
      * dropped.
      */
     @BinderThread
-    fun addCommand(type: CommandType) {
+    fun addCommand(type: CommandType): CommandInfo? {
         if (commandQueue.size >= MAX_QUEUE_SIZE) {
-            Log.d(TAG, "commands queue is full ($commandQueue). command not added: $type")
-            return
+            Log.d(TAG, "command not added: $type - queue is full ($commandQueue).")
+            return null
         }
 
         val command = CommandInfo(type)
@@ -90,8 +112,17 @@ class OverviewCommandHelper(
         Log.d(TAG, "command added: $command")
 
         if (commandQueue.size == 1) {
-            Executors.MAIN_EXECUTOR.execute { executeNext() }
+            Log.d(TAG, "execute: $command - queue size: ${commandQueue.size}")
+            if (enableOverviewCommandHelperTimeout()) {
+                coroutineScope.launch(dispatcherProvider.main) { processNextCommand() }
+            } else {
+                Executors.MAIN_EXECUTOR.execute { processNextCommand() }
+            }
+        } else {
+            Log.d(TAG, "not executed: $command - queue size: ${commandQueue.size}")
         }
+
+        return command
     }
 
     fun canStartHomeSafely(): Boolean = commandQueue.isEmpty() || commandQueue.first().type == HOME
@@ -108,7 +139,7 @@ class OverviewCommandHelper(
      * completion (returns false).
      */
     @UiThread
-    private fun executeNext() {
+    private fun processNextCommand() {
         val command: CommandInfo =
             commandQueue.firstOrNull()
                 ?: run {
@@ -119,12 +150,22 @@ class OverviewCommandHelper(
         command.status = CommandStatus.PROCESSING
         Log.d(TAG, "executing command: $command")
 
-        val result = executeCommand(command)
-        Log.d(TAG, "command executed: $command with result: $result")
-        if (result) {
-            onCommandFinished(command)
+        if (enableOverviewCommandHelperTimeout()) {
+            coroutineScope.launch(dispatcherProvider.main) {
+                withTimeout(QUEUE_WAIT_DURATION_IN_MS) {
+                    executeCommandSuspended(command)
+                    ensureActive()
+                    onCommandFinished(command)
+                }
+            }
         } else {
-            Log.d(TAG, "waiting for command callback: $command")
+            val result = executeCommand(command, onCallbackResult = { onCommandFinished(command) })
+            Log.d(TAG, "command executed: $command with result: $result")
+            if (result) {
+                onCommandFinished(command)
+            } else {
+                Log.d(TAG, "waiting for command callback: $command")
+            }
         }
     }
 
@@ -132,7 +173,9 @@ class OverviewCommandHelper(
      * Executes the task and returns true if next task can be executed. If false, then the next task
      * is deferred until [.scheduleNextTask] is called
      */
-    private fun executeCommand(command: CommandInfo): Boolean {
+    @VisibleForTesting
+    fun executeCommand(command: CommandInfo, onCallbackResult: () -> Unit): Boolean {
+        // This shouldn't happen if we execute 1 command per time.
         if (waitForToggleCommandComplete && command.type == TOGGLE) {
             Log.d(TAG, "executeCommand: $command - waiting for toggle command complete")
             return true
@@ -141,15 +184,37 @@ class OverviewCommandHelper(
         val recentsView = visibleRecentsView
         Log.d(TAG, "executeCommand: $command - visibleRecentsView: $recentsView")
         return if (recentsView != null) {
-            executeWhenRecentsIsVisible(command, recentsView)
+            executeWhenRecentsIsVisible(command, recentsView, onCallbackResult)
         } else {
-            executeWhenRecentsIsNotVisible(command)
+            executeWhenRecentsIsNotVisible(command, onCallbackResult)
         }
     }
+
+    /**
+     * Executes the task and returns true if next task can be executed. If false, then the next task
+     * is deferred until [.scheduleNextTask] is called
+     */
+    private suspend fun executeCommandSuspended(command: CommandInfo) =
+        suspendCancellableCoroutine { continuation ->
+            fun processResult(isCompleted: Boolean) {
+                Log.d(TAG, "command executed: $command with result: $isCompleted")
+                if (isCompleted) {
+                    continuation.resume(Unit)
+                } else {
+                    Log.d(TAG, "waiting for command callback: $command")
+                }
+            }
+
+            val result = executeCommand(command, onCallbackResult = { processResult(true) })
+            processResult(result)
+
+            continuation.invokeOnCancellation { cancelCommand(command, it) }
+        }
 
     private fun executeWhenRecentsIsVisible(
         command: CommandInfo,
         recentsView: RecentsView<*, *>,
+        onCallbackResult: () -> Unit,
     ): Boolean =
         when (command.type) {
             SHOW -> true // already visible
@@ -161,7 +226,7 @@ class OverviewCommandHelper(
                     keyboardTaskFocusIndex = PagedView.INVALID_PAGE
                     val currentPage = recentsView.nextPage
                     val taskView = recentsView.getTaskViewAt(currentPage)
-                    launchTask(recentsView, taskView, command)
+                    launchTask(recentsView, taskView, command, onCallbackResult)
                 }
             }
             TOGGLE -> {
@@ -171,7 +236,7 @@ class OverviewCommandHelper(
                     } else {
                         recentsView.nextTaskView ?: recentsView.runningTaskView
                     }
-                launchTask(recentsView, taskView, command)
+                launchTask(recentsView, taskView, command, onCallbackResult)
             }
             HOME -> {
                 recentsView.startHome()
@@ -182,19 +247,20 @@ class OverviewCommandHelper(
     private fun launchTask(
         recents: RecentsView<*, *>,
         taskView: TaskView?,
-        command: CommandInfo
+        command: CommandInfo,
+        onCallbackResult: () -> Unit
     ): Boolean {
         var callbackList: RunnableList? = null
         if (taskView != null) {
             waitForToggleCommandComplete = true
             taskView.isEndQuickSwitchCuj = true
-            callbackList = taskView.launchTasks()
+            callbackList = taskView.launchWithAnimation()
         }
 
         if (callbackList != null) {
             callbackList.add {
                 Log.d(TAG, "launching task callback: $command")
-                onCommandFinished(command)
+                onCallbackResult()
                 waitForToggleCommandComplete = false
             }
             Log.d(TAG, "launching task - waiting for callback: $command")
@@ -206,7 +272,10 @@ class OverviewCommandHelper(
         }
     }
 
-    private fun executeWhenRecentsIsNotVisible(command: CommandInfo): Boolean {
+    private fun executeWhenRecentsIsNotVisible(
+        command: CommandInfo,
+        onCallbackResult: () -> Unit
+    ): Boolean {
         val recentsViewContainer = activityInterface.getCreatedContainer() as? RecentsViewContainer
         val recentsView: RecentsView<*, *>? = recentsViewContainer?.getOverviewPanel()
         val deviceProfile = recentsViewContainer?.getDeviceProfile()
@@ -263,7 +332,7 @@ class OverviewCommandHelper(
                     Log.d(TAG, "switching to Overview state - onAnimationEnd: $command")
                     super.onAnimationEnd(animation)
                     onRecentsViewFocusUpdated(command)
-                    onCommandFinished(command)
+                    onCallbackResult()
                 }
             }
         if (activityInterface.switchToRecentsIfVisible(animatorListener)) {
@@ -289,7 +358,7 @@ class OverviewCommandHelper(
                 command.createTime
             )
         interactionHandler.setGestureEndCallback {
-            onTransitionComplete(command, interactionHandler)
+            onTransitionComplete(command, interactionHandler, onCallbackResult)
         }
         interactionHandler.initWhenReady("OverviewCommandHelper: command.type=${command.type}")
 
@@ -321,11 +390,6 @@ class OverviewCommandHelper(
                 }
             }
 
-        // TODO(b/361768912): Dead code. Remove or update after this bug is fixed.
-        //        if (visibleRecentsView != null) {
-        //            visibleRecentsView.moveRunningTaskToFront();
-        //        }
-
         if (taskAnimationManager.isRecentsAnimationRunning) {
             command.setAnimationCallbacks(
                 taskAnimationManager.continueRecentsAnimation(gestureState)
@@ -351,29 +415,40 @@ class OverviewCommandHelper(
         return false
     }
 
-    private fun onTransitionComplete(command: CommandInfo, handler: AbsSwipeUpHandler<*, *, *>) {
+    private fun onTransitionComplete(
+        command: CommandInfo,
+        handler: AbsSwipeUpHandler<*, *, *>,
+        onCommandResult: () -> Unit
+    ) {
         Log.d(TAG, "switching via recents animation - onTransitionComplete: $command")
         command.removeListener(handler)
         Trace.endAsyncSection(TRANSITION_NAME, 0)
         onRecentsViewFocusUpdated(command)
-        onCommandFinished(command)
+        onCommandResult()
     }
 
     /** Called when the command finishes execution. */
     private fun onCommandFinished(command: CommandInfo) {
         command.status = CommandStatus.COMPLETED
-        if (commandQueue.first() !== command) {
+        if (commandQueue.firstOrNull() !== command) {
             Log.d(
                 TAG,
                 "next task not scheduled. First pending command type " +
-                    "is ${commandQueue.first()} - command type is: $command"
+                    "is ${commandQueue.firstOrNull()} - command type is: $command"
             )
             return
         }
 
         Log.d(TAG, "command executed successfully! $command")
         commandQueue.remove(command)
-        executeNext()
+        processNextCommand()
+    }
+
+    private fun cancelCommand(command: CommandInfo, throwable: Throwable?) {
+        command.status = CommandStatus.CANCELED
+        Log.e(TAG, "command cancelled: $command - $throwable")
+        commandQueue.remove(command)
+        processNextCommand()
     }
 
     private fun updateRecentsViewFocus(command: CommandInfo) {
@@ -447,7 +522,8 @@ class OverviewCommandHelper(
         pw.println("  waitForToggleCommandComplete=$waitForToggleCommandComplete")
     }
 
-    private data class CommandInfo(
+    @VisibleForTesting
+    data class CommandInfo(
         val type: CommandType,
         var status: CommandStatus = CommandStatus.IDLE,
         val createTime: Long = SystemClock.elapsedRealtime(),
@@ -468,7 +544,8 @@ class OverviewCommandHelper(
         enum class CommandStatus {
             IDLE,
             PROCESSING,
-            COMPLETED
+            COMPLETED,
+            CANCELED
         }
     }
 
@@ -489,5 +566,6 @@ class OverviewCommandHelper(
          * should be enough. We'll toss in one more because we're kind hearted.
          */
         private const val MAX_QUEUE_SIZE = 3
+        private const val QUEUE_WAIT_DURATION_IN_MS = 5000L
     }
 }

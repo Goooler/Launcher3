@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"태스크 바 분할"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"상단/왼쪽으로 이동"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"하단/오른쪽으로 이동"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{앱 #개 더 표시}other{앱 #개 더 표시}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{데스크톱 앱 #개를 표시합니다.}other{데스크톱 앱 #개를 표시합니다.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{추가 앱}other{추가 앱}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"데스크톱"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> 및 <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"풍선"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"더보기"</string>

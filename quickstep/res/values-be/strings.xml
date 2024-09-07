@@ -141,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"Раздзяляльнік панэлі задач"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Перамясціць уверх/улева"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Перамясціць уніз/управа"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Паказаць ячшэ # праграму.}one{Паказаць ячшэ # праграму.}few{Паказаць ячшэ # праграмы.}many{Паказаць ячшэ # праграм.}other{Паказаць ячшэ # праграмы.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{Паказаць # праграму для ПК.}one{Паказаць # праграму для ПК.}few{Паказаць # праграмы для ПК.}many{Паказаць # праграм для ПК.}other{Паказаць # праграмы для ПК.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{даступная праграма}one{даступная праграма}few{даступныя праграмы}many{даступных праграм}other{даступнай праграмы}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"Працоўны стол"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> і <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"Бурбалкі"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"Меню з пашырэннем"</string>

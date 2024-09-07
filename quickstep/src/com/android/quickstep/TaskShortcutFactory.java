@@ -431,7 +431,7 @@ public interface TaskShortcutFactory {
 
         @Override
         public void onClick(View view) {
-            if (mTaskView.launchTaskAnimated() != null) {
+            if (mTaskView.launchAsStaticTile() != null) {
                 SystemUiProxy.INSTANCE.get(mTarget.asContext()).startScreenPinning(
                         mTaskView.getFirstTask().key.id);
             }

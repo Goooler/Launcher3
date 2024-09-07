@@ -34,9 +34,6 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVI
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NOTIFICATION_DOT_ENABLED
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_THEMED_ICON_DISABLED
 import com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY
-import com.google.android.apps.nexuslauncher.PrefKey.KEY_ENABLE_MINUS_ONE
-import com.google.android.apps.nexuslauncher.PrefKey.OVERVIEW_SUGGESTED_ACTIONS
-import com.google.android.apps.nexuslauncher.PrefKey.SMARTSPACE_ON_HOME_SCREEN
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -141,7 +138,14 @@ class SettingsChangeLoggerTest {
             .isTrue()
         assertThat(capturedEvents.any { it.id == LAUNCHER_HOME_SCREEN_SUGGESTIONS_ENABLED.id })
             .isTrue()
-        // LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED
-        assertThat(capturedEvents.any { it.id == 617 }).isTrue()
+        assertThat(capturedEvents.any { it.id == LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED }).isTrue()
+    }
+
+    companion object {
+        private const val KEY_ENABLE_MINUS_ONE = "pref_enable_minus_one"
+        private const val OVERVIEW_SUGGESTED_ACTIONS = "pref_overview_action_suggestions"
+        private const val SMARTSPACE_ON_HOME_SCREEN = "pref_smartspace_home_screen"
+
+        private const val LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED = 617
     }
 }

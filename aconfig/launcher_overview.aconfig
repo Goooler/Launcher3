@@ -39,3 +39,12 @@ flag {
     bug: "353947137"
 }
 
+flag {
+    name: "enable_overview_command_helper_timeout"
+    namespace: "launcher_overview"
+    description: "Enables OverviewCommandHelper new version with a timeout to prevent the queue to be unresponsive."
+    bug: "351122926"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}

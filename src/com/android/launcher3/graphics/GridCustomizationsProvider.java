@@ -32,6 +32,7 @@ import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
 import android.os.Message;
 import android.os.Messenger;
+import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
@@ -80,8 +81,10 @@ public class GridCustomizationsProvider extends ContentProvider {
     private static final String KEY_SURFACE_PACKAGE = "surface_package";
     private static final String KEY_CALLBACK = "callback";
     public static final String KEY_HIDE_BOTTOM_ROW = "hide_bottom_row";
+    public static final String KEY_GRID_NAME = "grid_name";
 
     private static final int MESSAGE_ID_UPDATE_PREVIEW = 1337;
+    private static final int MESSAGE_ID_UPDATE_GRID = 7414;
 
     /**
      * Here we use the IBinder and the screen ID as the key of the active previews.
@@ -245,11 +248,22 @@ public class GridCustomizationsProvider extends ContentProvider {
             if (destroyed) {
                 return true;
             }
-            if (message.what == MESSAGE_ID_UPDATE_PREVIEW) {
-                renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
-            } else {
-                destroyObserver(this);
+
+            switch (message.what) {
+                case MESSAGE_ID_UPDATE_PREVIEW:
+                    renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
+                    break;
+                case MESSAGE_ID_UPDATE_GRID:
+                    String gridName = message.getData().getString(KEY_GRID_NAME);
+                    if (!TextUtils.isEmpty(gridName)) {
+                        renderer.updateGrid(gridName);
+                    }
+                    break;
+                default:
+                    destroyObserver(this);
+                    break;
             }
+
             return true;
         }
 

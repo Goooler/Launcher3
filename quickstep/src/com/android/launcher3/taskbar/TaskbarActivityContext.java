@@ -1431,7 +1431,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                                 && !(foundTaskView instanceof DesktopTaskView)) {
                             TestLogging.recordEvent(
                                     TestProtocol.SEQUENCE_MAIN, "start: taskbarAppIcon");
-                            foundTaskView.launchTasks();
+                            foundTaskView.launchWithAnimation();
                             return;
                         }
                     }

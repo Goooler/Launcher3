@@ -39,6 +39,7 @@ import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.core.util.component1
 import androidx.core.util.component2
+import androidx.core.view.isVisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.Executors
@@ -108,18 +109,18 @@ constructor(
     }
 
     private fun setNoLimit() {
+        isVisible = false
         hasLimit = false
-        setContentDescription(appUsageLimitTimeMs = -1, appRemainingTimeMs = -1)
-        visibility = INVISIBLE
         appRemainingTimeMs = -1
+        setContentDescription(appUsageLimitTimeMs = -1, appRemainingTimeMs = -1)
     }
 
     private fun setLimit(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
-        this.appRemainingTimeMs = appRemainingTimeMs
+        isVisible = true
         hasLimit = true
-        text = Utilities.prefixTextWithIcon(context, R.drawable.ic_hourglass_top, getBannerText())
-        visibility = VISIBLE
+        this.appRemainingTimeMs = appRemainingTimeMs
         setContentDescription(appUsageLimitTimeMs, appRemainingTimeMs)
+        text = Utilities.prefixTextWithIcon(context, R.drawable.ic_hourglass_top, getBannerText())
     }
 
     private fun setContentDescription(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
@@ -172,7 +173,7 @@ constructor(
 
     /** Mark the DWB toast as destroyed and hide it. */
     fun destroy() {
-        visibility = INVISIBLE
+        isVisible = false
         isDestroyed = true
     }
 

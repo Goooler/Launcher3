@@ -731,16 +731,19 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
         val mainRootCandidate = splitRoots.first
         // Will contain changes (1) and (2) in diagram above
         val leafRoots: List<Change> = splitRoots.second
+        // Don't rely on DP.isLeftRightSplit because if launcher is portrait apps could still
+        // launch in landscape if system auto-rotate is enabled and phone is held horizontally
+        val isLeftRightSplit = leafRoots.all { it.endAbsBounds.top == 0 }
 
         // Find the place where our left/top app window meets the divider (used for the
         // launcher side animation)
         val leftTopApp =
             leafRoots.single { change ->
-                (dp.isLeftRightSplit && change.endAbsBounds.left == 0) ||
-                    (!dp.isLeftRightSplit && change.endAbsBounds.top == 0)
+                (isLeftRightSplit && change.endAbsBounds.left == 0) ||
+                    (!isLeftRightSplit && change.endAbsBounds.top == 0)
             }
         val dividerPos =
-            if (dp.isLeftRightSplit) leftTopApp.endAbsBounds.right
+            if (isLeftRightSplit) leftTopApp.endAbsBounds.right
             else leftTopApp.endAbsBounds.bottom
 
         // Create a new floating view in Launcher, positioned above the launching icon

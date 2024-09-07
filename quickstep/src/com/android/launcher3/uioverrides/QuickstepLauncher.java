@@ -610,7 +610,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                                         .append(" is missing."),
                                 QUICK_SWITCH_FROM_HOME_FALLBACK);
                     }
-                    taskToLaunch.launchTask(success -> {
+                    taskToLaunch.launchWithoutAnimation(success -> {
                         if (!success) {
                             getStateManager().goToState(OVERVIEW);
                         } else {

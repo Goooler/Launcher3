@@ -52,7 +52,11 @@ class DeviceConfigWrapper private constructor(propReader: PropReader) {
         )
 
     val lpnhTimeoutMs =
-        propReader.get("LPNH_TIMEOUT_MS", 450, "Controls lpnh timeout in milliseconds")
+        propReader.get(
+            "LPNH_TIMEOUT_MS",
+            DEFAULT_LPNH_TIMEOUT_MS,
+            "Controls lpnh timeout in milliseconds"
+        )
 
     val lpnhSlopPercentage =
         propReader.get("LPNH_SLOP_PERCENTAGE", 100, "Controls touch slop percentage for lpnh")
@@ -172,5 +176,7 @@ class DeviceConfigWrapper private constructor(propReader: PropReader) {
         @JvmStatic val configHelper by lazy { DeviceConfigHelper(::DeviceConfigWrapper) }
 
         @JvmStatic fun get() = configHelper.config
+
+        const val DEFAULT_LPNH_TIMEOUT_MS = 450
     }
 }

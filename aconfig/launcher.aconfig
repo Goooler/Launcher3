@@ -360,3 +360,31 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "one_grid_specs"
+    namespace: "launcher"
+    description: "Defines the new specs for grids based on OneGrid"
+    bug: "364711064"
+}
+
+flag {
+    name: "one_grid_mounted_mode"
+    namespace: "launcher"
+    description: "Support a fixed landscape mode for handheld devices"
+    bug: "364711735"
+}
+
+flag {
+    name: "one_grid_rotation_handling"
+    namespace: "launcher"
+    description: "New landscape approach for the workspace using different rows and columns in landscape and portrait"
+    bug: "364711814"
+}
+
+flag {
+    name: "grid_migration_refactor"
+    namespace: "launcher"
+    description: "Refactor grid migration such that the code is simpler to understand and update"
+    bug: "358399271"
+}
