@@ -463,7 +463,8 @@ public class TaskbarLauncherStateController {
             controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
         });
 
-        mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_OVERVIEW,
+        TaskbarStashController stashController = mControllers.taskbarStashController;
+        stashController.updateStateForFlag(FLAG_IN_OVERVIEW,
                 mLauncherState == LauncherState.OVERVIEW);
 
         AnimatorSet animatorSet = new AnimatorSet();
@@ -495,8 +496,6 @@ public class TaskbarLauncherStateController {
                 public void onAnimationStart(Animator animation) {
                     mIsAnimatingToLauncher = isInLauncher;
 
-                    TaskbarStashController stashController =
-                            mControllers.taskbarStashController;
                     if (DEBUG) {
                         Log.d(TAG, "onAnimationStart - FLAG_IN_APP: " + !isInLauncher);
                     }
@@ -512,6 +511,8 @@ public class TaskbarLauncherStateController {
 
             // Handle closing open popups when going home/overview
             handleOpenFloatingViews = true;
+        } else {
+            stashController.applyState();
         }
 
         if (handleOpenFloatingViews && isInLauncher) {

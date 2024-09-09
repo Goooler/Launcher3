@@ -516,8 +516,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 isInState(() -> LauncherState.NORMAL));
     }
 
-    //TODO(b/359277238): fix falling tests
-    @Ignore
     @Test
     @PortraitLandscape
     @TaskbarModeSwitch

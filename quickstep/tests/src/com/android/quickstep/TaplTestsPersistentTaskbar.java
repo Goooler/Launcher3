@@ -23,7 +23,6 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.quickstep.NavigationModeSwitchRule.NavigationModeSwitch;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -31,8 +30,6 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class TaplTestsPersistentTaskbar extends AbstractTaplTestsTaskbar {
 
-    //TODO(b/359277238): fix falling tests
-    @Ignore
     @Test
     @NavigationModeSwitch
     public void testTaskbarFillsWidth() {

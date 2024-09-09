@@ -1137,6 +1137,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_TRANSIENT_TASKBAR,
                     !hasAnyFlag(FLAG_STASHED_IN_APP_AUTO));
         }
+        if (hasAnyFlag(changedFlags, FLAG_IN_OVERVIEW | FLAG_IN_APP)) {
+            mControllers.runAfterInit(() -> mControllers.taskbarInsetsController
+                    .onTaskbarOrBubblebarWindowHeightOrInsetsChanged());
+        }
         mActivity.applyForciblyShownFlagWhileTransientTaskbarUnstashed(!isStashedInApp());
     }
 
