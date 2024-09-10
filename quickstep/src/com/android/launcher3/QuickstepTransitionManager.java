@@ -56,7 +56,6 @@ import static com.android.launcher3.config.FeatureFlags.ENABLE_BACK_SWIPE_HOME_A
 import static com.android.launcher3.config.FeatureFlags.ENABLE_SCRIM_FOR_APP_LAUNCH;
 import static com.android.launcher3.config.FeatureFlags.KEYGUARD_ANIMATION;
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
-import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.testing.shared.TestProtocol.WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE;
 import static com.android.launcher3.util.DisplayController.isTransientTaskbar;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
@@ -138,8 +137,8 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.DynamicResource;
-import com.android.launcher3.util.ObjectWrapper;
 import com.android.launcher3.util.RunnableList;
+import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.ScrimView;
@@ -174,6 +173,7 @@ import com.android.wm.shell.startingsurface.IStartingWindowListener;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -434,7 +434,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
      */
     private void addLaunchCookie(IBinder cookie, ItemInfo info, ActivityOptions options) {
         if (cookie == null) {
-            cookie = mLauncher.getLaunchCookie(info);
+            cookie = StableViewInfo.toLaunchCookie(info);
         }
 
         if (cookie != null) {
@@ -1433,20 +1433,12 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
         // Find the associated item info for the launch cookie (if available), note that predicted
         // apps actually have an id of -1, so use another default id here
-        final ArrayList<IBinder> launchCookies = runningTaskTarget.taskInfo.launchCookies == null
-                ? new ArrayList<>()
+        final List<IBinder> launchCookies = runningTaskTarget.taskInfo.launchCookies == null
+                ? Collections.EMPTY_LIST
                 : runningTaskTarget.taskInfo.launchCookies;
 
-        int launchCookieItemId = NO_MATCHING_ID;
-        for (IBinder cookie : launchCookies) {
-            Integer itemId = ObjectWrapper.unwrap(cookie);
-            if (itemId != null) {
-                launchCookieItemId = itemId;
-                break;
-            }
-        }
-
-        return mLauncher.getFirstMatchForAppClose(launchCookieItemId, packageName,
+        return mLauncher.getFirstMatchForAppClose(
+                StableViewInfo.fromLaunchCookies(launchCookies), packageName,
                 UserHandle.of(runningTaskTarget.taskInfo.userId), true /* supportsAllAppsState */);
     }
 

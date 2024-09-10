@@ -42,7 +42,6 @@ import com.android.internal.jank.Cuj;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -220,11 +219,6 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
             AnimatorSet animatorSet = new AnimatorSet();
             mCancelSplitRunnable.accept(animatorSet, duration);
             animatorSet.start();
-        }
-        if (FeatureFlags.ENABLE_PREMIUM_HAPTICS_ALL_APPS.get() &&
-                ((mFromState == NORMAL && mToState == ALL_APPS)
-                        || (mFromState == ALL_APPS && mToState == NORMAL)) && isFling) {
-            mVibratorWrapper.vibrateForDragBump();
         }
     }
 

@@ -169,6 +169,8 @@ constructor(
         bubbleBarView.translationY = 0f
         bubbleBarView.scaleX = 1f
         bubbleBarView.scaleY = BUBBLE_ANIMATION_INITIAL_SCALE_Y
+        bubbleBarView.setBackgroundScaleX(1f)
+        bubbleBarView.setBackgroundScaleY(1f)
         bubbleBarView.relativePivotY = 0.5f
 
         // this is the offset between the center of the bubble bar and the center of the stash
@@ -311,6 +313,7 @@ constructor(
             animatingBubble = null
             if (!canceled) bubbleStashController.stashBubbleBarImmediate()
             bubbleBarView.relativePivotY = 1f
+            bubbleBarView.scaleY = 1f
             bubbleStashController.updateTaskbarTouchRegion()
         }
         animator.start()

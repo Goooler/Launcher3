@@ -25,7 +25,6 @@ import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDS
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_PORTRAIT;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.Utilities.pxFromSp;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
@@ -503,7 +502,7 @@ public class DeviceProfile {
         bottomSheetCloseDuration = res.getInteger(R.integer.config_bottomSheetCloseDuration);
         if (isTablet) {
             bottomSheetWorkspaceScale = workspaceContentScale;
-            if (isMultiDisplay && !ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH.get()) {
+            if (isMultiDisplay) {
                 // TODO(b/259893832): Revert to use maxWallpaperScale to calculate bottomSheetDepth
                 // when screen recorder bug is fixed.
                 if (enableScalingRevealHomeAnimation()) {

@@ -45,7 +45,6 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
 import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
-import static com.android.quickstep.GestureState.GestureEndTarget.ALL_APPS;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
 import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
 import static com.android.quickstep.GestureState.GestureEndTarget.NEW_TASK;
@@ -265,8 +264,6 @@ public abstract class AbsSwipeUpHandler<
             getNextStateFlag("STATE_CURRENT_TASK_FINISHED");
     private static final int STATE_FINISH_WITH_NO_END =
             getNextStateFlag("STATE_FINISH_WITH_NO_END");
-    private static final int STATE_SETTLED_ON_ALL_APPS =
-            getNextStateFlag("STATE_SETTLED_ON_ALL_APPS");
 
     private static final int LAUNCHER_UI_STATES =
             STATE_LAUNCHER_PRESENT | STATE_LAUNCHER_DRAWN | STATE_LAUNCHER_STARTED |
@@ -320,7 +317,6 @@ public abstract class AbsSwipeUpHandler<
     private boolean mGestureStarted;
     private boolean mLogDirectionUpOrLeft = true;
     private boolean mIsLikelyToStartNewTask;
-    private boolean mIsInAllAppsRegion;
 
     private final long mTouchTimeMs;
     private long mLauncherFrameDrawnTime;
@@ -457,9 +453,6 @@ public abstract class AbsSwipeUpHandler<
                 this::finishCurrentTransitionToHome);
         mStateCallback.runOnceAtState(STATE_SCALED_CONTROLLER_HOME | STATE_CURRENT_TASK_FINISHED,
                 this::reset);
-        mStateCallback.runOnceAtState(STATE_SETTLED_ON_ALL_APPS | STATE_SCREENSHOT_CAPTURED
-                        | STATE_GESTURE_COMPLETED,
-                this::finishCurrentTransitionToAllApps);
 
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_APP_CONTROLLER_RECEIVED
                         | STATE_LAUNCHER_DRAWN | STATE_SCALED_CONTROLLER_RECENTS
@@ -724,9 +717,7 @@ public abstract class AbsSwipeUpHandler<
                 maybeUpdateRecentsAttachedState(true/* animate */, true/* moveRunningTask */);
                 Optional.ofNullable(mContainerInterface.getTaskbarController())
                         .ifPresent(TaskbarUIController::startTranslationSpring);
-                if (!mIsInAllAppsRegion) {
-                    performHapticFeedback();
-                }
+                performHapticFeedback();
             }
 
             @Override
@@ -774,9 +765,7 @@ public abstract class AbsSwipeUpHandler<
                 .findTask(mGestureState.getTopRunningTaskId())
                 : null;
         final boolean recentsAttachedToAppWindow;
-        if (mIsInAllAppsRegion) {
-            recentsAttachedToAppWindow = false;
-        } else if (mGestureState.getEndTarget() != null) {
+        if (mGestureState.getEndTarget() != null) {
             recentsAttachedToAppWindow = mGestureState.getEndTarget().recentsAttachedToAppWindow;
         } else if (mContinuingLastGesture
                 && mRecentsView.getRunningTaskIndex() != mRecentsView.getNextPage()) {
@@ -832,31 +821,6 @@ public abstract class AbsSwipeUpHandler<
             maybeUpdateRecentsAttachedState(animate);
         }
     }
-
-    /**
-     * Update whether user is currently dragging in a region that will trigger all apps.
-     */
-    private void setIsInAllAppsRegion(boolean isInAllAppsRegion) {
-        if (mIsInAllAppsRegion == isInAllAppsRegion
-                || !mContainerInterface.allowAllAppsFromOverview()) {
-            return;
-        }
-        mIsInAllAppsRegion = isInAllAppsRegion;
-
-        // Newly entering or exiting the zone - do haptic and animate recent tasks.
-        VibratorWrapper.INSTANCE.get(mContext).vibrate(OVERVIEW_HAPTIC);
-        maybeUpdateRecentsAttachedState(true);
-
-        if (mContainer != null) {
-            mContainer.getAppsView().getSearchUiManager()
-                    .prepareToFocusEditText(mIsInAllAppsRegion);
-        }
-
-        // Draw active task below Launcher so that All Apps can appear over it.
-        runActionOnRemoteHandles(remoteTargetHandle ->
-                remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(isInAllAppsRegion));
-    }
-
 
     private void buildAnimationController() {
         if (!canCreateNewOrUpdateExistingLauncherTransitionController()) {
@@ -917,8 +881,6 @@ public abstract class AbsSwipeUpHandler<
     @UiThread
     @Override
     public void onCurrentShiftUpdated() {
-        float threshold = DeviceConfigWrapper.get().getAllAppsOverviewThreshold() / 100f;
-        setIsInAllAppsRegion(mCurrentShift.value >= threshold);
         updateSysUiFlags(mCurrentShift.value);
         applyScrollAndTransform();
 
@@ -1203,9 +1165,6 @@ public abstract class AbsSwipeUpHandler<
         }
 
         switch (endTarget) {
-            case ALL_APPS:
-                mStateCallback.setState(STATE_SETTLED_ON_ALL_APPS | STATE_CAPTURE_SCREENSHOT);
-                break;
             case HOME:
                 mStateCallback.setState(STATE_SCALED_CONTROLLER_HOME | STATE_CAPTURE_SCREENSHOT);
                 // Notify the SysUI to use fade-in animation when entering PiP
@@ -1324,9 +1283,6 @@ public abstract class AbsSwipeUpHandler<
         final boolean willGoToNewTask =
                 isScrollingToNewTask() && Math.abs(velocity.x) > Math.abs(endVelocity);
         final boolean isSwipeUp = endVelocity < 0;
-        if (mIsInAllAppsRegion) {
-            return isSwipeUp ? ALL_APPS : LAST_TASK;
-        }
         if (!isSwipeUp) {
             final boolean isCenteredOnNewTask = mRecentsView != null
                     && mRecentsView.getDestinationPage() != mRecentsView.getRunningTaskIndex();
@@ -1342,9 +1298,7 @@ public abstract class AbsSwipeUpHandler<
         // Fully gestural mode.
         final boolean isFlingX = Math.abs(velocity.x) > mContext.getResources()
                 .getDimension(R.dimen.quickstep_fling_threshold_speed);
-        if (mIsInAllAppsRegion) {
-            return ALL_APPS;
-        } else if (isScrollingToNewTask && isFlingX) {
+        if (isScrollingToNewTask && isFlingX) {
             // Flinging towards new task takes precedence over mIsMotionPaused (which only
             // checks y-velocity).
             return NEW_TASK;
@@ -1399,8 +1353,7 @@ public abstract class AbsSwipeUpHandler<
                     .setUserIsNotGoingHome(endTarget != GestureState.GestureEndTarget.HOME);
         }
 
-        float endShift = endTarget == ALL_APPS ? mDragLengthFactor
-                : endTarget.isLauncher ? 1 : 0;
+        float endShift = endTarget.isLauncher ? 1 : 0;
         final float startShift;
         if (!isFling) {
             long expectedDuration = Math.abs(Math.round((endShift - currentShift)
@@ -2027,12 +1980,6 @@ public abstract class AbsSwipeUpHandler<
         reset();
     }
 
-    @UiThread
-    private void finishCurrentTransitionToAllApps() {
-        finishCurrentTransitionToHome();
-        reset();
-    }
-
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
         if (mContainer != null) {
@@ -2174,7 +2121,6 @@ public abstract class AbsSwipeUpHandler<
     private void updateThumbnail() {
         if (mGestureState.getEndTarget() == HOME
                 || mGestureState.getEndTarget() == NEW_TASK
-                || mGestureState.getEndTarget() == ALL_APPS
                 || mRecentsView == null) {
             // Capture the screenshot before finishing the transition to home or quickswitching to
             // ensure it's taken in the correct orientation, but no need to update the thumbnail.

@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.views;
 
-import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.views.FloatingIconView.getLocationBoundsForView;
 import static com.android.launcher3.views.FloatingIconViewCompanion.setPropertiesVisible;
 
@@ -160,7 +159,7 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
         if (mContract == null) {
             return;
         }
-        View icon = mLauncher.getFirstMatchForAppClose(NO_MATCHING_ID,
+        View icon = mLauncher.getFirstMatchForAppClose(null /* StableViewInfo */,
                 mContract.componentName.getPackageName(), mContract.user,
                 false /* supportsAllAppsState */);
 

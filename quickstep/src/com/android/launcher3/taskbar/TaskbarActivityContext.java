@@ -914,11 +914,16 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.navbarButtonsViewController.transitionTo(barMode, animate);
     }
 
+    public void appTransitionPending(boolean pending) {
+        mControllers.stashedHandleViewController.setIsAppTransitionPending(pending);
+    }
+
     /**
      * Called when this instance of taskbar is no longer needed
      */
     public void onDestroy() {
         mIsDestroyed = true;
+        mTaskbarFeatureEvaluator.onDestroy();
         setUIController(TaskbarUIController.DEFAULT);
         mControllers.onDestroy();
         if (!enableTaskbarNoRecreate() && !ENABLE_TASKBAR_NAVBAR_UNIFICATION) {

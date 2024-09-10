@@ -187,6 +187,13 @@ public class BubbleStashedHandleViewController {
     }
 
     /**
+     * Returns bounds of the stashed handle view
+     */
+    public void getBounds(Rect bounds) {
+        bounds.set(mStashedHandleBounds);
+    }
+
+    /**
      * Called when system ui state changes. Bubbles don't show when the device is locked.
      */
     public void setHiddenForSysui(boolean hidden) {

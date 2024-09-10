@@ -142,13 +142,6 @@ class DeviceConfigWrapper private constructor(propReader: PropReader) {
             "Controls extra dp on the nav bar sides to trigger LPNH. Can be negative for a smaller touch region."
         )
 
-    val allAppsOverviewThreshold =
-        propReader.get(
-            "ALL_APPS_OVERVIEW_THRESHOLD",
-            180,
-            "Threshold to open All Apps from Overview"
-        )
-
     /** Dump config values. */
     fun dump(prefix: String, writer: PrintWriter) {
         writer.println("$prefix DeviceConfigWrapper:")
@@ -169,7 +162,6 @@ class DeviceConfigWrapper private constructor(propReader: PropReader) {
         writer.println("$prefix\tenableLpnhDeepPress=$enableLpnhDeepPress")
         writer.println("$prefix\tlpnhHapticHintDelay=$lpnhHapticHintDelay")
         writer.println("$prefix\tlpnhExtraTouchWidthDp=$lpnhExtraTouchWidthDp")
-        writer.println("$prefix\tallAppsOverviewThreshold=$allAppsOverviewThreshold")
     }
 
     companion object {

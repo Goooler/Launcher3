@@ -50,32 +50,30 @@ class RecentsViewUtils {
     }
 
     /**
-     * Counts [numChildren] that are [DesktopTaskView] instances.
+     * Counts [TaskView]s that are [DesktopTaskView] instances.
      *
-     * @param numChildren Quantity of children to transverse
-     * @param getTaskViewAt Function that provides a TaskView given an index
+     * @param taskViews List of [TaskView]s
      */
-    fun getDesktopTaskViewCount(numChildren: Int, getTaskViewAt: (Int) -> TaskView?): Int =
-        (0 until numChildren).count { getTaskViewAt(it) is DesktopTaskView }
+    fun getDesktopTaskViewCount(taskViews: List<TaskView>): Int =
+        taskViews.count { it is DesktopTaskView }
 
     /**
      * Returns the first TaskView that should be displayed as a large tile.
      *
-     * @param numChildren Quantity of children to transverse
-     * @param getTaskViewAt Function that provides a TaskView given an index
+     * @param taskViews List of [TaskView]s
      */
-    fun getFirstLargeTaskView(numChildren: Int, getTaskViewAt: (Int) -> TaskView?): TaskView? {
-        return (0 until numChildren).firstNotNullOfOrNull { index ->
-            val taskView = getTaskViewAt(index)
-            if (taskView?.isLargeTile == true) taskView else null
-        }
-    }
+    fun getFirstLargeTaskView(taskViews: List<TaskView>): TaskView? =
+        taskViews.firstOrNull { it.isLargeTile }
 
     fun screenshotTasks(
         taskView: TaskView,
-        recentsAnimationController: RecentsAnimationController
+        recentsAnimationController: RecentsAnimationController,
     ): Map<Int, ThumbnailData> =
         taskView.taskContainers.associate {
             it.task.key.id to recentsAnimationController.screenshotTask(it.task.key.id)
         }
+
+    /** Returns the current list of [TaskView] children. */
+    fun getTaskViews(taskViewCount: Int, requireTaskViewAt: (Int) -> TaskView): List<TaskView> =
+        (0 until taskViewCount).map(requireTaskViewAt)
 }

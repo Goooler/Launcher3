@@ -19,6 +19,7 @@ package com.android.launcher3.taskbar.bubbles.stashing
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
+import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.View
 import com.android.launcher3.anim.AnimatedFloat
@@ -199,6 +200,10 @@ class PersistentBubbleStashController(
     }
 
     override fun getHandleTranslationY(): Float? = null
+
+    override fun getHandleBounds(bounds: Rect) {
+        // no op since does not have a handle view
+    }
 
     private fun updateExpandedState(expand: Boolean) {
         if (bubbleBarViewController.isHiddenForNoBubbles) {

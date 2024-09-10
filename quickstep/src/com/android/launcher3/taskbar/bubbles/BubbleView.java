@@ -20,12 +20,14 @@ import android.app.Notification;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.FloatProperty;
 import android.view.LayoutInflater;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
@@ -48,12 +50,27 @@ public class BubbleView extends ConstraintLayout {
 
     public static final int DEFAULT_PATH_SIZE = 100;
 
+    public static FloatProperty<BubbleView> STASH_TRANSLATION_Y = new FloatProperty<>(
+            "stashTranslationY") {
+        @Override
+        public void setValue(BubbleView bubbleView, float transY) {
+            bubbleView.setStashTranslationY(transY);
+        }
+
+        @Override
+        public Float get(BubbleView bubbleView) {
+            return bubbleView.mStashTranslationY;
+        }
+    };
+
     private final ImageView mBubbleIcon;
     private final ImageView mAppIcon;
     private int mBubbleSize;
 
     private float mDragTranslationX;
     private float mOffsetX;
+    private float mTranslationY;
+    private float mStashTranslationY;
 
     private DotRenderer mDotRenderer;
     private DotRenderer.DrawParams mDrawParams;
@@ -110,6 +127,10 @@ public class BubbleView extends ConstraintLayout {
 
         setFocusable(true);
         setClickable(true);
+
+        // We manage the shadow ourselves when creating the bitmap
+        setOutlineAmbientShadowColor(Color.TRANSPARENT);
+        setOutlineSpotShadowColor(Color.TRANSPARENT);
     }
 
     private void updateBubbleSizeAndDotRender() {
@@ -152,14 +173,32 @@ public class BubbleView extends ConstraintLayout {
         applyDragTranslation();
     }
 
+    private void applyDragTranslation() {
+        setTranslationX(mDragTranslationX + mOffsetX);
+    }
+
+    /**
+     * Set translation in y direction during stash and unstash from handle
+     */
+    public void setStashTranslationY(float translationY) {
+        mStashTranslationY = translationY;
+        applyTranslationY();
+    }
+
+    @Override
+    public void setTranslationY(float translationY) {
+        mTranslationY = translationY;
+        applyTranslationY();
+    }
+
+    private void applyTranslationY() {
+        super.setTranslationY(mTranslationY + mStashTranslationY);
+    }
+
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         updateBubbleSizeAndDotRender();
-    }
-
-    private void applyDragTranslation() {
-        setTranslationX(mDragTranslationX + mOffsetX);
     }
 
     @Override

@@ -329,10 +329,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         final ActivityOptions options = ActivityOptions.makeBasic();
         options.setPendingIntentBackgroundActivityStartMode(
                 ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
-        // Use regular (non-transient) launch for all apps page to control IME.
-        if (!containerInterface.allowAllAppsFromOverview()) {
-            options.setTransientLaunch();
-        }
+        options.setTransientLaunch();
         options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
 
         // Notify taskbar that we should skip reacting to launcher visibility change to

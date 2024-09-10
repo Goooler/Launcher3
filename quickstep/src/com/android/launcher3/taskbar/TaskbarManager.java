@@ -549,7 +549,15 @@ public class TaskbarManager {
 
     public void transitionTo(@BarTransitions.TransitionMode int barMode,
             boolean animate) {
-        mTaskbarActivityContext.transitionTo(barMode, animate);
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.transitionTo(barMode, animate);
+        }
+    }
+
+    public void appTransitionPending(boolean pending) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.appTransitionPending(pending);
+        }
     }
 
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {

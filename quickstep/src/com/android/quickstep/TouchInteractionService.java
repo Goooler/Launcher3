@@ -379,6 +379,15 @@ public class TouchInteractionService extends Service {
             ));
         }
 
+        @BinderThread
+        @Override
+        public void appTransitionPending(boolean pending) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.appTransitionPending(pending))
+            ));
+        }
+
         /**
          * Preloads the Overview activity.
          * <p>

@@ -133,11 +133,6 @@ public final class FallbackActivityInterface extends
     }
 
     @Override
-    public boolean allowAllAppsFromOverview() {
-        return false;
-    }
-
-    @Override
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
         // In non-gesture mode, user might be clicking on the home button which would directly
         // start the home activity instead of going through recents. In that case, defer starting

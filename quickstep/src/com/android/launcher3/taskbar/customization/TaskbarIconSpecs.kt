@@ -37,6 +37,8 @@ object TaskbarIconSpecs {
 
     val minimumTaskbarIconTouchSize = TaskbarIconSize(48)
 
+    val transientOrPinnedTaskbarIconPaddingSize = iconSize52dp
+
     val transientTaskbarIconSizeByGridSize =
         mapOf(
             TransientTaskbarIconSizeKey(6, 5, false) to iconSize52dp,

@@ -18,7 +18,6 @@ package com.android.quickstep;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
-import static com.android.launcher3.LauncherState.FLOATING_SEARCH_BAR;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
@@ -40,7 +39,6 @@ import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
@@ -268,13 +266,6 @@ public final class LauncherActivityInterface extends
     @Override
     public Rect getOverviewWindowBounds(Rect homeBounds, RemoteAnimationTarget target) {
         return homeBounds;
-    }
-
-    @Override
-    public boolean allowAllAppsFromOverview() {
-        return FeatureFlags.ENABLE_ALL_APPS_FROM_OVERVIEW.get()
-                // If floating search bar would not show in overview, don't allow all apps gesture.
-                && OVERVIEW.areElementsVisible(getCreatedContainer(), FLOATING_SEARCH_BAR);
     }
 
     @Override

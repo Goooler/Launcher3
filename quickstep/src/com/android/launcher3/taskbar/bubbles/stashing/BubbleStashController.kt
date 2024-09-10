@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar.bubbles.stashing
 
+import android.graphics.Rect
 import android.view.InsetsController
 import android.view.MotionEvent
 import android.view.View
@@ -145,6 +146,9 @@ interface BubbleStashController {
 
     /** Returns the translation of the handle. */
     fun getHandleTranslationY(): Float?
+
+    /** Returns bounds of the handle */
+    fun getHandleBounds(bounds: Rect)
 
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and

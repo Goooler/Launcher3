@@ -34,6 +34,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ActivityOptionsWrapper;
+import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
 /** Provides a Quickstep specific animation when launching an activity from an app widget. */
@@ -69,8 +70,8 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler {
                 .getActivityLaunchOptions(hostView);
         Object itemInfo = hostView.getTag();
         IBinder launchCookie = null;
-        if (itemInfo instanceof ItemInfo) {
-            launchCookie = mLauncher.getLaunchCookie((ItemInfo) itemInfo);
+        if (itemInfo instanceof ItemInfo info) {
+            launchCookie = StableViewInfo.toLaunchCookie(info);
             activityOptions.options.setLaunchCookie(launchCookie);
         }
         if (Utilities.ATLEAST_S && !pendingIntent.isActivity()) {

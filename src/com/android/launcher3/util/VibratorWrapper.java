@@ -25,12 +25,10 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.net.Uri;
-import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.Utilities;
@@ -54,20 +52,6 @@ public class VibratorWrapper implements SafeCloseable {
     static final Uri HAPTIC_FEEDBACK_URI = Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED);
 
     @VisibleForTesting static final float LOW_TICK_SCALE = 0.9f;
-    @VisibleForTesting static final float DRAG_TEXTURE_SCALE = 0.03f;
-    @VisibleForTesting static final float DRAG_COMMIT_SCALE = 0.5f;
-    @VisibleForTesting static final float DRAG_BUMP_SCALE = 0.4f;
-    @VisibleForTesting static final int DRAG_TEXTURE_EFFECT_SIZE = 200;
-
-    @Nullable
-    private final VibrationEffect mDragEffect;
-    @Nullable
-    private final VibrationEffect mCommitEffect;
-    @Nullable
-    private final VibrationEffect mBumpEffect;
-
-    private long mLastDragTime;
-    private final int mThresholdUntilNextDragCallMillis;
 
     /**
      * Haptic when entering overview.
@@ -100,28 +84,6 @@ public class VibratorWrapper implements SafeCloseable {
         } else {
             mIsHapticFeedbackEnabled = false;
         }
-
-        if (Utilities.ATLEAST_S && mVibrator.areAllPrimitivesSupported(
-                PRIMITIVE_LOW_TICK)) {
-
-            // Drag texture, Commit, and Bump should only be used for premium phones.
-            // Before using these haptics make sure check if the device can use it
-            mDragEffect = getDragEffect();
-            mCommitEffect = VibrationEffect.startComposition().addPrimitive(
-                    VibrationEffect.Composition.PRIMITIVE_TICK, DRAG_COMMIT_SCALE).compose();
-            mBumpEffect = VibrationEffect.startComposition().addPrimitive(
-                    PRIMITIVE_LOW_TICK, DRAG_BUMP_SCALE).compose();
-            int primitiveDuration = mVibrator.getPrimitiveDurations(
-                    PRIMITIVE_LOW_TICK)[0];
-
-            mThresholdUntilNextDragCallMillis =
-                    DRAG_TEXTURE_EFFECT_SIZE * primitiveDuration + 100;
-        } else {
-            mDragEffect = null;
-            mCommitEffect = null;
-            mBumpEffect = null;
-            mThresholdUntilNextDragCallMillis = 0;
-        }
     }
 
     @Override
@@ -132,52 +94,11 @@ public class VibratorWrapper implements SafeCloseable {
     }
 
     /**
-     * This is called when the user swipes to/from all apps. This is meant to be used in between
-     * long animation progresses so that it gives a dragging texture effect. For a better
-     * experience, this should be used in combination with vibrateForDragCommit().
-     */
-    public void vibrateForDragTexture() {
-        if (mDragEffect == null) {
-            return;
-        }
-        long currentTime = SystemClock.elapsedRealtime();
-        long elapsedTimeSinceDrag = currentTime - mLastDragTime;
-        if (elapsedTimeSinceDrag >= mThresholdUntilNextDragCallMillis) {
-            vibrate(mDragEffect);
-            mLastDragTime = currentTime;
-        }
-    }
-
-    /**
-     * This is used when user reaches the commit threshold when swiping to/from from all apps.
-     */
-    public void vibrateForDragCommit() {
-        if (mCommitEffect != null) {
-            vibrate(mCommitEffect);
-        }
-        // resetting dragTexture timestamp to be able to play dragTexture again
-        mLastDragTime = 0;
-    }
-
-    /**
-     * The bump haptic is used to be called at the end of a swipe and only if it the gesture is a
-     * FLING going to/from all apps. Client can just call this method elsewhere just for the
-     * effect.
-     */
-    public void vibrateForDragBump() {
-        if (mBumpEffect != null) {
-            vibrate(mBumpEffect);
-        }
-    }
-
-    /**
      * This should be used to cancel a haptic in case where the haptic shouldn't be vibrating. For
      * example, when no animation is happening but a vibrator happens to be vibrating still.
      */
     public void cancelVibrate() {
         UI_HELPER_EXECUTOR.execute(mVibrator::cancel);
-        // reset dragTexture timestamp to be able to play dragTexture again whenever cancelled
-        mLastDragTime = 0;
     }
 
     /** Vibrates with the given effect if haptic feedback is available and enabled. */
@@ -216,14 +137,5 @@ public class VibratorWrapper implements SafeCloseable {
 
             vibrate(primitiveLowTickEffect);
         }
-    }
-
-    static VibrationEffect getDragEffect() {
-        VibrationEffect.Composition dragEffect = VibrationEffect.startComposition();
-        for (int i = 0; i < DRAG_TEXTURE_EFFECT_SIZE; i++) {
-            dragEffect.addPrimitive(
-                    PRIMITIVE_LOW_TICK, DRAG_TEXTURE_SCALE);
-        }
-        return dragEffect.compose();
     }
 }

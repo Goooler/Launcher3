@@ -94,6 +94,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     // States that affect whether region sampling is enabled or not
     private boolean mIsStashed;
     private boolean mIsLumaSamplingEnabled;
+    private boolean mIsAppTransitionPending;
     private boolean mTaskbarHidden;
 
     private float mTranslationYForSwipe;
@@ -267,6 +268,11 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         updateSamplingState();
     }
 
+    public void setIsAppTransitionPending(boolean pending) {
+        mIsAppTransitionPending = pending;
+        updateSamplingState();
+    }
+
     private void updateSamplingState() {
         updateRegionSamplingWindowVisibility();
         if (shouldSample()) {
@@ -278,7 +284,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     }
 
     private boolean shouldSample() {
-        return mIsStashed && mIsLumaSamplingEnabled;
+        return mIsStashed && mIsLumaSamplingEnabled && !mIsAppTransitionPending;
     }
 
     protected void updateStashedHandleHintScale() {

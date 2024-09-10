@@ -1123,6 +1123,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return super.onTouchEvent(ev);
     }
 
+    @Override
+    protected void onDisallowSwipeToMinusOnePage() {
+        mLauncher.getOverlayManager().onDisallowSwipeToMinusOnePage();
+    }
+
     /**
      * Called directly from a CellLayout (not by the framework), after we've been added as a
      * listener via setOnInterceptTouchEventListener(). This allows us to tell the CellLayout

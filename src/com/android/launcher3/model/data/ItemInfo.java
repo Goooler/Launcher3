@@ -81,8 +81,6 @@ public class ItemInfo {
 
     public static final boolean DEBUG = false;
     public static final int NO_ID = -1;
-    // An id that doesn't match any item, including predicted apps with have an id=NO_ID
-    public static final int NO_MATCHING_ID = Integer.MIN_VALUE;
 
     /** Hidden field Settings.Secure.NAV_BAR_KIDS_MODE */
     private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor("nav_bar_kids_mode");
@@ -543,6 +541,14 @@ public class ItemInfo {
     public void setTitle(@Nullable final CharSequence title,
             @Nullable final ModelWriter modelWriter) {
         this.title = title;
+    }
+
+    /**
+     * Returns a string ID that is stable for a user session, but may not be persisted
+     */
+    @Nullable
+    public Object getStableId() {
+        return getComponentKey();
     }
 
     private int getUserType(UserIconInfo info) {
