@@ -799,6 +799,9 @@ public class BubbleBarView extends FrameLayout {
             removeView(removedBubble);
             int index = addingOverflow ? getChildCount() : 0;
             addView(addedBubble, index, lp);
+            if (onEndRunnable != null) {
+                onEndRunnable.run();
+            }
             return;
         }
         int index = addingOverflow ? getChildCount() : 0;

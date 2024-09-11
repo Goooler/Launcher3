@@ -47,7 +47,7 @@ public class TestStabilityRule implements TestRule {
                     + ")$");
     private static final Pattern PLATFORM_BUILD =
             Pattern.compile("^("
-                    + "(?<commandLine>eng\\.[a-z]+\\.[0-9]+\\.[0-9]+)|"
+                    + "(?<commandLine>eng\\..+)|"
                     + "(?<presubmit>P[0-9]+)|"
                     + "(?<postsubmit>[0-9]+)"
                     + ")$");

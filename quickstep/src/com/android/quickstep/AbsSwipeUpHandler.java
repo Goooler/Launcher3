@@ -192,7 +192,6 @@ public abstract class AbsSwipeUpHandler<
 
     // Null if the recents animation hasn't started yet or has been canceled or finished.
     protected @Nullable RecentsAnimationController mRecentsAnimationController;
-    protected @Nullable RecentsAnimationController mDeferredCleanupRecentsAnimationController;
     protected RecentsAnimationTargets mRecentsAnimationTargets;
     protected @Nullable RECENTS_CONTAINER mContainer;
     protected @Nullable RECENTS_VIEW mRecentsView;
@@ -533,14 +532,7 @@ public abstract class AbsSwipeUpHandler<
             HashMap<Integer, ThumbnailData> snapshots =
                     mGestureState.consumeRecentsAnimationCanceledSnapshot();
             if (snapshots != null) {
-                mRecentsView.switchToScreenshot(snapshots, () -> {
-                    if (mRecentsAnimationController != null) {
-                        mRecentsAnimationController.cleanupScreenshot();
-                    } else if (mDeferredCleanupRecentsAnimationController != null) {
-                        mDeferredCleanupRecentsAnimationController.cleanupScreenshot();
-                        mDeferredCleanupRecentsAnimationController = null;
-                    }
-                });
+                mRecentsView.switchToScreenshot(snapshots, () -> {});
                 mRecentsView.onRecentsAnimationComplete();
             }
         });
@@ -987,9 +979,6 @@ public abstract class AbsSwipeUpHandler<
                 /* event= */ "cancelRecentsAnimation",
                 /* gestureEvent= */ CANCEL_RECENTS_ANIMATION);
         mActivityInitListener.unregister("AbsSwipeUpHandler.onRecentsAnimationCanceled");
-        // Cache the recents animation controller so we can defer its cleanup to after having
-        // properly cleaned up the screenshot without accidentally using it.
-        mDeferredCleanupRecentsAnimationController = mRecentsAnimationController;
         mStateCallback.setStateOnUiThread(STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED);
         // Defer clearing the controller and the targets until after we've updated the state
         mRecentsAnimationController = null;

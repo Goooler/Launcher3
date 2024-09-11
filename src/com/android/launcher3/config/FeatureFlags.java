@@ -104,10 +104,6 @@ public final class FeatureFlags {
     public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(270395274,
             "FOLDABLE_SINGLE_PAGE", DISABLED, "Use a single page for the workspace");
 
-    public static final BooleanFlag ENABLE_PARAMETRIZE_REORDER = getDebugFlag(289420844,
-            "ENABLE_PARAMETRIZE_REORDER", DISABLED,
-            "Enables generating the reorder using a set of parameters");
-
     // TODO(Block 12): Clean up flags
     public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(270396680,
             "ENABLE_MULTI_INSTANCE", DISABLED,
@@ -153,10 +149,6 @@ public final class FeatureFlags {
     // When enabled the promise icon is visible in all apps while installation an app.
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(270390012,
             "PROMISE_APPS_IN_ALL_APPS", DISABLED, "Add promise icon in all-apps");
-
-    public static final BooleanFlag KEYGUARD_ANIMATION = getDebugFlag(270390904,
-            "KEYGUARD_ANIMATION", DISABLED,
-            "Enable animation for keyguard going away on wallpaper");
 
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = getReleaseFlag(270390907,
             "ENABLE_DEVICE_SEARCH", ENABLED, "Allows on device search in all apps");
@@ -214,9 +206,6 @@ public final class FeatureFlags {
             "ENABLE_SEARCH_UNINSTALLED_APPS", ENABLED, "Search uninstalled app results.");
 
     // TODO(Block 20): Clean up flags
-    public static final BooleanFlag ENABLE_SCRIM_FOR_APP_LAUNCH = getDebugFlag(270393276,
-            "ENABLE_SCRIM_FOR_APP_LAUNCH", DISABLED, "Enables scrim during app launch animation.");
-
     public static final BooleanFlag ENABLE_BACK_SWIPE_HOME_ANIMATION = getDebugFlag(270393426,
             "ENABLE_BACK_SWIPE_HOME_ANIMATION", ENABLED,
             "Enables home animation to icon when user swipes back.");

@@ -452,7 +452,6 @@ public class LauncherBackAnimationController {
                 mQuickstepTransitionManager.createWallpaperOpenAnimations(
                     new RemoteAnimationTarget[]{mBackTarget},
                     new RemoteAnimationTarget[0],
-                    false /* fromUnlock */,
                     resolveRectF,
                     cornerRadius,
                     mBackInProgress /* fromPredictiveBack */);

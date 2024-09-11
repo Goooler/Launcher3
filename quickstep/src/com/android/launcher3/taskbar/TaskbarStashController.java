@@ -576,6 +576,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 /* isStashed= */ mActivity.isPhoneMode(),
                 placeholderDuration,
                 TRANSITION_UNSTASH_SUW_MANUAL,
+                /* skipTaskbarBackgroundDelay */ false,
                 /* jankTag= */ "SUW_MANUAL");
         animation.addListener(AnimatorListeners.forEndCallback(
                 () -> mControllers.taskbarViewController.setDeferUpdatesForSUW(false)));
@@ -585,13 +586,14 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Create a stash animation and save to {@link #mAnimator}.
      *
-     * @param isStashed     whether it's a stash animation or an unstash animation
-     * @param duration      duration of the animation
-     * @param animationType what transition type to play.
-     * @param jankTag       tag to be used in jank monitor trace.
+     * @param isStashed                  whether it's a stash animation or an unstash animation
+     * @param duration                   duration of the animation
+     * @param animationType              what transition type to play.
+     * @param skipTaskbarBackgroundDelay Iff true, skips delaying the taskbar background.
+     * @param jankTag                    tag to be used in jank monitor trace.
      */
     private void createAnimToIsStashed(boolean isStashed, long duration,
-            @StashAnimation int animationType, String jankTag) {
+            @StashAnimation int animationType, boolean skipTaskbarBackgroundDelay, String jankTag) {
         if (animationType == TRANSITION_UNSTASH_SUW_MANUAL && isStashed) {
             // The STASH_ANIMATION_SUW_MANUAL must only be used during an unstash animation.
             Log.e(TAG, "Illegal arguments:Using TRANSITION_UNSTASH_SUW_MANUAL to stash taskbar");
@@ -629,7 +631,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         if (isTransientTaskbar) {
-            createTransientAnimToIsStashed(mAnimator, isStashed, duration, animationType);
+            createTransientAnimToIsStashed(mAnimator, isStashed, duration,
+                    skipTaskbarBackgroundDelay, animationType);
         } else {
             createAnimToIsStashed(mAnimator, isStashed, duration, stashTranslation, animationType);
         }
@@ -735,7 +738,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     private void createTransientAnimToIsStashed(AnimatorSet as, boolean isStashed, long duration,
-            @StashAnimation int animationType) {
+            boolean skipTaskbarBackgroundDelay, @StashAnimation int animationType) {
         // Target values of the properties this is going to set
         final float backgroundOffsetTarget = isStashed ? 1 : 0;
         final float iconAlphaTarget = isStashed ? 0 : 1;
@@ -786,7 +789,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 backgroundAndHandleAlphaStartDelay,
                 backgroundAndHandleAlphaDuration, LINEAR);
 
-        if (enableScalingRevealHomeAnimation() && !isStashed) {
+        if (enableScalingRevealHomeAnimation() && isStashed && !skipTaskbarBackgroundDelay) {
             play(as, getTaskbarBackgroundAnimatorWhenNotGoingHome(duration),
                     0, 0, LINEAR);
             as.addListener(AnimatorListeners.forEndCallback(
@@ -1343,8 +1346,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 mIsStashed = isStashed;
                 mLastStartedTransitionType = animationType;
 
+                boolean skipTaskbarBgDelay = !hasAnyFlag(FLAG_STASHED_IN_TASKBAR_ALL_APPS)
+                        && hasAnyFlag(FLAG_STASHED_IN_TASKBAR_ALL_APPS, changedFlags);
                 // This sets mAnimator.
-                createAnimToIsStashed(mIsStashed, duration, animationType,
+                createAnimToIsStashed(mIsStashed, duration, animationType, skipTaskbarBgDelay,
                         computeTaskbarJankMonitorTag(changedFlags));
                 return mAnimator;
             }
