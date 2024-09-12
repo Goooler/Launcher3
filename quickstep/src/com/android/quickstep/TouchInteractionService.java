@@ -94,6 +94,7 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarManager;
@@ -462,6 +463,18 @@ public class TouchInteractionService extends Service {
             return tis.mTaskbarManager;
         }
 
+        /**
+         * Returns the {@link DesktopVisibilityController}
+         * <p>
+         * Returns {@code null} if TouchInteractionService is not connected
+         */
+        @Nullable
+        public DesktopVisibilityController getDesktopVisibilityController() {
+            TouchInteractionService tis = mTis.get();
+            if (tis == null) return null;
+            return tis.mDesktopVisibilityController;
+        }
+
         @VisibleForTesting
         public void injectFakeTrackpadForTesting() {
             TouchInteractionService tis = mTis.get();
@@ -637,6 +650,8 @@ public class TouchInteractionService extends Service {
 
     private NavigationMode mGestureStartNavMode = null;
 
+    private DesktopVisibilityController mDesktopVisibilityController;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -657,7 +672,9 @@ public class TouchInteractionService extends Service {
                 mInputDeviceListener.onInputDeviceAdded(inputDeviceId);
             }
         }
-        mTaskbarManager = new TaskbarManager(this, mAllAppsActionManager, mNavCallbacks);
+        mDesktopVisibilityController = new DesktopVisibilityController(this);
+        mTaskbarManager = new TaskbarManager(
+                this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
@@ -752,8 +769,8 @@ public class TouchInteractionService extends Service {
     private void onOverviewTargetChange(boolean isHomeAndOverviewSame) {
         mAllAppsActionManager.setHomeAndOverviewSame(isHomeAndOverviewSame);
 
-        StatefulActivity newOverviewActivity = mOverviewComponentObserver.getActivityInterface()
-                .getCreatedContainer();
+        StatefulActivity<?> newOverviewActivity =
+                mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
         if (newOverviewActivity != null) {
             mTaskbarManager.setActivity(newOverviewActivity);
         }
@@ -817,6 +834,7 @@ public class TouchInteractionService extends Service {
         mTrackpadsConnected.clear();
 
         mTaskbarManager.destroy();
+        mDesktopVisibilityController.onDestroy();
         sConnected = false;
 
         ScreenOnTracker.INSTANCE.get(this).removeListener(mScreenOnListener);
@@ -1663,6 +1681,7 @@ public class TouchInteractionService extends Service {
             createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
         }
         mTaskbarManager.dumpLogs("", pw);
+        mDesktopVisibilityController.dumpLogs("", pw);
         pw.println("AssistStateManager:");
         AssistStateManager.INSTANCE.get(this).dump("\t", pw);
         SystemUiProxy.INSTANCE.get(this).dump(pw);

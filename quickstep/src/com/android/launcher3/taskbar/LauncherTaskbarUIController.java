@@ -38,14 +38,12 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.taskbar.bubbles.BubbleBarController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.HomeVisibilityState;
-import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
@@ -128,8 +126,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
         onLauncherVisibilityChanged(false);
+        super.onDestroy();
         mTaskbarLauncherStateController.onDestroy();
 
         mLauncher.setTaskbarUIController(null);
@@ -235,11 +233,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             return null;
         }
 
-        DesktopVisibilityController desktopController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
         if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher)
-                && desktopController != null
-                && desktopController.areDesktopTasksVisible()) {
+                && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
             // TODO: b/333533253 - Remove after flag rollout
             isVisible = false;
         }

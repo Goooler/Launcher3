@@ -206,7 +206,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mModelCallbacks.init(controllers);
         if (mActivity.isUserSetupComplete() && sEnableModelLoadingForTests) {
             // Only load the callbacks if user setup is completed
-            LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
+            controllers.runAfterInit(() -> LauncherAppState.getInstance(mActivity).getModel()
+                    .addCallbacksAndLoad(mModelCallbacks));
         }
         mTaskbarNavButtonTranslationY =
                 controllers.navbarButtonsViewController.getTaskbarNavButtonTranslationY();

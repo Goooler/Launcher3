@@ -102,7 +102,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
             shadowAlpha = LIGHT_THEME_SHADOW_ALPHA
         }
 
-        if (DisplayController.isInDesktopMode(context)) {
+        if (context.areDesktopTasksVisible()) {
             fullCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context)
             cornerRadius = fullCornerRadius
         } else {
@@ -200,7 +200,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
                 mapRange(
                         scale,
                         0f,
-                        res.getDimensionPixelSize(R.dimen.transient_taskbar_bottom_margin).toFloat()
+                        res.getDimensionPixelSize(R.dimen.transient_taskbar_bottom_margin).toFloat(),
                     )
                     .toInt()
             shadowBlur =
@@ -245,7 +245,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
                 -mapRange(
                     1f - progress,
                     0f,
-                    if (isAnimatingPinning) 0f else stashedHandleHeight / 2f
+                    if (isAnimatingPinning) 0f else stashedHandleHeight / 2f,
                 )
 
         // Draw shadow.
@@ -255,7 +255,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
             shadowBlur,
             0f,
             keyShadowDistance,
-            setColorAlphaBound(Color.BLACK, Math.round(newShadowAlpha))
+            setColorAlphaBound(Color.BLACK, Math.round(newShadowAlpha)),
         )
         strokePaint.alpha = (paint.alpha * strokeAlpha) / 255
 
@@ -263,7 +263,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
             transientBackgroundBounds.left + halfWidthDelta + hotseatOffsetLeft,
             bottom - newBackgroundHeight + hotseatOffsetTop,
             transientBackgroundBounds.right - halfWidthDelta + hotseatOffsetRight,
-            bottom + hotseatOffsetBottom
+            bottom + hotseatOffsetBottom,
         )
         val horizontalInset = fullWidth * widthInsetPercentage
         lastDrawnTransientRect.inset(horizontalInset, 0f)

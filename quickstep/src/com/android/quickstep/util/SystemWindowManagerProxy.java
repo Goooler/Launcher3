@@ -30,7 +30,6 @@ import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
-import com.android.quickstep.LauncherActivityInterface;
 
 import java.util.List;
 import java.util.Set;
@@ -40,8 +39,17 @@ import java.util.Set;
  */
 public class SystemWindowManagerProxy extends WindowManagerProxy {
 
+    private final TISBindHelper mTISBindHelper;
+
     public SystemWindowManagerProxy(Context context) {
         super(true);
+        mTISBindHelper = new TISBindHelper(context, binder -> {});
+    }
+
+    @Override
+    public void close() {
+        super.close();
+        mTISBindHelper.onDestroy();
     }
 
     @Override
@@ -53,7 +61,7 @@ public class SystemWindowManagerProxy extends WindowManagerProxy {
     @Override
     public boolean isInDesktopMode() {
         DesktopVisibilityController desktopController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+                mTISBindHelper.getDesktopVisibilityController();
         return desktopController != null && desktopController.areDesktopTasksVisible();
     }
 

@@ -128,7 +128,9 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
 
     @Nullable
     public DesktopVisibilityController getDesktopVisibilityController() {
-        return null;
+        CONTAINER_TYPE container = getCreatedContainer();
+
+        return container == null ? null : container.getDesktopVisibilityController();
     }
 
     /**

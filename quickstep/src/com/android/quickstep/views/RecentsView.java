@@ -4328,9 +4328,8 @@ public abstract class RecentsView<
         }
 
         // Init task grid nav helper with top/bottom id arrays.
-        // TODO(b/361070854): Add keyboard navigation for all large tiles.
         TaskGridNavHelper taskGridNavHelper = new TaskGridNavHelper(getTopRowIdArray(),
-                getBottomRowIdArray(), mFocusedTaskViewId);
+                getBottomRowIdArray(), mUtils.getLargeTaskViewIds(getTaskViews()));
 
         // Get current page's task view ID.
         TaskView currentPageTaskView = getCurrentPageTaskView();

@@ -23,9 +23,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.R;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
-import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
@@ -116,10 +114,8 @@ public final class KeyboardQuickSwitchController implements
         mQuickSwitchViewController = new KeyboardQuickSwitchViewController(
                 mControllers, overlayContext, keyboardQuickSwitchView, mControllerCallbacks);
 
-        DesktopVisibilityController desktopController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
         final boolean onDesktop =
-                desktopController != null && desktopController.areDesktopTasksVisible();
+                mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible();
 
         if (mModel.isTaskListValid(mTaskListChangeId)) {
             // When we are opening the KQS with no focus override, check if the first task is

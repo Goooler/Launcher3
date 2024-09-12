@@ -26,7 +26,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.content.Context;
 import android.os.Handler;
-import android.os.RemoteException;
 import android.util.Log;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.RemoteAnimationTarget;
@@ -210,7 +209,7 @@ public class LauncherAnimationRunner extends RemoteAnimationRunnerCompat {
          * animation finished runnable.
          */
         @Override
-        public void onAnimationFinished() throws RemoteException {
+        public void onAnimationFinished() {
             mASyncFinishRunnable.run();
         }
     }
@@ -240,12 +239,5 @@ public class LauncherAnimationRunner extends RemoteAnimationRunnerCompat {
         @Override
         @UiThread
         default void onAnimationCancelled() {}
-
-        /**
-         * Returns whether this animation factory supports a tightly coupled return animation.
-         */
-        default boolean supportsReturnTransition() {
-            return false;
-        }
     }
 }

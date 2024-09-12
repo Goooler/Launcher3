@@ -7,7 +7,6 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_WIDGETS_TAP;
 import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findAllWidgetsForPackageUser;
 
-import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -35,6 +34,7 @@ import com.android.launcher3.allapps.PrivateProfileManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.InstantAppResolver;
@@ -184,10 +184,12 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
 
         @Override
         public void onClick(View view) {
-            dismissTaskMenuView();
             Rect sourceBounds = Utilities.getViewBounds(view);
+            ActivityOptionsWrapper options = mTarget.getActivityLaunchOptions(view, mItemInfo);
+            // Dismiss the taskMenu when the app launch animation is complete
+            options.onEndCallback.add(this::dismissTaskMenuView);
             PackageManagerHelper.startDetailsActivityForInfo(view.getContext(), mItemInfo,
-                    sourceBounds, ActivityOptions.makeBasic().toBundle());
+                    sourceBounds, options.toBundle());
             mTarget.getStatsLogManager().logger().withItemInfo(mItemInfo)
                     .log(LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP);
         }

@@ -253,11 +253,14 @@ public class FloatingIconView extends FrameLayout implements
     public static void getLocationBoundsForView(Launcher launcher, View v, boolean isOpening,
             RectF outRect, Rect outViewBounds) {
         boolean ignoreTransform = !isOpening;
-        if (v instanceof BubbleTextHolder) {
-            v = ((BubbleTextHolder) v).getBubbleText();
+        if (v instanceof DeepShortcutView dsv) {
+            v = dsv.getIconView();
             ignoreTransform = false;
-        } else if (v.getParent() instanceof DeepShortcutView) {
-            v = ((DeepShortcutView) v.getParent()).getIconView();
+        } else if (v.getParent() instanceof DeepShortcutView dsv) {
+            v = dsv.getIconView();
+            ignoreTransform = false;
+        } else if (v instanceof BubbleTextHolder bth) {
+            v = bth.getBubbleText();
             ignoreTransform = false;
         }
         if (v == null) {
@@ -298,10 +301,10 @@ public class FloatingIconView extends FrameLayout implements
 
         Drawable badge = null;
         if (info instanceof SystemShortcut) {
-            if (originalView instanceof ImageView) {
-                drawable = ((ImageView) originalView).getDrawable();
-            } else if (originalView instanceof DeepShortcutView) {
-                drawable = ((DeepShortcutView) originalView).getIconView().getBackground();
+            if (originalView instanceof ImageView iv) {
+                drawable = iv.getDrawable();
+            } else if (originalView instanceof DeepShortcutView dsv) {
+                drawable = dsv.getIconView().getBackground();
             } else {
                 drawable = originalView.getBackground();
             }

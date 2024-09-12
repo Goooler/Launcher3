@@ -25,7 +25,6 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
 import com.android.launcher3.taskbar.bubbles.BubbleControllers;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayController;
-import com.android.launcher3.util.DisplayController;
 import com.android.systemui.shared.rotation.RotationButtonController;
 
 import java.io.PrintWriter;
@@ -194,13 +193,17 @@ public class TaskbarControllers {
                 voiceInteractionWindowController
         };
 
-        if (DisplayController.isInDesktopMode(taskbarActivityContext)) {
+        if (taskbarDesktopModeController.getAreDesktopTasksVisible()) {
             mCornerRoundness.updateValue(taskbarDesktopModeController.getTaskbarCornerRoundness(
                     mSharedState.showCornerRadiusInDesktopMode));
         } else {
             mCornerRoundness.updateValue(TaskbarBackgroundRenderer.MAX_ROUNDNESS);
         }
+        onPostInit();
+    }
 
+    @VisibleForTesting
+    public void onPostInit() {
         mAreAllControllersInitialized = true;
         for (Runnable postInitCallback : mPostInitCallbacks) {
             postInitCallback.run();

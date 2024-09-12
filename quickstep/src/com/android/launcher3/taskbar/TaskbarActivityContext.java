@@ -100,6 +100,7 @@ import com.android.launcher3.model.data.TaskItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.popup.PopupDataProvider;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.AutohideSuspendFlag;
 import com.android.launcher3.taskbar.TaskbarTranslationController.TransitionCallback;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
@@ -140,7 +141,6 @@ import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.views.ActivityContext;
-import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.NavHandle;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SystemUiProxy;
@@ -223,7 +223,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public TaskbarActivityContext(Context windowContext,
             @Nullable Context navigationBarPanelContext, DeviceProfile launcherDp,
             TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
-            unfoldTransitionProgressProvider) {
+            unfoldTransitionProgressProvider,
+            @NonNull DesktopVisibilityController desktopVisibilityController) {
         super(windowContext);
 
         mNavigationBarPanelContext = navigationBarPanelContext;
@@ -336,17 +337,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new VoiceInteractionWindowController(this),
                 new TaskbarTranslationController(this),
                 new TaskbarSpringOnStashController(this),
-                new TaskbarRecentAppsController(
-                        this,
-                        RecentsModel.INSTANCE.get(this),
-                        LauncherActivityInterface.INSTANCE::getDesktopVisibilityController),
+                new TaskbarRecentAppsController(this, RecentsModel.INSTANCE.get(this)),
                 TaskbarEduTooltipController.newInstance(this),
                 new KeyboardQuickSwitchController(),
-                new TaskbarPinningController(this, () ->
-                        DisplayController.isInDesktopMode(this)),
+                new TaskbarPinningController(this),
                 bubbleControllersOptional,
-                new TaskbarDesktopModeController(
-                        LauncherActivityInterface.INSTANCE::getDesktopVisibilityController));
+                new TaskbarDesktopModeController(desktopVisibilityController));
+
         mLauncherPrefs = LauncherPrefs.get(this);
     }
 
@@ -1208,14 +1205,21 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.uiController.startSplitSelection(splitSelectSource);
     }
 
+    boolean areDesktopTasksVisible() {
+        return mControllers != null
+                && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible();
+    }
+
     protected void onTaskbarIconClicked(View view) {
         TaskbarUIController taskbarUIController = mControllers.uiController;
         RecentsView recents = taskbarUIController.getRecentsView();
         boolean shouldCloseAllOpenViews = true;
         Object tag = view.getTag();
         if (tag instanceof GroupTask groupTask) {
-            handleGroupTaskLaunch(groupTask, /* remoteTransition = */ null,
-                    DisplayController.isInDesktopMode(this));
+            handleGroupTaskLaunch(
+                    groupTask,
+                    /* remoteTransition= */ null,
+                    areDesktopTasksVisible());
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else if (tag instanceof FolderInfo) {
             // Tapping an expandable folder icon on Taskbar

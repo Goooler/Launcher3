@@ -26,6 +26,7 @@ import android.provider.Settings.Secure.USER_SETUP_COMPLETE
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.ServiceTestRule
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks
@@ -143,6 +144,7 @@ class TaskbarUnitTestRule(
                                     PendingIntent(IIntentSender.Default())
                                 },
                                 object : TaskbarNavButtonCallbacks {},
+                                DesktopVisibilityController(context),
                             ) {
                             override fun recreateTaskbar() {
                                 super.recreateTaskbar()

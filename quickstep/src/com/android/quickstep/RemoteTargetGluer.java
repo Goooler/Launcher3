@@ -68,7 +68,7 @@ public class RemoteTargetGluer {
      */
     public RemoteTargetGluer(Context context, BaseContainerInterface sizingStrategy) {
         DesktopVisibilityController desktopVisibilityController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+                sizingStrategy.getDesktopVisibilityController();
         if (desktopVisibilityController != null) {
             int visibleTasksCount = desktopVisibilityController.getVisibleDesktopTasksCount();
             if (visibleTasksCount > 0) {

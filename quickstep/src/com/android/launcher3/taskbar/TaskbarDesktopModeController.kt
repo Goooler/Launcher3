@@ -22,18 +22,18 @@ import com.android.launcher3.taskbar.TaskbarBackgroundRenderer.Companion.MAX_ROU
 
 /** Handles Taskbar in Desktop Windowing mode. */
 class TaskbarDesktopModeController(
-    private val desktopVisibilityControllerProvider: () -> DesktopVisibilityController?
+    private val desktopVisibilityController: DesktopVisibilityController
 ) : TaskbarDesktopModeListener {
     private lateinit var taskbarControllers: TaskbarControllers
     private lateinit var taskbarSharedState: TaskbarSharedState
 
-    private val desktopVisibilityController: DesktopVisibilityController?
-        get() = desktopVisibilityControllerProvider()
+    val areDesktopTasksVisible: Boolean
+        get() = desktopVisibilityController.areDesktopTasksVisible()
 
     fun init(controllers: TaskbarControllers, sharedState: TaskbarSharedState) {
         taskbarControllers = controllers
         taskbarSharedState = sharedState
-        desktopVisibilityController?.registerTaskbarDesktopModeListener(this)
+        desktopVisibilityController.registerTaskbarDesktopModeListener(this)
     }
 
     override fun onTaskbarCornerRoundingUpdate(doesAnyTaskRequireTaskbarRounding: Boolean) {
@@ -50,5 +50,5 @@ class TaskbarDesktopModeController(
         }
     }
 
-    fun onDestroy() = desktopVisibilityController?.unregisterTaskbarDesktopModeListener(this)
+    fun onDestroy() = desktopVisibilityController.unregisterTaskbarDesktopModeListener(this)
 }

@@ -64,3 +64,11 @@ filegroup {
         "tests/multivalentScreenshotTests/src/**/*.kt",
     ],
 }
+
+filegroup {
+    name: "launcher3-quickstep-testing",
+    path: "testing",
+    srcs: [
+        "testing/**/*.kt",
+    ],
+}

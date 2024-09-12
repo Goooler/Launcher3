@@ -40,7 +40,6 @@ import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -163,16 +162,6 @@ public final class LauncherActivityInterface extends
             return null;
         }
         return launcher.getDepthController();
-    }
-
-    @Nullable
-    @Override
-    public DesktopVisibilityController getDesktopVisibilityController() {
-        QuickstepLauncher launcher = getCreatedContainer();
-        if (launcher == null) {
-            return null;
-        }
-        return launcher.getDesktopVisibilityController();
     }
 
     @Nullable

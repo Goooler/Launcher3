@@ -15,17 +15,10 @@
  */
 package com.android.launcher3.taskbar.bubbles
 
-import android.app.Notification
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.util.PathParser
-import android.view.LayoutInflater
 import androidx.test.core.app.ApplicationProvider
-import com.android.launcher3.R
-import com.android.wm.shell.shared.bubbles.BubbleInfo
+import com.android.launcher3.taskbar.bubbles.testing.FakeBubbleViewFactory
 import com.google.android.apps.nexuslauncher.imagecomparison.goldenpathmanager.ViewScreenshotGoldenPathManager
 import org.junit.Rule
 import org.junit.Test
@@ -50,7 +43,7 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
             DeviceEmulationSpec.forDisplays(
                 Displays.Phone,
                 isDarkTheme = false,
-                isLandscape = false
+                isLandscape = false,
             )
     }
 
@@ -58,7 +51,7 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     val screenshotRule =
         ViewScreenshotTestRule(
             emulationSpec,
-            ViewScreenshotGoldenPathManager(getEmulatedDevicePathConfig(emulationSpec))
+            ViewScreenshotGoldenPathManager(getEmulatedDevicePathConfig(emulationSpec)),
         )
 
     @Test
@@ -86,39 +79,16 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     }
 
     private fun setupBubbleView(suppressNotification: Boolean = false): BubbleView {
-        val inflater = LayoutInflater.from(context)
-
-        val iconSize = 100
-        // BubbleView uses launcher's badge to icon ratio and expects the badge image to already
-        // have the right size
-        val badgeToIconRatio = 0.444f
-        val badgeRadius = iconSize * badgeToIconRatio / 2
-        val icon = createCircleBitmap(radius = iconSize / 2, color = Color.LTGRAY)
-        val badge = createCircleBitmap(radius = badgeRadius.toInt(), color = Color.RED)
-
-        val flags =
-            if (suppressNotification) Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION else 0
-        val bubbleInfo =
-            BubbleInfo("key", flags, null, null, 0, context.packageName, null, null, false, true)
-        val bubbleView = inflater.inflate(R.layout.bubblebar_item_view, null) as BubbleView
-        val dotPath =
-            PathParser.createPathFromPathData(
-                context.resources.getString(com.android.internal.R.string.config_icon_mask)
+        val bubbleView =
+            FakeBubbleViewFactory.createBubble(
+                context,
+                key = "key",
+                parent = null,
+                iconSize = 100,
+                iconColor = Color.LTGRAY,
+                suppressNotification = suppressNotification,
             )
-        val bubble =
-            BubbleBarBubble(bubbleInfo, bubbleView, badge, icon, Color.BLUE, dotPath, "test app")
-        bubbleView.setBubble(bubble)
         bubbleView.showDotIfNeeded(1f)
         return bubbleView
-    }
-
-    private fun createCircleBitmap(radius: Int, color: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawARGB(0, 0, 0, 0)
-        val paint = Paint()
-        paint.color = color
-        canvas.drawCircle(radius.toFloat(), radius.toFloat(), radius.toFloat(), paint)
-        return bitmap
     }
 }

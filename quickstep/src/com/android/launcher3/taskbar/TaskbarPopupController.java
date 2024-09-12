@@ -189,7 +189,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
         // here will reflect in the popup
         ArrayList<SystemShortcut.Factory> shortcuts = new ArrayList<>();
         shortcuts.add(APP_INFO);
-        if (!mControllers.taskbarRecentAppsController.isInDesktopMode()) {
+        if (!mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
             shortcuts.addAll(mControllers.uiController.getSplitMenuOptions().toList());
         }
         if (com.android.wm.shell.Flags.enableBubbleAnything()) {
