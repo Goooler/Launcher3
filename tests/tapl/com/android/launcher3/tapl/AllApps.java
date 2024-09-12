@@ -56,11 +56,9 @@ public abstract class AllApps extends LauncherInstrumentation.VisibleContainer
 
     private static final String BOTTOM_SHEET_RES_ID = "bottom_sheet_background";
     private static final String FAST_SCROLLER_RES_ID = "fast_scroller";
-
-    private static final Pattern EVENT_ALT_ESC_DOWN = Pattern.compile(
-            "Key event: KeyEvent.*?action=ACTION_DOWN.*?keyCode=KEYCODE_ESCAPE.*?metaState=0");
     private static final Pattern EVENT_ALT_ESC_UP = Pattern.compile(
             "Key event: KeyEvent.*?action=ACTION_UP.*?keyCode=KEYCODE_ESCAPE.*?metaState=0");
+    private static final String UNLOCK_BUTTON_VIEW_RES_ID = "ps_lock_unlock_button";
 
     private final int mHeight;
     private final int mIconHeight;
@@ -294,6 +292,10 @@ public abstract class AllApps extends LauncherInstrumentation.VisibleContainer
         return mLauncher.waitForObjectInContainer(allAppsContainer, "apps_list_view");
     }
 
+    protected UiObject2 getAllAppsHeader(UiObject2 allAppsContainer) {
+        return mLauncher.waitForObjectInContainer(allAppsContainer, "all_apps_header");
+    }
+
     protected UiObject2 getSearchBox(UiObject2 allAppsContainer) {
         return mLauncher.waitForObjectInContainer(allAppsContainer, "search_container_all_apps");
     }
@@ -407,7 +409,6 @@ public abstract class AllApps extends LauncherInstrumentation.VisibleContainer
     /** Presses the esc key to dismiss AllApps. */
     public void dismissByEscKey() {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
-            mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_ALT_ESC_DOWN);
             mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_ALT_ESC_UP);
             mLauncher.runToState(
                     () -> mLauncher.getDevice().pressKeyCode(KEYCODE_ESCAPE),
@@ -418,6 +419,43 @@ public abstract class AllApps extends LauncherInstrumentation.VisibleContainer
                 verifyVisibleContainerOnDismiss();
             }
         }
+    }
+
+    /** Returns PredictionRow if present in view. */
+    @NonNull
+    public PredictionRow getPredictionRowView() {
+        final UiObject2 allAppsContainer = verifyActiveContainer();
+        final UiObject2 allAppsHeader = getAllAppsHeader(allAppsContainer);
+        return new PredictionRow(mLauncher, allAppsHeader);
+    }
+
+    /** Returns PrivateSpaceContainer if present in view. */
+    @NonNull
+    public PrivateSpaceContainer getPrivateSpaceUnlockedView() {
+        final UiObject2 allAppsContainer = verifyActiveContainer();
+        final UiObject2 appListRecycler = getAppListRecycler(allAppsContainer);
+        return new PrivateSpaceContainer(mLauncher, appListRecycler, this, true);
+    }
+
+    /** Returns PrivateSpaceContainer in locked state, if present in view. */
+    @NonNull
+    public PrivateSpaceContainer getPrivateSpaceLockedView() {
+        final UiObject2 allAppsContainer = verifyActiveContainer();
+        final UiObject2 appListRecycler = getAppListRecycler(allAppsContainer);
+        return new PrivateSpaceContainer(mLauncher, appListRecycler, this, false);
+    }
+
+    /**
+     * Toggles Lock/Unlock of Private Space, changing the All Apps Ui.
+     */
+    public void togglePrivateSpace() {
+        final UiObject2 allAppsContainer = verifyActiveContainer();
+        final UiObject2 appListRecycler = getAppListRecycler(allAppsContainer);
+        UiObject2 unLockButtonView = mLauncher.waitForObjectInContainer(appListRecycler,
+                UNLOCK_BUTTON_VIEW_RES_ID);
+        mLauncher.waitForObjectEnabled(unLockButtonView, "Private Space Unlock Button");
+        mLauncher.assertTrue("PS Unlock Button is non-clickable", unLockButtonView.isClickable());
+        unLockButtonView.click();
     }
 
     protected abstract void verifyVisibleContainerOnDismiss();

@@ -49,7 +49,6 @@ import static com.android.launcher3.touch.BothAxesSwipeDetector.DIRECTION_UP;
 import static com.android.launcher3.util.NavigationMode.THREE_BUTTONS;
 import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
 import static com.android.quickstep.views.RecentsView.CONTENT_ALPHA;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
@@ -85,7 +84,6 @@ import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.MotionPauseDetector;
 import com.android.quickstep.util.WorkspaceRevealAnim;
-import com.android.quickstep.views.LauncherRecentsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
@@ -109,9 +107,9 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     private final float mMaxYProgress;
     private final MotionPauseDetector mMotionPauseDetector;
     private final float mMotionPauseMinDisplacement;
-    private final LauncherRecentsView mRecentsView;
+    private final RecentsView mRecentsView;
     protected final AnimatorListener mClearStateOnCancelListener =
-            newCancelListener(this::clearState);
+            newCancelListener(this::clearState, /* isSingleUse = */ false);
 
     private boolean mNoIntercept;
     private LauncherState mStartState;
@@ -174,12 +172,8 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         if ((ev.getEdgeFlags() & Utilities.EDGE_NAV_BAR) == 0) {
             return false;
         }
-        int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
+        long stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
-            return false;
-        }
-        if (isDesktopModeSupported()) {
-            // TODO(b/268075592): add support for quickswitch to/from desktop
             return false;
         }
         if (isTrackpadMultiFingerSwipe(ev)) {

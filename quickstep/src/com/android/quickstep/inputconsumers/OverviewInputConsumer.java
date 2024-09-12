@@ -28,26 +28,27 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.Utilities;
 import com.android.launcher3.statemanager.BaseState;
-import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.views.BaseDragLayer;
-import com.android.quickstep.BaseActivityInterface;
+import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.InputConsumer;
 import com.android.quickstep.TaskUtils;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.system.InputMonitorCompat;
 
 /**
  * Input consumer for handling touch on the recents/Launcher activity.
  */
-public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulActivity<S>>
+public class OverviewInputConsumer<S extends BaseState<S>, T extends RecentsViewContainer>
         implements InputConsumer {
 
-    private final T mActivity;
-    private final BaseActivityInterface<?, T> mActivityInterface;
+    private final T mContainer;
+    private final BaseContainerInterface<?, T> mContainerInterface;
     private final BaseDragLayer mTarget;
     private final InputMonitorCompat mInputMonitor;
+    private final GestureState mGestureState;
 
     private final int[] mLocationOnScreen = new int[2];
 
@@ -56,14 +57,15 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
     private boolean mHasSetTouchModeForFirstDPadEvent;
     private boolean mIsWaitingForAttachToWindow;
 
-    public OverviewInputConsumer(GestureState gestureState, T activity,
+    public OverviewInputConsumer(GestureState gestureState, T container,
             @Nullable InputMonitorCompat inputMonitor, boolean startingInActivityBounds) {
-        mActivity = activity;
+        mContainer = container;
         mInputMonitor = inputMonitor;
         mStartingInActivityBounds = startingInActivityBounds;
-        mActivityInterface = gestureState.getActivityInterface();
+        mContainerInterface = gestureState.getContainerInterface();
+        mGestureState = gestureState;
 
-        mTarget = activity.getDragLayer();
+        mTarget = container.getDragLayer();
         mTarget.getLocationOnScreen(mLocationOnScreen);
     }
 
@@ -84,14 +86,17 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
             ev.setEdgeFlags(flags | Utilities.EDGE_NAV_BAR);
         }
         ev.offsetLocation(-mLocationOnScreen[0], -mLocationOnScreen[1]);
-        boolean handled = mTarget.proxyTouchEvent(ev, mStartingInActivityBounds);
+        boolean handled = false;
+        if (mGestureState == null || !mGestureState.isInExtendedSlopRegion()) {
+            handled = mTarget.proxyTouchEvent(ev, mStartingInActivityBounds);
+        }
         ev.offsetLocation(mLocationOnScreen[0], mLocationOnScreen[1]);
         ev.setEdgeFlags(flags);
 
         if (!mTargetHandledTouch && handled) {
             mTargetHandledTouch = true;
             if (!mStartingInActivityBounds) {
-                mActivityInterface.closeOverlay();
+                mContainerInterface.closeOverlay();
                 TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
             }
             if (mInputMonitor != null) {
@@ -100,13 +105,13 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
             }
         }
         if (mHasSetTouchModeForFirstDPadEvent) {
-            mActivity.getRootView().clearFocus();
+            mContainer.getRootView().clearFocus();
         }
     }
 
     @Override
     public void onHoverEvent(MotionEvent ev) {
-        mActivity.dispatchGenericMotionEvent(ev);
+        mContainer.dispatchGenericMotionEvent(ev);
     }
 
     @Override
@@ -115,7 +120,8 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_MUTE:
-                MediaSessionManager mgr = mActivity.getSystemService(MediaSessionManager.class);
+                MediaSessionManager mgr = mContainer.asContext()
+                        .getSystemService(MediaSessionManager.class);
                 mgr.dispatchVolumeKeyEventAsSystemService(ev,
                         AudioManager.USE_DEFAULT_STREAM_TYPE);
                 break;
@@ -124,7 +130,7 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
                 if (mHasSetTouchModeForFirstDPadEvent) {
                     break;
                 }
-                View viewRoot = mActivity.getRootView();
+                View viewRoot = mContainer.getRootView();
                 if (viewRoot.isAttachedToWindow()) {
                     setTouchModeChanged(viewRoot);
                     break;
@@ -150,7 +156,7 @@ public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulAct
             default:
                 break;
         }
-        mActivity.dispatchKeyEvent(ev);
+        mContainer.dispatchKeyEvent(ev);
     }
 
     private void setTouchModeChanged(@NonNull View viewRoot) {

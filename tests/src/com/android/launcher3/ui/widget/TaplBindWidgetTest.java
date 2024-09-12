@@ -43,6 +43,7 @@ import android.widget.RemoteViews;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherSettings;
@@ -76,7 +77,7 @@ import java.util.function.Consumer;
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class TaplBindWidgetTest extends AbstractLauncherUiTest {
+public class TaplBindWidgetTest extends AbstractLauncherUiTest<Launcher> {
 
     @Rule
     public ShellCommandRule mGrantWidgetRule = ShellCommandRule.grantWidgetBind();
@@ -251,22 +252,20 @@ public class TaplBindWidgetTest extends AbstractLauncherUiTest {
     private void addPendingItemToScreen(LauncherAppWidgetInfo item, int restoreStatus) {
         item.restoreStatus = restoreStatus;
         item.screenId = FIRST_SCREEN_ID;
-        new FavoriteItemsTransaction(mTargetContext)
-                .addItem(() -> item)
-                .commitAndLoadHome(mLauncher);
+        commitTransactionAndLoadHome(
+                new FavoriteItemsTransaction(mTargetContext).addItem(() -> item));
     }
 
     private LauncherAppWidgetProviderInfo addWidgetToScreen(boolean hasConfigureScreen,
             boolean bindWidget, Consumer<LauncherAppWidgetInfo> itemOverride) {
         LauncherAppWidgetProviderInfo info = TestViewHelpers.findWidgetProvider(hasConfigureScreen);
-        new FavoriteItemsTransaction(mTargetContext)
+        commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext)
                 .addItem(() -> {
                     LauncherAppWidgetInfo item = createWidgetInfo(info, mTargetContext, bindWidget);
                     item.screenId = FIRST_SCREEN_ID;
                     itemOverride.accept(item);
                     return item;
-                })
-                .commitAndLoadHome(mLauncher);
+                }));
         return info;
     }
 

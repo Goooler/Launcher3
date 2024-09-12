@@ -36,11 +36,14 @@
     <string name="shortcut_not_available">Shortcut isn\'t available</string>
     <!-- User visible name for the launcher/home screen. [CHAR_LIMIT=30] -->
     <string name="home_screen">Home</string>
+    <!-- Description for setting the current launcher as the default home app. [CHAR_LIMIT=none]-->
+    <string name="set_default_home_app">Set <xliff:g id="launcher_name" example="Launcher3">%1$s</xliff:g> as default home app in Settings</string>
 
     <!-- Options for recent tasks -->
     <!-- Title for an option to enter split screen mode for a given app -->
     <string name="recent_task_option_split_screen">Split screen</string>
     <string name="split_app_info_accessibility">App info for %1$s</string>
+    <string name="split_app_usage_settings">Usage settings for %1$s</string>
 
     <!-- App pairs -->
     <string name="save_app_pair">Save app pair</string>
@@ -66,6 +69,12 @@
     <!-- Spoken text for a screen reader. The placeholder text is the widget name.
          [CHAR_LIMIT=none]-->
     <string name="widget_preview_context_description"><xliff:g id="widget_name" example="Calendar month view">%1$s</xliff:g> widget</string>
+    <!-- Spoken text for a screen reader. The first placeholder text is the widget name, the
+         remaining placeholders are for the widget dimensions.
+         [CHAR_LIMIT=none]-->
+    <string name="widget_preview_name_and_dims_content_description">
+        <xliff:g id="widget_name" example="Calendar month view">%1$s</xliff:g> widget, %2$d wide by %3$d high
+    </string>
     <!-- Message to tell the user to press and hold a widget/icon to add it to the home screen.
          [CHAR LIMIT=NONE]  -->
     <string name="add_item_request_drag_hint">Touch &amp; hold the widget to move it around the home screen</string>
@@ -77,12 +86,21 @@
     <!-- Widget suggestions header title in the full widgets picker for large screen devices
     in landscape mode. [CHAR_LIMIT=50] -->
     <string name="suggested_widgets_header_title">Suggestions</string>
-    <string name="productivity_widget_recommendation_category_label">Your Daily Essentials</string>
-    <string name="news_widget_recommendation_category_label">News For You</string>
-    <string name="social_and_entertainment_widget_recommendation_category_label">Your Chill Zone</string>
-    <string name="fitness_widget_recommendation_category_label">Reach Your Fitness Goals</string>
-    <string name="weather_widget_recommendation_category_label">Stay Ahead of the Weather</string>
-    <string name="others_widget_recommendation_category_label">You Might Also Like</string>
+    <!-- Title for the widget suggestions category that displays widgets provided by
+    productivity apps for daily use [CHAR_LIMIT=50] -->
+    <string name="productivity_widget_recommendation_category_label">Essentials</string>
+    <!-- Title for the widget suggestions category that displays widgets provided by
+    news and magazines related apps [CHAR_LIMIT=50] -->
+    <string name="news_widget_recommendation_category_label">News &amp; magazines</string>
+    <!-- Title for the widget suggestions category that displays widgets provided by
+    entertainment apps [CHAR_LIMIT=50] -->
+    <string name="entertainment_widget_recommendation_category_label">Entertainment</string>
+    <!-- Title for the widget suggestions category that displays widgets provided by
+    social apps [CHAR_LIMIT=50] -->
+    <string name="social_widget_recommendation_category_label">Social</string>
+    <!-- Title for the widget suggestions category that displays general widget suggestions
+    [CHAR_LIMIT=50] -->
+    <string name="others_widget_recommendation_category_label">Suggested for you</string>
     <!-- accessibilityPaneTitle for the right pane when showing suggested widgets. -->
     <string name="widget_picker_right_pane_accessibility_title"><xliff:g id="selected_header" example="Calendar">%1$s</xliff:g> widgets on right, search and options on left</string>
     <!-- Label for showing the number of widgets an app has in the full widgets picker.
@@ -125,19 +143,15 @@
     <!-- A widget category label for grouping widgets related to note taking. [CHAR_LIMIT=30] -->
     <string name="widget_category_note_taking">Note-taking</string>
 
-    <!-- Title of a dialog. This dialog lets a user know how they can use widgets on their phone.
-         [CHAR_LIMIT=NONE] -->
-    <string name="widget_education_header">Useful info at your fingertips</string>
-    <!-- Dialog text. This dialog lets a user know how they can use widgets on their phone.
-         [CHAR_LIMIT=NONE] -->
-    <string name="widget_education_content">To get info without opening apps, you can add widgets to your home screen</string>
+    <!-- Text on the button that adds a widget to the home screen. [CHAR_LIMIT=15] -->
+    <string name="widget_add_button_label">Add</string>
+    <!-- Accessibility content description for the button that adds a widget to the home screen. The
+         placeholder text is the widget name. [CHAR_LIMIT=none] -->
+    <string name="widget_add_button_content_description">Add <xliff:g id="widget_name" example="Calendar month view">%1$s</xliff:g> widget</string>
 
     <!-- Text on an educational tip on widget informing users that they can change widget settings.
          [CHAR_LIMIT=NONE] -->
     <string name="reconfigurable_widget_education_tip">Tap to change widget settings</string>
-
-    <!-- Text on the button that closes the education dialog about widgets. [CHAR_LIMIT=50] -->
-    <string name="widget_education_close_button">Got it</string>
 
     <!-- Spoken text for screen readers. This text is for an icon that lets the user change a
          widget's settings. [CHAR_LIMIT=50] -->
@@ -187,6 +201,8 @@
     <string name="app_info_drop_target_label">App info</string>
     <!-- Label for install to private profile shortcut label. [CHAR_LIMIT=20] -->
     <string name="install_private_system_shortcut_label">Install in private</string>
+    <!-- Label for uninstall app private profile shortcut.-->
+    <string name="uninstall_private_system_shortcut_label">Uninstall app</string>
     <!-- Label for install drop target. [CHAR_LIMIT=20] -->
     <string name="install_drop_target_label">Install</string>
     <!-- Label for dismiss prediction. -->
@@ -329,7 +345,7 @@
     <!-- Title for an app whose download has been started. -->
     <string name="app_waiting_download_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> waiting to install</string>
     <!-- Title for an app which is archived. -->
-    <string name="app_archived_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> is archived. Tap to download.</string>
+    <string name="app_archived_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> is archived. Tap to download and restore.</string>
 
 
     <!-- Title shown on the alert dialog prompting the user to update the application in market
@@ -468,22 +484,20 @@
     <!-- Private space tile label -->
     <string name="private_space_label">Private space</string>
     <!-- Private space tile secondary label -->
-    <string name="private_space_secondary_label">Keep private apps locked and hidden</string>
+    <string name="private_space_secondary_label">Tap to set up or open</string>
     <!-- Title for Private Space Container shown at the bottom of all apps drawer -->
     <string name="ps_container_title">Private</string>
     <!-- Description for Private Space Settings button -->
     <string name="ps_container_settings">Private Space Settings</string>
-    <!-- Description for Private Space Lock/Unlock button -->
-    <string name="ps_container_lock_unlock_button">Lock/Unlock Private Space</string>
+    <!-- Description for Private Space Unlock button -->
+    <string name="ps_container_unlock_button_content_description">Private, unlocked.</string>
+    <!-- Description for Private Space Lock button -->
+    <string name="ps_container_lock_button_content_description">Private, locked.</string>
     <string name="ps_container_lock_title">Lock</string>
     <!-- Description for Private Space Transition button -->
     <string name="ps_container_transition">Private Space Transitioning</string>
     <!-- Title for Private Space install app icon -->
-    <string name="ps_add_button_label">Install apps</string>
+    <string name="ps_add_button_label">Install</string>
     <!-- Content description for install app icon -->
     <string name="ps_add_button_content_description">Install apps to Private Space</string>
-
-    <!-- Strings for bubble bar -->
-    <!-- content description for the overflow bubble [CHAR_LIMIT=none] -->
-    <string name="bubble_bar_overflow_description">Overflow</string>
 </resources>

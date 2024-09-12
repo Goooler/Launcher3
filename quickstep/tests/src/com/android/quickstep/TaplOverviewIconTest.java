@@ -27,6 +27,7 @@ import android.platform.test.annotations.PlatinumTest;
 import com.android.launcher3.tapl.OverviewTask.OverviewSplitTask;
 import com.android.launcher3.tapl.OverviewTaskMenu;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.rule.TestStabilityRule;
 
 import org.junit.Test;
@@ -35,7 +36,7 @@ import org.junit.Test;
  * This test run in both Out of process (Oop) and in-process (Ipc).
  * Tests the app Icon in overview.
  */
-public class TaplOverviewIconTest extends AbstractLauncherUiTest {
+public class TaplOverviewIconTest extends AbstractLauncherUiTest<QuickstepLauncher> {
 
     private static final String CALCULATOR_APP_PACKAGE =
             resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR);
@@ -87,6 +88,8 @@ public class TaplOverviewIconTest extends AbstractLauncherUiTest {
     }
 
     private void createAndLaunchASplitPair() {
+        clearAllRecentTasks();
+
         startTestActivity(2);
         startTestActivity(3);
 

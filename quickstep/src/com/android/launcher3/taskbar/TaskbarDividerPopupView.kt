@@ -69,8 +69,6 @@ constructor(
 
     private lateinit var dividerView: View
 
-    private val menuWidth =
-        resources.getDimensionPixelSize(R.dimen.taskbar_pinning_popup_menu_width)
     private val popupCornerRadius = Themes.getDialogCornerRadius(context)
     private val arrowWidth = resources.getDimension(R.dimen.popup_arrow_width)
     private val arrowHeight = resources.getDimension(R.dimen.popup_arrow_height)
@@ -98,16 +96,21 @@ constructor(
         popupContainer.getDescendantRectRelativeToSelf(dividerView, outPos)
     }
 
-    @SuppressLint("UseSwitchCompatOrMaterialCode")
+    @SuppressLint("UseSwitchCompatOrMaterialCode", "ClickableViewAccessibility")
     override fun onFinishInflate() {
         super.onFinishInflate()
         val taskbarSwitchOption = requireViewById<LinearLayout>(R.id.taskbar_switch_option)
         val alwaysShowTaskbarSwitch = requireViewById<Switch>(R.id.taskbar_pinning_switch)
         val taskbarVisibilityIcon = requireViewById<View>(R.id.taskbar_pinning_visibility_icon)
+
         alwaysShowTaskbarSwitch.isChecked = alwaysShowTaskbarOn
+        alwaysShowTaskbarSwitch.setOnTouchListener { view, event ->
+            (view.parent as View).onTouchEvent(event)
+        }
+        alwaysShowTaskbarSwitch.setOnClickListener { view -> (view.parent as View).performClick() }
+
         if (ActivityContext.lookupContext<TaskbarActivityContext>(context).isGestureNav) {
             taskbarSwitchOption.setOnClickListener {
-                alwaysShowTaskbarSwitch.isClickable = true
                 alwaysShowTaskbarSwitch.isChecked = !alwaysShowTaskbarOn
                 onClickAlwaysShowTaskbarSwitchOption()
             }
@@ -125,7 +128,7 @@ constructor(
     /** Orient object as usual and then center object horizontally. */
     override fun orientAboutObject() {
         super.orientAboutObject()
-        x = mTempRect.centerX() - menuWidth / 2f
+        x = mTempRect.centerX() - measuredWidth / 2f
     }
 
     override fun onControllerInterceptTouchEvent(ev: MotionEvent?): Boolean {

@@ -18,6 +18,7 @@ package com.android.launcher3.provider;
 
 import static android.os.Process.myUserHandle;
 
+import static com.android.launcher3.BuildConfig.WIDGETS_ENABLED;
 import static com.android.launcher3.Flags.enableLauncherBrMetricsFixed;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.LauncherPrefs.APP_WIDGET_IDS;
@@ -64,13 +65,12 @@ import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.model.LoaderTask;
 import com.android.launcher3.model.ModelDbController;
-import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ContentWriter;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.LogConfig;
@@ -418,9 +418,7 @@ public class RestoreDbTask {
         DeviceGridState deviceGridState = new DeviceGridState(context);
         FileLog.d(TAG, "restore initiated from backup: DeviceGridState=" + deviceGridState);
         LauncherPrefs.get(context).putSync(RESTORE_DEVICE.to(deviceGridState.getDeviceType()));
-        if (enableLauncherBrMetricsFixed()) {
-            LauncherPrefs.get(context).putSync(IS_FIRST_LOAD_AFTER_RESTORE.to(true));
-        }
+        LauncherPrefs.get(context).putSync(IS_FIRST_LOAD_AFTER_RESTORE.to(true));
     }
 
     @WorkerThread
@@ -448,7 +446,7 @@ public class RestoreDbTask {
     private void restoreAppWidgetIds(Context context, ModelDbController controller,
             LauncherRestoreEventLogger launcherRestoreEventLogger, int[] oldWidgetIds,
             int[] newWidgetIds, @NonNull AppWidgetHost host) {
-        if (WidgetsModel.GO_DISABLE_WIDGETS) {
+        if (!WIDGETS_ENABLED) {
             FileLog.e(TAG, "Skipping widget ID remap as widgets not supported");
             host.deleteHost();
             launcherRestoreEventLogger.logFavoritesItemsRestoreFailed(Favorites.ITEM_TYPE_APPWIDGET,
@@ -476,7 +474,7 @@ public class RestoreDbTask {
         logDatabaseWidgetInfo(controller);
 
         for (int i = 0; i < oldWidgetIds.length; i++) {
-            FileLog.i(TAG, "Widget state restore id " + oldWidgetIds[i] + " => " + newWidgetIds[i]);
+            FileLog.i(TAG, "migrating appWidgetId: " + oldWidgetIds[i] + " => " + newWidgetIds[i]);
 
             final AppWidgetProviderInfo provider = widgets.getAppWidgetInfo(newWidgetIds[i]);
             final int state;
@@ -526,10 +524,7 @@ public class RestoreDbTask {
         }
 
         logFavoritesTable(controller.getDb(), "launcher db after remap widget ids", null, null);
-        LauncherAppState app = LauncherAppState.getInstanceNoCreate();
-        if (app != null) {
-            app.getModel().forceReload();
-        }
+        LauncherAppState.INSTANCE.executeIfCreated(app -> app.getModel().forceReload());
     }
 
     private static void logDatabaseWidgetInfo(ModelDbController controller) {
@@ -577,9 +572,8 @@ public class RestoreDbTask {
 
     protected static void maybeOverrideShortcuts(Context context, ModelDbController controller,
             SQLiteDatabase db, long currentUser) {
-        Map<String, LauncherActivityInfo> activityOverrides = ApiWrapper.getActivityOverrides(
-                context);
-
+        Map<String, LauncherActivityInfo> activityOverrides =
+                ApiWrapper.INSTANCE.get(context).getActivityOverrides();
         if (activityOverrides == null || activityOverrides.isEmpty()) {
             return;
         }

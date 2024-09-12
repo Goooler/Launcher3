@@ -24,6 +24,9 @@ import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.UtilitiesKt.CLIP_CHILDREN_FALSE_MODIFIER;
+import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
+import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_BOTTOM_SHEET_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
@@ -38,8 +41,6 @@ import android.animation.ValueAnimator;
 import android.util.FloatProperty;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.FloatRange;
@@ -167,6 +168,8 @@ public class AllAppsTransitionController
     private final AnimatedFloat mAllAppScale = new AnimatedFloat(this::onScaleProgressChanged);
     private final int mNavScrimFlag;
 
+    @Nullable private Animator.AnimatorListener mAllAppsSearchBackAnimationListener;
+
     private boolean mIsVerticalLayout;
 
     // Animation in this class is controlled by a single variable {@link mProgress}.
@@ -280,8 +283,7 @@ public class AllAppsTransitionController
             return;
         }
 
-        float deceleratedProgress =
-                Interpolators.PREDICTIVE_BACK_DECELERATED_EASE.getInterpolation(backProgress);
+        float deceleratedProgress = Interpolators.BACK_GESTURE.getInterpolation(backProgress);
         float scaleProgress = ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE
                 + (1 - ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE)
                 * (1 - deceleratedProgress);
@@ -292,12 +294,11 @@ public class AllAppsTransitionController
     private void onScaleProgressChanged() {
         final float scaleProgress = mAllAppScale.value;
         SCALE_PROPERTY.set(mLauncher.getAppsView(), scaleProgress);
-        mLauncher.getScrimView().setScrimHeaderScale(scaleProgress);
+        if (!mLauncher.getAppsView().isSearching() || !mLauncher.getDeviceProfile().isTablet) {
+            mLauncher.getScrimView().setScrimHeaderScale(scaleProgress);
+        }
 
         AllAppsRecyclerView rv = mLauncher.getAppsView().getActiveRecyclerView();
-        if (rv != null && rv.getScrollbar() != null) {
-            rv.getScrollbar().setVisibility(scaleProgress < 1f ? View.INVISIBLE : View.VISIBLE);
-        }
 
         // Disable view clipping from all apps' RecyclerView up to all apps view during scale
         // animation, and vice versa. The goal is to display extra roll(s) app icons (rendered in
@@ -306,18 +307,34 @@ public class AllAppsTransitionController
         if (hasScaleEffect != mHasScaleEffect) {
             mHasScaleEffect = hasScaleEffect;
             if (mHasScaleEffect) {
-                setClipChildrenOnViewTree(rv, mLauncher.getAppsView(), false);
+                modifyAttributesOnViewTree(rv, mLauncher.getAppsView(),
+                        CLIP_CHILDREN_FALSE_MODIFIER);
             } else {
-                restoreClipChildrenOnViewTree(rv, mLauncher.getAppsView());
+                restoreAttributesOnViewTree(rv, mLauncher.getAppsView(),
+                        CLIP_CHILDREN_FALSE_MODIFIER);
             }
         }
     }
 
-    /** Animate all apps view to 1f scale. */
+    /** Set {@link Animator.AnimatorListener} for scaling all apps scale to 1 animation. */
+    public void setAllAppsSearchBackAnimationListener(Animator.AnimatorListener listener) {
+        mAllAppsSearchBackAnimationListener = listener;
+    }
+
+    /**
+     * Animate all apps view to 1f scale. This is called when backing (exiting) from all apps
+     * search view to all apps view.
+     */
     public void animateAllAppsToNoScale() {
-        mAllAppScale.animateToValue(1f)
-                .setDuration(REVERT_SWIPE_ALL_APPS_TO_HOME_ANIMATION_DURATION_MS)
-                .start();
+        if (mAllAppScale.isAnimating()) {
+            return;
+        }
+        Animator animator = mAllAppScale.animateToValue(1f)
+                .setDuration(REVERT_SWIPE_ALL_APPS_TO_HOME_ANIMATION_DURATION_MS);
+        if (mAllAppsSearchBackAnimationListener != null) {
+            animator.addListener(mAllAppsSearchBackAnimationListener);
+        }
+        animator.start();
     }
 
     /**
@@ -420,79 +437,6 @@ public class AllAppsTransitionController
         mAppsViewAlpha.setUpdateVisibility(true);
         mAppsViewTranslationY = new MultiPropertyFactory<>(
                 mAppsView, VIEW_TRANSLATE_Y, APPS_VIEW_INDEX_COUNT, Float::sum);
-    }
-
-    /**
-     * Recursively call {@link ViewGroup#setClipChildren(boolean)} from {@link View} to ts parent
-     * (direct or indirect) inclusive. This method will also save the old clipChildren value on each
-     * view with {@link View#setTag(int, Object)}, which can be restored in
-     * {@link #restoreClipChildrenOnViewTree(View, ViewParent)}.
-     *
-     * Note that if parent is null or not a parent of the view, this method will be applied all the
-     * way to root view.
-     *
-     * @param v child view
-     * @param parent direct or indirect parent of child view
-     * @param clipChildren whether we should clip children
-     */
-    private static void setClipChildrenOnViewTree(
-            @Nullable View v,
-            @Nullable ViewParent parent,
-            boolean clipChildren) {
-        if (v == null) {
-            return;
-        }
-
-        if (v instanceof ViewGroup) {
-            ViewGroup viewGroup = (ViewGroup) v;
-            boolean oldClipChildren = viewGroup.getClipChildren();
-            if (oldClipChildren != clipChildren) {
-                v.setTag(R.id.saved_clip_children_tag_id, oldClipChildren);
-                viewGroup.setClipChildren(clipChildren);
-            }
-        }
-
-        if (v == parent) {
-            return;
-        }
-
-        if (v.getParent() instanceof View) {
-            setClipChildrenOnViewTree((View) v.getParent(), parent, clipChildren);
-        }
-    }
-
-    /**
-     * Recursively call {@link ViewGroup#setClipChildren(boolean)} to restore clip children value
-     * set in {@link #setClipChildrenOnViewTree(View, ViewParent, boolean)} on view to its parent
-     * (direct or indirect) inclusive.
-     *
-     * Note that if parent is null or not a parent of the view, this method will be applied all the
-     * way to root view.
-     *
-     * @param v child view
-     * @param parent direct or indirect parent of child view
-     */
-    private static void restoreClipChildrenOnViewTree(
-            @Nullable View v, @Nullable ViewParent parent) {
-        if (v == null) {
-            return;
-        }
-        if (v instanceof ViewGroup) {
-            ViewGroup viewGroup = (ViewGroup) v;
-            Object viewTag = viewGroup.getTag(R.id.saved_clip_children_tag_id);
-            if (viewTag instanceof Boolean) {
-                viewGroup.setClipChildren((boolean) viewTag);
-                viewGroup.setTag(R.id.saved_clip_children_tag_id, null);
-            }
-        }
-
-        if (v == parent) {
-            return;
-        }
-
-        if (v.getParent() instanceof View) {
-            restoreClipChildrenOnViewTree((View) v.getParent(), parent);
-        }
     }
 
     /**

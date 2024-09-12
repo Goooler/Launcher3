@@ -46,9 +46,12 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
+import androidx.annotation.NonNull;
+
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.touch.DefaultPagedViewHandler;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
 import com.android.launcher3.util.SplitConfigurationOptions;
@@ -75,6 +78,7 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     public <T> T getSecondaryValue(T x, T y) {
         return y;
     }
+
     @Override
     public boolean isLayoutNaturalToLauncher() {
         return true;
@@ -123,6 +127,11 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     @Override
     public float getEnd(RectF rect) {
         return rect.right;
+    }
+
+    @Override
+    public void rotateInsets(@NonNull Rect insets, @NonNull Rect outInsets) {
+        outInsets.set(insets);
     }
 
     @Override
@@ -212,7 +221,8 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     @Override
     public int getTaskMenuHeight(float taskInsetMargin, DeviceProfile deviceProfile,
             float taskMenuX, float taskMenuY) {
-        return (int) (deviceProfile.availableHeightPx - taskInsetMargin - taskMenuY);
+        return (int) (deviceProfile.heightPx - deviceProfile.getInsets().top - taskMenuY
+                    - deviceProfile.getOverviewActionsClaimedSpaceBelow());
     }
 
     @Override
@@ -796,9 +806,15 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     }
 
     @Override
-    public Float getFloatingTaskPrimaryTranslation(View floatingTask, DeviceProfile dp) {
+    public float getFloatingTaskPrimaryTranslation(View floatingTask, DeviceProfile dp) {
         return dp.isLeftRightSplit
                 ? floatingTask.getTranslationX()
                 : floatingTask.getTranslationY();
+    }
+
+    @NonNull
+    @Override
+    public LauncherAtom.TaskSwitcherContainer.OrientationHandler getHandlerTypeForLogging() {
+        return LauncherAtom.TaskSwitcherContainer.OrientationHandler.PORTRAIT;
     }
 }

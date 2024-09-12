@@ -20,7 +20,6 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERV
 import android.content.Context;
 import android.graphics.Rect;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
@@ -33,7 +32,7 @@ import com.android.quickstep.views.RecentsView;
 public class OverviewModalTaskState extends OverviewState {
 
     private static final int STATE_FLAGS =
-            FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_WORKSPACE_INACCESSIBLE;
+            FLAG_DISABLE_RESTORE | FLAG_RECENTS_VIEW_VISIBLE | FLAG_WORKSPACE_INACCESSIBLE;
 
     public OverviewModalTaskState(int id) {
         super(id, LAUNCHER_STATE_OVERVIEW, STATE_FLAGS);
@@ -51,7 +50,7 @@ public class OverviewModalTaskState extends OverviewState {
 
     @Override
     public float[] getOverviewScaleAndOffset(Launcher launcher) {
-        return getOverviewScaleAndOffsetForModalState(launcher);
+        return getOverviewScaleAndOffsetForModalState(launcher.getOverviewPanel());
     }
 
     @Override
@@ -60,7 +59,7 @@ public class OverviewModalTaskState extends OverviewState {
     }
 
     @Override
-    public void onBackPressed(Launcher launcher) {
+    public void onBackInvoked(Launcher launcher) {
         launcher.getStateManager().goToState(LauncherState.OVERVIEW);
     }
 
@@ -72,8 +71,7 @@ public class OverviewModalTaskState extends OverviewState {
         return super.isTaskbarStashed(launcher);
     }
 
-    public static float[] getOverviewScaleAndOffsetForModalState(BaseDraggingActivity activity) {
-        RecentsView recentsView = activity.<RecentsView>getOverviewPanel();
+    public static float[] getOverviewScaleAndOffsetForModalState(RecentsView recentsView) {
         Rect taskSize = recentsView.getSelectedTaskBounds();
         Rect modalTaskSize = new Rect();
         recentsView.getModalTaskSize(modalTaskSize);

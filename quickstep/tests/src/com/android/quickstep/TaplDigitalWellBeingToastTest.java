@@ -86,9 +86,10 @@ public class TaplDigitalWellBeingToastTest extends AbstractQuickStepTest {
         final TaskView task = getOnceNotNull("No latest task", launcher -> getLatestTask(launcher));
 
         return getFromLauncher(launcher -> {
-            assertTrue("Latest task is not Calculator",
-                    CALCULATOR_PACKAGE.equals(task.getTask().getTopComponent().getPackageName()));
-            return task.getDigitalWellBeingToast();
+            TaskView.TaskContainer taskContainer = task.getTaskContainers().get(0);
+            assertTrue("Latest task is not Calculator", CALCULATOR_PACKAGE.equals(
+                    taskContainer.getTask().getTopComponent().getPackageName()));
+            return taskContainer.getDigitalWellBeingToast();
         });
     }
 

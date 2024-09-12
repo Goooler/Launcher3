@@ -26,6 +26,7 @@ import android.view.KeyEvent;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.tapl.HomeAllApps;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
@@ -37,7 +38,7 @@ import org.junit.runner.RunWith;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
-public class TaplKeyboardFocusTest extends AbstractLauncherUiTest {
+public class TaplKeyboardFocusTest extends AbstractLauncherUiTest<Launcher> {
 
     @Test
     public void testAllAppsFocusApp() {
@@ -74,7 +75,6 @@ public class TaplKeyboardFocusTest extends AbstractLauncherUiTest {
     }
 
     @Test
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/311410127
     public void testAllAppsExitSearchAndFocusSearchResults() {
         final HomeAllApps allApps = mLauncher.goHome().switchToAllApps();
         assertTrue("Launcher internal state is not All Apps",

@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.taskbar;
 
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
-
 import android.content.ComponentName;
 import android.content.pm.ActivityInfo;
 
@@ -97,7 +95,11 @@ public final class KeyboardQuickSwitchController implements
 
     private void openQuickSwitchView(int currentFocusedIndex) {
         if (mQuickSwitchViewController != null) {
-            return;
+            if (!mQuickSwitchViewController.isCloseAnimationRunning()) {
+                return;
+            }
+            // Allow the KQS to be reopened during the close animation to make it more responsive
+            closeQuickSwitchView(false);
         }
         TaskbarOverlayContext overlayContext =
                 mControllers.taskbarOverlayController.requestWindow();
@@ -113,9 +115,7 @@ public final class KeyboardQuickSwitchController implements
         DesktopVisibilityController desktopController =
                 LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
         final boolean onDesktop =
-                isDesktopModeSupported()
-                        && desktopController != null
-                        && desktopController.areFreeformTasksVisible();
+                desktopController != null && desktopController.areDesktopTasksVisible();
 
         if (mModel.isTaskListValid(mTaskListChangeId)) {
             // When we are opening the KQS with no focus override, check if the first task is
@@ -148,28 +148,16 @@ public final class KeyboardQuickSwitchController implements
         });
     }
 
-    private void processLoadedTasks(ArrayList<GroupTask> tasks) {
+    private void processLoadedTasks(List<GroupTask> tasks) {
         // Only store MAX_TASK tasks, from most to least recent
         Collections.reverse(tasks);
-
-        // Hide all desktop tasks and show them on the hidden tile
-        int hiddenDesktopTasks = 0;
-        if (isDesktopModeSupported()) {
-            DesktopTask desktopTask = findDesktopTask(tasks);
-            if (desktopTask != null) {
-                hiddenDesktopTasks = desktopTask.tasks.size();
-                tasks = tasks.stream()
-                        .filter(t -> !(t instanceof DesktopTask))
-                        .collect(Collectors.toCollection(ArrayList<GroupTask>::new));
-            }
-        }
         mTasks = tasks.stream()
                 .limit(MAX_TASKS)
                 .collect(Collectors.toList());
-        mNumHiddenTasks = Math.max(0, tasks.size() - MAX_TASKS) + hiddenDesktopTasks;
+        mNumHiddenTasks = Math.max(0, tasks.size() - MAX_TASKS);
     }
 
-    private void processLoadedTasksOnDesktop(ArrayList<GroupTask> tasks) {
+    private void processLoadedTasksOnDesktop(List<GroupTask> tasks) {
         // Find the single desktop task that contains a grouping of desktop tasks
         DesktopTask desktopTask = findDesktopTask(tasks);
 
@@ -185,7 +173,7 @@ public final class KeyboardQuickSwitchController implements
     }
 
     @Nullable
-    private DesktopTask findDesktopTask(ArrayList<GroupTask> tasks) {
+    private DesktopTask findDesktopTask(List<GroupTask> tasks) {
         return (DesktopTask) tasks.stream()
                 .filter(t -> t instanceof DesktopTask)
                 .findFirst()

@@ -45,6 +45,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TOUCHPAD_GESTURES_DISABLED;
 
 import android.app.ActivityTaskManager;
 import android.content.Context;
@@ -61,7 +62,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
@@ -69,6 +69,7 @@ import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.SettingsCache;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.util.AssistStateManager;
 import com.android.quickstep.util.GestureExclusionManager;
 import com.android.quickstep.util.GestureExclusionManager.ExclusionListener;
 import com.android.quickstep.util.NavBarPosition;
@@ -98,7 +99,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     private final DisplayController mDisplayController;
 
     private final GestureExclusionManager mExclusionManager;
-
+    private final AssistStateManager mAssistStateManager;
 
     private final RotationTouchHelper mRotationTouchHelper;
     private final TaskStackChangeListener mPipListener;
@@ -108,7 +109,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
 
     private final ArrayList<Runnable> mOnDestroyActions = new ArrayList<>();
 
-    private @SystemUiStateFlags int mSystemUiStateFlags = QuickStepContract.SYSUI_STATE_AWAKE;
+    private @SystemUiStateFlags long mSystemUiStateFlags = QuickStepContract.SYSUI_STATE_AWAKE;
     private NavigationMode mMode = THREE_BUTTONS;
     private NavBarPosition mNavBarPosition;
 
@@ -149,6 +150,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         mContext = context;
         mDisplayController = DisplayController.INSTANCE.get(context);
         mExclusionManager = exclusionManager;
+        mAssistStateManager = AssistStateManager.INSTANCE.get(context);
         mIsOneHandedModeSupported = SystemProperties.getBoolean(SUPPORT_ONE_HANDED_MODE, false);
         mRotationTouchHelper = RotationTouchHelper.INSTANCE.get(context);
         if (isInstanceForTouches) {
@@ -351,7 +353,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     /**
      * Updates the system ui state flags from SystemUI.
      */
-    public void setSystemUiFlags(int stateFlags) {
+    public void setSystemUiFlags(@SystemUiStateFlags long stateFlags) {
         mSystemUiStateFlags = stateFlags;
     }
 
@@ -359,7 +361,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
      * @return the system ui state flags.
      */
     // TODO(141886704): See if we can remove this
-    public int getSystemUiStateFlags() {
+    @SystemUiStateFlags
+    public long getSystemUiStateFlags() {
         return mSystemUiStateFlags;
     }
 
@@ -384,7 +387,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         boolean canStartWithNavHidden = (mSystemUiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) == 0
                 || (mSystemUiStateFlags & SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY) != 0
                 || mRotationTouchHelper.isTaskListFrozen();
-        return canStartWithNavHidden && canStartTrackpadGesture();
+        return canStartWithNavHidden && canStartAnyGesture();
     }
 
     /**
@@ -393,14 +396,24 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
      * mode.
      */
     public boolean canStartTrackpadGesture() {
-        return (mSystemUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_QUICK_SETTINGS_EXPANDED) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_MAGNIFICATION_OVERLAP) == 0
-                && ((mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
-                        || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0)
-                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION) == 0;
+        boolean trackpadGesturesEnabled =
+                (mSystemUiStateFlags & SYSUI_STATE_TOUCHPAD_GESTURES_DISABLED) == 0;
+        return trackpadGesturesEnabled && canStartAnyGesture();
+    }
+
+    /**
+     * Common logic to determine if either trackpad or finger gesture can be started
+     */
+    private boolean canStartAnyGesture() {
+        boolean homeOrOverviewEnabled = (mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
+                || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0;
+        long gestureDisablingStates = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
+                        | SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
+                        | SYSUI_STATE_QUICK_SETTINGS_EXPANDED
+                        | SYSUI_STATE_MAGNIFICATION_OVERLAP
+                        | SYSUI_STATE_DEVICE_DREAMING
+                        | SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION;
+        return (gestureDisablingStates & mSystemUiStateFlags) == 0 && homeOrOverviewEnabled;
     }
 
     /**
@@ -590,9 +603,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
                 : QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON;
         float touchSlop = ViewConfiguration.get(mContext).getScaledTouchSlop();
 
-        if (FeatureFlags.CUSTOM_LPNH_THRESHOLDS.get()) {
-            float customSlopMultiplier =
-                    FeatureFlags.LPNH_SLOP_PERCENTAGE.get() / 100f;
+        if (mAssistStateManager.getLPNHCustomSlopMultiplier().isPresent()) {
+            float customSlopMultiplier = mAssistStateManager.getLPNHCustomSlopMultiplier().get();
             return customSlopMultiplier * slopMultiplier * touchSlop;
         } else {
             return slopMultiplier * touchSlop;

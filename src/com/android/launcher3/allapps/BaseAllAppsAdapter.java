@@ -15,12 +15,15 @@
  */
 package com.android.launcher3.allapps;
 
+import static android.view.View.GONE;
+
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_LEFT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_RIGHT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_NOTHING;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_TOP_LEFT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_TOP_RIGHT;
 import static com.android.launcher3.allapps.UserProfileManager.STATE_DISABLED;
+import static com.android.launcher3.allapps.UserProfileManager.STATE_ENABLED;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -40,7 +43,6 @@ import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.views.ActivityContext;
 
@@ -169,16 +171,9 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
     protected final OnClickListener mOnIconClickListener;
     protected final OnLongClickListener mOnIconLongClickListener;
     protected OnFocusChangeListener mIconFocusListener;
-    private final PrivateSpaceHeaderViewController mPrivateSpaceHeaderViewController;
 
     public BaseAllAppsAdapter(T activityContext, LayoutInflater inflater,
             AlphabeticalAppsList<T> apps, SearchAdapterProvider<?> adapterProvider) {
-        this(activityContext, inflater, apps, adapterProvider, null);
-    }
-
-    public BaseAllAppsAdapter(T activityContext, LayoutInflater inflater,
-            AlphabeticalAppsList<T> apps, SearchAdapterProvider<?> adapterProvider,
-            PrivateSpaceHeaderViewController privateSpaceHeaderViewController) {
         mActivityContext = activityContext;
         mApps = apps;
         mLayoutInflater = inflater;
@@ -187,7 +182,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
         mOnIconLongClickListener = mActivityContext.getAllAppsItemLongClickListener();
 
         mAdapterProvider = adapterProvider;
-        mPrivateSpaceHeaderViewController = privateSpaceHeaderViewController;
     }
 
     /** Checks if the passed viewType represents all apps divider. */
@@ -270,6 +264,29 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                 icon.reset();
                 icon.applyFromApplicationInfo(adapterItem.itemInfo);
                 icon.setOnFocusChangeListener(mIconFocusListener);
+                PrivateProfileManager privateProfileManager = mApps.getPrivateProfileManager();
+                if (privateProfileManager != null) {
+                    // Set the alpha of the private space icon to 0 upon expanding the header so the
+                    // alpha can animate -> 1. This should only be in effect when doing a
+                    // transitioning between Locked/Unlocked state.
+                    boolean isPrivateSpaceItem =
+                            privateProfileManager.isPrivateSpaceItem(adapterItem);
+                    if (icon.getAlpha() == 0 || icon.getAlpha() == 1) {
+                        icon.setAlpha(isPrivateSpaceItem
+                                && privateProfileManager.isStateTransitioning()
+                                && (privateProfileManager.isScrolling() ||
+                                    privateProfileManager.getReadyToAnimate())
+                                && privateProfileManager.getCurrentState() == STATE_ENABLED
+                                ? 0 : 1);
+                    }
+                    // Views can still be bounded before the app list is updated hence showing icons
+                    // after collapsing.
+                    if (privateProfileManager.getCurrentState() == STATE_DISABLED
+                            && isPrivateSpaceItem) {
+                        adapterItem.decorationInfo = null;
+                        icon.setVisibility(GONE);
+                    }
+                }
                 break;
             }
             case VIEW_TYPE_EMPTY_SEARCH: {
@@ -283,13 +300,10 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_PRIVATE_SPACE_HEADER:
                 RelativeLayout psHeaderLayout = holder.itemView.findViewById(
                         R.id.ps_header_layout);
-                assert mPrivateSpaceHeaderViewController != null;
-                assert psHeaderLayout != null;
-                mPrivateSpaceHeaderViewController.addPrivateSpaceHeaderViewElements(psHeaderLayout);
+                mApps.getPrivateProfileManager().bindPrivateSpaceHeaderViewElements(psHeaderLayout);
                 AdapterItem adapterItem = mApps.getAdapterItems().get(position);
                 int roundRegions = ROUND_TOP_LEFT | ROUND_TOP_RIGHT;
-                if (mPrivateSpaceHeaderViewController.getPrivateProfileManager().getCurrentState()
-                        == STATE_DISABLED) {
+                if (mApps.getPrivateProfileManager().getCurrentState() == STATE_DISABLED) {
                     roundRegions |= (ROUND_BOTTOM_LEFT | ROUND_BOTTOM_RIGHT);
                 }
                 adapterItem.decorationInfo =
@@ -298,7 +312,8 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                 break;
             case VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER:
                 adapterItem = mApps.getAdapterItems().get(position);
-                adapterItem.decorationInfo = new SectionDecorationInfo(mActivityContext,
+                adapterItem.decorationInfo = mApps.getPrivateProfileManager().getCurrentState()
+                        == STATE_DISABLED ? null : new SectionDecorationInfo(mActivityContext,
                         ROUND_NOTHING, true /* decorateTogether */);
                 break;
             case VIEW_TYPE_ALL_APPS_DIVIDER:

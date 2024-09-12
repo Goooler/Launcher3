@@ -32,8 +32,6 @@ import static com.android.launcher3.ui.TaplTestsLauncher3Test.getAppPackageName;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.rule.ShellCommandRule.disableHeadsUpNotification;
 import static com.android.launcher3.util.rule.ShellCommandRule.getLauncherCommand;
-import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
-import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -59,6 +57,7 @@ import com.android.launcher3.tapl.TestHelpers;
 import com.android.launcher3.testcomponent.TestCommandReceiver;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.util.Wait;
+import com.android.launcher3.util.rule.ExtendedLongPressTimeoutRule;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
@@ -76,17 +75,21 @@ import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 import org.junit.runners.model.Statement;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
 public class FallbackRecentsTest {
 
     private static final String FALLBACK_LAUNCHER_TITLE = "Test launcher";
+    private static final Pattern COMPONENT_INFO_REGEX = Pattern.compile("ComponentInfo\\{(.*)\\}");
 
     private final UiDevice mDevice;
     private final LauncherInstrumentation mLauncher;
@@ -101,6 +104,9 @@ public class FallbackRecentsTest {
     @Rule
     public ScreenRecordRule mScreenRecordRule = new ScreenRecordRule();
 
+    @Rule
+    public ExtendedLongPressTimeoutRule mLongPressTimeoutRule = new ExtendedLongPressTimeoutRule();
+
     public FallbackRecentsTest() throws RemoteException {
         Instrumentation instrumentation = getInstrumentation();
         Context context = instrumentation.getContext();
@@ -108,8 +114,6 @@ public class FallbackRecentsTest {
         mDevice.setOrientationNatural();
         mLauncher = AbstractLauncherUiTest.createLauncherInstrumentation();
         mLauncher.enableDebugTracing();
-        // b/143488140
-        //mLauncher.enableCheckEventsForSuccessfulGestures();
 
         if (TestHelpers.isInLauncherProcess()) {
             Utilities.enableRunningInTestHarnessForTests();
@@ -132,7 +136,6 @@ public class FallbackRecentsTest {
                     TestCommandReceiver.callCommand(TestCommandReceiver.DISABLE_TEST_LAUNCHER);
                     UiDevice.getInstance(getInstrumentation()).executeShellCommand(
                             getLauncherCommand(getLauncherInMyProcess()));
-                    // b/143488140
                     pressHomeAndWaitForOverviewClose();
                 }
             }
@@ -176,8 +179,6 @@ public class FallbackRecentsTest {
         }
     }
 
-    // b/143488140
-    //@NavigationModeSwitch
     @Test
     public void goToOverviewFromHome() {
         mDevice.pressHome();
@@ -186,9 +187,6 @@ public class FallbackRecentsTest {
 
         mLauncher.getLaunchedAppState().switchToOverview();
     }
-
-    // Staging; will be promoted to presubmit if stable
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
 
     //@NavigationModeSwitch
     @Test
@@ -249,11 +247,8 @@ public class FallbackRecentsTest {
                 DEFAULT_UI_TIMEOUT, mLauncher);
     }
 
-    // b/143488140
-    //@NavigationModeSwitch
     @Test
-    @ScreenRecordRule.ScreenRecord // b/321775748
-    public void testOverview() {
+    public void testOverview() throws IOException {
         startAppFast(getAppPackageName());
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
         startTestActivity(2);
@@ -261,7 +256,10 @@ public class FallbackRecentsTest {
         Wait.atMost("Expected three apps in the task list",
                 () -> mLauncher.getRecentTasks().size() >= 3, DEFAULT_ACTIVITY_TIMEOUT, mLauncher);
 
+        checkTestLauncher();
         BaseOverview overview = mLauncher.getLaunchedAppState().switchToOverview();
+        checkTestLauncher();
+
         executeOnRecents(recents -> {
             assertTrue("Don't have at least 3 tasks", getTaskCount(recents) >= 3);
         });
@@ -301,6 +299,17 @@ public class FallbackRecentsTest {
         pressHomeAndGoToOverview().dismissAllTasks();
         assertTrue("Fallback Launcher not visible", TestHelpers.wait(Until.hasObject(By.pkg(
                 mOtherLauncherActivity.packageName).text(FALLBACK_LAUNCHER_TITLE)), WAIT_TIME_MS));
+    }
+
+    private void checkTestLauncher() throws IOException {
+        final Matcher matcher = COMPONENT_INFO_REGEX.matcher(
+                mDevice.executeShellCommand("cmd shortcut get-default-launcher"));
+        assertTrue("Incorrect output from get-default-launcher", matcher.find());
+        assertEquals("Current Launcher activity is incorrect",
+                "com.google.android.apps.nexuslauncher.tests/com.android"
+                        + ".launcher3.testcomponent.TestLauncherActivity",
+                matcher.group(1)
+        );
     }
 
     private int getCurrentOverviewPage(RecentsActivity recents) {

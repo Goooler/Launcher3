@@ -180,7 +180,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
      * Maps the touch (from 0..1) to the adapter position that should be visible.
      */
     @Override
-    public String scrollToPositionAtProgress(float touchFraction) {
+    public CharSequence scrollToPositionAtProgress(float touchFraction) {
         int rowCount = mApps.getNumAppRows();
         if (rowCount == 0) {
             return "";
@@ -305,9 +305,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
 
     @Override
     public int getScrollBarTop() {
-        return ActivityContext.lookupContext(getContext()).getAppsView().isSearchSupported()
-                ? getResources().getDimensionPixelOffset(R.dimen.all_apps_header_top_padding)
-                : 0;
+        return getResources().getDimensionPixelOffset(R.dimen.all_apps_header_top_padding);
     }
 
     @Override

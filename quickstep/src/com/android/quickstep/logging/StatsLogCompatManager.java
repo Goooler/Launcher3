@@ -16,6 +16,10 @@
 
 package com.android.quickstep.logging;
 
+import static android.view.Surface.ROTATION_180;
+import static android.view.Surface.ROTATION_270;
+import static android.view.Surface.ROTATION_90;
+
 import static androidx.core.util.Preconditions.checkNotNull;
 import static androidx.core.util.Preconditions.checkState;
 
@@ -26,10 +30,17 @@ import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerC
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.SEARCH_RESULT_CONTAINER;
 import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WORKSPACE_SNAPSHOT;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_0;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_90;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_180;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_270;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__ALLAPPS;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__BACKGROUND;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__HOME;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__OVERVIEW;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__PORTRAIT;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__LANDSCAPE;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__SEASCAPE;
 
 import android.content.Context;
 import android.text.TextUtils;
@@ -58,11 +69,8 @@ import com.android.launcher3.logger.LauncherAtomExtensions.DeviceSearchResultCon
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.model.AllAppsList;
-import com.android.launcher3.model.BaseModelUpdateTask;
-import com.android.launcher3.model.BgDataModel;
-import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.LogConfig;
 import com.android.launcher3.views.ActivityContext;
@@ -113,7 +121,7 @@ public class StatsLogCompatManager extends StatsLogManager {
             new CopyOnWriteArrayList<>();
 
     public StatsLogCompatManager(Context context) {
-        mContext = context;
+        super(context);
     }
 
     @Override
@@ -230,10 +238,15 @@ public class StatsLogCompatManager extends StatsLogManager {
         private int mInputType = SysUiStatsLog.LAUNCHER_UICHANGED__INPUT_TYPE__UNKNOWN;
         private Optional<Integer> mFeatures = Optional.empty();
         private Optional<String> mPackageName = Optional.empty();
+        /**
+         * Indicates the current rotation of the display. Uses {@link android.view.Surface values.}
+         */
+        private final int mDisplayRotation;
 
         StatsCompatLogger(Context context, ActivityContext activityContext) {
             mContext = context;
             mActivityContext = Optional.ofNullable(activityContext);
+            mDisplayRotation = DisplayController.INSTANCE.get(mContext).getInfo().rotation;
         }
 
         @Override
@@ -347,7 +360,6 @@ public class StatsLogCompatManager extends StatsLogManager {
                         event.getId() + "";
                 Log.d(TAG, name);
             }
-            LauncherAppState appState = LauncherAppState.getInstanceNoCreate();
 
             if (mSlice == null && mSliceItem != null) {
                 mSlice = LauncherAtom.Slice.newBuilder().setUri(
@@ -369,25 +381,17 @@ public class StatsLogCompatManager extends StatsLogManager {
                 return;
             }
 
-            if (mItemInfo.container < 0 || appState == null) {
+            if (mItemInfo.container < 0 || !LauncherAppState.INSTANCE.executeIfCreated(app -> {
+                // Item is inside a collection, fetch collection info in a BG thread
+                // and then write to StatsLog.
+                app.getModel().enqueueModelUpdateTask((taskController, dataModel, apps) ->
+                        write(event, applyOverwrites(mItemInfo.buildProto(
+                                dataModel.collections.get(mItemInfo.container)))));
+            })) {
                 // Write log on the model thread so that logs do not go out of order
                 // (for eg: drop comes after drag)
                 Executors.MODEL_EXECUTOR.execute(
                         () -> write(event, applyOverwrites(mItemInfo.buildProto())));
-            } else {
-                // Item is inside a collection, fetch collection info in a BG thread
-                // and then write to StatsLog.
-                appState.getModel().enqueueModelUpdateTask(
-                        new BaseModelUpdateTask() {
-                            @Override
-                            public void execute(@NonNull final LauncherAppState app,
-                                    @NonNull final BgDataModel dataModel,
-                                    @NonNull final AllAppsList apps) {
-                                CollectionInfo collectionInfo =
-                                        dataModel.collections.get(mItemInfo.container);
-                                write(event, applyOverwrites(mItemInfo.buildProto(collectionInfo)));
-                            }
-                        });
             }
         }
 
@@ -404,6 +408,20 @@ public class StatsLogCompatManager extends StatsLogManager {
                     break;
                 case LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END:
                     InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_ALL_APPS_SCROLL);
+                    break;
+                case LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_BEGIN:
+                    InteractionJankMonitorWrapper.begin(view, Cuj.CUJ_LAUNCHER_PRIVATE_SPACE_LOCK);
+                    break;
+                case LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_END:
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_PRIVATE_SPACE_LOCK);
+                    break;
+                case LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_BEGIN:
+                    InteractionJankMonitorWrapper.begin(
+                            view,
+                            Cuj.CUJ_LAUNCHER_PRIVATE_SPACE_UNLOCK);
+                    break;
+                case LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_END:
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_PRIVATE_SPACE_UNLOCK);
                     break;
                 default:
                     break;
@@ -501,7 +519,28 @@ public class StatsLogCompatManager extends StatsLogManager {
                     getSearchAttributes(atomInfo) /* searchAttributes */,
                     getAttributes(atomInfo) /* attributes */,
                     inputType /* input_type */,
-                    atomInfo.getUserType() /* user_type */);
+                    atomInfo.getUserType() /* user_type */,
+                    getDisplayRotation() /* display_rotation */,
+                    getRecentsOrientationHandler(atomInfo) /* recents_orientation_handler */);
+        }
+
+        private int getDisplayRotation() {
+            return switch (mDisplayRotation) {
+                case ROTATION_90 -> LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_90;
+                case ROTATION_180 -> LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_180;
+                case ROTATION_270 -> LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_270;
+                default -> LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_0;
+            };
+        }
+
+        private int getRecentsOrientationHandler(LauncherAtom.ItemInfo itemInfo) {
+            var orientationHandler =
+                    itemInfo.getContainerInfo().getTaskSwitcherContainer().getOrientationHandler();
+            return switch (orientationHandler) {
+                case PORTRAIT -> LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__PORTRAIT;
+                case LANDSCAPE -> LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__LANDSCAPE;
+                case SEASCAPE -> LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__SEASCAPE;
+            };
         }
     }
 

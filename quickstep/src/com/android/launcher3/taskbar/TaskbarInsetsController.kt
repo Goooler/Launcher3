@@ -53,6 +53,7 @@ import com.android.launcher3.config.FeatureFlags.enableTaskbarNoRecreate
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.DisplayController
+import com.android.launcher3.util.Executors
 import java.io.PrintWriter
 import kotlin.jvm.optionals.getOrNull
 import kotlin.math.max
@@ -76,6 +77,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
     private val gestureNavSettingsObserver =
         GestureNavigationSettingsObserver(
             context.mainThreadHandler,
+            Executors.UI_HELPER_EXECUTOR.handler,
             context,
             this::onTaskbarOrBubblebarWindowHeightOrInsetsChanged
         )
@@ -154,6 +156,19 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 context.deviceProfile.widthPx,
                 windowLayoutParams.height
             )
+
+            // if there's an animating bubble add it to the touch region so that it's clickable
+            val isAnimatingNewBubble =
+                controllers.bubbleControllers
+                    .getOrNull()
+                    ?.bubbleBarViewController
+                    ?.isAnimatingNewBubble
+                    ?: false
+            if (isAnimatingNewBubble) {
+                val iconBounds =
+                    controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
+                defaultTouchableRegion.op(iconBounds, Region.Op.UNION)
+            }
         }
 
         // Pre-calculate insets for different providers across different rotations for this gravity
@@ -393,7 +408,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         ) {
             // Taskbar has some touchable elements, take over the full taskbar area
             if (
-                controllers.uiController.isInOverview &&
+                controllers.uiController.isInOverviewUi &&
                     DisplayController.isTransientTaskbar(context)
             ) {
                 val region =

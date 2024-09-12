@@ -30,6 +30,7 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_NEW_TASK;
 
 import android.content.Intent;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 
@@ -37,10 +38,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.statemanager.BaseState;
-import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
 import java.io.PrintWriter;
@@ -151,7 +152,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     // Needed to interact with the current activity
     private final Intent mHomeIntent;
     private final Intent mOverviewIntent;
-    private final BaseActivityInterface mActivityInterface;
+    private final BaseContainerInterface mContainerInterface;
     private final MultiStateCallback mStateCallback;
     private final int mGestureId;
 
@@ -182,14 +183,15 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     private HashMap<Integer, ThumbnailData> mRecentsAnimationCanceledSnapshots;
 
     /** The time when the swipe up gesture is triggered. */
-    private long mSwipeUpStartTimeMs;
+    private final long mSwipeUpStartTimeMs = SystemClock.uptimeMillis();
 
     private boolean mHandlingAtomicEvent;
+    private boolean mIsInExtendedSlopRegion;
 
     public GestureState(OverviewComponentObserver componentObserver, int gestureId) {
         mHomeIntent = componentObserver.getHomeIntent();
         mOverviewIntent = componentObserver.getOverviewIntent();
-        mActivityInterface = componentObserver.getActivityInterface();
+        mContainerInterface = componentObserver.getActivityInterface();
         mStateCallback = new MultiStateCallback(
                 STATE_NAMES.toArray(new String[0]), GestureState::getTrackedEventForState);
         mGestureId = gestureId;
@@ -198,7 +200,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     public GestureState(GestureState other) {
         mHomeIntent = other.mHomeIntent;
         mOverviewIntent = other.mOverviewIntent;
-        mActivityInterface = other.mActivityInterface;
+        mContainerInterface = other.mContainerInterface;
         mStateCallback = other.mStateCallback;
         mGestureId = other.mGestureId;
         mRunningTask = other.mRunningTask;
@@ -212,7 +214,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
         // Do nothing, only used for initializing the gesture state prior to user unlock
         mHomeIntent = new Intent();
         mOverviewIntent = new Intent();
-        mActivityInterface = null;
+        mContainerInterface = null;
         mStateCallback = new MultiStateCallback(
                 STATE_NAMES.toArray(new String[0]), GestureState::getTrackedEventForState);
         mGestureId = -1;
@@ -268,9 +270,9 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     /**
      * @return the interface to the activity handing the UI updates for this gesture.
      */
-    public <S extends BaseState<S>,
-            T extends StatefulActivity<S>> BaseActivityInterface<S, T> getActivityInterface() {
-        return mActivityInterface;
+    public <S extends BaseState<S>, T extends RecentsViewContainer>
+            BaseContainerInterface<S, T> getContainerInterface() {
+        return mContainerInterface;
     }
 
     /**
@@ -493,6 +495,25 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     }
 
     /**
+     * Set whether it's in long press nav handle (LPNH)'s extended touch slop region, e.g., second
+     * stage region in order to continue respect LPNH and ignore other touch slop logic.
+     * This will only be set to true when flag ENABLE_LPNH_TWO_STAGES is turned on.
+     */
+    public void setIsInExtendedSlopRegion(boolean isInExtendedSlopRegion) {
+        if (DeviceConfigWrapper.get().getEnableLpnhTwoStages()) {
+            mIsInExtendedSlopRegion = isInExtendedSlopRegion;
+        }
+    }
+
+    /**
+     * Returns whether it's in LPNH's extended touch slop region. This is only valid when flag
+     * ENABLE_LPNH_TWO_STAGES is turned on.
+     */
+    public boolean isInExtendedSlopRegion() {
+        return mIsInExtendedSlopRegion;
+    }
+
+    /**
      * Returns and clears the canceled animation thumbnail data. This call only returns a value
      * while STATE_RECENTS_ANIMATION_CANCELED state is being set, and the caller is responsible for
      * calling {@link RecentsAnimationController#cleanupScreenshot()}.
@@ -506,10 +527,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
             return data;
         }
         return null;
-    }
-
-    void setSwipeUpStartTimeMs(long uptimeMs) {
-        mSwipeUpStartTimeMs = uptimeMs;
     }
 
     long getSwipeUpStartTimeMs() {

@@ -102,15 +102,33 @@ class TaskbarNavLayoutter(
         startContextualContainer.removeAllViews()
 
         if (!context.deviceProfile.isGestureMode) {
-            val contextualMargin = resources.getDimensionPixelSize(
-                    R.dimen.taskbar_contextual_button_padding)
+            val contextualMargin =
+                resources.getDimensionPixelSize(R.dimen.taskbar_contextual_button_padding)
             repositionContextualContainer(endContextualContainer, WRAP_CONTENT, 0, 0, Gravity.END)
-            repositionContextualContainer(startContextualContainer, WRAP_CONTENT, contextualMargin,
-                    contextualMargin, Gravity.START)
+            repositionContextualContainer(
+                startContextualContainer,
+                WRAP_CONTENT,
+                contextualMargin,
+                contextualMargin,
+                Gravity.START
+            )
 
             if (imeSwitcher != null) {
+                val imeStartMargin =
+                    resources.getDimensionPixelSize(
+                        R.dimen.taskbar_ime_switcher_button_margin_start
+                    )
                 startContextualContainer.addView(imeSwitcher)
-                imeSwitcher.layoutParams = getParamsToCenterView()
+                val imeSwitcherButtonParams =
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                imeSwitcherButtonParams.apply {
+                    marginStart = imeStartMargin
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                imeSwitcher.layoutParams = imeSwitcherButtonParams
             }
             if (a11yButton != null) {
                 endContextualContainer.addView(a11yButton)

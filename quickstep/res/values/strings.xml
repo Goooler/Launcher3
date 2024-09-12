@@ -26,6 +26,8 @@
     <string name="recent_task_option_pin">Pin</string>
     <!-- Title for an option to enter freeform mode for a given app -->
     <string name="recent_task_option_freeform">Freeform</string>
+    <!-- Title for an option to enter desktop windowing mode for a given app -->
+    <string name="recent_task_option_desktop">Desktop</string>
 
     <!-- Recents: The empty recents string. [CHAR LIMIT=NONE] -->
     <string name="recents_empty_message">No recent items</string>
@@ -322,12 +324,22 @@
             other{Show # more apps.}
         }</string>
 
+    <!-- Label for quick switch tile showing how many apps are available in desktop mode [CHAR LIMIT=NONE] -->
+    <string name="quick_switch_desktop">{count, plural,
+            =1{Show # desktop app.}
+            other{Show # desktop apps.}
+        }</string>
+
     <!-- Accessibility label for quick switch tiles showing split tasks [CHAR LIMIT=NONE] -->
     <string name="quick_switch_split_task"><xliff:g id="app_name_1" example="Chrome">%1$s</xliff:g> and <xliff:g id="app_name_2" example="Gmail">%2$s</xliff:g></string>
 
-    <!-- ******* Desktop ******* -->
-    <!-- Text shown in popup to choose a desktop app. [CHAR LIMIT=60] -->
-    <string name="desktop_select_app_toast">Adding app to Desktop</string>
-    <!-- Text shown on a button that closes the popup for choosing a desktop app. [CHAR_LIMIT=40] -->
-    <string name="desktop_button_close_app_toast">Cancel</string>
+    <!-- Strings for bubble bar -->
+    <!-- Fallback name for a bubble if it does have a title [CHAR_LIMIT=none] -->
+    <string name="bubble_bar_bubble_fallback_description">Bubble</string>
+    <!-- content description for the overflow bubble [CHAR_LIMIT=none] -->
+    <string name="bubble_bar_overflow_description">Overflow</string>
+    <!-- Content description for a bubble bar bubble. [CHAR_LIMIT=none] -->
+    <string name="bubble_bar_bubble_description"><xliff:g id="notification_title" example="some title">%1$s</xliff:g> from <xliff:g id="app_name" example="YouTube">%2$s</xliff:g></string>
+    <!-- Content description for bubble bar when it has multiple bubbles. [CHAR_LIMIT=NONE] -->
+    <string name="bubble_bar_description_multiple_bubbles"><xliff:g id="bubble_bar_bubble_description" example="some title from YouTube">%1$s</xliff:g> and <xliff:g id="bubble_count" example="4">%2$d</xliff:g> more</string>
 </resources>

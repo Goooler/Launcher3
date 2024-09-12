@@ -17,6 +17,8 @@ package com.android.launcher3.taskbar.allapps;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.Flags.enablePredictiveBackGesture;
+import static com.android.launcher3.touch.AllAppsSwipeController.ALL_APPS_FADE_MANUAL;
+import static com.android.launcher3.touch.AllAppsSwipeController.SCRIM_FADE_MANUAL;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -32,6 +34,7 @@ import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
@@ -40,6 +43,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsViewController.TaskbarAllAppsCallbacks;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.AbstractSlideInView;
 
 /** Wrapper for taskbar all apps with slide-in behavior. */
@@ -96,7 +100,7 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         mAllAppsCallbacks.onAllAppsTransitionStart(true);
         if (!animate) {
             mAllAppsCallbacks.onAllAppsTransitionEnd(true);
-            mTranslationShift = TRANSLATION_SHIFT_OPENED;
+            setTranslationShift(TRANSLATION_SHIFT_OPENED);
             return;
         }
 
@@ -113,8 +117,25 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
 
     @Override
     protected void onOpenCloseAnimationPending(PendingAnimation animation) {
-        mAllAppsCallbacks.onAllAppsAnimationPending(
-                animation, mToTranslationShift == TRANSLATION_SHIFT_OPENED);
+        final boolean isOpening = mToTranslationShift == TRANSLATION_SHIFT_OPENED;
+
+        if (mActivityContext.getDeviceProfile().isPhone) {
+            final Interpolator allAppsFadeInterpolator =
+                    isOpening ? ALL_APPS_FADE_MANUAL : Interpolators.reverse(ALL_APPS_FADE_MANUAL);
+            animation.setViewAlpha(mAppsView, 1 - mToTranslationShift, allAppsFadeInterpolator);
+        }
+
+        mAllAppsCallbacks.onAllAppsAnimationPending(animation, isOpening);
+    }
+
+    @Override
+    protected Interpolator getScrimInterpolator() {
+        if (mActivityContext.getDeviceProfile().isTablet) {
+            return super.getScrimInterpolator();
+        }
+        return mToTranslationShift == TRANSLATION_SHIFT_OPENED
+                ? SCRIM_FADE_MANUAL
+                : Interpolators.reverse(SCRIM_FADE_MANUAL);
     }
 
     /** The apps container inside this view. */
@@ -154,6 +175,9 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     protected void onFinishInflate() {
         super.onFinishInflate();
         mAppsView = findViewById(R.id.apps_view);
+        if (mActivityContext.getDeviceProfile().isPhone) {
+            mAppsView.setAlpha(0);
+        }
         mContent = mAppsView;
 
         // Setup header protection for search bar, if enabled.
@@ -196,15 +220,14 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        mAppsView.drawOnScrimWithScale(canvas, mSlideInViewScale.value);
+        // We should call drawOnScrimWithBottomOffset() rather than drawOnScrimWithScale(). Because
+        // for taskbar all apps, the scrim view is a child view of AbstractSlideInView. Thus scaling
+        // down in AbstractSlideInView#onScaleProgressChanged() with SCALE_PROPERTY has already
+        // done the job - there is no need to re-apply scale effect here. But it also means we need
+        // to pass extra bottom offset to background scrim to fill the bottom gap during predictive
+        // back swipe.
+        mAppsView.drawOnScrimWithBottomOffset(canvas, getBottomOffsetPx());
         super.dispatchDraw(canvas);
-    }
-
-    @Override
-    protected void onScaleProgressChanged() {
-        super.onScaleProgressChanged();
-        mAppsView.setClipChildren(!mIsBackProgressing);
-        mAppsView.getAppsRecyclerViewContainer().setClipChildren(!mIsBackProgressing);
     }
 
     @Override
@@ -215,7 +238,9 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
 
     @Override
     protected int getScrimColor(Context context) {
-        return context.getColor(R.color.widgets_picker_scrim);
+        return mActivityContext.getDeviceProfile().isPhone
+                ? Themes.getAttrColor(context, R.attr.allAppsScrimColor)
+                : context.getColor(R.color.widgets_picker_scrim);
     }
 
     @Override
@@ -253,9 +278,29 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         return getPopupContainer().isEventOverView(mAppsView.getVisibleContainerView(), ev);
     }
 
+    /**
+     * In taskbar all apps search mode, we should scale down content inside all apps, rather
+     * than the whole all apps bottom sheet, to indicate we will navigate back within the all apps.
+     */
+    @Override
+    public boolean shouldAnimateContentViewInBackSwipe() {
+        return mAllAppsCallbacks.canHandleSearchBackInvoked();
+    }
+
+    @Override
+    protected void onUserSwipeToDismissProgressChanged() {
+        super.onUserSwipeToDismissProgressChanged();
+        mAppsView.setClipChildren(!mIsDismissInProgress);
+        mAppsView.getAppsRecyclerViewContainer().setClipChildren(!mIsDismissInProgress);
+    }
+
     @Override
     public void onBackInvoked() {
-        if (!mAllAppsCallbacks.handleSearchBackInvoked()) {
+        if (mAllAppsCallbacks.handleSearchBackInvoked()) {
+            // We need to scale back taskbar all apps if we navigate back within search inside all
+            // apps
+            post(this::animateSwipeToDismissProgressToStart);
+        } else {
             super.onBackInvoked();
         }
     }

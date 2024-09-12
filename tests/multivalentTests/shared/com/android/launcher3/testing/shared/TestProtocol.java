@@ -120,6 +120,8 @@ public final class TestProtocol {
     public static final String REQUEST_CLEAR_DATA = "clear-data";
     public static final String REQUEST_HOTSEAT_ICON_NAMES = "get-hotseat-icon-names";
     public static final String REQUEST_IS_TABLET = "is-tablet";
+    public static final String REQUEST_IS_PREDICTIVE_BACK_SWIPE_ENABLED =
+            "is-predictive-back-swipe-enabled";
     public static final String REQUEST_ENABLE_TASKBAR_NAVBAR_UNIFICATION =
             "enable-taskbar-navbar-unification";
     public static final String REQUEST_NUM_ALL_APPS_COLUMNS = "num-all-apps-columns";
@@ -167,26 +169,20 @@ public final class TestProtocol {
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
-    public static final String TWO_NEXUS_LAUNCHER_ACTIVITY_WHILE_UNLOCKING = "b/273347463";
-    public static final String TWO_TASKBAR_LONG_CLICKS = "b/262282528";
     public static final String ICON_MISSING = "b/282963545";
-    public static final String OVERVIEW_OVER_HOME = "b/279059025";
     public static final String UIOBJECT_STALE_ELEMENT = "b/319501259";
-    public static final String GET_FROM_RECENTS_FAILURE = "b/321775748";
-    public static final String SUCCESSFUL_GESTURE_MISMATCH_EVENTS = "b/324940434";
     public static final String TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE = "b/326908466";
-    public static final String TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE = "b/326073471";
-
-    public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
-    public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";
-    public static final String REQUEST_IS_EMULATE_DISPLAY_RUNNING = "is-emulate-display-running";
-    public static final String REQUEST_EMULATE_PRINT_DEVICE = "emulate-print-device";
+    public static final String WIDGET_CONFIG_NULL_EXTRA_INTENT = "b/324419890";
+    public static final String OVERVIEW_SELECT_TOOLTIP_MISALIGNED = "b/332485341";
 
     public static final String REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW = "enable-grid-only-overview";
     public static final String REQUEST_FLAG_ENABLE_APP_PAIRS = "enable-app-pairs";
 
     public static final String REQUEST_UNSTASH_BUBBLE_BAR_IF_STASHED =
             "unstash-bubble-bar-if-stashed";
+
+    public static final String REQUEST_INJECT_FAKE_TRACKPAD = "inject-fake-trackpad";
+    public static final String REQUEST_EJECT_FAKE_TRACKPAD = "eject-fake-trackpad";
 
     /** Logs {@link Log#d(String, String)} if {@link #sDebugTracing} is true. */
     public static void testLogD(String tag, String message) {

@@ -20,7 +20,7 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.util.AttributeSet;
-import android.util.FloatProperty;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -39,12 +39,10 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.TaskOverlayFactory.OverlayUICallbacks;
-import com.android.quickstep.util.AppPairsController;
 import com.android.quickstep.util.LayoutUtils;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-
 import java.util.Arrays;
 
 /**
@@ -52,6 +50,7 @@ import java.util.Arrays;
  */
 public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayout
         implements OnClickListener, Insettable {
+    public static final String TAG = "OverviewActionsView";
     private final Rect mInsets = new Rect();
 
     @IntDef(flag = true, value = {
@@ -257,6 +256,8 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
      *                      pair.
      */
     public void updateForGroupedTask(boolean isGroupedTask, boolean canSaveAppPair) {
+        Log.d(TAG, "updateForGroupedTask() called with: isGroupedTask = [" + isGroupedTask
+                + "], canSaveAppPair = [" + canSaveAppPair + "]");
         mIsGroupedTask = isGroupedTask;
         mCanSaveAppPair = canSaveAppPair;
         updateActionButtonsVisibility();
@@ -276,6 +277,8 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         assert mDp != null;
         boolean showSingleTaskActions = !mIsGroupedTask;
         boolean showGroupActions = mIsGroupedTask && mDp.isTablet && mCanSaveAppPair;
+        Log.d(TAG, "updateActionButtonsVisibility() called: showSingleTaskActions = ["
+                + showSingleTaskActions + "], showGroupActions = [" + showGroupActions + "]");
         getActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showSingleTaskActions ? 1 : 0);
         getGroupActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showGroupActions ? 1 : 0);
     }

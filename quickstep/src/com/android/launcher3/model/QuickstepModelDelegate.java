@@ -70,8 +70,10 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSparseArrayMap;
+import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PersistedItemArray;
 import com.android.quickstep.logging.SettingsChangeLogger;
 import com.android.quickstep.logging.StatsLogCompatManager;
@@ -111,12 +113,11 @@ public class QuickstepModelDelegate extends ModelDelegate {
     private final InvariantDeviceProfile mIDP;
     private final AppEventProducer mAppEventProducer;
     private final StatsManager mStatsManager;
-    private final Context mContext;
 
     protected boolean mActive = false;
 
     public QuickstepModelDelegate(Context context) {
-        mContext = context;
+        super(context);
         mAppEventProducer = new AppEventProducer(context, this::onAppTargetEvent);
 
         mIDP = InvariantDeviceProfile.INSTANCE.get(context);
@@ -150,7 +151,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
         // TODO: Implement caching and preloading
 
         WorkspaceItemFactory factory =
-                new WorkspaceItemFactory(mApp, ums, pinnedShortcuts, numColumns, state.containerId);
+                new WorkspaceItemFactory(mApp, ums, mPmHelper, pinnedShortcuts, numColumns,
+                        state.containerId);
         FixedContainerItems fci = new FixedContainerItems(state.containerId,
                 state.storage.read(mApp.getContext(), factory, ums.allUsers::get));
         if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
@@ -326,8 +328,12 @@ public class QuickstepModelDelegate extends ModelDelegate {
         super.destroy();
         mActive = false;
         StatsLogCompatManager.LOGS_CONSUMER.remove(mAppEventProducer);
-        if (mIsPrimaryInstance) {
-            mStatsManager.clearPullAtomCallback(SysUiStatsLog.LAUNCHER_LAYOUT_SNAPSHOT);
+        if (mIsPrimaryInstance && mStatsManager != null) {
+            try {
+                mStatsManager.clearPullAtomCallback(SysUiStatsLog.LAUNCHER_LAYOUT_SNAPSHOT);
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Failed to unregister snapshot logging callback with StatsManager", e);
+            }
         }
         destroyPredictors();
     }
@@ -526,6 +532,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
 
         private final LauncherAppState mAppState;
         private final UserManagerState mUMS;
+        private final PackageManagerHelper mPmHelper;
         private final Map<ShortcutKey, ShortcutInfo> mPinnedShortcuts;
         private final int mMaxCount;
         private final int mContainer;
@@ -533,9 +540,11 @@ public class QuickstepModelDelegate extends ModelDelegate {
         private int mReadCount = 0;
 
         protected WorkspaceItemFactory(LauncherAppState appState, UserManagerState ums,
-                Map<ShortcutKey, ShortcutInfo> pinnedShortcuts, int maxCount, int container) {
+                PackageManagerHelper pmHelper, Map<ShortcutKey, ShortcutInfo> pinnedShortcuts,
+                int maxCount, int container) {
             mAppState = appState;
             mUMS = ums;
+            mPmHelper = pmHelper;
             mPinnedShortcuts = pinnedShortcuts;
             mMaxCount = maxCount;
             mContainer = container;
@@ -558,6 +567,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
                     AppInfo info = new AppInfo(
                             lai,
                             UserCache.INSTANCE.get(mAppState.getContext()).getUserInfo(user),
+                            ApiWrapper.INSTANCE.get(mAppState.getContext()),
+                            mPmHelper,
                             mUMS.isUserQuiet(user));
                     info.container = mContainer;
                     mAppState.getIconCache().getTitleAndIcon(info, lai, false);

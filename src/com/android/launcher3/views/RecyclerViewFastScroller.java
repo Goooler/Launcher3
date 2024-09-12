@@ -30,6 +30,7 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Property;
@@ -108,6 +109,13 @@ public class RecyclerViewFastScroller extends View {
 
     private float mLastTouchY;
     private boolean mIsDragging;
+    /**
+     * Tracks whether a keyboard hide request has been sent due to downward scrolling.
+     * <p>
+     * Set to true when scrolling down and reset when scrolling up to prevents redundant hide
+     * requests during continuous downward scrolls.
+     */
+    private boolean mRequestedHideKeyboard;
     private boolean mIsThumbDetached;
     private final boolean mCanThumbDetach;
     private boolean mIgnoreDragGesture;
@@ -121,11 +129,12 @@ public class RecyclerViewFastScroller extends View {
     // Fast scroller popup
     private TextView mPopupView;
     private boolean mPopupVisible;
-    private String mPopupSectionName;
+    private CharSequence mPopupSectionName;
     private Insets mSystemGestureInsets;
 
     protected FastScrollRecyclerView mRv;
     private RecyclerView.OnScrollListener mOnScrollListener;
+    private final ActivityContext mActivityContext;
 
     private int mDownX;
     private int mDownY;
@@ -162,7 +171,7 @@ public class RecyclerViewFastScroller extends View {
         mDeltaThreshold = res.getDisplayMetrics().density * SCROLL_DELTA_THRESHOLD_DP;
         mScrollbarLeftOffsetTouchDelegate = res.getDisplayMetrics().density
                 * SCROLLBAR_LEFT_OFFSET_TOUCH_DELEGATE_DP;
-
+        mActivityContext = ActivityContext.lookupContext(context);
         TypedArray ta =
                 context.obtainStyledAttributes(attrs, R.styleable.RecyclerViewFastScroller, defStyleAttr, 0);
         mCanThumbDetach = ta.getBoolean(R.styleable.RecyclerViewFastScroller_canThumbDetach, false);
@@ -247,6 +256,7 @@ public class RecyclerViewFastScroller extends View {
                 mDownX = x;
                 mDownY = mLastY = y;
                 mDownTimeStampMillis = ev.getDownTime();
+                mRequestedHideKeyboard = false;
 
                 if ((Math.abs(mDy) < mDeltaThreshold &&
                         mRv.getScrollState() != SCROLL_STATE_IDLE)) {
@@ -259,6 +269,7 @@ public class RecyclerViewFastScroller extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
+                boolean isScrollingDown = y > mLastY;
                 mLastY = y;
                 int absDeltaY = Math.abs(y - mDownY);
                 int absDeltaX = Math.abs(x - mDownX);
@@ -274,6 +285,14 @@ public class RecyclerViewFastScroller extends View {
                     }
                 }
                 if (mIsDragging) {
+                    if (isScrollingDown) {
+                        if (!mRequestedHideKeyboard) {
+                            mActivityContext.hideKeyboard();
+                        }
+                        mRequestedHideKeyboard = true;
+                    } else {
+                        mRequestedHideKeyboard = false;
+                    }
                     updateFastScrollSectionNameAndThumbOffset(y);
                 }
                 break;
@@ -293,7 +312,6 @@ public class RecyclerViewFastScroller extends View {
     }
 
     private void calcTouchOffsetAndPrepToFastScroll(int downY, int lastY) {
-        ActivityContext.lookupContext(getContext()).hideKeyboard();
         mIsDragging = true;
         if (mCanThumbDetach) {
             mIsThumbDetached = true;
@@ -307,13 +325,13 @@ public class RecyclerViewFastScroller extends View {
         // Update the fastscroller section name at this touch position
         int bottom = mRv.getScrollbarTrackHeight() - mThumbHeight;
         float boundedY = (float) Math.max(0, Math.min(bottom, y - mTouchOffsetY));
-        String sectionName = mRv.scrollToPositionAtProgress(boundedY / bottom);
+        CharSequence sectionName = mRv.scrollToPositionAtProgress(boundedY / bottom);
         if (!sectionName.equals(mPopupSectionName)) {
             mPopupSectionName = sectionName;
             mPopupView.setText(sectionName);
             performHapticFeedback(CLOCK_TICK);
         }
-        animatePopupVisibility(!sectionName.isEmpty());
+        animatePopupVisibility(!TextUtils.isEmpty(sectionName));
         mLastTouchY = boundedY;
         setThumbOffsetY((int) mLastTouchY);
     }

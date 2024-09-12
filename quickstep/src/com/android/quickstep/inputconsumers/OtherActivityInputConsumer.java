@@ -49,7 +49,6 @@ import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.AbsSwipeUpHandler;
 import com.android.quickstep.AbsSwipeUpHandler.Factory;
-import com.android.quickstep.BaseActivityInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.InputConsumer;
 import com.android.quickstep.RecentsAnimationCallbacks;
@@ -86,8 +85,6 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
     private final CachedEventDispatcher mRecentsViewDispatcher = new CachedEventDispatcher();
     private final InputMonitorCompat mInputMonitorCompat;
     private final InputEventReceiver mInputEventReceiver;
-    private final BaseActivityInterface mActivityInterface;
-
     private final AbsSwipeUpHandler.Factory mHandlerFactory;
 
     private final Consumer<OtherActivityInputConsumer> mOnCompleteCallback;
@@ -135,7 +132,6 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         mTaskAnimationManager = taskAnimationManager;
         mGestureState = gestureState;
         mHandlerFactory = handlerFactory;
-        mActivityInterface = mGestureState.getActivityInterface();
 
         mMotionPauseDetector = new MotionPauseDetector(base, false,
                 mNavBarPosition.isLeftEdge() || mNavBarPosition.isRightEdge()
@@ -288,8 +284,9 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
 
                 float horizontalDist = Math.abs(displacementX);
                 float upDist = -displacement;
-                boolean passedSlop = mGestureState.isTrackpadGesture() || squaredHypot(
-                        displacementX, displacementY) >= mSquaredTouchSlop;
+                boolean passedSlop = mGestureState.isTrackpadGesture()
+                        || (squaredHypot(displacementX, displacementY) >= mSquaredTouchSlop
+                            && !mGestureState.isInExtendedSlopRegion());
 
                 if (!mPassedSlopOnThisGesture && passedSlop) {
                     mPassedSlopOnThisGesture = true;
@@ -394,7 +391,8 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         mInteractionHandler = mHandlerFactory.newHandler(mGestureState, touchTimeMs);
         mInteractionHandler.setGestureEndCallback(this::onInteractionGestureFinished);
         mMotionPauseDetector.setOnMotionPauseListener(mInteractionHandler.getMotionPauseListener());
-        mInteractionHandler.initWhenReady();
+        mInteractionHandler.initWhenReady(
+                "OtherActivityInputConsumer.startTouchTrackingForWindowAnimation");
 
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
             mActiveCallbacks = mTaskAnimationManager.continueRecentsAnimation(mGestureState);

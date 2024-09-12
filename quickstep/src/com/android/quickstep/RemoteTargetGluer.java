@@ -17,7 +17,6 @@
 package com.android.quickstep;
 
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 import static com.android.wm.shell.util.SplitBounds.KEY_EXTRA_SPLIT_BOUNDS;
 
 import android.app.WindowConfiguration;
@@ -58,7 +57,7 @@ public class RemoteTargetGluer {
     /**
      * Use this constructor if remote targets are split-screen independent
      */
-    public RemoteTargetGluer(Context context, BaseActivityInterface sizingStrategy,
+    public RemoteTargetGluer(Context context, BaseContainerInterface sizingStrategy,
             RemoteAnimationTargets targets, boolean forDesktop) {
         init(context, sizingStrategy, targets.apps.length, forDesktop);
     }
@@ -67,18 +66,16 @@ public class RemoteTargetGluer {
      * Use this constructor if you want the number of handles created to match the number of active
      * running tasks
      */
-    public RemoteTargetGluer(Context context, BaseActivityInterface sizingStrategy) {
-        if (isDesktopModeSupported()) {
-            DesktopVisibilityController desktopVisibilityController =
-                    LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-            if (desktopVisibilityController != null) {
-                int visibleTasksCount = desktopVisibilityController.getVisibleFreeformTasksCount();
-                if (visibleTasksCount > 0) {
-                    // Allocate +1 to account for a new task added to the desktop mode
-                    int numHandles = visibleTasksCount + 1;
-                    init(context, sizingStrategy, numHandles, true /* forDesktop */);
-                    return;
-                }
+    public RemoteTargetGluer(Context context, BaseContainerInterface sizingStrategy) {
+        DesktopVisibilityController desktopVisibilityController =
+                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+        if (desktopVisibilityController != null) {
+            int visibleTasksCount = desktopVisibilityController.getVisibleDesktopTasksCount();
+            if (visibleTasksCount > 0) {
+                // Allocate +1 to account for a new task added to the desktop mode
+                int numHandles = visibleTasksCount + 1;
+                init(context, sizingStrategy, numHandles, true /* forDesktop */);
+                return;
             }
         }
 
@@ -87,13 +84,13 @@ public class RemoteTargetGluer {
         init(context, sizingStrategy, DEFAULT_NUM_HANDLES, false /* forDesktop */);
     }
 
-    private void init(Context context, BaseActivityInterface sizingStrategy, int numHandles,
+    private void init(Context context, BaseContainerInterface sizingStrategy, int numHandles,
             boolean forDesktop) {
         mRemoteTargetHandles = createHandles(context, sizingStrategy, numHandles, forDesktop);
     }
 
     private RemoteTargetHandle[] createHandles(Context context,
-            BaseActivityInterface sizingStrategy, int numHandles, boolean forDesktop) {
+            BaseContainerInterface sizingStrategy, int numHandles, boolean forDesktop) {
         RemoteTargetHandle[] handles = new RemoteTargetHandle[numHandles];
         for (int i = 0; i < numHandles; i++) {
             TaskViewSimulator tvs = new TaskViewSimulator(context, sizingStrategy);
@@ -225,8 +222,10 @@ public class RemoteTargetGluer {
 
         for (int i = 0; i < mRemoteTargetHandles.length; i++) {
             RemoteAnimationTarget primaryTaskTarget = targets.apps[i];
+            List<RemoteAnimationTarget> excludeTargets = Arrays.stream(targets.apps)
+                    .filter(target -> target.taskId != primaryTaskTarget.taskId).toList();
             mRemoteTargetHandles[i].mTransformParams.setTargetSet(
-                    createRemoteAnimationTargetsForTaskId(targets, primaryTaskTarget.taskId));
+                    createRemoteAnimationTargetsForTarget(targets, excludeTargets));
             mRemoteTargetHandles[i].mTaskViewSimulator.setPreview(primaryTaskTarget, null);
         }
         return mRemoteTargetHandles;
@@ -290,33 +289,6 @@ public class RemoteTargetGluer {
                 new RemoteAnimationTarget[0]);
         return new RemoteAnimationTargets(
                 filteredApps, targets.wallpapers, targets.nonApps, targets.targetMode);
-    }
-
-    /**
-     * Ensures that we only animate one specific app target. Includes ancillary targets such as
-     * home/recents
-     *
-     * @param targets remote animation targets to filter
-     * @param taskId  id for a task that we want this remote animation to apply to
-     * @return {@link RemoteAnimationTargets} where app target only includes the app that has the
-     * {@code taskId} that was passed in
-     */
-    private RemoteAnimationTargets createRemoteAnimationTargetsForTaskId(
-            RemoteAnimationTargets targets, int taskId) {
-        RemoteAnimationTarget[] targetApp = null;
-        for (RemoteAnimationTarget targetCompat : targets.unfilteredApps) {
-            if (targetCompat.taskId == taskId) {
-                targetApp = new RemoteAnimationTarget[]{targetCompat};
-                break;
-            }
-        }
-
-        if (targetApp == null) {
-            targetApp = new RemoteAnimationTarget[0];
-        }
-
-        return new RemoteAnimationTargets(targetApp, targets.wallpapers, targets.nonApps,
-                targets.targetMode);
     }
 
     /**

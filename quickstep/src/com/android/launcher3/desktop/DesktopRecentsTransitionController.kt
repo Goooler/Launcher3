@@ -20,9 +20,9 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
 import android.view.SurfaceControl
-import android.window.IRemoteTransition
 import android.window.IRemoteTransitionFinishedCallback
 import android.window.RemoteTransition
+import android.window.RemoteTransitionStub
 import android.window.TransitionInfo
 import com.android.launcher3.statehandlers.DepthController
 import com.android.launcher3.statemanager.StateManager
@@ -30,11 +30,12 @@ import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.views.DesktopTaskView
+import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource
 import java.util.function.Consumer
 
 /** Manage recents related operations with desktop tasks */
 class DesktopRecentsTransitionController(
-    private val stateManager: StateManager<*>,
+    private val stateManager: StateManager<*, *>,
     private val systemUiProxy: SystemUiProxy,
     private val appThread: IApplicationThread,
     private val depthController: DepthController?
@@ -56,12 +57,17 @@ class DesktopRecentsTransitionController(
         systemUiProxy.showDesktopApps(desktopTaskView.display.displayId, transition)
     }
 
+    /** Launch desktop tasks from recents view */
+    fun moveToDesktop(taskId: Int, transitionSource: DesktopModeTransitionSource) {
+        systemUiProxy.moveToDesktop(taskId, transitionSource)
+    }
+
     private class RemoteDesktopLaunchTransitionRunner(
         private val desktopTaskView: DesktopTaskView,
-        private val stateManager: StateManager<*>,
+        private val stateManager: StateManager<*, *>,
         private val depthController: DepthController?,
         private val successCallback: Consumer<Boolean>?
-    ) : IRemoteTransition.Stub() {
+    ) : RemoteTransitionStub() {
 
         override fun startAnimation(
             token: IBinder,
@@ -89,17 +95,6 @@ class DesktopRecentsTransitionController(
                     successCallback?.accept(true)
                 }
             }
-        }
-
-        override fun mergeAnimation(
-            transition: IBinder,
-            info: TransitionInfo,
-            t: SurfaceControl.Transaction,
-            mergeTarget: IBinder,
-            finishCallback: IRemoteTransitionFinishedCallback
-        ) {}
-
-        override fun onTransitionConsumed(transition: IBinder?, aborted: Boolean) {
         }
     }
 

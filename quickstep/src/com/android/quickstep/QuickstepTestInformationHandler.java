@@ -198,6 +198,12 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
                             .unstashBubbleBarIfStashed();
                 });
                 return response;
+            case TestProtocol.REQUEST_INJECT_FAKE_TRACKPAD:
+                runOnTISBinder(tisBinder -> tisBinder.injectFakeTrackpadForTesting());
+                return response;
+            case TestProtocol.REQUEST_EJECT_FAKE_TRACKPAD:
+                runOnTISBinder(tisBinder -> tisBinder.ejectFakeTrackpadForTesting());
+                return response;
         }
 
         return super.call(method, arg, extras);
@@ -208,7 +214,7 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
         RecentsAnimationDeviceState rads = new RecentsAnimationDeviceState(mContext);
         OverviewComponentObserver observer = new OverviewComponentObserver(mContext, rads);
         try {
-            return observer.getActivityInterface().getCreatedActivity();
+            return observer.getActivityInterface().getCreatedContainer();
         } finally {
             observer.onDestroy();
             rads.destroy();

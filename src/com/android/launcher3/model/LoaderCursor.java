@@ -17,7 +17,7 @@
 package com.android.launcher3.model;
 
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
-import static com.android.launcher3.config.FeatureFlags.shouldShowFirstPageWidget;
+import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -52,10 +52,12 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ContentWriter;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSparseArrayMap;
+import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.UserIconInfo;
 
 import java.net.URISyntaxException;
@@ -72,6 +74,7 @@ public class LoaderCursor extends CursorWrapper {
 
     private final LauncherAppState mApp;
     private final Context mContext;
+    private final PackageManagerHelper mPmHelper;
     private final IconCache mIconCache;
     private final InvariantDeviceProfile mIDP;
     private final @Nullable LauncherRestoreEventLogger mRestoreEventLogger;
@@ -113,6 +116,7 @@ public class LoaderCursor extends CursorWrapper {
     public int restoreFlag;
 
     public LoaderCursor(Cursor cursor, LauncherAppState app, UserManagerState userManagerState,
+            PackageManagerHelper pmHelper,
             @Nullable LauncherRestoreEventLogger restoreEventLogger) {
         super(cursor);
 
@@ -120,6 +124,7 @@ public class LoaderCursor extends CursorWrapper {
         allUsers = userManagerState.allUsers;
         mContext = app.getContext();
         mIconCache = app.getIconCache();
+        mPmHelper = pmHelper;
         mIDP = app.getInvariantDeviceProfile();
         mRestoreEventLogger = restoreEventLogger;
 
@@ -366,7 +371,8 @@ public class LoaderCursor extends CursorWrapper {
         }
 
         if (mActivityInfo != null) {
-            AppInfo.updateRuntimeFlagsForActivityTarget(info, mActivityInfo, userIconInfo);
+            AppInfo.updateRuntimeFlagsForActivityTarget(info, mActivityInfo, userIconInfo,
+                    ApiWrapper.INSTANCE.get(mContext), mPmHelper);
         }
 
         // from the db
@@ -548,7 +554,8 @@ public class LoaderCursor extends CursorWrapper {
         if (!mOccupied.containsKey(item.screenId)) {
             GridOccupancy screen = new GridOccupancy(countX + 1, countY + 1);
             if (item.screenId == Workspace.FIRST_SCREEN_ID && (FeatureFlags.QSB_ON_FIRST_SCREEN
-                    && !shouldShowFirstPageWidget() && isFirstPagePinnedItemEnabled)) {
+                    && !SHOULD_SHOW_FIRST_PAGE_WIDGET
+                    && isFirstPagePinnedItemEnabled)) {
                 // Mark the first X columns (X is width of the search container) in the first row as
                 // occupied (if the feature is enabled) in order to account for the search
                 // container.

@@ -17,15 +17,27 @@
 package com.android.quickstep.views;
 
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
+import static com.android.quickstep.util.BorderAnimator.DEFAULT_BORDER_COLOR;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.widget.Button;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.Flags;
+import com.android.launcher3.R;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
+import com.android.quickstep.util.BorderAnimator;
+
+import kotlin.Unit;
 
 public class ClearAllButton extends Button {
 
@@ -55,7 +67,7 @@ public class ClearAllButton extends Button {
                 }
             };
 
-    private final StatefulActivity mActivity;
+    private final RecentsViewContainer mContainer;
     private float mScrollAlpha = 1;
     private float mContentAlpha = 1;
     private float mVisibilityAlpha = 1;
@@ -71,11 +83,75 @@ public class ClearAllButton extends Button {
     private float mScrollOffsetPrimary;
 
     private int mSidePadding;
+    private int mOutlinePadding;
+    private boolean mBorderEnabled;
+    @Nullable
+    private final BorderAnimator mFocusBorderAnimator;
 
     public ClearAllButton(Context context, AttributeSet attrs) {
         super(context, attrs);
         mIsRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
-        mActivity = StatefulActivity.fromContext(context);
+        mContainer = RecentsViewContainer.containerFromContext(context);
+
+        if (Flags.enableFocusOutline()) {
+            TypedArray styledAttrs = context.obtainStyledAttributes(attrs,
+                    R.styleable.ClearAllButton);
+            Resources resources = getResources();
+            mOutlinePadding = resources.getDimensionPixelSize(
+                    R.dimen.recents_clear_all_outline_padding);
+            mFocusBorderAnimator =
+                    BorderAnimator.createSimpleBorderAnimator(
+                            /* borderRadiusPx= */ resources.getDimensionPixelSize(
+                                    R.dimen.recents_clear_all_outline_radius),
+                            /* borderWidthPx= */ context.getResources().getDimensionPixelSize(
+                                    R.dimen.keyboard_quick_switch_border_width),
+                            /* boundsBuilder= */ this::updateBorderBounds,
+                            /* targetView= */ this,
+                            /* borderColor= */ styledAttrs.getColor(
+                                    R.styleable.ClearAllButton_focusBorderColor,
+                                    DEFAULT_BORDER_COLOR));
+            styledAttrs.recycle();
+        } else {
+            mFocusBorderAnimator = null;
+        }
+    }
+
+    private Unit updateBorderBounds(@NonNull Rect bounds) {
+        bounds.set(0, 0, getWidth(), getHeight());
+        // Make the value negative to form a padding between button and outline
+        bounds.inset(-mOutlinePadding, -mOutlinePadding);
+        return Unit.INSTANCE;
+    }
+
+    @Override
+    public void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        if (mFocusBorderAnimator != null && mBorderEnabled) {
+            mFocusBorderAnimator.setBorderVisibility(gainFocus, /* animated= */ true);
+        }
+    }
+
+    /**
+     * Enable or disable showing border on focus change
+     */
+    public void setBorderEnabled(boolean enabled) {
+        if (mBorderEnabled == enabled) {
+            return;
+        }
+
+        mBorderEnabled = enabled;
+        if (mFocusBorderAnimator != null) {
+            mFocusBorderAnimator.setBorderVisibility(/* visible= */
+                    enabled && isFocused(), /* animated= */true);
+        }
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        if (mFocusBorderAnimator != null) {
+            mFocusBorderAnimator.drawBorder(canvas);
+        }
+        super.draw(canvas);
     }
 
     @Override
@@ -253,7 +329,7 @@ public class ClearAllButton extends Button {
      * Get the Y translation that is set in the original layout position, before scrolling.
      */
     private float getOriginalTranslationY() {
-        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+        DeviceProfile deviceProfile = mContainer.getDeviceProfile();
         if (deviceProfile.isTablet) {
             if (enableGridOnlyOverview()) {
                 return (getRecentsView().getLastComputedTaskSize().height()

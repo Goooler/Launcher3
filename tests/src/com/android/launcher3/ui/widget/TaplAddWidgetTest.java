@@ -25,13 +25,13 @@ import android.platform.test.annotations.PlatinumTest;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.celllayout.FavoriteItemsTransaction;
 import com.android.launcher3.tapl.Widget;
 import com.android.launcher3.tapl.WidgetResizeFrame;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.ui.TestViewHelpers;
-import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
@@ -46,17 +46,16 @@ import org.junit.runner.RunWith;
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class TaplAddWidgetTest extends AbstractLauncherUiTest {
+public class TaplAddWidgetTest extends AbstractLauncherUiTest<Launcher> {
 
     @Rule
     public ShellCommandRule mGrantWidgetRule = ShellCommandRule.grantWidgetBind();
 
     @Test
     @PortraitLandscape
-    @ScreenRecord // b/316910614
     public void testDragIcon() throws Throwable {
         mLauncher.enableDebugTracing(); // b/289161193
-        new FavoriteItemsTransaction(mTargetContext).commitAndLoadHome(mLauncher);
+        commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
 
         waitForLauncherCondition("Workspace didn't finish loading", l -> !l.isWorkspaceLoading());
 
@@ -85,14 +84,13 @@ public class TaplAddWidgetTest extends AbstractLauncherUiTest {
      * A custom shortcut is a 1x1 widget that launches a specific intent when user tap on it.
      * Custom shortcuts are replaced by deep shortcuts after api 25.
      */
-    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
     @Test
     @PortraitLandscape
     public void testDragCustomShortcut() throws Throwable {
         // TODO(b/322820039): Enable test for tablets - the picker UI has changed and test needs to
         //  be updated to look for appropriate UI elements.
         Assume.assumeFalse(mLauncher.isTablet());
-        new FavoriteItemsTransaction(mTargetContext).commitAndLoadHome(mLauncher);
+        commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
 
         mLauncher.getWorkspace().openAllWidgets()
                 .getWidget("com.android.launcher3.testcomponent.CustomShortcutConfigActivity")
@@ -104,11 +102,11 @@ public class TaplAddWidgetTest extends AbstractLauncherUiTest {
     /**
      * Test dragging a widget to the workspace and resize it.
      */
+    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/316910614
     @PlatinumTest(focusArea = "launcher")
     @Test
-    @ScreenRecord // b/316910614
     public void testResizeWidget() throws Throwable {
-        new FavoriteItemsTransaction(mTargetContext).commitAndLoadHome(mLauncher);
+        commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
 
         waitForLauncherCondition("Workspace didn't finish loading", l -> !l.isWorkspaceLoading());
 

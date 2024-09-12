@@ -27,8 +27,10 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"ৱিজেটবোৰক সুৰক্ষিত ম\'ডত অক্ষম কৰা হ’ল"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"শ্বৰ্টকাট নাই"</string>
     <string name="home_screen" msgid="5629429142036709174">"গৃহ স্ক্ৰীন"</string>
+    <string name="set_default_home_app" msgid="5808906607627586381">"ছেটিঙত <xliff:g id="LAUNCHER_NAME">%1$s</xliff:g>ক ডিফ’ল্ট গৃহপৃষ্ঠা এপ্‌ হিচাপে ছেট কৰক"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"বিভাজিত স্ক্ৰীন"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"%1$sৰ বাবে এপৰ তথ্য"</string>
+    <string name="split_app_usage_settings" msgid="7214375263347964093">"%1$sৰ বাবে ব্যৱহাৰৰ ছেটিং"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"এপৰ পেয়াৰ ছেভ কৰক"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"এই ডিভাইচটোত এই এপ্‌ পেয়াৰ কৰাৰ সুবিধাটো সমৰ্থিত নহয়"</string>
@@ -39,16 +41,16 @@
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d বহল x %2$d ওখ"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ৱিজেট"</string>
+    <string name="widget_preview_name_and_dims_content_description" msgid="8489038126122831595">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ৱিজেট, %2$d বহল %3$d ওখ"</string>
     <string name="add_item_request_drag_hint" msgid="8730547755622776606">"ৱিজেটটো গৃহ স্ক্ৰীনৰ আশে-পাশে নিবলৈ সেইটোত স্পৰ্শ কৰি ধৰি ৰাখক"</string>
     <string name="add_to_home_screen" msgid="9168649446635919791">"গৃহ স্ক্ৰীনত যোগ কৰক"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ৱিজেটটো গৃহ স্ক্ৰীনত যোগ দিয়া হৈছে"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"পৰামৰ্শ"</string>
-    <string name="productivity_widget_recommendation_category_label" msgid="1722113555721820766">"আপোনাৰ দৈনিক অত্যাৱশ্যকীয় সামগ্ৰী"</string>
-    <string name="news_widget_recommendation_category_label" msgid="3908242346768119070">"আপোনাৰ বাবে বাতৰি"</string>
-    <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"আপোনাৰ পচন্দৰ স্থান"</string>
-    <string name="fitness_widget_recommendation_category_label" msgid="2657652999128882431">"আপোনাৰ সুস্থতাৰ লক্ষ্যত উপনীত হওক"</string>
-    <string name="weather_widget_recommendation_category_label" msgid="6712678763480668598">"বতৰৰ বিষয়ে আগতীয়াকৈ জানক"</string>
-    <string name="others_widget_recommendation_category_label" msgid="897876078077284733">"আপুনি হয়তো এইটোও পচন্দ কৰিব"</string>
+    <string name="productivity_widget_recommendation_category_label" msgid="3811812719618323750">"অত্যাৱশ্যকীয়সমূহ"</string>
+    <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"বাতৰি আৰু আলোচনী"</string>
+    <string name="entertainment_widget_recommendation_category_label" msgid="3973107268630717874">"মনোৰঞ্জন"</string>
+    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"সামাজিক"</string>
+    <string name="others_widget_recommendation_category_label" msgid="5555987036267226245">"আপোনাৰ বাবে পৰামৰ্শ হিচাপে আগবঢ়োৱা"</string>
     <string name="widget_picker_right_pane_accessibility_title" msgid="1673313931455067502">"<xliff:g id="SELECTED_HEADER">%1$s</xliff:g> ৱিজেট সোঁফালে, সন্ধান আৰু বিকল্পসমূহ বাওঁফালে"</string>
     <string name="widgets_count" msgid="6467746476364652096">"{count,plural, =1{# টা ৱিজেট}one{# টা ৱিজেট}other{# টা ৱিজেট}}"</string>
     <string name="shortcuts_count" msgid="8471715556199592381">"{count,plural, =1{# টা শ্বৰ্টকাট}one{# টা শ্বৰ্টকাট}other{# টা শ্বৰ্টকাট}}"</string>
@@ -62,10 +64,9 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"কৰ্মস্থান"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"বাৰ্তালাপ"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"টোকা গ্ৰহণ কৰা"</string>
-    <string name="widget_education_header" msgid="4874760613775913787">"আপোনাৰ আঙুলিৰে টিপতে উপযোগী তথ্য পাওক"</string>
-    <string name="widget_education_content" msgid="1731667670753497052">"এপ্ নোখোলাকৈ তথ্য পাবলৈ আপুনি নিজৰ গৃহ স্ক্ৰীনত ৱিজেট যোগ দিব পাৰে"</string>
+    <string name="widget_add_button_label" msgid="2761267068711937179">"যোগ দিয়ক"</string>
+    <string name="widget_add_button_content_description" msgid="1810530016360039643">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ৱিজেট যোগ দিয়ক"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"ৱিজেটৰ ছেটিং সলনি কৰিবলৈ টিপক"</string>
-    <string name="widget_education_close_button" msgid="8676165703104836580">"বুজি পালোঁ"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"ৱিজেটৰ ছেটিং সলনি কৰক"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"এপ্‌সমূহ সন্ধান কৰক"</string>
     <string name="all_apps_loading_message" msgid="5813968043155271636">"এপ্‌সমূহ ল’ড কৰি থকা হৈছে…"</string>
@@ -85,6 +86,7 @@
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"আনইনষ্টল কৰক"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"এপ্‌ সম্পৰ্কীয় তথ্য"</string>
     <string name="install_private_system_shortcut_label" msgid="1616889277073184841">"গোপনে ইনষ্টল কৰক"</string>
+    <string name="uninstall_private_system_shortcut_label" msgid="8423460530441627982">"এপ্‌ আনইনষ্টল কৰক"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"ইনষ্টল কৰক"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"পৰামৰ্শ নিদিব"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"পূৰ্বানুমান কৰা এপ্‌টো পিন কৰক"</string>
@@ -136,7 +138,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ইনষ্টল কৰি থকা হৈছে, <xliff:g id="PROGRESS">%2$s</xliff:g> সম্পূৰ্ণ হৈছে"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> ডাউনল’ড কৰি থকা হৈছে, <xliff:g id="PROGRESS">%2$s</xliff:g> সম্পূৰ্ণ হ’ল"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ইনষ্টল হোৱালৈ অপেক্ষা কৰি থকা হৈছে"</string>
-    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> আৰ্কাইভ কৰা হৈছে। ডাউনল’ড কৰিবলৈ টিপক।"</string>
+    <string name="app_archived_title" msgid="7717956158562544081">"<xliff:g id="NAME">%1$s</xliff:g> আৰ্কাইভ কৰা হৈছে। ডাউনল’ড আৰু পুনঃস্থাপন কৰিবলৈ টিপক।"</string>
     <string name="dialog_update_title" msgid="114234265740994042">"এপ্‌টো আপডে’ট কৰা প্ৰয়োজন"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"এই চিহ্নটোৰ এপ্‌টো আপডে’ট কৰা হোৱা নাই। আপুনি এই শ্বৰ্টকাটটো পুনৰ সক্ষম কৰিবলৈ মেনুৱেলী আপডে’ট কৰিব পাৰে অথবা চিহ্নটো আঁতৰাব পাৰে।"</string>
     <string name="dialog_update" msgid="2178028071796141234">"আপডে’ট কৰক"</string>
@@ -184,13 +186,13 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"ফিল্টাৰ"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"বিফল: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"প্ৰাইভেট স্পে\'চ"</string>
-    <string name="private_space_secondary_label" msgid="611902414159280263">"ব্যক্তিগত এপ্‌সমূহ লক কৰি লুকুৱাই ৰাখক"</string>
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"ছেট আপ কৰিবলৈ টিপক অথবা খোলক"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"ব্যক্তিগত"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"ব্যক্তিগত স্পে’চৰ ছেটিং"</string>
-    <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"প্ৰাইভেট স্পে\'চ লক/আনলক কৰক"</string>
+    <string name="ps_container_unlock_button_content_description" msgid="9181551784092204234">"ব্যক্তিগত, আনলক কৰা আছে।"</string>
+    <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"ব্যক্তিগত, লক কৰা আছে।"</string>
     <string name="ps_container_lock_title" msgid="2640257399982364682">"লক কৰক"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"ব্যক্তিগত স্পে’চৰ স্থানান্তৰণ"</string>
-    <string name="ps_add_button_label" msgid="8611055839242385935">"এপ্‌ ইনষ্টল কৰক"</string>
+    <string name="ps_add_button_label" msgid="8127988716897128773">"ইনষ্টল কৰক"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"এপ্‌সমূহ প্ৰাইভেট স্পেচত ইনষ্টল কৰক"</string>
-    <string name="bubble_bar_overflow_description" msgid="7410995531938041192">"অ’ভাৰফ্ল’"</string>
 </resources>

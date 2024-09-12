@@ -62,12 +62,13 @@ public class SplitWithKeyboardShortcutController {
     private final int mSplitPlaceholderInset;
 
     public SplitWithKeyboardShortcutController(QuickstepLauncher launcher,
-            SplitSelectStateController controller) {
+            SplitSelectStateController controller,
+            OverviewComponentObserver overviewComponentObserver,
+            RecentsAnimationDeviceState deviceState) {
         mLauncher = launcher;
         mController = controller;
-        mDeviceState = new RecentsAnimationDeviceState(launcher.getApplicationContext());
-        mOverviewComponentObserver = new OverviewComponentObserver(launcher.getApplicationContext(),
-                mDeviceState);
+        mDeviceState = deviceState;
+        mOverviewComponentObserver = overviewComponentObserver;
 
         mSplitPlaceholderSize = mLauncher.getResources().getDimensionPixelSize(
                 R.dimen.split_placeholder_size);
@@ -135,7 +136,7 @@ public class SplitWithKeyboardShortcutController {
             RectF startingTaskRect = new RectF();
             final FloatingTaskView floatingTaskView = FloatingTaskView.getFloatingTaskView(
                     mLauncher, mLauncher.getDragLayer(),
-                    controller.screenshotTask(runningTaskInfo.taskId).thumbnail,
+                    controller.screenshotTask(runningTaskInfo.taskId).getThumbnail(),
                     null /* icon */, startingTaskRect);
             RecentsModel.INSTANCE.get(mLauncher.getApplicationContext())
                     .getIconCache()

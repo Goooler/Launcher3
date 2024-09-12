@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
-import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
@@ -51,9 +50,11 @@ import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
+import com.android.quickstep.util.SystemUiFlagUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.animation.ViewRootSync;
 import com.android.systemui.shared.recents.model.ThumbnailData;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -65,7 +66,7 @@ import java.util.StringJoiner;
  */
 public class TaskbarLauncherStateController {
 
-    private static final String TAG = TaskbarLauncherStateController.class.getSimpleName();
+    private static final String TAG = "TaskbarLauncherStateController";
     private static final boolean DEBUG = false;
 
     /** Launcher activity is visible and focused. */
@@ -194,7 +195,7 @@ public class TaskbarLauncherStateController {
                     updateStateForFlag(FLAG_LAUNCHER_IN_STATE_TRANSITION, true);
                     if (!mShouldDelayLauncherStateAnim) {
                         if (toState == LauncherState.NORMAL) {
-                            applyState(QuickstepTransitionManager.TASKBAR_TO_HOME_DURATION);
+                            applyState(QuickstepTransitionManager.getTaskbarToHomeDuration());
                         } else {
                             applyState();
                         }
@@ -226,7 +227,7 @@ public class TaskbarLauncherStateController {
 
     /** Initializes the controller instance, and applies the initial state immediately. */
     public void init(TaskbarControllers controllers, QuickstepLauncher launcher,
-            int sysuiStateFlags) {
+            @SystemUiStateFlags long sysuiStateFlags) {
         mCanSyncViews = false;
 
         mControllers = controllers;
@@ -325,11 +326,12 @@ public class TaskbarLauncherStateController {
     }
 
     /** SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values. */
-    public void updateStateForSysuiFlags(int systemUiStateFlags) {
+    public void updateStateForSysuiFlags(@SystemUiStateFlags long systemUiStateFlags) {
         updateStateForSysuiFlags(systemUiStateFlags, /* applyState */ true);
     }
 
-    private void updateStateForSysuiFlags(int systemUiStateFlags, boolean applyState) {
+    private void updateStateForSysuiFlags(@SystemUiStateFlags long systemUiStateFlags,
+            boolean applyState) {
         final boolean prevIsAwake = hasAnyFlag(FLAG_AWAKE);
         final boolean currIsAwake = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_AWAKE);
 
@@ -341,8 +343,7 @@ public class TaskbarLauncherStateController {
                     prevIsAwake && hasAnyFlag(FLAGS_LAUNCHER_ACTIVE));
         }
 
-        boolean isDeviceLocked = hasAnyFlag(systemUiStateFlags, MASK_ANY_SYSUI_LOCKED);
-        updateStateForFlag(FLAG_DEVICE_LOCKED, isDeviceLocked);
+        updateStateForFlag(FLAG_DEVICE_LOCKED, SystemUiFlagUtils.isLocked(systemUiStateFlags));
 
         // Taskbar is hidden whenever the device is dreaming. The dreaming state includes the
         // interactive dreams, AoD, screen off. Since the SYSUI_STATE_DEVICE_DREAMING only kicks in
@@ -389,11 +390,11 @@ public class TaskbarLauncherStateController {
         }
     }
 
-    private boolean hasAnyFlag(int flagMask) {
+    private boolean hasAnyFlag(long flagMask) {
         return hasAnyFlag(mState, flagMask);
     }
 
-    private boolean hasAnyFlag(int flags, int flagMask) {
+    private boolean hasAnyFlag(long flags, long flagMask) {
         return (flags & flagMask) != 0;
     }
 
@@ -662,11 +663,12 @@ public class TaskbarLauncherStateController {
      * Returns if the current Launcher state has hotseat on top of other elemnets.
      */
     public boolean isInHotseatOnTopStates() {
-        return mLauncherState != LauncherState.ALL_APPS;
+        return mLauncherState != LauncherState.ALL_APPS
+                && !mLauncher.getWorkspace().isOverlayShown();
     }
 
-    boolean isInOverview() {
-        return mLauncherState == LauncherState.OVERVIEW;
+    boolean isInOverviewUi() {
+        return mLauncherState.isRecentsViewVisible;
     }
 
     private void playStateTransitionAnim(AnimatorSet animatorSet, long duration,
@@ -836,6 +838,7 @@ public class TaskbarLauncherStateController {
         appendFlag(result, flags, FLAG_LAUNCHER_WAS_ACTIVE_WHILE_AWAKE,
                 "was_active_while_awake");
         appendFlag(result, flags, FLAG_DEVICE_LOCKED, "device_locked");
+        appendFlag(result, flags, FLAG_TASKBAR_HIDDEN, "taskbar_hidden");
         return result.toString();
     }
 

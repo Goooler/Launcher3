@@ -57,6 +57,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.ComponentWithLabel.ComponentCachingLogic;
 import com.android.launcher3.icons.cache.BaseIconCache;
 import com.android.launcher3.icons.cache.CachingLogic;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.IconRequestInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
@@ -577,7 +578,7 @@ public class IconCache extends BaseIconCache {
         try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
             final BitmapInfo tempBitmap = li.createBadgedIconBitmap(
                     mContext.getDrawable(widgetSection.mSectionDrawable),
-                    new BaseIconFactory.IconOptions().setShrinkNonAdaptiveIcons(false));
+                    new BaseIconFactory.IconOptions());
             mWidgetCategoryBitmapInfos.put(infoInOut.widgetCategory, tempBitmap);
             infoInOut.bitmap = getBadgedIcon(tempBitmap, infoInOut.user);
         } catch (Exception e) {
@@ -640,5 +641,11 @@ public class IconCache extends BaseIconCache {
     public interface ItemInfoUpdateReceiver {
 
         void reapplyItemInfo(ItemInfoWithIcon info);
+    }
+
+    /** Log persistently to FileLog.d for debugging. */
+    @Override
+    protected void logdPersistently(String tag, String message, @Nullable Exception e) {
+        FileLog.d(tag, message, e);
     }
 }

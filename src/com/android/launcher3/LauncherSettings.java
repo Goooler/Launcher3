@@ -139,6 +139,11 @@ public class LauncherSettings {
         public static final int ITEM_TYPE_SEARCH_ACTION = 9;
 
         /**
+         * Private space install app button.
+         */
+        public static final int ITEM_TYPE_PRIVATE_SPACE_INSTALL_APP_BUTTON = 11;
+
+        /**
          * The custom icon bitmap.
          * <P>Type: BLOB</P>
          */
@@ -178,6 +183,7 @@ public class LauncherSettings {
         public static final int CONTAINER_SHORTCUTS = -107;
         public static final int CONTAINER_SETTINGS = -108;
         public static final int CONTAINER_TASKSWITCHER = -109;
+        public static final int CONTAINER_PRIVATESPACE = -110;
 
         // Represents any of the extended containers implemented in non-AOSP variants.
         public static final int EXTENDED_CONTAINERS = -200;
@@ -206,6 +212,8 @@ public class LauncherSettings {
                 case ITEM_TYPE_TASK: return "TASK";
                 case ITEM_TYPE_QSB: return "QSB";
                 case ITEM_TYPE_APP_PAIR: return "APP_PAIR";
+                case ITEM_TYPE_PRIVATE_SPACE_INSTALL_APP_BUTTON:
+                    return "PRIVATE_SPACE_INSTALL_APP_BUTTON";
                 default: return String.valueOf(type);
             }
         }

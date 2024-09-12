@@ -16,10 +16,10 @@
 
 package com.android.launcher3.model;
 
+import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.LauncherSettings.Favorites.TMP_TABLE;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_SMARTSPACE_REMOVAL;
-import static com.android.launcher3.config.FeatureFlags.shouldShowFirstPageWidget;
+import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 import static com.android.launcher3.model.LoaderTask.SMARTSPACE_ON_HOME_SCREEN;
 import static com.android.launcher3.provider.LauncherDbUtils.copyTable;
 import static com.android.launcher3.provider.LauncherDbUtils.dropTable;
@@ -49,6 +49,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
+import com.android.launcher3.util.ContentWriter;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
@@ -223,19 +224,13 @@ public class GridSizeMigrationUtil {
             screens.add(screenId);
         }
 
-        boolean preservePages = false;
-        if (screens.isEmpty() && FeatureFlags.ENABLE_NEW_MIGRATION_LOGIC.get()) {
-            preservePages = destDeviceState.compareTo(srcDeviceState) >= 0
-                    && destDeviceState.getColumns() - srcDeviceState.getColumns() <= 2;
-        }
-
         // Then we place the items on the screens
         for (int screenId : screens) {
             if (DEBUG) {
                 Log.d(TAG, "Migrating " + screenId);
             }
             solveGridPlacement(helper, srcReader,
-                    destReader, screenId, trgX, trgY, workspaceToBeAdded, false);
+                    destReader, screenId, trgX, trgY, workspaceToBeAdded);
             if (workspaceToBeAdded.isEmpty()) {
                 break;
             }
@@ -245,8 +240,8 @@ public class GridSizeMigrationUtil {
         // any of the screens, in this case we add them to new screens until all of them are placed.
         int screenId = destReader.mLastScreenId + 1;
         while (!workspaceToBeAdded.isEmpty()) {
-            solveGridPlacement(helper, srcReader,
-                    destReader, screenId, trgX, trgY, workspaceToBeAdded, preservePages);
+            solveGridPlacement(helper, srcReader, destReader, screenId, trgX, trgY,
+                    workspaceToBeAdded);
             screenId++;
         }
 
@@ -348,14 +343,14 @@ public class GridSizeMigrationUtil {
     private static void solveGridPlacement(@NonNull final DatabaseHelper helper,
             @NonNull final DbReader srcReader, @NonNull final DbReader destReader,
             final int screenId, final int trgX, final int trgY,
-            @NonNull final List<DbEntry> sortedItemsToPlace, final boolean matchingScreenIdOnly) {
+            @NonNull final List<DbEntry> sortedItemsToPlace) {
         final GridOccupancy occupied = new GridOccupancy(trgX, trgY);
         final Point trg = new Point(trgX, trgY);
         final Point next = new Point(0, screenId == 0
                 && (FeatureFlags.QSB_ON_FIRST_SCREEN
-                && (!ENABLE_SMARTSPACE_REMOVAL.get() || LauncherPrefs.getPrefs(destReader.mContext)
+                && (!enableSmartspaceRemovalToggle() || LauncherPrefs.getPrefs(destReader.mContext)
                 .getBoolean(SMARTSPACE_ON_HOME_SCREEN, true))
-                && !shouldShowFirstPageWidget())
+                && !SHOULD_SHOW_FIRST_PAGE_WIDGET)
                 ? 1 /* smartspace */ : 0);
         List<DbEntry> existedEntries = destReader.mWorkspaceEntriesByScreenId.get(screenId);
         if (existedEntries != null) {
@@ -366,8 +361,6 @@ public class GridSizeMigrationUtil {
         Iterator<DbEntry> iterator = sortedItemsToPlace.iterator();
         while (iterator.hasNext()) {
             final DbEntry entry = iterator.next();
-            if (matchingScreenIdOnly && entry.screenId < screenId) continue;
-            if (matchingScreenIdOnly && entry.screenId > screenId) break;
             if (entry.minSpanX > trgX || entry.minSpanY > trgY) {
                 iterator.remove();
                 continue;
@@ -435,7 +428,8 @@ public class GridSizeMigrationUtil {
         }
     }
 
-    protected static class DbReader {
+    @VisibleForTesting
+    public static class DbReader {
 
         private final SQLiteDatabase mDb;
         private final String mTableName;
@@ -446,7 +440,7 @@ public class GridSizeMigrationUtil {
         private final Map<Integer, ArrayList<DbEntry>> mWorkspaceEntriesByScreenId =
                 new ArrayMap<>();
 
-        DbReader(SQLiteDatabase db, String tableName, Context context,
+        public DbReader(SQLiteDatabase db, String tableName, Context context,
                 Set<String> validPackages) {
             mDb = db;
             mTableName = tableName;
@@ -681,6 +675,11 @@ public class GridSizeMigrationUtil {
         private String mProvider;
         private Map<String, Set<Integer>> mFolderItems = new HashMap<>();
 
+        /**
+         * Id of the specific widget.
+         */
+        public int appWidgetId = NO_ID;
+
         /** Comparator according to the reading order */
         @Override
         public int compareTo(DbEntry another) {
@@ -714,6 +713,18 @@ public class GridSizeMigrationUtil {
             values.put(LauncherSettings.Favorites.SPANY, spanY);
         }
 
+        @Override
+        public void writeToValues(@NonNull ContentWriter writer) {
+            super.writeToValues(writer);
+            writer.put(LauncherSettings.Favorites.APPWIDGET_ID, appWidgetId);
+        }
+
+        @Override
+        public void readFromValues(@NonNull ContentValues values) {
+            super.readFromValues(values);
+            appWidgetId = values.getAsInteger(LauncherSettings.Favorites.APPWIDGET_ID);
+        }
+
         /** This id is not used in the DB is only used while doing the migration and it identifies
          * an entry on each workspace. For example two calculator icons would have the same
          * migration id even thought they have different database ids.
@@ -724,7 +735,10 @@ public class GridSizeMigrationUtil {
                 case LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR:
                     return getFolderMigrationId();
                 case LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET:
-                    return mProvider;
+                    // mProvider is the app the widget belongs to and appWidgetId it's the unique
+                    // is of the widget, we need both because if you remove a widget and then add it
+                    // again, then it can change and the WidgetProvider would not know the widget.
+                    return mProvider + appWidgetId;
                 case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION:
                     final String intentStr = cleanIntentString(mIntent);
                     try {

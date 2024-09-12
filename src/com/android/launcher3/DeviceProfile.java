@@ -18,6 +18,7 @@ package com.android.launcher3;
 
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.Flags.enableOverviewIconMenu;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_DEFAULT;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDSCAPE;
@@ -31,6 +32,7 @@ import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTO
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.testing.shared.ResourceUtils.pxFromDp;
 import static com.android.launcher3.testing.shared.ResourceUtils.roundPxValueFromFloat;
+import static com.android.wm.shell.Flags.enableTinyTaskbar;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -51,7 +53,6 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.CellLayout.ContainerType;
 import com.android.launcher3.DevicePaddings.DevicePadding;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.model.data.ItemInfo;
@@ -63,13 +64,13 @@ import com.android.launcher3.responsive.ResponsiveCellSpecsProvider;
 import com.android.launcher3.responsive.ResponsiveSpec.Companion.ResponsiveSpecType;
 import com.android.launcher3.responsive.ResponsiveSpec.DimensionType;
 import com.android.launcher3.responsive.ResponsiveSpecsProvider;
-import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.CellContentDimensions;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IconSizeSteps;
 import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.util.window.WindowManagerProxy;
 
 import java.io.PrintWriter;
 import java.util.Locale;
@@ -102,6 +103,7 @@ public class DeviceProfile {
     public final boolean transposeLayoutWithOrientation;
     public final boolean isMultiDisplay;
     public final boolean isTwoPanels;
+    public boolean isPredictiveBackSwipe;
     public final boolean isQsbInline;
 
     // Device properties in current orientation
@@ -351,7 +353,8 @@ public class DeviceProfile {
         isTablet = info.isTablet(windowBounds);
         isPhone = !isTablet;
         isTwoPanels = isTablet && isMultiDisplay;
-        isTaskbarPresent = isTablet && ApiWrapper.TASKBAR_DRAWN_IN_PROCESS;
+        isTaskbarPresent = (isTablet || (enableTinyTaskbar() && isGestureMode))
+                && WindowManagerProxy.INSTANCE.get(context).isTaskbarDrawnInProcess();
 
         // Some more constants.
         context = getContext(context, info, isVerticalBarLayout() || (isTablet && isLandscape)
@@ -439,7 +442,11 @@ public class DeviceProfile {
             if (isMultiDisplay && !ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH.get()) {
                 // TODO(b/259893832): Revert to use maxWallpaperScale to calculate bottomSheetDepth
                 // when screen recorder bug is fixed.
-                bottomSheetDepth = 1f;
+                if (enableScalingRevealHomeAnimation()) {
+                    bottomSheetDepth = 0.3f;
+                } else {
+                    bottomSheetDepth = 1f;
+                }
             } else {
                 // The goal is to set wallpaper to zoom at workspaceContentScale when in AllApps.
                 // When depth is 0, wallpaper zoom is set to maxWallpaperScale.
@@ -706,7 +713,7 @@ public class DeviceProfile {
         overviewTaskThumbnailTopMarginPx =
                 enableOverviewIconMenu() ? 0 : overviewTaskIconSizePx + overviewTaskMarginPx;
         // Don't add margin with floating search bar to minimize risk of overlapping.
-        overviewActionsTopMarginPx = FeatureFlags.ENABLE_FLOATING_SEARCH_BAR.get() ? 0
+        overviewActionsTopMarginPx = Flags.floatingSearchBar() ? 0
                 : res.getDimensionPixelSize(R.dimen.overview_actions_top_margin);
         overviewPageSpacing = res.getDimensionPixelSize(R.dimen.overview_page_spacing);
         overviewActionsButtonSpacing = res.getDimensionPixelSize(
@@ -2395,7 +2402,7 @@ public class DeviceProfile {
                 mTransposeLayoutWithOrientation = !mInfo.isTablet(mWindowBounds);
             }
             if (mIsGestureMode == null) {
-                mIsGestureMode = mInfo.navigationMode.hasGestures;
+                mIsGestureMode = mInfo.getNavigationMode().hasGestures;
             }
             if (mDotRendererCache == null) {
                 mDotRendererCache = new SparseArray<>();

@@ -46,6 +46,7 @@ import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.views.ArrowTipView;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
+import com.android.launcher3.widget.PendingAppWidgetHostView;
 import com.android.launcher3.widget.util.WidgetSizes;
 
 import java.util.ArrayList;
@@ -135,6 +136,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     private final Rect mWidgetViewNewRect = new Rect();
     private final @Nullable LauncherAppWidgetHostView.CellChildViewPreLayoutListener
             mCellChildViewPreLayoutListener;
+    private final @NonNull OnLayoutChangeListener mWidgetViewLayoutListener;
 
     private int mXDown, mYDown;
 
@@ -176,6 +178,9 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         mDragAcrossTwoPanelOpacityMargin = mLauncher.getResources().getDimensionPixelSize(
                 R.dimen.resize_frame_invalid_drag_across_two_panel_opacity_margin);
         mDragLayerRelativeCoordinateHelper = new ViewGroupFocusHelper(mLauncher.getDragLayer());
+
+        mWidgetViewLayoutListener =
+                (v, l, t, r, b, oldL, oldT, oldR, oldB) -> setCornerRadiusFromWidget();
     }
 
     @Override
@@ -200,27 +205,34 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     }
 
     public static void showForWidget(LauncherAppWidgetHostView widget, CellLayout cellLayout) {
+        // If widget is not added to view hierarchy, we cannot show resize frame at correct location
+        if (widget.getParent() == null) {
+            return;
+        }
         Launcher launcher = Launcher.getLauncher(cellLayout.getContext());
         AbstractFloatingView.closeAllOpenViews(launcher);
 
         DragLayer dl = launcher.getDragLayer();
         AppWidgetResizeFrame frame = (AppWidgetResizeFrame) launcher.getLayoutInflater()
                 .inflate(R.layout.app_widget_resize_frame, dl, false);
-        if (widget.hasEnforcedCornerRadius()) {
-            float enforcedCornerRadius = widget.getEnforcedCornerRadius();
-            ImageView imageView = frame.findViewById(R.id.widget_resize_frame);
-            Drawable d = imageView.getDrawable();
-            if (d instanceof GradientDrawable) {
-                GradientDrawable gd = (GradientDrawable) d.mutate();
-                gd.setCornerRadius(enforcedCornerRadius);
-            }
-        }
         frame.setupForWidget(widget, cellLayout, dl);
         ((DragLayer.LayoutParams) frame.getLayoutParams()).customPosition = true;
 
         dl.addView(frame);
         frame.mIsOpen = true;
         frame.post(() -> frame.snapToWidget(false));
+    }
+
+    private void setCornerRadiusFromWidget() {
+        if (mWidgetView != null && mWidgetView.hasEnforcedCornerRadius()) {
+            float enforcedCornerRadius = mWidgetView.getEnforcedCornerRadius();
+            ImageView imageView = findViewById(R.id.widget_resize_frame);
+            Drawable d = imageView.getDrawable();
+            if (d instanceof GradientDrawable) {
+                GradientDrawable gd = (GradientDrawable) d.mutate();
+                gd.setCornerRadius(enforcedCornerRadius);
+            }
+        }
     }
 
     private void setupForWidget(LauncherAppWidgetHostView widgetView, CellLayout cellLayout,
@@ -312,6 +324,9 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
                 .log(LAUNCHER_WIDGET_RESIZE_STARTED);
 
         setOnKeyListener(this);
+
+        setCornerRadiusFromWidget();
+        mWidgetView.addOnLayoutChangeListener(mWidgetViewLayoutListener);
     }
 
     public boolean beginResizeIfPointInRegion(int x, int y) {
@@ -470,8 +485,11 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             mLastDirectionVector[1] = mDirectionVector[1];
         }
 
-        if (mCellLayout.createAreaForResize(cellX, cellY, spanX, spanY, mWidgetView,
-                mDirectionVector, onDismiss)) {
+        // We don't want to evaluate resize if a widget was pending config activity and was already
+        // occupying a space on the screen. This otherwise will cause reorder algorithm evaluate a
+        // different location for the widget and cause a jump.
+        if (!(mWidgetView instanceof PendingAppWidgetHostView) && mCellLayout.createAreaForResize(
+                cellX, cellY, spanX, spanY, mWidgetView, mDirectionVector, onDismiss)) {
             if (mStateAnnouncer != null && (lp.cellHSpan != spanX || lp.cellVSpan != spanY) ) {
                 mStateAnnouncer.announce(
                         mLauncher.getString(R.string.widget_resized, spanX, spanY));
@@ -721,6 +739,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             mWidgetView.setLayoutTransition(null);
         }
         mDragLayer.removeView(this);
+        mWidgetView.removeOnLayoutChangeListener(mWidgetViewLayoutListener);
     }
 
     private void updateInvalidResizeEffect(CellLayout cellLayout, CellLayout pairedCellLayout,

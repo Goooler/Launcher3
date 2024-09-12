@@ -29,9 +29,11 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -76,6 +78,10 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
     private final Rect mRect = new Rect();
 
+    private final Matrix mMatrix = new Matrix();
+    private final RectF mPreviewBitmapRect = new RectF();
+    private final RectF mCanvasRect = new RectF();
+
     private final LauncherWidgetHolder mWidgetHolder;
     private final LauncherAppWidgetProviderInfo mAppwidget;
     private final LauncherAppWidgetInfo mInfo;
@@ -103,9 +109,14 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
     public PendingAppWidgetHostView(Context context, LauncherWidgetHolder widgetHolder,
             LauncherAppWidgetInfo info, @Nullable LauncherAppWidgetProviderInfo appWidget) {
-        this(context, widgetHolder, info, appWidget,
-                context.getResources().getText(R.string.gadget_complete_setup_text));
+        this(context, widgetHolder, info, appWidget, null);
+    }
 
+    public PendingAppWidgetHostView(Context context, LauncherWidgetHolder widgetHolder,
+            LauncherAppWidgetInfo info, @Nullable LauncherAppWidgetProviderInfo appWidget,
+            @Nullable Bitmap previewBitmap) {
+        this(context, widgetHolder, info, appWidget,
+                context.getResources().getText(R.string.gadget_complete_setup_text), previewBitmap);
         super.updateAppWidget(null);
         setOnClickListener(mActivityContext.getItemOnClickListener());
 
@@ -123,7 +134,7 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             Context context, LauncherWidgetHolder widgetHolder,
             int appWidgetId, @NonNull LauncherAppWidgetProviderInfo appWidget) {
         this(context, widgetHolder, new LauncherAppWidgetInfo(appWidgetId, appWidget.provider),
-                appWidget, appWidget.label);
+                appWidget, appWidget.label, null);
         getBackground().mutate().setAlpha(DEFERRED_ALPHA);
 
         mCenterDrawable = new ColorDrawable(Color.TRANSPARENT);
@@ -132,8 +143,12 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         mIsDeferredWidget = true;
     }
 
-    /** Set {@link Bitmap} of widget preview. */
-    public void setPreviewBitmap(@Nullable Bitmap previewBitmap) {
+    /**
+     * Set {@link Bitmap} of widget preview and update background drawable. When showing preview
+     * bitmap, we shouldn't draw background.
+     */
+    public void setPreviewBitmapAndUpdateBackground(@Nullable Bitmap previewBitmap) {
+        setBackgroundResource(previewBitmap != null ? 0 : R.drawable.pending_widget_bg);
         if (this.mPreviewBitmap == previewBitmap) {
             return;
         }
@@ -143,7 +158,8 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
     private PendingAppWidgetHostView(Context context,
             LauncherWidgetHolder widgetHolder, LauncherAppWidgetInfo info,
-            LauncherAppWidgetProviderInfo appwidget, CharSequence label) {
+            LauncherAppWidgetProviderInfo appwidget, CharSequence label,
+            @Nullable Bitmap previewBitmap) {
         super(new ContextThemeWrapper(context, R.style.WidgetContainerTheme));
         mWidgetHolder = widgetHolder;
         mAppwidget = appwidget;
@@ -161,7 +177,7 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         mPreviewPaint = new Paint(ANTI_ALIAS_FLAG | DITHER_FLAG | FILTER_BITMAP_FLAG);
 
         setWillNotDraw(false);
-        setBackgroundResource(R.drawable.pending_widget_bg);
+        setPreviewBitmapAndUpdateBackground(previewBitmap);
     }
 
     @Override
@@ -440,7 +456,11 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
     protected void onDraw(Canvas canvas) {
         if (mPreviewBitmap != null
                 && (mInfo.restoreStatus & LauncherAppWidgetInfo.FLAG_UI_NOT_READY) != 0) {
-            canvas.drawBitmap(mPreviewBitmap, 0, 0, mPreviewPaint);
+            mPreviewBitmapRect.set(0, 0, mPreviewBitmap.getWidth(), mPreviewBitmap.getHeight());
+            mCanvasRect.set(0, 0, getWidth(), getHeight());
+
+            mMatrix.setRectToRect(mPreviewBitmapRect, mCanvasRect, Matrix.ScaleToFit.CENTER);
+            canvas.drawBitmap(mPreviewBitmap, mMatrix, mPreviewPaint);
             return;
         }
         if (mCenterDrawable == null) {
@@ -463,7 +483,6 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             mSetupTextLayout.draw(canvas);
             canvas.restore();
         }
-
     }
 
     /**

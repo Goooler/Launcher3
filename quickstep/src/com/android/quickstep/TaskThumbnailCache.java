@@ -21,11 +21,13 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import android.content.Context;
 import android.content.res.Resources;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.R;
 import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.Preconditions;
+import com.android.quickstep.task.thumbnail.data.TaskThumbnailDataSource;
 import com.android.quickstep.util.TaskKeyByLastActiveTimeCache;
 import com.android.quickstep.util.TaskKeyCache;
 import com.android.quickstep.util.TaskKeyLruCache;
@@ -38,7 +40,7 @@ import java.util.ArrayList;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class TaskThumbnailCache {
+public class TaskThumbnailCache implements TaskThumbnailDataSource {
 
     private final Executor mBgExecutor;
     private final TaskKeyCache<ThumbnailData> mCache;
@@ -148,12 +150,13 @@ public class TaskThumbnailCache {
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
-    public CancellableTask updateThumbnailInBackground(
-            Task task, Consumer<ThumbnailData> callback) {
+    @Override
+    public CancellableTask<ThumbnailData> updateThumbnailInBackground(
+            Task task, @NonNull Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 
         boolean lowResolution = !mHighResLoadingState.isEnabled();
-        if (task.thumbnail != null && task.thumbnail.thumbnail != null
+        if (task.thumbnail != null && task.thumbnail.getThumbnail() != null
                 && (!task.thumbnail.reducedResolution || lowResolution)) {
             // Nothing to load, the thumbnail is already high-resolution or matches what the
             // request, so just callback
@@ -184,12 +187,12 @@ public class TaskThumbnailCache {
         return newSize > oldSize;
     }
 
-    private CancellableTask updateThumbnailInBackground(TaskKey key, boolean lowResolution,
-            Consumer<ThumbnailData> callback) {
+    private CancellableTask<ThumbnailData> updateThumbnailInBackground(TaskKey key,
+            boolean lowResolution, Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 
         ThumbnailData cachedThumbnail = mCache.getAndInvalidateIfModified(key);
-        if (cachedThumbnail != null &&  cachedThumbnail.thumbnail != null
+        if (cachedThumbnail != null &&  cachedThumbnail.getThumbnail() != null
                 && (!cachedThumbnail.reducedResolution || lowResolution)) {
             // Already cached, lets use that thumbnail
             callback.accept(cachedThumbnail);
@@ -200,7 +203,7 @@ public class TaskThumbnailCache {
                 () -> {
                     ThumbnailData thumbnailData = ActivityManagerWrapper.getInstance()
                             .getTaskThumbnail(key.id, lowResolution);
-                    return thumbnailData.thumbnail != null ? thumbnailData
+                    return thumbnailData.getThumbnail() != null ? thumbnailData
                             : ActivityManagerWrapper.getInstance().takeTaskThumbnail(key.id);
                 },
                 MAIN_EXECUTOR,
@@ -210,7 +213,7 @@ public class TaskThumbnailCache {
                     if (enableGridOnlyOverview() && result.reducedResolution
                             && getHighResLoadingState().isEnabled()) {
                         ThumbnailData newCachedThumbnail = mCache.getAndInvalidateIfModified(key);
-                        if (newCachedThumbnail != null && newCachedThumbnail.thumbnail != null
+                        if (newCachedThumbnail != null && newCachedThumbnail.getThumbnail() != null
                                 && !newCachedThumbnail.reducedResolution) {
                             return;
                         }

@@ -36,9 +36,9 @@ import androidx.annotation.NonNull;
 
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherModel.ModelUpdateTask;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.logging.FileLog;
@@ -48,7 +48,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutRequest;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.FlagOp;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -71,11 +71,11 @@ import java.util.stream.Collectors;
  * or when a user availability changes.
  */
 @SuppressWarnings("NewApi")
-public class PackageUpdatedTask extends BaseModelUpdateTask {
+public class PackageUpdatedTask implements ModelUpdateTask {
 
     // TODO(b/290090023): Set to false after root causing is done.
-    private static final boolean DEBUG = true;
     private static final String TAG = "PackageUpdatedTask";
+    private static final boolean DEBUG = true;
 
     public static final int OP_NONE = 0;
     public static final int OP_ADD = 1;
@@ -102,8 +102,9 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
     }
 
     @Override
-    public void execute(@NonNull final LauncherAppState app, @NonNull final BgDataModel dataModel,
-            @NonNull final AllAppsList appsList) {
+    public void execute(@NonNull ModelTaskController taskController, @NonNull BgDataModel dataModel,
+            @NonNull AllAppsList appsList) {
+        final LauncherAppState app = taskController.getApp();
         final Context context = app.getContext();
         final IconCache iconCache = app.getIconCache();
 
@@ -116,29 +117,39 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                 : ItemInfoMatcher.ofPackages(packageSet, mUser);
         final HashSet<ComponentName> removedComponents = new HashSet<>();
         final HashMap<String, List<LauncherActivityInfo>> activitiesLists = new HashMap<>();
-
+        if (DEBUG) {
+            Log.d(TAG, "Package updated: mOp=" + getOpString()
+                    + " packages=" + Arrays.toString(packages));
+        }
         switch (mOp) {
             case OP_ADD: {
                 for (int i = 0; i < N; i++) {
-                    if (DEBUG) Log.d(TAG, "mAllAppsList.addPackage " + packages[i]);
                     iconCache.updateIconsForPkg(packages[i], mUser);
                     if (FeatureFlags.PROMISE_APPS_IN_ALL_APPS.get()) {
+                        if (DEBUG) {
+                            Log.d(TAG, "OP_ADD: PROMISE_APPS_IN_ALL_APPS enabled:"
+                                    + " removing promise icon apps from package=" + packages[i]);
+                        }
                         appsList.removePackage(packages[i], mUser);
                     }
-                    activitiesLists.put(
-                            packages[i], appsList.addPackage(context, packages[i], mUser));
+                    activitiesLists.put(packages[i],
+                            appsList.addPackage(context, packages[i], mUser));
                 }
                 flagOp = FlagOp.NO_OP.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
                 break;
             }
             case OP_UPDATE:
-                try (SafeCloseable t =
-                             appsList.trackRemoves(a -> removedComponents.add(a.componentName))) {
+                try (SafeCloseable t = appsList.trackRemoves(a -> {
+                    Log.d(TAG, "OP_UPDATE - AllAppsList.trackRemoves callback:"
+                            + " removed component=" + a.componentName
+                            + " id=" + a.id
+                            + " Look for earlier AllAppsList logs to find more information.");
+                    removedComponents.add(a.componentName);
+                })) {
                     for (int i = 0; i < N; i++) {
-                        if (DEBUG) Log.d(TAG, "mAllAppsList.updatePackage " + packages[i]);
                         iconCache.updateIconsForPkg(packages[i], mUser);
-                        activitiesLists.put(
-                                packages[i], appsList.updatePackage(context, packages[i], mUser));
+                        activitiesLists.put(packages[i],
+                                appsList.updatePackage(context, packages[i], mUser));
                     }
                 }
                 // Since package was just updated, the target must be available now.
@@ -146,14 +157,15 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                 break;
             case OP_REMOVE: {
                 for (int i = 0; i < N; i++) {
-                    FileLog.d(TAG, "Removing app icon: " + packages[i]);
                     iconCache.removeIconsForPkg(packages[i], mUser);
                 }
                 // Fall through
             }
             case OP_UNAVAILABLE:
                 for (int i = 0; i < N; i++) {
-                    if (DEBUG) Log.d(TAG, "mAllAppsList.removePackage " + packages[i]);
+                    if (DEBUG) {
+                        Log.d(TAG, getOpString() + ": removing package=" + packages[i]);
+                    }
                     appsList.removePackage(packages[i], mUser);
                 }
                 flagOp = FlagOp.NO_OP.addFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
@@ -162,7 +174,6 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
             case OP_UNSUSPEND:
                 flagOp = FlagOp.NO_OP.setFlag(
                         WorkspaceItemInfo.FLAG_DISABLED_SUSPENDED, mOp == OP_SUSPEND);
-                if (DEBUG) Log.d(TAG, "mAllAppsList.(un)suspend " + N);
                 appsList.updateDisabledFlags(matcher, flagOp);
                 break;
             case OP_USER_AVAILABILITY_CHANGE: {
@@ -192,7 +203,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                 break;
         }
 
-        bindApplicationsIfNeeded();
+        taskController.bindApplicationsIfNeeded();
 
         final IntSet removedShortcuts = new IntSet();
         // Shortcuts to keep even if the corresponding app was removed
@@ -233,7 +244,16 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                                                 .query(ShortcutRequest.PINNED);
                                 if (shortcut.isEmpty()) {
                                     isTargetValid = false;
+                                    if (DEBUG) {
+                                        Log.d(TAG, "Pinned Shortcut not found for updated"
+                                                + " package=" + si.getTargetPackage());
+                                    }
                                 } else {
+                                    if (DEBUG) {
+                                        Log.d(TAG, "Found pinned shortcut for updated"
+                                                + " package=" + si.getTargetPackage()
+                                                + ", isTargetValid=" + isTargetValid);
+                                    }
                                     si.updateFromDeepShortcutInfo(shortcut.get(0), context);
                                     infoUpdated = true;
                                 }
@@ -241,6 +261,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                                 isTargetValid = context.getSystemService(LauncherApps.class)
                                         .isActivityEnabled(cn, mUser);
                             }
+
                             if (!isTargetValid && (si.hasStatusFlag(
                                     FLAG_RESTORED_ICON | FLAG_AUTOINSTALL_ICON)
                                     || si.isArchived())) {
@@ -248,12 +269,25 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                                     infoUpdated = true;
                                 } else if (si.hasPromiseIconUi()) {
                                     removedShortcuts.add(si.id);
+                                    if (DEBUG) {
+                                        FileLog.w(TAG, "Removing restored shortcut promise icon"
+                                                + " that no longer points to valid component."
+                                                + " id=" + si.id
+                                                + ", package=" + si.getTargetPackage()
+                                                + ", status=" + si.status
+                                                + ", isArchived=" + si.isArchived());
+                                    }
                                     return;
                                 }
                             } else if (!isTargetValid) {
                                 removedShortcuts.add(si.id);
-                                FileLog.e(TAG, "Restored shortcut no longer valid "
-                                        + si.getIntent());
+                                if (DEBUG) {
+                                    FileLog.w(TAG, "Removing shortcut that no longer points to"
+                                            + " valid component."
+                                            + " id=" + si.id
+                                            + " package=" + si.getTargetPackage()
+                                            + " status=" + si.status);
+                                }
                                 return;
                             } else {
                                 si.status = WorkspaceItemInfo.DEFAULT;
@@ -268,6 +302,8 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                         if (isNewApkAvailable) {
                             List<LauncherActivityInfo> activities = activitiesLists.get(
                                     packageName);
+                            // TODO: See if we can migrate this to
+                            //  AppInfo#updateRuntimeFlagsForActivityTarget
                             si.setProgressLevel(
                                     activities == null || activities.isEmpty()
                                             ? 100
@@ -286,10 +322,8 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                             }
                             if (si.itemType == Favorites.ITEM_TYPE_APPLICATION) {
                                 if (activities != null && !activities.isEmpty()) {
-                                    si.status = ApiWrapper
-                                            .isNonResizeableActivity(activities.get(0))
-                                            ? si.status | WorkspaceItemInfo.FLAG_NON_RESIZEABLE
-                                            : si.status & ~WorkspaceItemInfo.FLAG_NON_RESIZEABLE;
+                                    si.setNonResizeable(ApiWrapper.INSTANCE.get(context)
+                                            .isNonResizeableActivity(activities.get(0)));
                                 }
                                 iconCache.getTitleAndIcon(si, si.usingLowResIcon());
                                 infoUpdated = true;
@@ -307,7 +341,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                         updatedWorkspaceItems.add(si);
                     }
                     if (infoUpdated && si.id != ItemInfo.NO_ID) {
-                        getModelWriter().updateItemInDatabase(si);
+                        taskController.getModelWriter().updateItemInDatabase(si);
                     }
                 });
 
@@ -326,20 +360,21 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                         widgetInfo.restoreStatus |= LauncherAppWidgetInfo.FLAG_UI_NOT_READY;
 
                         widgets.add(widgetInfo);
-                        getModelWriter().updateItemInDatabase(widgetInfo);
+                        taskController.getModelWriter().updateItemInDatabase(widgetInfo);
                     }
                 }
             }
 
-            bindUpdatedWorkspaceItems(updatedWorkspaceItems);
+            taskController.bindUpdatedWorkspaceItems(updatedWorkspaceItems);
             if (!removedShortcuts.isEmpty()) {
-                deleteAndBindComponentsRemoved(
+                taskController.deleteAndBindComponentsRemoved(
                         ItemInfoMatcher.ofItemIds(removedShortcuts),
-                        "removed because the target component is invalid");
+                        "removing shortcuts with invalid target components."
+                                + " ids=" + removedShortcuts);
             }
 
             if (!widgets.isEmpty()) {
-                scheduleCallbackTask(c -> c.bindWidgetsRestored(widgets));
+                taskController.scheduleCallbackTask(c -> c.bindWidgetsRestored(widgets));
             }
         }
 
@@ -347,6 +382,9 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
         if (mOp == OP_REMOVE) {
             // Mark all packages in the broadcast to be removed
             Collections.addAll(removedPackages, packages);
+            if (DEBUG) {
+                Log.d(TAG, "OP_REMOVE: removing packages=" + Arrays.toString(packages));
+            }
 
             // No need to update the removedComponents as
             // removedPackages is a super-set of removedComponents
@@ -355,6 +393,10 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
             final LauncherApps launcherApps = context.getSystemService(LauncherApps.class);
             for (int i=0; i<N; i++) {
                 if (!launcherApps.isPackageEnabled(packages[i], mUser)) {
+                    if (DEBUG) {
+                        Log.d(TAG, "OP_UPDATE:"
+                                + " package " + packages[i] + " is disabled, removing package.");
+                    }
                     removedPackages.add(packages[i]);
                 }
             }
@@ -365,7 +407,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                     ItemInfoMatcher.ofPackages(removedPackages, mUser)
                             .or(ItemInfoMatcher.ofComponents(removedComponents, mUser))
                             .and(ItemInfoMatcher.ofItemIds(forceKeepShortcuts).negate());
-            deleteAndBindComponentsRemoved(removeMatch,
+            taskController.deleteAndBindComponentsRemoved(removeMatch,
                     "removed because the corresponding package or component is removed. "
                             + "mOp=" + mOp + " removedPackages=" + removedPackages.stream().collect(
                                     Collectors.joining(",", "[", "]"))
@@ -384,7 +426,7 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
             for (int i = 0; i < N; i++) {
                 dataModel.widgetsModel.update(app, new PackageUserKey(packages[i], mUser));
             }
-            bindUpdatedWidgets(dataModel);
+            taskController.bindUpdatedWidgets(dataModel);
         }
     }
 
@@ -400,12 +442,27 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
             return false;
         }
         // Try to find the best match activity.
-        Intent intent = new PackageManagerHelper(context).getAppLaunchIntent(packageName, mUser);
+        Intent intent = PackageManagerHelper.INSTANCE.get(context)
+                .getAppLaunchIntent(packageName, mUser);
         if (intent != null) {
             si.intent = intent;
             si.status = WorkspaceItemInfo.DEFAULT;
             return true;
         }
         return false;
+    }
+
+    private String getOpString() {
+        return switch (mOp) {
+            case OP_NONE -> "NONE";
+            case OP_ADD -> "ADD";
+            case OP_UPDATE -> "UPDATE";
+            case OP_REMOVE -> "REMOVE";
+            case OP_UNAVAILABLE -> "UNAVAILABLE";
+            case OP_SUSPEND -> "SUSPEND";
+            case OP_UNSUSPEND -> "UNSUSPEND";
+            case OP_USER_AVAILABILITY_CHANGE -> "USER_AVAILABILITY_CHANGE";
+            default -> "UNKNOWN";
+        };
     }
 }

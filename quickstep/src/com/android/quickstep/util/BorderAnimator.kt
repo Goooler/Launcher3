@@ -50,7 +50,7 @@ private constructor(
     private val disappearanceDurationMs: Long,
     private val interpolator: Interpolator,
 ) {
-    private val borderAnimationProgress = AnimatedFloat { updateOutline() }
+    private val borderAnimationProgress = AnimatedFloat { _ -> updateOutline() }
     private val borderPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = borderColor
@@ -86,7 +86,7 @@ private constructor(
         fun createSimpleBorderAnimator(
             @Px borderRadiusPx: Int,
             @Px borderWidthPx: Int,
-            boundsBuilder: (rect: Rect?) -> Unit,
+            boundsBuilder: (Rect) -> Unit,
             targetView: View,
             @ColorInt borderColor: Int = DEFAULT_BORDER_COLOR,
             appearanceDurationMs: Long = DEFAULT_APPEARANCE_ANIMATION_DURATION_MS,
@@ -224,6 +224,7 @@ private constructor(
 
         val borderWidth: Float
             get() = borderWidthPx * animationProgress
+
         val alignmentAdjustment: Float
             // Outset the border by half the width to create an outwards-growth animation
             get() = -borderWidth / 2f + alignmentAdjustmentInset
@@ -250,7 +251,7 @@ private constructor(
     /** BorderAnimationParams that simply draws the border outside the bounds of the target view. */
     private class SimpleParams(
         @Px borderWidthPx: Int,
-        boundsBuilder: (rect: Rect?) -> Unit,
+        boundsBuilder: (Rect) -> Unit,
         targetView: View,
     ) : BorderAnimationParams(borderWidthPx, boundsBuilder, targetView) {
         override val alignmentAdjustmentInset = 0

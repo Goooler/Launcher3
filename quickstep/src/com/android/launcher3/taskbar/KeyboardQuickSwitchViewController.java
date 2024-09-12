@@ -32,6 +32,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.SlideInRemoteTransition;
 import com.android.systemui.shared.recents.model.Task;
@@ -94,8 +95,12 @@ public class KeyboardQuickSwitchViewController {
                 mViewCallbacks);
     }
 
+    boolean isCloseAnimationRunning() {
+        return mCloseAnimation != null;
+    }
+
     protected void closeQuickSwitchView(boolean animate) {
-        if (mCloseAnimation != null) {
+        if (isCloseAnimationRunning()) {
             // Let currently-running animation finish.
             if (!animate) {
                 mCloseAnimation.end();
@@ -130,7 +135,7 @@ public class KeyboardQuickSwitchViewController {
     }
 
     private int launchTaskAt(int index) {
-        if (mCloseAnimation != null) {
+        if (isCloseAnimationRunning()) {
             // Ignore taps on task views and alt key unpresses while the close animation is running.
             return -1;
         }
@@ -138,7 +143,7 @@ public class KeyboardQuickSwitchViewController {
         // views have been added in the KeyboardQuickSwitchView.
         GroupTask task = mControllerCallbacks.getTaskAt(index);
         if (task == null) {
-            return Math.max(0, index);
+            return mOnDesktop ? 1 : Math.max(0, index);
         }
         if (mControllerCallbacks.isTaskRunning(task)) {
             // Ignore attempts to run the selected task if it is already running.
@@ -153,7 +158,13 @@ public class KeyboardQuickSwitchViewController {
                 AnimationUtils.loadInterpolator(
                         context, android.R.interpolator.fast_out_extra_slow_in)),
                 "SlideInTransition");
-        if (mOnDesktop) {
+        if (task instanceof DesktopTask) {
+            UI_HELPER_EXECUTOR.execute(() ->
+                    SystemUiProxy.INSTANCE.get(mKeyboardQuickSwitchView.getContext())
+                            .showDesktopApps(
+                                    mKeyboardQuickSwitchView.getDisplay().getDisplayId(),
+                                    remoteTransition));
+        } else if (mOnDesktop) {
             UI_HELPER_EXECUTOR.execute(() ->
                     SystemUiProxy.INSTANCE.get(mKeyboardQuickSwitchView.getContext())
                             .showDesktopApp(task.task1.key.id));
@@ -186,7 +197,7 @@ public class KeyboardQuickSwitchViewController {
         pw.println(prefix + "KeyboardQuickSwitchViewController:");
 
         pw.println(prefix + "\thasFocus=" + mKeyboardQuickSwitchView.hasFocus());
-        pw.println(prefix + "\tcloseAnimationRunning=" + (mCloseAnimation != null));
+        pw.println(prefix + "\tisCloseAnimationRunning=" + isCloseAnimationRunning());
         pw.println(prefix + "\tmCurrentFocusIndex=" + mCurrentFocusIndex);
     }
 
@@ -239,8 +250,7 @@ public class KeyboardQuickSwitchViewController {
         }
 
         void launchTaskAt(int index) {
-            mCurrentFocusIndex = Utilities.boundToRange(
-                    index, 0, mKeyboardQuickSwitchView.getChildCount() - 1);
+            mCurrentFocusIndex = index;
             mControllers.taskbarActivityContext.launchKeyboardFocusedTask();
         }
 

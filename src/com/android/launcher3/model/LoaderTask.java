@@ -18,11 +18,11 @@ package com.android.launcher3.model;
 
 import static com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN;
 import static com.android.launcher3.Flags.enableLauncherBrMetricsFixed;
+import static com.android.launcher3.Flags.enableSmartspaceAsAWidget;
+import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
 import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
 import static com.android.launcher3.LauncherPrefs.SHOULD_SHOW_SMARTSPACE;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_SMARTSPACE_REMOVAL;
-import static com.android.launcher3.config.FeatureFlags.SMARTSPACE_AS_A_WIDGET;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
@@ -47,6 +47,7 @@ import android.os.Bundle;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.LongSparseArray;
@@ -89,6 +90,7 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.shortcuts.ShortcutRequest.QueryResult;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IOUtils;
 import com.android.launcher3.util.IntArray;
@@ -132,11 +134,12 @@ public class LoaderTask implements Runnable {
     private FirstScreenBroadcast mFirstScreenBroadcast;
 
     @NonNull
-    private final LauncherBinder mLauncherBinder;
+    private final BaseLauncherBinder mLauncherBinder;
 
     private final LauncherApps mLauncherApps;
     private final UserManager mUserManager;
     private final UserCache mUserCache;
+    private final PackageManagerHelper mPmHelper;
 
     private final InstallSessionHelper mSessionHelper;
     private final IconCache mIconCache;
@@ -153,13 +156,13 @@ public class LoaderTask implements Runnable {
     private String mDbName;
 
     public LoaderTask(@NonNull LauncherAppState app, AllAppsList bgAllAppsList, BgDataModel bgModel,
-            ModelDelegate modelDelegate, @NonNull LauncherBinder launcherBinder) {
+            ModelDelegate modelDelegate, @NonNull BaseLauncherBinder launcherBinder) {
         this(app, bgAllAppsList, bgModel, modelDelegate, launcherBinder, new UserManagerState());
     }
 
     @VisibleForTesting
     LoaderTask(@NonNull LauncherAppState app, AllAppsList bgAllAppsList, BgDataModel bgModel,
-            ModelDelegate modelDelegate, @NonNull LauncherBinder launcherBinder,
+            ModelDelegate modelDelegate, @NonNull BaseLauncherBinder launcherBinder,
             UserManagerState userManagerState) {
         mApp = app;
         mBgAllAppsList = bgAllAppsList;
@@ -169,6 +172,7 @@ public class LoaderTask implements Runnable {
         mLauncherApps = mApp.getContext().getSystemService(LauncherApps.class);
         mUserManager = mApp.getContext().getSystemService(UserManager.class);
         mUserCache = UserCache.INSTANCE.get(mApp.getContext());
+        mPmHelper = PackageManagerHelper.INSTANCE.get(mApp.getContext());
         mSessionHelper = InstallSessionHelper.INSTANCE.get(mApp.getContext());
         mIconCache = mApp.getIconCache();
         mUserManagerState = userManagerState;
@@ -192,17 +196,32 @@ public class LoaderTask implements Runnable {
     }
 
     private void sendFirstScreenActiveInstallsBroadcast() {
-        ArrayList<ItemInfo> firstScreenItems = new ArrayList<>();
-        ArrayList<ItemInfo> allItems = mBgDataModel.getAllWorkspaceItems();
-
         // Screen set is never empty
         IntArray allScreens = mBgDataModel.collectWorkspaceScreens();
         final int firstScreen = allScreens.get(0);
         IntSet firstScreens = IntSet.wrap(firstScreen);
 
+        ArrayList<ItemInfo> allItems = mBgDataModel.getAllWorkspaceItems();
+        ArrayList<ItemInfo> firstScreenItems = new ArrayList<>();
         filterCurrentWorkspaceItems(firstScreens, allItems, firstScreenItems,
                 new ArrayList<>() /* otherScreenItems are ignored */);
-        mFirstScreenBroadcast.sendBroadcasts(mApp.getContext(), firstScreenItems);
+        final int launcherBroadcastInstalledApps = Settings.Secure.getInt(
+                mApp.getContext().getContentResolver(),
+                "launcher_broadcast_installed_apps",
+                /* def= */ 0);
+        if (launcherBroadcastInstalledApps == 1 && mIsRestoreFromBackup) {
+            List<FirstScreenBroadcastModel> broadcastModels =
+                    FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
+                            mPmHelper,
+                            firstScreenItems,
+                            mInstallingPkgsCached,
+                            mBgDataModel.appWidgets
+                    );
+            logASplit("Sending first screen broadcast with additional archiving Extras");
+            FirstScreenBroadcastHelper.sendBroadcastsForModels(mApp.getContext(), broadcastModels);
+        } else {
+            mFirstScreenBroadcast.sendBroadcasts(mApp.getContext(), firstScreenItems);
+        }
     }
 
     public void run() {
@@ -246,7 +265,7 @@ public class LoaderTask implements Runnable {
             mModelDelegate.workspaceLoadComplete();
             // Notify the installer packages of packages with active installs on the first screen.
             sendFirstScreenActiveInstallsBroadcast();
-            logASplit("sendFirstScreenActiveInstallsBroadcast");
+            logASplit("sendFirstScreenBroadcast");
 
             // Take a break
             waitForIdle();
@@ -319,13 +338,13 @@ public class LoaderTask implements Runnable {
             verifyNotStopped();
             LauncherPrefs prefs = LauncherPrefs.get(mApp.getContext());
 
-            if (SMARTSPACE_AS_A_WIDGET.get() && prefs.get(SHOULD_SHOW_SMARTSPACE)) {
+            if (enableSmartspaceAsAWidget() && prefs.get(SHOULD_SHOW_SMARTSPACE)) {
                 mLauncherBinder.bindSmartspaceWidget();
                 // Turn off pref.
                 prefs.putSync(SHOULD_SHOW_SMARTSPACE.to(false));
                 logASplit("bindSmartspaceWidget");
                 verifyNotStopped();
-            } else if (!SMARTSPACE_AS_A_WIDGET.get() && WIDGET_ON_FIRST_SCREEN
+            } else if (!enableSmartspaceAsAWidget() && WIDGET_ON_FIRST_SCREEN
                     && !prefs.get(LauncherPrefs.SHOULD_SHOW_SMARTSPACE)) {
                 // Turn on pref.
                 prefs.putSync(SHOULD_SHOW_SMARTSPACE.to(true));
@@ -396,7 +415,7 @@ public class LoaderTask implements Runnable {
             logASplit("workspaceDelegateItems");
         }
         mBgDataModel.isFirstPagePinnedItemEnabled = FeatureFlags.QSB_ON_FIRST_SCREEN
-                && (!ENABLE_SMARTSPACE_REMOVAL.get() || LauncherPrefs.getPrefs(
+                && (!enableSmartspaceRemovalToggle() || LauncherPrefs.getPrefs(
                 mApp.getContext()).getBoolean(SMARTSPACE_ON_HOME_SCREEN, true));
     }
 
@@ -406,7 +425,6 @@ public class LoaderTask implements Runnable {
             @Nullable LoaderMemoryLogger memoryLogger,
             @Nullable LauncherRestoreEventLogger restoreEventLogger) {
         final Context context = mApp.getContext();
-        final PackageManagerHelper pmHelper = new PackageManagerHelper(context);
         final boolean isSdCardReady = Utilities.isBootCompleted();
         final WidgetInflater widgetInflater = new WidgetInflater(context);
 
@@ -433,7 +451,8 @@ public class LoaderTask implements Runnable {
             mShortcutKeyToPinnedShortcuts = new HashMap<>();
             final LoaderCursor c = new LoaderCursor(
                     dbController.query(TABLE_NAME, null, selection, null, null),
-                    mApp, mUserManagerState, mIsRestoreFromBackup ? restoreEventLogger : null);
+                    mApp, mUserManagerState, mPmHelper,
+                    mIsRestoreFromBackup ? restoreEventLogger : null);
             final Bundle extras = c.getExtras();
             mDbName = extras == null ? null : extras.getString(ModelDbController.EXTRA_DB_NAME);
             try {
@@ -443,10 +462,10 @@ public class LoaderTask implements Runnable {
                 List<IconRequestInfo<WorkspaceItemInfo>> iconRequestInfos = new ArrayList<>();
 
                 WorkspaceItemProcessor itemProcessor = new WorkspaceItemProcessor(c, memoryLogger,
-                        mUserManagerState, mLauncherApps, mPendingPackages,
+                        mUserCache, mUserManagerState, mLauncherApps, mPendingPackages,
                         mShortcutKeyToPinnedShortcuts, mApp, mBgDataModel,
                         mWidgetProvidersMap, installingPkgs, isSdCardReady,
-                        widgetInflater, pmHelper, iconRequestInfos, unlockedUsers,
+                        widgetInflater, mPmHelper, iconRequestInfos, unlockedUsers,
                         allDeepShortcuts);
 
                 while (!mStopped && c.moveToNext()) {
@@ -694,7 +713,8 @@ public class LoaderTask implements Runnable {
             // Create the ApplicationInfos
             for (int i = 0; i < apps.size(); i++) {
                 LauncherActivityInfo app = apps.get(i);
-                AppInfo appInfo = new AppInfo(app, mUserCache.getUserInfo(user), quietMode);
+                AppInfo appInfo = new AppInfo(app, mUserCache.getUserInfo(user),
+                        ApiWrapper.INSTANCE.get(mApp.getContext()), mPmHelper, quietMode);
                 if (Flags.enableSupportForArchiving() && app.getApplicationInfo().isArchived) {
                     // For archived apps, include progress info in case there is a pending
                     // install session post restart of device.

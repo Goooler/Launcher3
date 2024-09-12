@@ -20,6 +20,7 @@ import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
+import static com.android.launcher3.util.DisplayController.CHANGE_DESKTOP_MODE;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
 import static com.android.launcher3.util.DisplayController.CHANGE_TASKBAR_PINNING;
@@ -59,6 +60,7 @@ import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Partner;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.WindowManagerProxy;
 
@@ -75,7 +77,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class InvariantDeviceProfile {
+public class InvariantDeviceProfile implements SafeCloseable {
 
     public static final String TAG = "IDP";
     // We do not need any synchronization for this variable as its only written on UI thread.
@@ -229,14 +231,14 @@ public class InvariantDeviceProfile {
         if (!newGridName.equals(gridName)) {
             LauncherPrefs.get(context).put(GRID_NAME, newGridName);
         }
-        LockedUserState.get(context).runOnUserUnlocked(() -> {
-            new DeviceGridState(this).writeToPrefs(context);
-        });
+        LockedUserState.get(context).runOnUserUnlocked(() ->
+            new DeviceGridState(this).writeToPrefs(context));
 
         DisplayController.INSTANCE.get(context).setPriorityListener(
                 (displayContext, info, flags) -> {
                     if ((flags & (CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS
-                            | CHANGE_NAVIGATION_MODE | CHANGE_TASKBAR_PINNING)) != 0) {
+                            | CHANGE_NAVIGATION_MODE | CHANGE_TASKBAR_PINNING
+                            | CHANGE_DESKTOP_MODE)) != 0) {
                         onConfigChanged(displayContext);
                     }
                 });
@@ -262,7 +264,7 @@ public class InvariantDeviceProfile {
 
         // Get the display info based on default display and interpolate it to existing display
         Info defaultInfo = DisplayController.INSTANCE.get(context).getInfo();
-        @DeviceType int defaultDeviceType = getDeviceType(defaultInfo);
+        @DeviceType int defaultDeviceType = defaultInfo.getDeviceType();
         DisplayOption defaultDisplayOption = invDistWeightedInterpolate(
                 defaultInfo,
                 getPredefinedDeviceProfiles(context, gridName, defaultDeviceType,
@@ -271,7 +273,7 @@ public class InvariantDeviceProfile {
 
         Context displayContext = context.createDisplayContext(display);
         Info myInfo = new Info(displayContext);
-        @DeviceType int deviceType = getDeviceType(myInfo);
+        @DeviceType int deviceType = myInfo.getDeviceType();
         DisplayOption myDisplayOption = invDistWeightedInterpolate(
                 myInfo,
                 getPredefinedDeviceProfiles(context, gridName, deviceType,
@@ -293,6 +295,11 @@ public class InvariantDeviceProfile {
                 COUNT_SIZES);
 
         initGrid(context, myInfo, result, deviceType);
+    }
+
+    @Override
+    public void close() {
+        DisplayController.INSTANCE.executeIfCreated(dc -> dc.setPriorityListener(null));
     }
 
     /**
@@ -324,30 +331,13 @@ public class InvariantDeviceProfile {
         }
     }
 
-    private static @DeviceType int getDeviceType(Info displayInfo) {
-        int flagPhone = 1 << 0;
-        int flagTablet = 1 << 1;
-
-        int type = displayInfo.supportedBounds.stream()
-                .mapToInt(bounds -> displayInfo.isTablet(bounds) ? flagTablet : flagPhone)
-                .reduce(0, (a, b) -> a | b);
-        if (type == (flagPhone | flagTablet)) {
-            // device has profiles supporting both phone and table modes
-            return TYPE_MULTI_DISPLAY;
-        } else if (type == flagTablet) {
-            return TYPE_TABLET;
-        } else {
-            return TYPE_PHONE;
-        }
-    }
-
     public static String getCurrentGridName(Context context) {
         return LauncherPrefs.get(context).get(GRID_NAME);
     }
 
     private String initGrid(Context context, String gridName) {
         Info displayInfo = DisplayController.INSTANCE.get(context).getInfo();
-        @DeviceType int deviceType = getDeviceType(displayInfo);
+        @DeviceType int deviceType = displayInfo.getDeviceType();
 
         ArrayList<DisplayOption> allOptions =
                 getPredefinedDeviceProfiles(context, gridName, deviceType,

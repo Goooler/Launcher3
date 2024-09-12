@@ -39,6 +39,7 @@ import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.NavigationMode;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.TaskStackChangeListener;
@@ -50,7 +51,7 @@ import java.util.ArrayList;
 /**
  * Helper class for transforming touch events
  */
-public class RotationTouchHelper implements DisplayInfoChangeListener {
+public class RotationTouchHelper implements DisplayInfoChangeListener, SafeCloseable {
 
     public static final MainThreadInitializedObject<RotationTouchHelper> INSTANCE =
             new MainThreadInitializedObject<>(RotationTouchHelper::new);
@@ -156,7 +157,7 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
         // Register for navigation mode changes
         mDisplayController.addChangeListener(this);
         DisplayController.Info info = mDisplayController.getInfo();
-        onDisplayInfoChangedInternal(info, CHANGE_ALL, info.navigationMode.hasGestures);
+        onDisplayInfoChangedInternal(info, CHANGE_ALL, info.getNavigationMode().hasGestures);
         runOnDestroy(() -> mDisplayController.removeChangeListener(this));
 
         mOrientationListener = new OrientationEventListener(mContext) {
@@ -195,6 +196,11 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
 
     private void runOnDestroy(Runnable action) {
         mOnDestroyActions.add(action);
+    }
+
+    @Override
+    public void close() {
+        destroy();
     }
 
     /**
@@ -285,7 +291,7 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
         }
 
         if ((flags & CHANGE_NAVIGATION_MODE) != 0) {
-            NavigationMode newMode = info.navigationMode;
+            NavigationMode newMode = info.getNavigationMode();
             mOrientationTouchTransformer.setNavigationMode(newMode, mDisplayController.getInfo(),
                     mContext.getResources());
 
@@ -345,14 +351,14 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
     }
 
     void onEndTargetCalculated(GestureState.GestureEndTarget endTarget,
-            BaseActivityInterface activityInterface) {
+            BaseContainerInterface containerInterface) {
         if (endTarget == GestureState.GestureEndTarget.RECENTS) {
             mInOverview = true;
             if (!mTaskListFrozen) {
                 // If we're in landscape w/o ever quickswitching, show the navbar in landscape
                 enableMultipleRegions(true);
             }
-            activityInterface.onExitOverview(this, mExitOverviewRunnable);
+            containerInterface.onExitOverview(this, mExitOverviewRunnable);
         } else if (endTarget == GestureState.GestureEndTarget.HOME
                 || endTarget == GestureState.GestureEndTarget.ALL_APPS) {
             enableMultipleRegions(false);

@@ -59,7 +59,7 @@ import java.util.UUID;
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class TaplRequestPinItemTest extends AbstractLauncherUiTest {
+public class TaplRequestPinItemTest extends AbstractLauncherUiTest<Launcher> {
 
     @Rule
     public ShellCommandRule mGrantWidgetRule = ShellCommandRule.grantWidgetBind();
@@ -128,7 +128,7 @@ public class TaplRequestPinItemTest extends AbstractLauncherUiTest {
 
     private void runTest(String activityMethod, boolean isWidget, ItemOperator itemMatcher,
             Intent... commandIntents) throws Throwable {
-        new FavoriteItemsTransaction(mTargetContext).commitAndLoadHome(mLauncher);
+        commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
 
         // Open Pin item activity
         BlockingBroadcastReceiver openMonitor = new BlockingBroadcastReceiver(

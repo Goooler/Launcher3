@@ -511,7 +511,7 @@ public class HotseatPredictionController implements DragController.DragListener,
 
         @Override
         public void onClick(View view) {
-            dismissTaskMenuView(mTarget);
+            dismissTaskMenuView();
             pinPrediction(mItemInfo);
         }
     }
@@ -533,7 +533,7 @@ public class HotseatPredictionController implements DragController.DragListener,
     }
 
     public void dump(String prefix, PrintWriter writer) {
-        writer.println(prefix + this.getClass().getSimpleName());
+        writer.println(prefix + "HotseatPredictionController");
         writer.println(prefix + "\tFlags: " + getStateString(mPauseFlags));
         writer.println(prefix + "\tmHotSeatItemsCount: " + mHotSeatItemsCount);
         writer.println(prefix + "\tmPredictedItems: " + mPredictedItems);

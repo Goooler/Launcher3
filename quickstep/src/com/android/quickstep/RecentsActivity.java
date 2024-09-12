@@ -27,7 +27,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
+import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -57,6 +57,7 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAnimationRunner;
 import com.android.launcher3.LauncherAnimationRunner.AnimationResult;
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory;
+import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
@@ -85,6 +86,7 @@ import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 
 import java.io.FileDescriptor;
@@ -95,7 +97,8 @@ import java.util.List;
  * A recents activity that shows the recently launched tasks as swipable task cards.
  * See {@link com.android.quickstep.views.RecentsView}.
  */
-public final class RecentsActivity extends StatefulActivity<RecentsState> {
+public final class RecentsActivity extends StatefulActivity<RecentsState> implements
+        RecentsViewContainer {
     private static final String TAG = "RecentsActivity";
 
     public static final ActivityTracker<RecentsActivity> ACTIVITY_TRACKER =
@@ -109,11 +112,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     private RecentsDragLayer mDragLayer;
     private ScrimView mScrimView;
     private FallbackRecentsView mFallbackRecentsView;
-    private OverviewActionsView mActionsView;
+    private OverviewActionsView<?> mActionsView;
     private TISBindHelper mTISBindHelper;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
-    private StateManager<RecentsState> mStateManager;
+    private StateManager<RecentsState, RecentsActivity> mStateManager;
 
     // Strong refs to runners which are cleared when the activity is destroyed
     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
@@ -130,21 +133,22 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
      * Init drag layer and overview panel views.
      */
     protected void setupViews() {
-        inflateRootView(R.layout.fallback_recents_activity);
-        setContentView(getRootView());
-        mDragLayer = findViewById(R.id.drag_layer);
-        mScrimView = findViewById(R.id.scrim_view);
-        mFallbackRecentsView = findViewById(R.id.overview_panel);
-        mActionsView = findViewById(R.id.overview_actions_view);
-        getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
         SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+        // SplitSelectStateController needs to be created before setContentView()
         mSplitSelectStateController =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
                         null /* depthController */, getStatsLogManager(),
                         systemUiProxy, RecentsModel.INSTANCE.get(this),
                         null /*activityBackCallback*/);
-        mDragLayer.recreateControllers();
-        if (isDesktopModeSupported()) {
+        // Setup root and child views
+        inflateRootView(R.layout.fallback_recents_activity);
+        LauncherRootView rootView = getRootView();
+        mDragLayer = rootView.findViewById(R.id.drag_layer);
+        mScrimView = rootView.findViewById(R.id.scrim_view);
+        mFallbackRecentsView = rootView.findViewById(R.id.overview_panel);
+        mActionsView = rootView.findViewById(R.id.overview_actions_view);
+
+        if (enableDesktopWindowingMode()) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     null /* depthController */
@@ -152,6 +156,10 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         }
         mFallbackRecentsView.init(mActionsView, mSplitSelectStateController,
                 mDesktopRecentsTransitionController);
+
+        setContentView(rootView);
+        rootView.getSysUiScrim().getSysUIProgress().updateValue(0);
+        mDragLayer.recreateControllers();
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
     }
@@ -224,11 +232,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     }
 
     @Override
-    public <T extends View> T getOverviewPanel() {
-        return (T) mFallbackRecentsView;
+    public FallbackRecentsView getOverviewPanel() {
+        return mFallbackRecentsView;
     }
 
-    public OverviewActionsView getActionsView() {
+    @Override
+    public OverviewActionsView<?> getActionsView() {
         return mActionsView;
     }
 
@@ -368,6 +377,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         getSystemUiController().updateUiState(SystemUiController.UI_STATE_BASE_WINDOW,
                 Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
         ACTIVITY_TRACKER.handleCreate(this);
+
+        // Set screen title for Talkback
+        setTitle(R.string.accessibility_recent_apps);
     }
 
     @Override
@@ -378,6 +390,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
             AccessibilityManagerCompat.sendStateEventToTest(getBaseContext(),
                     OVERVIEW_STATE_ORDINAL);
         }
+    }
+
+    @Override
+    public boolean shouldAnimateStateChange() {
+        return false;
     }
 
     /**
@@ -456,12 +473,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
             };
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+    public void collectStateHandlers(List<StateHandler<RecentsState>> out) {
         out.add(new FallbackRecentsStateController(this));
     }
 
     @Override
-    public StateManager<RecentsState> getStateManager() {
+    public StateManager<RecentsState, RecentsActivity> getStateManager() {
         return mStateManager;
     }
 
@@ -502,5 +519,10 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     @NonNull
     public TISBindHelper getTISBindHelper() {
         return mTISBindHelper;
+    }
+
+    @Override
+    public boolean isRecentsViewVisible() {
+        return getStateManager().getState().isRecentsViewVisible();
     }
 }

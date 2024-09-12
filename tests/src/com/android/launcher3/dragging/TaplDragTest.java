@@ -21,8 +21,6 @@ import static com.android.launcher3.util.TestConstants.AppNames.MAPS_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.PHOTOS_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.STORE_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.TEST_APP_NAME;
-import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
-import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -33,6 +31,7 @@ import android.os.SystemClock;
 import android.platform.test.annotations.PlatinumTest;
 import android.util.Log;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.tapl.Folder;
 import com.android.launcher3.tapl.FolderIcon;
 import com.android.launcher3.tapl.HomeAllApps;
@@ -42,8 +41,7 @@ import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.util.TestUtil;
-import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
-import com.android.launcher3.util.rule.TestStabilityRule;
+import com.android.launcher3.util.rule.ScreenRecordRule;
 
 import org.junit.Test;
 
@@ -57,7 +55,7 @@ import org.junit.Test;
  *    * Can drag an icon from AllApps into the workspace
  *    * Can drag an icon on the Workspace to other positions of the Workspace.
  */
-public class TaplDragTest extends AbstractLauncherUiTest {
+public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
 
     /**
      * Adds two icons to the Workspace and combines them into a folder, then makes sure the icons
@@ -66,9 +64,6 @@ public class TaplDragTest extends AbstractLauncherUiTest {
      */
     @Test
     @PortraitLandscape
-    @ScreenRecord
-    // Staging; will be promoted to presubmit if stable
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
     @PlatinumTest(focusArea = "launcher")
     public void testDragToFolder() {
         // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
@@ -200,6 +195,7 @@ public class TaplDragTest extends AbstractLauncherUiTest {
     @PlatinumTest(focusArea = "launcher")
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/343953783
     public void testDragAppIcon() {
 
         final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
@@ -227,24 +223,7 @@ public class TaplDragTest extends AbstractLauncherUiTest {
     public void testDragAppIconToMultipleWorkspaceCells() throws Exception {
         long startTime, endTime, elapsedTime;
         Point[] targets = TestUtil.getCornersAndCenterPositions(mLauncher);
-
-        for (Point target : targets) {
-            startTime = SystemClock.uptimeMillis();
-            final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
-            allApps.freeze();
-            try {
-                allApps.getAppIcon(TEST_APP_NAME).dragToWorkspace(target.x, target.y);
-            } finally {
-                allApps.unfreeze();
-            }
-            // Reset the workspace for the next shortcut creation.
-            reinitializeLauncherData(true);
-            endTime = SystemClock.uptimeMillis();
-            elapsedTime = endTime - startTime;
-            Log.d("testDragAppIconToWorkspaceCellTime",
-                    "Milliseconds taken to drag app icon to workspace cell: " + elapsedTime);
-        }
-
+        reinitializeLauncherData(true);
         // test to move a shortcut to other cell.
         final HomeAppIcon launcherTestAppIcon = createShortcutInCenterIfNotExist(TEST_APP_NAME);
         for (Point target : targets) {

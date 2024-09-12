@@ -29,7 +29,7 @@ import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.PackageInstallInfo;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 
 /**
  * Represents an ItemInfo which also holds an icon.
@@ -122,9 +122,14 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
     public static final int FLAG_ARCHIVED = 1 << 14;
 
     /**
-     * Flag indicating it's the Private Space Install App icon.
+     * Flag indicating whether the package related to the item & user does not support resizing.
      */
-    public static final int FLAG_PRIVATE_SPACE_INSTALL_APP = 1 << 15;
+    public static final int FLAG_NOT_RESIZEABLE = 1 << 15;
+
+    /**
+     * Flag indicating whether the package related to the item & user supports multiple instances.
+     */
+    public static final int FLAG_SUPPORTS_MULTI_INSTANCE = 1 << 16;
 
     /**
      * Status associated with the system state of the underlying item. This is calculated every
@@ -161,10 +166,6 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      * and its install session is active
      */
     public boolean isPendingDownload() {
-        if (isArchived()) {
-            return this.getProgressLevel() == 0
-                    && (this.runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) != 0;
-        }
         return getProgressLevel() == 0;
     }
 
@@ -176,6 +177,11 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
             return false;
         }
         return (runtimeStatusFlags & FLAG_ARCHIVED) != 0;
+    }
+
+    /** Returns true if the app is archived and doesn't have an active install session. */
+    public boolean isInactiveArchive() {
+        return isArchived() && (runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) == 0;
     }
 
     /**
@@ -250,14 +256,50 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
         }
     }
 
+    /**
+     * Sets whether this app info supports multi-instance.
+     */
+    protected void setSupportsMultiInstance(boolean supportsMultiInstance) {
+        if (supportsMultiInstance) {
+            runtimeStatusFlags |= FLAG_SUPPORTS_MULTI_INSTANCE;
+        } else {
+            runtimeStatusFlags &= ~FLAG_SUPPORTS_MULTI_INSTANCE;
+        }
+    }
+
+    /**
+     * Returns whether this app info supports multi-instance.
+     */
+    public boolean supportsMultiInstance() {
+        return (runtimeStatusFlags & FLAG_SUPPORTS_MULTI_INSTANCE) != 0;
+    }
+
+    /**
+     * Sets whether this app info is non-resizeable.
+     */
+    public void setNonResizeable(boolean nonResizeable) {
+        if (nonResizeable) {
+            runtimeStatusFlags |= FLAG_NOT_RESIZEABLE;
+        } else {
+            runtimeStatusFlags &= ~FLAG_NOT_RESIZEABLE;
+        }
+    }
+
+    /**
+     * Returns whether this app info is resizeable.
+     */
+    public boolean isNonResizeable() {
+        return (runtimeStatusFlags & FLAG_NOT_RESIZEABLE) != 0;
+    }
+
     /** Creates an intent to that launches the app store at this app's page. */
     @Nullable
     public Intent getMarketIntent(Context context) {
         String targetPackage = getTargetPackage();
 
         return targetPackage != null
-                ? ApiWrapper.getAppMarketActivityIntent(
-                context, targetPackage, Process.myUserHandle())
+                ? ApiWrapper.INSTANCE.get(context).getAppMarketActivityIntent(
+                        targetPackage, Process.myUserHandle())
                 : null;
     }
 
@@ -281,5 +323,12 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
         FastBitmapDrawable drawable = bitmap.newIcon(context, creationFlags);
         drawable.setIsDisabled(isDisabled());
         return drawable;
+    }
+
+    @Override
+    protected String dumpProperties() {
+        return super.dumpProperties()
+                + " supportsMultiInstance=" + supportsMultiInstance()
+                + " nonResizeable=" + isNonResizeable();
     }
 }

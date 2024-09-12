@@ -44,8 +44,9 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
-import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
+import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 import java.util.Collections;
@@ -55,7 +56,6 @@ import java.util.stream.Stream;
  * Base class for providing different taskbar UI
  */
 public class TaskbarUIController {
-
     public static final TaskbarUIController DEFAULT = new TaskbarUIController();
 
     // Initialized in init.
@@ -90,6 +90,10 @@ public class TaskbarUIController {
      * Called when taskbar icon layout bounds change.
      */
     protected void onIconLayoutBoundsChanged() { }
+
+    protected String getTaskbarUIControllerName() {
+        return "TaskbarUIController";
+    }
 
     /** Called when an icon is launched. */
     @CallSuper
@@ -137,7 +141,7 @@ public class TaskbarUIController {
     /**
      * SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values.
      */
-    public void updateStateForSysuiFlags(int sysuiFlags) {
+    public void updateStateForSysuiFlags(@SystemUiStateFlags long sysuiFlags) {
     }
 
     /**
@@ -193,7 +197,7 @@ public class TaskbarUIController {
     }
 
     /** Returns {@code true} if Taskbar is currently within overview. */
-    protected boolean isInOverview() {
+    protected boolean isInOverviewUi() {
         return false;
     }
 
@@ -207,7 +211,7 @@ public class TaskbarUIController {
         pw.println(String.format(
                 "%sTaskbarUIController: using an instance of %s",
                 prefix,
-                getClass().getSimpleName()));
+                getTaskbarUIControllerName()));
     }
 
     /**
@@ -259,14 +263,14 @@ public class TaskbarUIController {
                         if (foundTaskView != null) {
                             // There is already a running app of this type, use that as second app.
                             // Get index of task (0 or 1), in case it's a GroupedTaskView
-                            TaskIdAttributeContainer taskAttributes =
-                                    foundTaskView.getTaskAttributesById(foundTask.key.id);
+                            TaskContainer taskContainer =
+                                    foundTaskView.getTaskContainerById(foundTask.key.id);
                             recents.confirmSplitSelect(
                                     foundTaskView,
                                     foundTask,
-                                    taskAttributes.getIconView().getDrawable(),
-                                    taskAttributes.getThumbnailView(),
-                                    taskAttributes.getThumbnailView().getThumbnail(),
+                                    taskContainer.getIconView().getDrawable(),
+                                    taskContainer.getThumbnailViewDeprecated(),
+                                    taskContainer.getThumbnailViewDeprecated().getThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);
@@ -406,5 +410,12 @@ public class TaskbarUIController {
      */
     public void setSkipNextRecentsAnimEnd() {
         // Overridden
+    }
+
+    /**
+     * Sets whether the user is going home based on the current gesture.
+     */
+    public void setUserIsGoingHome(boolean isGoingHome) {
+        mControllers.taskbarStashController.setUserIsGoingHome(isGoingHome);
     }
 }

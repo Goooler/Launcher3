@@ -28,17 +28,21 @@
         android:layout_marginTop="16dp"
         android:accessibilityLiveRegion="polite"
         android:gravity="center_horizontal"
+        android:layout_gravity="top"
         android:lineHeight="20sp"
         android:textColor="?attr/widgetPickerTitleColor"
         android:textFontWeight="500"
         android:textSize="16sp"
+        android:maxLines="1"
+        android:paddingHorizontal="8dp"
+        android:ellipsize="end"
         android:visibility="gone" />
     <!-- Shown when there are more than one pages -->
     <com.android.launcher3.pageindicators.PageIndicatorDots
         android:id="@+id/widget_recommendations_page_indicator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
+        android:layout_gravity="center_horizontal|top"
         android:elevation="1dp"
         android:visibility="gone" />
     <!--
@@ -50,8 +54,9 @@
     <com.android.launcher3.widget.picker.WidgetRecommendationsView
         android:id="@+id/widget_recommendations_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_gravity="center"
+        android:layout_weight="1"
         android:background="@drawable/widgets_surface_background"
         android:importantForAccessibility="yes"
         launcher:pageIndicator="@+id/widget_recommendations_page_indicator" />

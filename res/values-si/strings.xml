@@ -27,8 +27,10 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"සුරක්ෂිත ආකාරය තුළ විජටය අබල කරන ලදි"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"කෙටි මග ලබා ගත නොහැකිය"</string>
     <string name="home_screen" msgid="5629429142036709174">"මුල් පිටුව"</string>
+    <string name="set_default_home_app" msgid="5808906607627586381">"<xliff:g id="LAUNCHER_NAME">%1$s</xliff:g> සැකසීම් තුළ පෙරනිමි මුල් පිටුව යෙදුම ලෙස සකසන්න"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"බෙදුම් තිරය"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"%1$s සඳහා යෙදුම් තතු"</string>
+    <string name="split_app_usage_settings" msgid="7214375263347964093">"%1$s සඳහා භාවිත සැකසීම්"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"යෙදුම් යුගල සුරකින්න"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"මෙම යෙදුම් යුගලය මෙම උපාංගයෙහි සහාය නොදක්වයි"</string>
@@ -39,16 +41,16 @@
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"පළල %1$d උස %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> විජට්ටුව"</string>
+    <string name="widget_preview_name_and_dims_content_description" msgid="8489038126122831595">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> විජට්ටුව, %2$d පළල සහ උස %3$d"</string>
     <string name="add_item_request_drag_hint" msgid="8730547755622776606">"විජට් එක මුල් පිටු තිරය වටා ගෙන යාමට විජට් එක ස්පර්ශ කර අල්ලාගෙන සිටින්න"</string>
     <string name="add_to_home_screen" msgid="9168649446635919791">"මුල් තිරය වෙත එක් කරන්න"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> විජට්ටුව මුල් පිටු තිරය වෙත එක් කරන ලදි"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"යෝජනා"</string>
-    <string name="productivity_widget_recommendation_category_label" msgid="1722113555721820766">"ඔබේ දෛනික අත්‍යවශ්‍යාංග"</string>
-    <string name="news_widget_recommendation_category_label" msgid="3908242346768119070">"ඔබ වෙනුවෙන් පුවත්"</string>
-    <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"ඔබේ නිවුණු කලාපය"</string>
-    <string name="fitness_widget_recommendation_category_label" msgid="2657652999128882431">"ඔබේ යෝග්‍යතා ඉලක්ක ළඟා කර ගන්න"</string>
-    <string name="weather_widget_recommendation_category_label" msgid="6712678763480668598">"කාලගුණයට ඉදිරියෙන් සිටින්න"</string>
-    <string name="others_widget_recommendation_category_label" msgid="897876078077284733">"ඔබ මේවාට ද කැමති විය හැක"</string>
+    <string name="productivity_widget_recommendation_category_label" msgid="3811812719618323750">"අත්‍යවශ්‍යාංග"</string>
+    <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"පුවත් සහ සඟරා"</string>
+    <string name="entertainment_widget_recommendation_category_label" msgid="3973107268630717874">"විනෝදාස්වාදය"</string>
+    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"සමාජයීය"</string>
+    <string name="others_widget_recommendation_category_label" msgid="5555987036267226245">"ඔබ සඳහා යෝජිත"</string>
     <string name="widget_picker_right_pane_accessibility_title" msgid="1673313931455067502">"දකුණේ <xliff:g id="SELECTED_HEADER">%1$s</xliff:g> විජට්, වමේ සෙවීම සහ විකල්ප"</string>
     <string name="widgets_count" msgid="6467746476364652096">"{count,plural, =1{විජට් #}one{විජට් #}other{විජට් #}}"</string>
     <string name="shortcuts_count" msgid="8471715556199592381">"{count,plural, =1{කෙටි මං #}one{කෙටි මං #}other{කෙටි මං #}}"</string>
@@ -62,10 +64,9 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"කාර්යාලය"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"සංවාද"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"සටහන් කර ගැනීම"</string>
-    <string name="widget_education_header" msgid="4874760613775913787">"ප්‍රයෝජනවත් තොරතුරු ඔබගේ ඇඟිලි තුඩු අග"</string>
-    <string name="widget_education_content" msgid="1731667670753497052">"යෙදුම් විවෘත නොකර තොරතුරු ලබා ගැනීම සඳහා, ඔබට ඔබගේ මුල් තිරයට විජට් එක් කළ හැකිය"</string>
+    <string name="widget_add_button_label" msgid="2761267068711937179">"එක් කරන්න"</string>
+    <string name="widget_add_button_content_description" msgid="1810530016360039643">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> විජට්ටුව එක් කරන්න"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"විජට් සැකසීම් වෙනස් කිරීමට තට්ටු කරන්න"</string>
-    <string name="widget_education_close_button" msgid="8676165703104836580">"තේරුණා"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"විජට් සැකසීම් වෙනස් කරන්න"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"යෙදුම් සොයන්න"</string>
     <string name="all_apps_loading_message" msgid="5813968043155271636">"යෙදුම් පූරණය වෙමින්…"</string>
@@ -85,6 +86,7 @@
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"අස්ථාපනය කරන්න"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"යෙදුම් තොරතුරු"</string>
     <string name="install_private_system_shortcut_label" msgid="1616889277073184841">"පෞද්ගලිකව ස්ථාපනය කරන්න"</string>
+    <string name="uninstall_private_system_shortcut_label" msgid="8423460530441627982">"යෙදුම අස්ථාපනය කරන්න"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"ස්ථාපනය කරන්න"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"යෙදුම යෝජනා නොකරන්න"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"පුරෝකථනය අමුණන්න"</string>
@@ -136,7 +138,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ස්ථාපනය කරමින්, <xliff:g id="PROGRESS">%2$s</xliff:g> සම්පූර්ණයි"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> බාගත කරමින්, <xliff:g id="PROGRESS">%2$s</xliff:g> සම්පූර්ණයි"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ස්ථාපනය කිරීමට බලා සිටිමින්"</string>
-    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> ලේඛනාරක්ෂණය කර ඇත. බාගැනීමට තට්ටු කරන්න"</string>
+    <string name="app_archived_title" msgid="7717956158562544081">"<xliff:g id="NAME">%1$s</xliff:g> සංරක්‍ෂිතයි. බා ගෙන ප්‍රතිසාධන කිරීමට තට්ටු කරන්න."</string>
     <string name="dialog_update_title" msgid="114234265740994042">"යෙදුම් යාවත්කාලීනයක් අවශ්‍යයි"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"මෙම නිරූපකය සඳහා යෙදුම යාවත්කාලීන කර නැත. ඔබට මෙම කෙටි මඟ යළි සබල කිරීමට හෝ නිරූපකය ඉවත් කිරීමට හස්තීයව යාවත්කාලීන කළ හැකිය."</string>
     <string name="dialog_update" msgid="2178028071796141234">"යාවත්කාලීන කරන්න"</string>
@@ -184,13 +186,13 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"පෙරහන"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"අසාර්ථකයි: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"පෞද්ගලික ඉඩ"</string>
-    <string name="private_space_secondary_label" msgid="611902414159280263">"පෞද්ගලික යෙදුම් අගුලු දමා සඟවා තබා ගන්න"</string>
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"පිහිටුවීමට හෝ විවෘත කිරීමට තට්ටු කරන්න"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"පෞද්ගලික"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"පෞද්ගලික අවකාශ සැකසීම්"</string>
-    <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"පෞද්ගලික අවකාශය අගුළු දමන්න/අගුළු හරින්න"</string>
+    <string name="ps_container_unlock_button_content_description" msgid="9181551784092204234">"පුද්ගලි, අගුලු හරින ලදි."</string>
+    <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"පුද්ගලික, අගුලු දමන ලදි."</string>
     <string name="ps_container_lock_title" msgid="2640257399982364682">"අගුළු දමන්න"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"පෞද්ගලික අවකාශ සංක්‍රමණය"</string>
-    <string name="ps_add_button_label" msgid="8611055839242385935">"යෙදුම් ස්ථාපනය කරන්න"</string>
+    <string name="ps_add_button_label" msgid="8127988716897128773">"ස්ථාපන කරන්න"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"පෞද්ගලික අවකාශයට යෙදුම් ස්ථාපනය කරන්න"</string>
-    <string name="bubble_bar_overflow_description" msgid="7410995531938041192">"පිටාර යාම"</string>
 </resources>

@@ -43,6 +43,9 @@ public class PrivateAppsSectionDecorator extends RecyclerView.ItemDecoration {
         for (int i = 0; i < parent.getChildCount(); i++) {
             View view = parent.getChildAt(i);
             int position = parent.getChildAdapterPosition(view);
+            if (position < 0 || position >= mAppsList.getAdapterItems().size()) {
+                continue;
+            }
             BaseAllAppsAdapter.AdapterItem adapterItem = mAppsList.getAdapterItems().get(position);
             SectionDecorationInfo info = adapterItem.decorationInfo;
             if (info == null) {
@@ -56,7 +59,7 @@ public class PrivateAppsSectionDecorator extends RecyclerView.ItemDecoration {
                                 new SectionDecorationHandler.UnionDecorationHandler(
                                         decorationHandler, parent.getPaddingLeft(),
                                         parent.getPaddingRight()));
-                unionHandler.addChild(decorationHandler, view, true /* applyBackground */);
+                unionHandler.addChild(decorationHandler, view);
                 deferredDecorations.put(PRIVATE_APP_SECTION, unionHandler);
             } else {
                 decorationHandler.onFocusDraw(c, view);

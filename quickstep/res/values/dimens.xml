@@ -98,6 +98,8 @@
     <dimen name="default_task_dismiss_drag_velocity_grid_focus_task">5dp</dimen>
 
     <dimen name="recents_clear_all_deadzone_vertical_margin">70dp</dimen>
+    <dimen name="recents_clear_all_outline_radius">24dp</dimen>
+    <dimen name="recents_clear_all_outline_padding">2dp</dimen>
 
     <!-- The speed in dp/s at which the user needs to be scrolling in recents such that we start
              loading full resolution screenshots. -->
@@ -327,6 +329,7 @@
     <dimen name="taskbar_contextual_padding_top">8dp</dimen>
     <dimen name="taskbar_nav_buttons_size">44dp</dimen>
     <dimen name="taskbar_split_instructions_margin">48dp</dimen>
+    <dimen name="taskbar_ime_switcher_button_margin_start">40dp</dimen>
     <dimen name="taskbar_suw_insets">48dp</dimen>
     <dimen name="taskbar_suw_frame">96dp</dimen>
     <dimen name="taskbar_hotseat_nav_spacing">24dp</dimen>
@@ -352,12 +355,19 @@
     <dimen name="taskbar_back_button_suw_start_margin">48dp</dimen>
     <dimen name="taskbar_back_button_suw_bottom_margin">1dp</dimen>
     <dimen name="taskbar_back_button_suw_height">72dp</dimen>
+    <dimen name="taskbar_running_app_indicator_height">4dp</dimen>
+    <dimen name="taskbar_running_app_indicator_width">14dp</dimen>
+    <dimen name="taskbar_running_app_indicator_top_margin">2dp</dimen>
+    <dimen name="taskbar_minimized_app_indicator_height">2dp</dimen>
+    <dimen name="taskbar_minimized_app_indicator_width">12dp</dimen>
+    <dimen name="taskbar_minimized_app_indicator_top_margin">2dp</dimen>
 
     <!-- Transient taskbar -->
     <dimen name="transient_taskbar_padding">12dp</dimen>
     <dimen name="transient_taskbar_min_width">150dp</dimen>
     <dimen name="transient_taskbar_bottom_margin">24dp</dimen>
     <dimen name="transient_taskbar_shadow_blur">40dp</dimen>
+    <dimen name="transient_taskbar_stroke_width">1dp</dimen>
     <dimen name="transient_taskbar_key_shadow_distance">10dp</dimen>
     <dimen name="transient_taskbar_stashed_height">32dp</dimen>
     <dimen name="transient_taskbar_all_apps_button_translation_x_offset">8dp</dimen>
@@ -374,6 +384,11 @@
     <dimen name="taskbar_catch_up_threshold">264dp</dimen>
     <!-- Taskbar swipe down threshold -->
     <dimen name="taskbar_to_nav_threshold">24dp</dimen>
+
+    <!-- Taskbar variables that help determine when to animate the Taskbar background -->
+    <!-- Velocity defined as dp per s. Negative because the gesture is an upwards motion. -->
+    <dimen name="taskbar_slow_velocity_y_threshold">-288dp</dimen>
+    <integer name="taskbar_background_duration">80</integer>
 
     <!-- Taskbar swipe up threshold multipliers -->
     <item name="taskbar_nav_threshold_mult" format="float" type="dimen">4.5</item>
@@ -419,15 +434,26 @@
     <dimen name="bubblebar_stashed_handle_width">55dp</dimen>
     <dimen name="bubblebar_stashed_size">@dimen/transient_taskbar_stashed_height</dimen>
     <dimen name="bubblebar_stashed_handle_height">@dimen/taskbar_stashed_handle_height</dimen>
-    <dimen name="bubblebar_pointer_size">8dp</dimen>
+    <!-- this is a pointer height minus 1dp to ensure the pointer overlaps with the bubblebar
+    background appropriately when close to the rounded corner -->
+    <dimen name="bubblebar_pointer_visible_size">9dp</dimen>
+    <dimen name="bubblebar_pointer_width">12dp</dimen>
+    <dimen name="bubblebar_pointer_height">10dp</dimen>
+    <dimen name="bubblebar_pointer_radius">2dp</dimen>
+    <!-- Container size with pointer included: bubblebar_size + bubblebar_pointer_size -->
+    <dimen name="bubblebar_size_with_pointer">80dp</dimen>
     <dimen name="bubblebar_elevation">1dp</dimen>
+    <dimen name="bubblebar_drag_elevation">2dp</dimen>
     <dimen name="bubblebar_hotseat_adjustment_threshold">90dp</dimen>
 
-    <dimen name="bubblebar_icon_size">50dp</dimen>
+    <dimen name="bubblebar_icon_size_small">32dp</dimen>
+    <dimen name="bubblebar_icon_size">36dp</dimen>
     <dimen name="bubblebar_badge_size">24dp</dimen>
     <dimen name="bubblebar_icon_overlap">12dp</dimen>
-    <dimen name="bubblebar_overflow_inset">24dp</dimen>
-    <dimen name="bubblebar_icon_spacing">3dp</dimen>
+    <dimen name="bubblebar_overflow_inset">16dp</dimen>
+    <dimen name="bubblebar_icon_spacing">6dp</dimen>
+    <dimen name="bubblebar_icon_spacing_large">8dp</dimen>
+    <dimen name="bubblebar_expanded_icon_spacing">12dp</dimen>
     <dimen name="bubblebar_icon_elevation">1dp</dimen>
 
     <!-- Bubble bar dismiss view -->
@@ -436,6 +462,16 @@
     <dimen name="bubblebar_dismiss_target_icon_size">24dp</dimen>
     <dimen name="bubblebar_dismiss_target_bottom_margin">50dp</dimen>
     <dimen name="bubblebar_dismiss_floating_gradient_height">548dp</dimen>
+    <dimen name="bubblebar_dismiss_zone_width">192dp</dimen>
+    <dimen name="bubblebar_dismiss_zone_height">242dp</dimen>
+
+    <!-- Bubble bar drop target -->
+    <dimen name="bubblebar_drop_target_corner_radius">36dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_default_width">412dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_default_height">600dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_corner_radius">28dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_padding">24dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_margin">16dp</dimen>
 
     <!-- Launcher splash screen -->
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->
@@ -457,12 +493,12 @@
     <dimen name="keyboard_quick_switch_no_recent_items_icon_size">24dp</dimen>
     <dimen name="keyboard_quick_switch_no_recent_items_icon_margin">8dp</dimen>
 
-    <!-- Desktop mode -->
-    <dimen name="desktop_mode_floating_app_select_height">56dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_elevation">4dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_margin">16dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_text_size">14sp</dimen>
-    <dimen name="desktop_mode_floating_app_select_text_margin">8dp</dimen>
+    <!-- Digital Wellbeing -->
+    <dimen name="digital_wellbeing_toast_height">48dp</dimen>
+
+    <!-- Splitscreen -->
+    <!-- Max width of the split instructions view -->
+    <dimen name="split_instructions_view_max_width">220dp</dimen>
 
     <!-- Splitscreen -->
     <!-- Max width of the split instructions view -->

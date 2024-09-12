@@ -22,20 +22,20 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static com.android.internal.jank.Cuj.CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_TASKBAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_PAIR_LAUNCH;
 import static com.android.launcher3.model.data.AppInfo.PACKAGE_KEY_COMPARATOR;
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_SUPPORTS_MULTI_INSTANCE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_NONE;
 import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
 import static com.android.wm.shell.common.split.SplitScreenConstants.isPersistentSnapPosition;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.LauncherApps;
-import android.content.pm.PackageManager;
 import android.util.Log;
 import android.util.Pair;
 
@@ -44,7 +44,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.jank.Cuj;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
@@ -61,9 +60,11 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
+import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TopTaskTracker;
@@ -94,43 +95,16 @@ public class AppPairsController {
     private Context mContext;
     private final SplitSelectStateController mSplitSelectStateController;
     private final StatsLogManager mStatsLogManager;
-    private final String[] mLegacyMultiInstanceSupportedApps;
-
     public AppPairsController(Context context,
             SplitSelectStateController splitSelectStateController,
             StatsLogManager statsLogManager) {
         mContext = context;
         mSplitSelectStateController = splitSelectStateController;
         mStatsLogManager = statsLogManager;
-        mLegacyMultiInstanceSupportedApps = mContext.getResources().getStringArray(
-                R.array.config_appsSupportMultiInstancesSplit);
     }
 
     void onDestroy() {
         mContext = null;
-    }
-
-    /**
-     * Returns whether the given component or its application supports multi-instance.
-     */
-    private boolean supportsMultiInstance(@NonNull ComponentName component) {
-        // Check the legacy hardcoded allowlist first
-        for (String pkg : mLegacyMultiInstanceSupportedApps) {
-            if (pkg.equals(component.getPackageName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Returns whether two apps should be considered the same for multi-instance purposes, which
-     * requires additional checks to ensure they can be started as multiple instances.
-     */
-    private boolean isSameAppForMultiInstance(@NonNull ItemInfo app1,
-            @NonNull ItemInfo app2) {
-        return app1.getTargetPackage().equals(app2.getTargetPackage())
-                && app1.user.equals(app2.user);
     }
 
     /**
@@ -149,27 +123,33 @@ public class AppPairsController {
         // - the task is not a GroupedTaskView
         // - both tasks in the GroupedTaskView are from the same app and the app does not
         //   support multi-instance
+        boolean hasUnpinnableApp = taskView.getTaskContainers().stream()
+                .anyMatch(att -> att != null && att.getItemInfo() != null
+                        && ((att.getItemInfo().runtimeStatusFlags
+                            & ItemInfoWithIcon.FLAG_NOT_PINNABLE) != 0));
         if (!FeatureFlags.enableAppPairs()
                 || !taskView.containsMultipleTasks()
+                || hasUnpinnableApp
                 || !(taskView instanceof GroupedTaskView)) {
             return false;
         }
 
         GroupedTaskView gtv = (GroupedTaskView) taskView;
-        TaskView.TaskIdAttributeContainer[] attributes = gtv.getTaskIdAttributeContainers();
-        WorkspaceItemInfo info1 = attributes[0].getItemInfo();
-        WorkspaceItemInfo info2 = attributes[1].getItemInfo();
-        AppInfo app1 = resolveAppInfoByComponent(info1.getComponentKey());
-        AppInfo app2 = resolveAppInfoByComponent(info2.getComponentKey());
+        List<TaskView.TaskContainer> containers = gtv.getTaskContainers();
+        ComponentKey taskKey1 = TaskUtils.getLaunchComponentKeyForTask(
+                containers.get(0).getTask().key);
+        ComponentKey taskKey2 = TaskUtils.getLaunchComponentKeyForTask(
+                containers.get(1).getTask().key);
+        AppInfo app1 = resolveAppInfoByComponent(taskKey1);
+        AppInfo app2 = resolveAppInfoByComponent(taskKey2);
 
         if (app1 == null || app2 == null) {
             // Disallow saving app pairs for apps that don't have a front-door in Launcher
             return false;
         }
 
-        if (isSameAppForMultiInstance(app1, app2)) {
-            if (!supportsMultiInstance(app1.getTargetComponent()) 
-                    || !supportsMultiInstance(app2.getTargetComponent())) {
+        if (PackageManagerHelper.isSameAppForMultiInstance(app1, app2)) {
+            if (!app1.supportsMultiInstance() || !app2.supportsMultiInstance()) {
                 return false;
             }
         }
@@ -192,9 +172,9 @@ public class AppPairsController {
      */
     public void saveAppPair(GroupedTaskView gtv) {
         InteractionJankMonitorWrapper.begin(gtv, Cuj.CUJ_LAUNCHER_SAVE_APP_PAIR);
-        TaskView.TaskIdAttributeContainer[] attributes = gtv.getTaskIdAttributeContainers();
-        WorkspaceItemInfo recentsInfo1 = attributes[0].getItemInfo();
-        WorkspaceItemInfo recentsInfo2 = attributes[1].getItemInfo();
+        List<TaskView.TaskContainer> containers = gtv.getTaskContainers();
+        WorkspaceItemInfo recentsInfo1 = containers.get(0).getItemInfo();
+        WorkspaceItemInfo recentsInfo2 = containers.get(1).getItemInfo();
         WorkspaceItemInfo app1 = resolveAppPairWorkspaceInfo(recentsInfo1);
         WorkspaceItemInfo app2 = resolveAppPairWorkspaceInfo(recentsInfo2);
 
@@ -207,12 +187,11 @@ public class AppPairsController {
             return;
         }
 
-        // WorkspaceItemProcessor won't process these new ItemInfos until the next launcher restart,
-        // so update some flags now.
-        updateWorkspaceItemFlags(app1);
-        updateWorkspaceItemFlags(app2);
-
         @PersistentSnapPosition int snapPosition = gtv.getSnapPosition();
+        if (snapPosition == SNAP_TO_NONE) {
+            // Free snap mode is enabled, just save it as 50/50 split.
+            snapPosition = SNAP_TO_50_50;
+        }
         if (!isPersistentSnapPosition(snapPosition)) {
             // If we received an illegal snap position, log an error and do not create the app pair
             Log.wtf(TAG, "Tried to save an app pair with illegal snapPosition "
@@ -233,7 +212,7 @@ public class AppPairsController {
             });
             MAIN_EXECUTOR.execute(() -> {
                 LauncherAccessibilityDelegate delegate =
-                        Launcher.getLauncher(mContext).getAccessibilityDelegate();
+                        QuickstepLauncher.getLauncher(mContext).getAccessibilityDelegate();
                 if (delegate != null) {
                     delegate.addToWorkspace(newAppPair, true, (success) -> {
                         if (success) {
@@ -307,7 +286,8 @@ public class AppPairsController {
      */
     @Nullable
     private AppInfo resolveAppInfoByComponent(@NonNull ComponentKey key) {
-        AllAppsStore appsStore = Launcher.getLauncher(mContext).getAppsView().getAppsStore();
+        AllAppsStore appsStore = ActivityContext.lookupContext(mContext)
+                .getAppsView().getAppsStore();
 
         // First look up the app info in order of:
         // - The exact activity for the recent task
@@ -332,49 +312,7 @@ public class AppPairsController {
         if (appInfo == null) {
             return null;
         }
-        return appInfo != null ? appInfo.makeWorkspaceItem(mContext) : null;
-    }
-
-    /**
-     * Updates flags for newly created WorkspaceItemInfos.
-     */
-    private void updateWorkspaceItemFlags(WorkspaceItemInfo wii) {
-        PackageManager pm = mContext.getPackageManager();
-        ActivityInfo ai = null;
-        try {
-            ai = pm.getActivityInfo(wii.getTargetComponent(), 0);
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.w(TAG, "PackageManager lookup failed.");
-        }
-
-        if (ai != null) {
-            wii.status = ai.resizeMode == ActivityInfo.RESIZE_MODE_UNRESIZEABLE
-                    ? wii.status | WorkspaceItemInfo.FLAG_NON_RESIZEABLE
-                    : wii.status & ~WorkspaceItemInfo.FLAG_NON_RESIZEABLE;
-        }
-    }
-
-    /**
-     * Converts a WorkspaceItemInfo of itemType=ITEM_TYPE_TASK (from a Recents task) to a new
-     * WorkspaceItemInfo of itemType=ITEM_TYPE_APPLICATION.
-     */
-    private WorkspaceItemInfo convertRecentsItemToAppItem(WorkspaceItemInfo recentsItem) {
-        if (recentsItem.itemType != LauncherSettings.Favorites.ITEM_TYPE_TASK) {
-            Log.w(TAG, "Expected ItemInfo of type ITEM_TYPE_TASK, but received "
-                    + recentsItem.itemType);
-        }
-
-        WorkspaceItemInfo launchableItem = recentsItem.clone();
-        PackageManager p = mContext.getPackageManager();
-        Intent launchIntent = p.getLaunchIntentForPackage(recentsItem.getTargetPackage());
-        Log.w(TAG, "Initial intent from Recents: " + launchableItem.intent + "\n"
-                + "Intent from PackageManager: " + launchIntent);
-        if (launchIntent != null) {
-            // If lookup from PackageManager fails, just use the existing intent
-            launchableItem.intent = launchIntent;
-        }
-        launchableItem.itemType = LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
-        return launchableItem;
+        return appInfo.makeWorkspaceItem(mContext);
     }
 
     /**
@@ -401,7 +339,7 @@ public class AppPairsController {
                 itemInfos.stream().map(ItemInfo::getComponentKey).toList();
 
         // Use TopTaskTracker to find the currently running app (or apps)
-        TopTaskTracker topTaskTracker = getTopTaskTracker(context);
+        TopTaskTracker topTaskTracker = getTopTaskTracker();
 
         // getRunningSplitTasksIds() will return a pair of ids if we are currently running a
         // split pair, or an empty array with zero length if we are running a single app.
@@ -574,7 +512,7 @@ public class AppPairsController {
      * Gets the TopTaskTracker, which is a cached record of the top running Task.
      */
     @VisibleForTesting
-    public TopTaskTracker getTopTaskTracker(Context context) {
-        return TopTaskTracker.INSTANCE.get(context);
+    public TopTaskTracker getTopTaskTracker() {
+        return TopTaskTracker.INSTANCE.get(mContext);
     }
 }

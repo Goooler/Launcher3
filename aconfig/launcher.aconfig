@@ -79,6 +79,13 @@ flag {
 }
 
 flag {
+    name: "enable_taskbar_customization"
+    namespace: "launcher"
+    description: "Enables taskbar customization framework."
+    bug: "347281365"
+}
+
+flag {
     name: "enable_unfolded_two_pane_picker"
     namespace: "launcher"
     description: "Enables two pane widget picker for unfolded foldables"
@@ -171,6 +178,13 @@ flag {
 }
 
 flag {
+  name: "force_monochrome_app_icons"
+  namespace: "launcher"
+  description: "Enable the ability to generate monochromatic icons, if it is not provided by the app"
+  bug: "270396209"
+}
+
+flag {
   name: "enable_add_app_widget_via_config_activity_v2"
   namespace: "launcher"
   description: "When adding app widget through config activity, directly add it to workspace to reduce flicker"
@@ -210,6 +224,27 @@ flag {
 }
 
 flag {
+    name: "enable_scaling_reveal_home_animation"
+    namespace: "launcher"
+    description: "Enables the Home gesture animation"
+    bug: "308801666"
+}
+
+flag {
+    name: "enable_widget_tap_to_add"
+    namespace: "launcher"
+    description: "Enables an add button in the widget picker"
+    bug: "323886237"
+}
+
+flag {
+    name: "enable_refactor_task_thumbnail"
+    namespace: "launcher"
+    description: "Enables rewritten version of TaskThumbnailViews in Overview"
+    bug: "331753115"
+}
+
+flag {
   name: "enable_handle_delayed_gesture_callbacks"
   namespace: "launcher"
   description: "Enables additional handling for delayed mid-gesture callbacks"
@@ -217,4 +252,67 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "enable_fallback_overview_in_window"
+    namespace: "launcher"
+    description: "Enables fallback recents opening inside of a window instead of an activity."
+    bug: "292269949"
+}
+
+flag {
+    name: "enable_smartspace_as_a_widget"
+    namespace: "launcher"
+    description: "Enables smartspace as a widget"
+    bug: "300140279"
+}
+
+flag {
+    name: "enable_smartspace_removal_toggle"
+    namespace: "launcher"
+    description: "Enables smartspace removal toggle"
+    bug: "303471576"
+}
+
+flag {
+  name: "enable_additional_home_animations"
+  namespace: "launcher"
+  description: "Enables custom home animations for non-running tasks"
+  bug: "237638627"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "enabled_folders_in_all_apps"
+    namespace: "launcher"
+    description: "Enables folders in all apps"
+    bug: "341582436"
+}
+
+flag {
+    name: "enable_recents_in_taskbar"
+    namespace: "launcher"
+    description: "Replace hybrid hotseat app predictions with strictly Recent Apps"
+    bug: "315354060"
+}
+
+flag {
+  name: "enable_first_screen_broadcast_archiving_extras"
+  namespace: "launcher"
+  description: "adds Extras to first screen broadcast for archived apps"
+  bug: "322314760"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "floating_search_bar"
+    namespace: "launcher"
+    description: "Search bar persists at the bottom of the screen across Launcher states"
+    bug: "346408388"
 }

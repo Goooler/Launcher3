@@ -42,6 +42,7 @@ import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.NavHandle;
 import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 
@@ -117,7 +118,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         mControllers = controllers;
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         Resources resources = mActivity.getResources();
-        if (mActivity.isPhoneGestureNavMode()) {
+        if (mActivity.isPhoneGestureNavMode() || mActivity.isTinyTaskbar()) {
             mTaskbarSize = resources.getDimensionPixelSize(R.dimen.taskbar_phone_size);
             mStashedHandleWidth =
                     resources.getDimensionPixelSize(R.dimen.taskbar_stashed_small_screen);
@@ -303,7 +304,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
                 homeDisabled ? 0 : 1);
     }
 
-    public void updateStateForSysuiFlags(int systemUiStateFlags) {
+    public void updateStateForSysuiFlags(@SystemUiStateFlags long systemUiStateFlags) {
         mTaskbarHidden = (systemUiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) != 0;
         updateRegionSamplingWindowVisibility();
     }

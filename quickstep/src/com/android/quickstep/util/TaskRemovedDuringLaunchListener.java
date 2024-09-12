@@ -22,10 +22,12 @@ import static com.android.launcher3.BaseActivity.EVENT_DESTROYED;
 import static com.android.launcher3.BaseActivity.EVENT_RESUMED;
 import static com.android.launcher3.BaseActivity.EVENT_STOPPED;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 
-import com.android.launcher3.BaseActivity;
 import com.android.quickstep.RecentsModel;
+import com.android.quickstep.views.RecentsViewContainer;
 
 /**
  * This class tracks the failure of a task launch through the TaskView.launchTask() call, in an
@@ -38,27 +40,33 @@ import com.android.quickstep.RecentsModel;
  */
 public class TaskRemovedDuringLaunchListener {
 
-    private BaseActivity mActivity;
+    private RecentsViewContainer mContainer;
     private int mLaunchedTaskId = INVALID_TASK_ID;
     private Runnable mTaskLaunchFailedCallback = null;
 
     private final Runnable mUnregisterCallback = this::unregister;
     private final Runnable mResumeCallback = this::checkTaskLaunchFailed;
 
+    private final Context mContext;
+
+    public TaskRemovedDuringLaunchListener(Context context) {
+        mContext = context;
+    }
+
     /**
      * Registers a failure listener callback if it detects a scenario in which an app launch
      * failed before the transition finished.
      */
-    public void register(BaseActivity activity, int launchedTaskId,
+    public void register(RecentsViewContainer container, int launchedTaskId,
             @NonNull Runnable taskLaunchFailedCallback) {
         // The normal task launch case, Launcher stops and updates its state correctly
-        activity.addEventCallback(EVENT_STOPPED, mUnregisterCallback);
+        container.addEventCallback(EVENT_STOPPED, mUnregisterCallback);
         // The transition hasn't finished but Launcher was resumed, check if the launch failed
-        activity.addEventCallback(EVENT_RESUMED, mResumeCallback);
+        container.addEventCallback(EVENT_RESUMED, mResumeCallback);
         // If we somehow don't get any of the above signals, then just unregister this listener
-        activity.addEventCallback(EVENT_DESTROYED, mUnregisterCallback);
+        container.addEventCallback(EVENT_DESTROYED, mUnregisterCallback);
 
-        mActivity = activity;
+        mContainer = container;
         mLaunchedTaskId = launchedTaskId;
         mTaskLaunchFailedCallback = taskLaunchFailedCallback;
     }
@@ -67,11 +75,11 @@ public class TaskRemovedDuringLaunchListener {
      * Unregisters the failure listener.
      */
     private void unregister() {
-        mActivity.removeEventCallback(EVENT_STOPPED, mUnregisterCallback);
-        mActivity.removeEventCallback(EVENT_RESUMED, mResumeCallback);
-        mActivity.removeEventCallback(EVENT_DESTROYED, mUnregisterCallback);
+        mContainer.removeEventCallback(EVENT_STOPPED, mUnregisterCallback);
+        mContainer.removeEventCallback(EVENT_RESUMED, mResumeCallback);
+        mContainer.removeEventCallback(EVENT_DESTROYED, mUnregisterCallback);
 
-        mActivity = null;
+        mContainer = null;
         mLaunchedTaskId = INVALID_TASK_ID;
         mTaskLaunchFailedCallback = null;
     }
@@ -88,7 +96,7 @@ public class TaskRemovedDuringLaunchListener {
         if (mLaunchedTaskId != INVALID_TASK_ID) {
             final int launchedTaskId = mLaunchedTaskId;
             final Runnable taskLaunchFailedCallback = mTaskLaunchFailedCallback;
-            RecentsModel.INSTANCE.getNoCreate().isTaskRemoved(mLaunchedTaskId, (taskRemoved) -> {
+            RecentsModel.INSTANCE.get(mContext).isTaskRemoved(mLaunchedTaskId, (taskRemoved) -> {
                 if (taskRemoved) {
                     ActiveGestureLog.INSTANCE.addLog(
                             new ActiveGestureLog.CompoundString("Launch failed, task (id=")

@@ -38,7 +38,6 @@ import static com.android.launcher3.QuickstepTransitionManager.SPLIT_LAUNCH_DURA
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.quickstep.util.AnimUtils.clampToDuration;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -81,7 +80,7 @@ import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.TaskThumbnailView;
+import com.android.quickstep.views.TaskThumbnailViewDeprecated;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.animation.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.recents.model.Task;
@@ -122,7 +121,7 @@ public final class TaskViewUtils {
                 for (int i = 0; i < recentsView.getTaskViewCount(); i++) {
                     TaskView taskView = recentsView.getTaskViewAt(i);
                     if (recentsView.isTaskViewVisible(taskView)) {
-                        Task.TaskKey key = taskView.getTask().key;
+                        Task.TaskKey key = taskView.getFirstTask().key;
                         if (componentName.equals(key.getComponent()) && userId == key.userId) {
                             return taskView;
                         }
@@ -166,8 +165,8 @@ public final class TaskViewUtils {
             @NonNull RemoteAnimationTarget[] nonAppTargets,
             @Nullable DepthController depthController,
             PendingAnimation out) {
-        boolean isQuickSwitch = v.isEndQuickswitchCuj();
-        v.setEndQuickswitchCuj(false);
+        boolean isQuickSwitch = v.isEndQuickSwitchCuj();
+        v.setEndQuickSwitchCuj(false);
 
         final RemoteAnimationTargets targets =
                 new RemoteAnimationTargets(appTargets, wallpaperTargets, nonAppTargets,
@@ -183,7 +182,7 @@ public final class TaskViewUtils {
             // Re-use existing handles
             remoteTargetHandles = recentsViewHandles;
         } else {
-            boolean forDesktop = isDesktopModeSupported() && v instanceof DesktopTaskView;
+            boolean forDesktop = v instanceof DesktopTaskView;
             RemoteTargetGluer gluer = new RemoteTargetGluer(v.getContext(),
                     recentsView.getSizeStrategy(), targets, forDesktop);
             if (forDesktop) {
@@ -335,7 +334,7 @@ public final class TaskViewUtils {
             // During animation we apply transformation on the thumbnailView (and not the rootView)
             // to follow the TaskViewSimulator. So the final matrix applied on the thumbnailView is:
             //    Mt K(0)` K(t) Mt`
-            TaskThumbnailView[] thumbnails = v.getThumbnails();
+            TaskThumbnailViewDeprecated[] thumbnails = v.getThumbnailViews();
 
             // In case simulator copies and thumbnail size do no match, ensure we get the lesser.
             // This ensures we do not create arrays with empty elements or attempt to references
@@ -345,7 +344,7 @@ public final class TaskViewUtils {
             Matrix[] mt = new Matrix[matrixSize];
             Matrix[] mti = new Matrix[matrixSize];
             for (int i = 0; i < matrixSize; i++) {
-                TaskThumbnailView ttv = thumbnails[i];
+                TaskThumbnailViewDeprecated ttv = thumbnails[i];
                 RectF localBounds = new RectF(0, 0,  ttv.getWidth(), ttv.getHeight());
                 float[] tvBoundsMapped = new float[]{0, 0,  ttv.getWidth(), ttv.getHeight()};
                 getDescendantCoordRelativeToAncestor(ttv, ttv.getRootView(), tvBoundsMapped, false);
@@ -392,7 +391,7 @@ public final class TaskViewUtils {
             out.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    for (TaskThumbnailView ttv : thumbnails) {
+                    for (TaskThumbnailViewDeprecated ttv : thumbnails) {
                         ttv.setAnimationMatrix(null);
                     }
                 }

@@ -42,7 +42,6 @@ import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
@@ -52,8 +51,7 @@ import com.android.launcher3.views.BaseDragLayer.TouchCompleteListener;
  * {@inheritDoc}
  */
 public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
-        implements TouchCompleteListener, View.OnLongClickListener,
-        LocalColorExtractor.Listener {
+        implements TouchCompleteListener, View.OnLongClickListener {
 
     private static final String TAG = "LauncherAppWidgetHostView";
 
@@ -70,12 +68,8 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
 
     private static final String TRACE_METHOD_NAME = "appwidget load-widget ";
 
-    private final Rect mTempRect = new Rect();
     private final CheckLongPressHelper mLongPressHelper;
     protected final ActivityContext mActivityContext;
-
-    // Maintain the color manager.
-    private final LocalColorExtractor mColorExtractor;
 
     private boolean mIsScrollable;
     private boolean mIsAttachedToWindow;
@@ -84,13 +78,10 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
 
     private long mDeferUpdatesUntilMillis = 0;
     RemoteViews mLastRemoteViews;
-    private boolean mHasDeferredColorChange = false;
-    private @Nullable SparseIntArray mDeferredColorChange = null;
-
-    // The following member variables are only used during drag-n-drop.
-    private boolean mIsInDragMode = false;
 
     private boolean mTrackingWidgetUpdate = false;
+
+    private int mFocusRectOutsets = 0;
 
     public LauncherAppWidgetHostView(Context context) {
         super(context);
@@ -100,12 +91,13 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
         setBackgroundResource(R.drawable.widget_internal_focus_bg);
         if (Flags.enableFocusOutline()) {
             setDefaultFocusHighlightEnabled(false);
+            mFocusRectOutsets = context.getResources().getDimensionPixelSize(
+                    R.dimen.focus_rect_widget_outsets);
         }
 
         if (Themes.getAttrBoolean(context, R.attr.isWorkspaceDarkText)) {
             setOnLightBackground(true);
         }
-        mColorExtractor = new LocalColorExtractor(); // no-op
     }
 
     @Override
@@ -173,8 +165,8 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     }
 
     /**
-     * Returns true if the application of {@link RemoteViews} through {@link #updateAppWidget} and
-     * colors through {@link #onColorsChanged} are currently being deferred.
+     * Returns true if the application of {@link RemoteViews} through {@link #updateAppWidget} are
+     * currently being deferred.
      * @see #beginDeferringUpdates()
      */
     private boolean isDeferringUpdates() {
@@ -183,9 +175,8 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
 
     /**
      * Begin deferring the application of any {@link RemoteViews} updates made through
-     * {@link #updateAppWidget} and color changes through {@link #onColorsChanged} until
-     * {@link #endDeferringUpdates()} has been called or the next {@link #updateAppWidget} or
-     * {@link #onColorsChanged} call after {@link #UPDATE_LOCK_TIMEOUT_MILLIS} have elapsed.
+     * {@link #updateAppWidget} until {@link #endDeferringUpdates()} has been called or the next
+     * {@link #updateAppWidget} call after {@link #UPDATE_LOCK_TIMEOUT_MILLIS} have elapsed.
      */
     public void beginDeferringUpdates() {
         mDeferUpdatesUntilMillis = SystemClock.uptimeMillis() + UPDATE_LOCK_TIMEOUT_MILLIS;
@@ -193,25 +184,15 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
 
     /**
      * Stop deferring the application of {@link RemoteViews} updates made through
-     * {@link #updateAppWidget} and color changes made through {@link #onColorsChanged} and apply
-     * any deferred updates.
+     * {@link #updateAppWidget} and apply any deferred updates.
      */
     public void endDeferringUpdates() {
         RemoteViews remoteViews;
-        SparseIntArray deferredColors;
-        boolean hasDeferredColors;
         mDeferUpdatesUntilMillis = 0;
         remoteViews = mLastRemoteViews;
-        deferredColors = mDeferredColorChange;
-        hasDeferredColors = mHasDeferredColorChange;
-        mDeferredColorChange = null;
-        mHasDeferredColorChange = false;
 
         if (remoteViews != null) {
             updateAppWidget(remoteViews);
-        }
-        if (hasDeferredColors) {
-            onColorsChanged(deferredColors);
         }
     }
 
@@ -238,7 +219,6 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
         super.onAttachedToWindow();
         mIsAttachedToWindow = true;
         checkIfAutoAdvance();
-        mColorExtractor.setListener(this);
     }
 
     @Override
@@ -249,7 +229,6 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
         // state is updated. So isAttachedToWindow() will return true until next frame.
         mIsAttachedToWindow = false;
         checkIfAutoAdvance();
-        mColorExtractor.setListener(null);
     }
 
     @Override
@@ -269,6 +248,13 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     }
 
     @Override
+    public void getFocusedRect(Rect r) {
+        super.getFocusedRect(r);
+        // Outset to a larger rect for drawing a padding between focus outline and widget
+        r.inset(mFocusRectOutsets, mFocusRectOutsets);
+    }
+
+    @Override
     public void onTouchComplete() {
         if (!mLongPressHelper.hasPerformedLongPress()) {
             // If a long press has been performed, we don't want to clear the record of that since
@@ -281,29 +267,6 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         mIsScrollable = checkScrollableRecursively(this);
-
-        if (!mIsInDragMode && getTag() instanceof LauncherAppWidgetInfo info) {
-            mTempRect.set(left, top, right, bottom);
-            mColorExtractor.setWorkspaceLocation(mTempRect, (View) getParent(), info.screenId);
-        }
-    }
-
-    /** Starts the drag mode. */
-    public void startDrag() {
-        mIsInDragMode = true;
-    }
-
-    /** Handles a drag event occurred on a workspace page corresponding to the {@code screenId}. */
-    public void handleDrag(Rect rectInView, View view, int screenId) {
-        if (mIsInDragMode) {
-            mColorExtractor.setWorkspaceLocation(rectInView, view, screenId);
-        }
-    }
-
-    /** Ends the drag mode. */
-    public void endDrag() {
-        mIsInDragMode = false;
-        requestLayout();
     }
 
     /**
@@ -324,20 +287,6 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     /** Clear the listener for the pre-layout in CellLayout */
     public void clearCellChildViewPreLayoutListener() {
         mCellChildViewPreLayoutListener = null;
-    }
-
-    @Override
-    public void onColorsChanged(SparseIntArray colors) {
-        if (isDeferringUpdates()) {
-            mDeferredColorChange = colors;
-            mHasDeferredColorChange = true;
-            return;
-        }
-        mDeferredColorChange = null;
-        mHasDeferredColorChange = false;
-
-        // setColorResources will reapply the view, which must happen in the UI thread.
-        post(() -> setColorResources(colors));
     }
 
     @Override

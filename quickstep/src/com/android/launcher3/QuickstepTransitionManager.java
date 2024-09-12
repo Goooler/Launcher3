@@ -43,6 +43,7 @@ import static com.android.launcher3.BaseActivity.INVISIBLE_ALL;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_APP_TRANSITIONS;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_PENDING_FLAGS;
 import static com.android.launcher3.BaseActivity.PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_BACKGROUND_COLOR;
 import static com.android.launcher3.LauncherState.ALL_APPS;
@@ -57,6 +58,7 @@ import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVIT
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.testing.shared.TestProtocol.WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE;
 import static com.android.launcher3.util.DisplayController.isTransientTaskbar;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.ORDERED_BG_EXECUTOR;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
@@ -149,6 +151,7 @@ import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.RectFSpringAnim.DefaultSpringConfig;
 import com.android.quickstep.util.RectFSpringAnim.TaskbarHotseatSpringConfig;
+import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
 import com.android.quickstep.util.StaggeredWorkspaceAnim;
 import com.android.quickstep.util.SurfaceTransaction;
 import com.android.quickstep.util.SurfaceTransaction.SurfaceProperties;
@@ -215,7 +218,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     public static final int TASKBAR_TO_APP_DURATION = 600;
     // TODO(b/236145847): Tune TASKBAR_TO_HOME_DURATION to 383 after conflict with unlock animation
     // is solved.
-    public static final int TASKBAR_TO_HOME_DURATION = 300;
+    private static final int TASKBAR_TO_HOME_DURATION_FAST = 300;
+    private static final int TASKBAR_TO_HOME_DURATION_SLOW = 1000;
     protected static final int CONTENT_SCALE_DURATION = 350;
     protected static final int CONTENT_SCRIM_DURATION = 350;
 
@@ -371,7 +375,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
      */
     protected boolean isLaunchingFromRecents(@NonNull View v,
             @Nullable RemoteAnimationTarget[] targets) {
-        return mLauncher.getStateManager().getState().overviewUi
+        return mLauncher.getStateManager().getState().isRecentsViewVisible
                 && findTaskViewToLaunch(mLauncher.getOverviewPanel(), v, targets) != null;
     }
 
@@ -1626,10 +1630,15 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             anim.play(getUnlockWindowAnimator(appTargets, wallpaperTargets));
         } else if (ENABLE_BACK_SWIPE_HOME_ANIMATION.get()
                 && !playFallBackAnimation) {
-            // Use a fixed velocity to start the animation.
-            float velocityPxPerS = DynamicResource.provider(mLauncher)
-                    .getDimension(R.dimen.unlock_staggered_velocity_dp_per_s);
-            PointF velocity = new PointF(0, -velocityPxPerS);
+            PointF velocity;
+            if (enableScalingRevealHomeAnimation()) {
+                velocity = new PointF();
+            } else {
+                // Use a fixed velocity to start the animation.
+                float velocityPxPerS = DynamicResource.provider(mLauncher)
+                        .getDimension(R.dimen.unlock_staggered_velocity_dp_per_s);
+                velocity = new PointF(0, -velocityPxPerS);
+            }
             rectFSpringAnim = getClosingWindowAnimators(
                     anim, appTargets, launcherView, velocity, startRect,
                     startWindowCornerRadius);
@@ -1638,8 +1647,15 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 // layout bounds.
                 skipAllAppsScale = true;
             } else if (!fromPredictiveBack) {
-                anim.play(new StaggeredWorkspaceAnim(mLauncher, velocity.y,
-                        true /* animateOverviewScrim */, launcherView).getAnimators());
+                if (enableScalingRevealHomeAnimation()) {
+                    anim.play(
+                            new ScalingWorkspaceRevealAnim(
+                                    mLauncher, rectFSpringAnim,
+                                    rectFSpringAnim.getTargetRect()).getAnimators());
+                } else {
+                    anim.play(new StaggeredWorkspaceAnim(mLauncher, velocity.y,
+                            true /* animateOverviewScrim */, launcherView).getAnimators());
+                }
 
                 if (!areAllTargetsTranslucent(appTargets)) {
                     anim.play(ObjectAnimator.ofFloat(mLauncher.getDepthController().stateDepth,
@@ -1702,6 +1718,14 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         }
 
         return new Pair(rectFSpringAnim, anim);
+    }
+
+    public static int getTaskbarToHomeDuration() {
+        if (enableScalingRevealHomeAnimation()) {
+            return TASKBAR_TO_HOME_DURATION_SLOW;
+        } else {
+            return TASKBAR_TO_HOME_DURATION_FAST;
+        }
     }
 
     /**
@@ -1870,7 +1894,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
             return new ContainerAnimationRunner(
                     new ActivityTransitionAnimator.AnimationDelegate(
-                            controller, callback, listener));
+                            MAIN_EXECUTOR, controller, callback, listener));
         }
 
         /**

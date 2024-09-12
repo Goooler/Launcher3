@@ -39,7 +39,7 @@ import org.junit.runner.RunWith;
  */
 @MediumTest
 @RunWith(AndroidJUnit4.class)
-public class TaplWidgetPickerTest extends AbstractLauncherUiTest {
+public class TaplWidgetPickerTest extends AbstractLauncherUiTest<Launcher> {
 
     private WidgetsRecyclerView getWidgetsView(Launcher launcher) {
         return WidgetsFullSheet.getWidgetsView(launcher);

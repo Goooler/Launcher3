@@ -18,6 +18,8 @@ package com.android.launcher3;
 
 import static android.graphics.drawable.AdaptiveIconDrawable.getExtraInsetFraction;
 
+import static com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN;
+import static com.android.launcher3.Flags.enableSmartspaceAsAWidget;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
@@ -68,6 +70,7 @@ import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.ChecksSdkIntAtLeast;
@@ -102,6 +105,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -130,6 +134,10 @@ public final class Utilities {
     @ChecksSdkIntAtLeast(api = VERSION_CODES.UPSIDE_DOWN_CAKE, codename = "U")
     public static final boolean ATLEAST_U = Build.VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.VANILLA_ICE_CREAM, codename = "V")
+    public static final boolean ATLEAST_V = Build.VERSION.SDK_INT
+            >= VERSION_CODES.VANILLA_ICE_CREAM;
+
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
      */
@@ -147,6 +155,9 @@ public final class Utilities {
     public static final int TRANSLATE_DOWN = 1;
     public static final int TRANSLATE_LEFT = 2;
     public static final int TRANSLATE_RIGHT = 3;
+
+    public static final boolean SHOULD_SHOW_FIRST_PAGE_WIDGET =
+            enableSmartspaceAsAWidget() && WIDGET_ON_FIRST_SCREEN;
 
     @IntDef({TRANSLATE_UP, TRANSLATE_DOWN, TRANSLATE_LEFT, TRANSLATE_RIGHT})
     public @interface AdjustmentDirection{}
@@ -634,7 +645,7 @@ public final class Utilities {
         } else {
             // Wrap the main icon in AID
             try (LauncherIcons li = LauncherIcons.obtain(context)) {
-                result = li.wrapToAdaptiveIcon(mainIcon);
+                result = li.wrapToAdaptiveIcon(mainIcon, null);
             }
         }
         if (result == null) {
@@ -830,5 +841,28 @@ public final class Utilities {
             default:
                 // No-Op
         }
+    }
+
+    /**
+     * Does a depth-first search through the View hierarchy starting at root, to find a view that
+     * matches the predicate. Returns null if no View was found. View has a findViewByPredicate
+     * member function but it is currently a @hide API.
+     */
+    @Nullable
+    public static <T extends View> T findViewByPredicate(@NonNull View root,
+            @NonNull Predicate<View> predicate) {
+        if (predicate.test(root)) {
+            return (T) root;
+        }
+        if (root instanceof ViewGroup parent) {
+            int count = parent.getChildCount();
+            for (int i = 0; i < count; i++) {
+                View view = findViewByPredicate(parent.getChildAt(i), predicate);
+                if (view != null) {
+                    return (T) view;
+                }
+            }
+        }
+        return null;
     }
 }

@@ -23,6 +23,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import android.content.Context;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.slice.SliceItem;
 
@@ -53,11 +54,18 @@ public class StatsLogManager implements ResourceBasedOverride {
     public static final int LAUNCHER_STATE_ALLAPPS = 4;
     public static final int LAUNCHER_STATE_UNCHANGED = 5;
 
+    @NonNull
+    protected final Context mContext;
+    @Nullable
+    protected final ActivityContext mActivityContext;
+
+    private KeyboardStateManager mKeyboardStateManager;
     private InstanceId mInstanceId;
 
-    protected @Nullable ActivityContext mActivityContext = null;
-    protected @Nullable Context mContext = null;
-    private KeyboardStateManager mKeyboardStateManager;
+    public StatsLogManager(@NonNull Context context) {
+        mContext = context;
+        mActivityContext = ActivityContext.lookupContextNoThrow(context);
+    }
 
     /**
      * Returns event enum based on the two state transition information when swipe
@@ -209,6 +217,9 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User tapped on free form icon on a task menu.")
         LAUNCHER_SYSTEM_SHORTCUT_FREE_FORM_TAP(519),
+
+        @UiEvent(doc = "User tapped on desktop icon on a task menu.")
+        LAUNCHER_SYSTEM_SHORTCUT_DESKTOP_TAP(1706),
 
         @UiEvent(doc = "User tapped on pause app system shortcut.")
         LAUNCHER_SYSTEM_SHORTCUT_PAUSE_TAP(521),
@@ -751,6 +762,39 @@ public class StatsLogManager implements ResourceBasedOverride {
                 + " metric.")
         LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED(1612),
 
+        @UiEvent(doc = "User tapped add widget button in widget sheet.")
+        LAUNCHER_WIDGET_ADD_BUTTON_TAP(1622),
+
+        @UiEvent(doc = "Number of user installed Private profile apps, shown above separator line")
+        LAUNCHER_PRIVATE_SPACE_USER_INSTALLED_APPS_COUNT(1672),
+
+        @UiEvent(doc = "Number of preinstalled Private profile apps, shown under separator line")
+        LAUNCHER_PRIVATE_SPACE_PREINSTALLED_APPS_COUNT(1673),
+
+        @UiEvent(doc = "Private space lock animation started")
+        LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_BEGIN(1725),
+
+        @UiEvent(doc = "Private space lock animation finished")
+        LAUNCHER_PRIVATE_SPACE_LOCK_ANIMATION_END(1726),
+
+        @UiEvent(doc = "Private space unlock animation started")
+        LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_BEGIN(1727),
+
+        @UiEvent(doc = "Private space unlock animation finished")
+        LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_END(1728),
+
+        @UiEvent(doc = "User rotates whilst in Overview / RecentsView")
+        LAUNCHER_OVERVIEW_ORIENTATION_CHANGED(1762),
+
+        @UiEvent(doc = "User launches Overview from 3 button navigation")
+        LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_3_BUTTON(1763),
+
+        @UiEvent(doc = "User launches Overview from alt+tab keyboard quick switch")
+        LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_KEYBOARD_QUICK_SWITCH(1764),
+
+        @UiEvent(doc = "User launches Overview from meta+tab keyboard shortcut")
+        LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_KEYBOARD_SHORTCUT(1765),
+
         // ADD MORE
         ;
 
@@ -1185,10 +1229,7 @@ public class StatsLogManager implements ResourceBasedOverride {
      * Creates a new instance of {@link StatsLogManager} based on provided context.
      */
     public static StatsLogManager newInstance(Context context) {
-        StatsLogManager manager = Overrides.getObject(StatsLogManager.class,
-                context.getApplicationContext(), R.string.stats_log_manager_class);
-        manager.mActivityContext = ActivityContext.lookupContextNoThrow(context);
-        manager.mContext = context;
-        return manager;
+        return Overrides.getObject(
+                StatsLogManager.class, context, R.string.stats_log_manager_class);
     }
 }

@@ -19,19 +19,12 @@ import static android.os.VibrationEffect.Composition.PRIMITIVE_LOW_TICK;
 import static android.os.VibrationEffect.createPredefined;
 import static android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED;
 
-import static com.android.launcher3.config.FeatureFlags.LPNH_HAPTIC_HINT_DELAY;
-import static com.android.launcher3.config.FeatureFlags.LPNH_HAPTIC_HINT_END_SCALE_PERCENT;
-import static com.android.launcher3.config.FeatureFlags.LPNH_HAPTIC_HINT_ITERATIONS;
-import static com.android.launcher3.config.FeatureFlags.LPNH_HAPTIC_HINT_SCALE_EXPONENT;
-import static com.android.launcher3.config.FeatureFlags.LPNH_HAPTIC_HINT_START_SCALE_PERCENT;
-import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import android.annotation.SuppressLint;
-import android.content.ContentResolver;
 import android.content.Context;
-import android.database.ContentObserver;
 import android.media.AudioAttributes;
+import android.net.Uri;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -40,12 +33,11 @@ import android.provider.Settings;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 
 /**
  * Wrapper around {@link Vibrator} to easily perform haptic feedback where necessary.
  */
-public class VibratorWrapper {
+public class VibratorWrapper implements SafeCloseable {
 
     public static final MainThreadInitializedObject<VibratorWrapper> INSTANCE =
             new MainThreadInitializedObject<>(VibratorWrapper::new);
@@ -57,6 +49,8 @@ public class VibratorWrapper {
 
     public static final VibrationEffect EFFECT_CLICK =
             createPredefined(VibrationEffect.EFFECT_CLICK);
+    private static final Uri HAPTIC_FEEDBACK_URI =
+            Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED);
 
     private static final float LOW_TICK_SCALE = 0.9f;
     private static final float DRAG_TEXTURE_SCALE = 0.03f;
@@ -71,9 +65,6 @@ public class VibratorWrapper {
     @Nullable
     private final VibrationEffect mBumpEffect;
 
-    @Nullable
-    private final VibrationEffect mSearchEffect;
-
     private long mLastDragTime;
     private final int mThresholdUntilNextDragCallMillis;
 
@@ -85,6 +76,8 @@ public class VibratorWrapper {
     private final Context mContext;
     private final Vibrator mVibrator;
     private final boolean mHasVibrator;
+    private final SettingsCache.OnChangeListener mHapticChangeListener =
+            isEnabled -> mIsHapticFeedbackEnabled = isEnabled;
 
     private boolean mIsHapticFeedbackEnabled;
 
@@ -93,16 +86,9 @@ public class VibratorWrapper {
         mVibrator = context.getSystemService(Vibrator.class);
         mHasVibrator = mVibrator.hasVibrator();
         if (mHasVibrator) {
-            final ContentResolver resolver = context.getContentResolver();
-            mIsHapticFeedbackEnabled = isHapticFeedbackEnabled(resolver);
-            final ContentObserver observer = new ContentObserver(MAIN_EXECUTOR.getHandler()) {
-                @Override
-                public void onChange(boolean selfChange) {
-                    mIsHapticFeedbackEnabled = isHapticFeedbackEnabled(resolver);
-                }
-            };
-            resolver.registerContentObserver(Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED),
-                    false /* notifyForDescendants */, observer);
+            SettingsCache cache = SettingsCache.INSTANCE.get(mContext);
+            cache.register(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
+            mIsHapticFeedbackEnabled = cache.getValue(HAPTIC_FEEDBACK_URI, 0);
         } else {
             mIsHapticFeedbackEnabled = false;
         }
@@ -133,24 +119,13 @@ public class VibratorWrapper {
             mBumpEffect = null;
             mThresholdUntilNextDragCallMillis = 0;
         }
+    }
 
-        if (mVibrator.areAllPrimitivesSupported(
-                VibrationEffect.Composition.PRIMITIVE_QUICK_RISE,
-                VibrationEffect.Composition.PRIMITIVE_TICK)) {
-            if (FeatureFlags.ENABLE_SEARCH_HAPTIC_HINT.get()) {
-                mSearchEffect = VibrationEffect.startComposition()
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 1f)
-                        .compose();
-            } else {
-                // quiet ramp, short pause, then sharp tick
-                mSearchEffect = VibrationEffect.startComposition()
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.25f)
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 1f, 50)
-                        .compose();
-            }
-        } else {
-            // fallback for devices without composition support
-            mSearchEffect = VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK);
+    @Override
+    public void close() {
+        if (mHasVibrator) {
+            SettingsCache.INSTANCE.get(mContext)
+                    .unregister(HAPTIC_FEEDBACK_URI, mHapticChangeListener);
         }
     }
 
@@ -203,10 +178,6 @@ public class VibratorWrapper {
         mLastDragTime = 0;
     }
 
-    private boolean isHapticFeedbackEnabled(ContentResolver resolver) {
-        return Settings.System.getInt(resolver, HAPTIC_FEEDBACK_ENABLED, 0) == 1;
-    }
-
     /** Vibrates with the given effect if haptic feedback is available and enabled. */
     public void vibrate(VibrationEffect vibrationEffect) {
         if (mHasVibrator && mIsHapticFeedbackEnabled) {
@@ -233,13 +204,6 @@ public class VibratorWrapper {
         }
     }
 
-    /** Indicates that search has been invoked. */
-    public void vibrateForSearch() {
-        if (mSearchEffect != null) {
-            vibrate(mSearchEffect);
-        }
-    }
-
     /** Indicates that Taskbar has been invoked. */
     public void vibrateForTaskbarUnstash() {
         if (Utilities.ATLEAST_S && mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
@@ -249,34 +213,6 @@ public class VibratorWrapper {
                     .compose();
 
             vibrate(primitiveLowTickEffect);
-        }
-    }
-
-    /** Indicates that search will be invoked if the current gesture is maintained. */
-    public void vibrateForSearchHint() {
-        if (FeatureFlags.ENABLE_SEARCH_HAPTIC_HINT.get() && Utilities.ATLEAST_S
-                && mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
-            float startScale = LPNH_HAPTIC_HINT_START_SCALE_PERCENT.get() / 100f;
-            float endScale = LPNH_HAPTIC_HINT_END_SCALE_PERCENT.get() / 100f;
-            int scaleExponent = LPNH_HAPTIC_HINT_SCALE_EXPONENT.get();
-            int iterations = LPNH_HAPTIC_HINT_ITERATIONS.get();
-            int delayMs = LPNH_HAPTIC_HINT_DELAY.get();
-
-            VibrationEffect.Composition composition = VibrationEffect.startComposition();
-            for (int i = 0; i < iterations; i++) {
-                float t = i / (iterations - 1f);
-                float scale = (float) Math.pow((1 - t) * startScale + t * endScale,
-                        scaleExponent);
-                if (i == 0) {
-                    // Adds a delay before the ramp starts
-                    composition.addPrimitive(PRIMITIVE_LOW_TICK, scale,
-                            delayMs);
-                } else {
-                    composition.addPrimitive(PRIMITIVE_LOW_TICK, scale);
-                }
-            }
-
-            vibrate(composition.compose());
         }
     }
 }

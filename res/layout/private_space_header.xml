@@ -24,7 +24,10 @@
         android:background="@drawable/bg_ps_header"
         android:clipToOutline="true"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:textDirection="locale"
+        android:orientation="horizontal"
+        android:contentDescription="@string/ps_container_lock_button_content_description"
+        android:importantForAccessibility="yes">
 
     <LinearLayout
         android:id="@+id/settingsAndLockGroup"
@@ -33,13 +36,12 @@
         android:layout_centerVertical="true"
         android:gravity="center_vertical"
         android:layout_alignParentEnd="true"
-        android:animateLayoutChanges="true">
-        <ImageButton
+        android:animateLayoutChanges="false">
+        <com.android.launcher3.allapps.PrivateSpaceSettingsButton
             android:id="@+id/ps_settings_button"
             android:layout_width="@dimen/ps_header_image_height"
             android:layout_height="@dimen/ps_header_image_height"
             android:background="@drawable/ps_settings_background"
-            android:layout_marginEnd="@dimen/ps_header_settings_icon_margin_end"
             android:src="@drawable/ic_ps_settings"
             android:contentDescription="@string/ps_container_settings" />
         <LinearLayout
@@ -48,8 +50,8 @@
             android:layout_height="@dimen/ps_header_image_height"
             android:background="@drawable/ps_lock_background"
             android:gravity="center_vertical"
-            android:layout_marginEnd="@dimen/ps_header_layout_margin"
-            android:contentDescription="@string/ps_container_lock_unlock_button">
+            android:layout_marginEnd="@dimen/ps_lock_button_margin_end"
+            android:contentDescription="@string/ps_container_lock_button_content_description">
             <ImageView
                 android:id="@+id/lock_icon"
                 android:layout_width="@dimen/ps_lock_icon_size"
@@ -87,13 +89,15 @@
     <TextView
         android:id="@+id/ps_container_header"
         android:layout_width="wrap_content"
-        android:layout_height="@dimen/ps_header_text_height"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/ps_header_text_height"
         android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
         android:layout_toStartOf="@+id/settingsAndLockGroup"
         android:gravity="center_vertical"
         android:layout_marginStart="@dimen/ps_header_layout_margin"
         android:text="@string/ps_container_title"
-        android:theme="@style/PrivateSpaceHeaderTextStyle"/>
+        android:theme="@style/PrivateSpaceHeaderTextStyle"
+        android:importantForAccessibility="no"/>
 
 </RelativeLayout>

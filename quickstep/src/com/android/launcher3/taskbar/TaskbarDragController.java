@@ -74,12 +74,14 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.shortcuts.ShortcutDragPreviewProvider;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.views.BubbleTextHolder;
+import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.util.LogUtils;
 import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.systemui.shared.recents.model.Task;
@@ -163,11 +165,6 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             return false;
         }
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onTaskbarItemLongClick");
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.TWO_TASKBAR_LONG_CLICKS,
-                    "TaskbarDragController.startDragOnLongClick",
-                    new Throwable());
-        }
         BubbleTextView btv = (BubbleTextView) view;
         mActivity.onDragStart();
         btv.post(() -> {
@@ -340,8 +337,13 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
     @Override
     protected void callOnDragStart() {
         super.callOnDragStart();
+        // TODO(297921594) clean it up when taskbar to desktop drag is implemented.
+        DesktopVisibilityController desktopController =
+                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+
         // Pre-drag has ended, start the global system drag.
-        if (mDisallowGlobalDrag) {
+        if (mDisallowGlobalDrag || (desktopController != null
+                && desktopController.areDesktopTasksVisible())) {
             AbstractFloatingView.closeAllOpenViewsExcept(mActivity, TYPE_TASKBAR_ALL_APPS);
             return;
         }

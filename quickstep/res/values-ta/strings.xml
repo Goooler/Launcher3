@@ -21,6 +21,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"பின் செய்தல்"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"குறிப்பிட்ட வடிவமில்லாத பயன்முறை"</string>
+    <string name="recent_task_option_desktop" msgid="8280879717125435668">"டெஸ்க்டாப்"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"சமீபத்தியவை எதுவுமில்லை"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"ஆப்ஸ் உபயோக அமைப்புகள்"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"எல்லாம் அழி"</string>
@@ -121,7 +122,7 @@
     <string name="taskbar_edu_close" msgid="887022990168191073">"மூடுக"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"முடிந்தது"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"முகப்பு"</string>
-    <string name="taskbar_button_a11y" msgid="5241161324875094465">"அணுகல்தன்மை"</string>
+    <string name="taskbar_button_a11y" msgid="5241161324875094465">"மாற்றுத்திறன் வசதி"</string>
     <string name="taskbar_button_back" msgid="8558862226461164514">"பின்செல்லும்"</string>
     <string name="taskbar_button_ime_switcher" msgid="1730244360907588541">"IME சுவிட்ச்சர்"</string>
     <string name="taskbar_button_recents" msgid="7273376136216613134">"சமீபத்தியவை"</string>
@@ -137,7 +138,10 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"மேலே/இடதுபுறம் நகர்த்தும்"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"கீழே/வலதுபுறம் நகர்த்தும்"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{மேலும் # ஆப்ஸைக் காட்டு.}other{மேலும் # ஆப்ஸைக் காட்டு.}}"</string>
+    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# டெஸ்க்டாப் ஆப்ஸைக் காட்டு.}other{# டெஸ்க்டாப் ஆப்ஸைக் காட்டு.}}"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> மற்றும் <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
-    <string name="desktop_select_app_toast" msgid="2306057322833956910">"ஆப்ஸை டெஸ்க்டாப்பில் சேர்க்கிறது"</string>
-    <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"ரத்துசெய்"</string>
+    <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"குமிழ்"</string>
+    <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"கூடுதல் விருப்பங்களைக் காட்டும்"</string>
+    <string name="bubble_bar_bubble_description" msgid="1882466152448446446">"<xliff:g id="APP_NAME">%2$s</xliff:g> வழங்கும் <xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>"</string>
+    <string name="bubble_bar_description_multiple_bubbles" msgid="3922207715357143648">"<xliff:g id="BUBBLE_BAR_BUBBLE_DESCRIPTION">%1$s</xliff:g> மற்றும் <xliff:g id="BUBBLE_COUNT">%2$d</xliff:g>"</string>
 </resources>

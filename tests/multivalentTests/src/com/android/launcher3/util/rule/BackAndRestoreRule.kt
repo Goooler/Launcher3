@@ -83,7 +83,7 @@ class BackAndRestoreRule : TestRule {
         }
         dbDirectory().mkdir()
         if (!dbDirectory().exists()) {
-            throw Exception("Databases directory doesn't exist")
+            throw Exception("Databases directory doesn't exists")
         }
     }
 

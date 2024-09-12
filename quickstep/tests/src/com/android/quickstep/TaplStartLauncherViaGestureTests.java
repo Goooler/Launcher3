@@ -16,13 +16,9 @@
 
 package com.android.quickstep;
 
-import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
-import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
-
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
-import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 import com.android.quickstep.NavigationModeSwitchRule.NavigationModeSwitch;
 
 import org.junit.Before;
@@ -39,7 +35,6 @@ public class TaplStartLauncherViaGestureTests extends AbstractQuickStepTest {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        // b/143488140
         mLauncher.goHome();
         // Start an activity where the gestures start.
         startTestActivity(2);
@@ -47,8 +42,6 @@ public class TaplStartLauncherViaGestureTests extends AbstractQuickStepTest {
 
     @Test
     @NavigationModeSwitch
-    // Stress tests are long. We permanently demote them from presubmit to match the presubmit SLO.
-    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
     public void testStressPressHome() {
         for (int i = 0; i < STRESS_REPEAT_COUNT; ++i) {
             // Destroy Launcher activity.
@@ -61,8 +54,6 @@ public class TaplStartLauncherViaGestureTests extends AbstractQuickStepTest {
 
     @Test
     @NavigationModeSwitch
-    // Stress tests are long. We permanently demote them from presubmit to match the presubmit SLO.
-    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
     public void testStressSwipeToOverview() {
         for (int i = 0; i < STRESS_REPEAT_COUNT; ++i) {
             // Destroy Launcher activity.
