@@ -30,7 +30,7 @@ public class LauncherApplication extends Application {
     public void onCreate() {
         super.onCreate();
         MainProcessInitializer.initialize(this);
-        mAppComponent = DaggerLauncherAppComponent.builder().build();
+        mAppComponent = DaggerLauncherAppComponent.builder().appContext(this).build();
     }
 
     public LauncherBaseAppComponent getAppComponent() {

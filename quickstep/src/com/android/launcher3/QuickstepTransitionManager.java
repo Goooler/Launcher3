@@ -51,7 +51,6 @@ import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.Utilities.mapBoundToRange;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_BACK_SWIPE_HOME_ANIMATION;
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
 import static com.android.launcher3.testing.shared.TestProtocol.WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE;
 import static com.android.launcher3.util.DisplayController.isTransientTaskbar;
@@ -1599,7 +1598,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
         boolean playWorkspaceReveal = !fromPredictiveBack;
         boolean skipAllAppsScale = false;
-        if (ENABLE_BACK_SWIPE_HOME_ANIMATION.get() && !playFallBackAnimation) {
+        if (!playFallBackAnimation) {
             PointF velocity;
             if (enableScalingRevealHomeAnimation()) {
                 velocity = new PointF();

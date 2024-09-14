@@ -66,8 +66,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(270394476,
             "ENABLE_DISMISS_PREDICTION_UNDO", DISABLED,
             "Show an 'Undo' snackbar when users dismiss a predicted hotseat item");
-    public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(270395171,
-            "CONTINUOUS_VIEW_TREE_CAPTURE", ENABLED, "Capture View tree every frame");
 
     public static final BooleanFlag ENABLE_WORKSPACE_LOADING_OPTIMIZATION = getDebugFlag(251502424,
             "ENABLE_WORKSPACE_LOADING_OPTIMIZATION", DISABLED,
@@ -206,14 +204,6 @@ public final class FeatureFlags {
             "ENABLE_SEARCH_UNINSTALLED_APPS", ENABLED, "Search uninstalled app results.");
 
     // TODO(Block 20): Clean up flags
-    public static final BooleanFlag ENABLE_BACK_SWIPE_HOME_ANIMATION = getDebugFlag(270393426,
-            "ENABLE_BACK_SWIPE_HOME_ANIMATION", ENABLED,
-            "Enables home animation to icon when user swipes back.");
-
-    public static final BooleanFlag ENABLE_DYNAMIC_TASKBAR_THRESHOLDS = getDebugFlag(294252473,
-            "ENABLE_DYNAMIC_TASKBAR_THRESHOLDS", ENABLED,
-            "Enables taskbar thresholds that scale based on screen size.");
-
     // Aconfig migration complete for ENABLE_HOME_TRANSITION_LISTENER.
     public static final BooleanFlag ENABLE_HOME_TRANSITION_LISTENER = getDebugFlag(306053414,
             "ENABLE_HOME_TRANSITION_LISTENER", DISABLED,
@@ -232,18 +222,7 @@ public final class FeatureFlags {
             "ENABLE_WIDGET_TRANSITION_FOR_RESIZING", DISABLED,
             "Enable widget transition animation when resizing the widgets");
 
-    public static final BooleanFlag PREEMPTIVE_UNFOLD_ANIMATION_START = getDebugFlag(270397209,
-            "PREEMPTIVE_UNFOLD_ANIMATION_START", ENABLED,
-            "Enables starting the unfold animation preemptively when unfolding, without"
-                    + "waiting for SystemUI and then merging the SystemUI progress whenever we "
-                    + "start receiving the events");
-
     // TODO(Block 25): Clean up flags
-    public static final BooleanFlag ENABLE_NEW_GESTURE_NAV_TUTORIAL = getDebugFlag(270396257,
-            "ENABLE_NEW_GESTURE_NAV_TUTORIAL", ENABLED,
-            "Enable the redesigned gesture navigation tutorial");
-
-    // TODO(Block 26): Clean up flags
     public static final BooleanFlag ENABLE_WIDGET_HOST_IN_BACKGROUND = getDebugFlag(270394384,
             "ENABLE_WIDGET_HOST_IN_BACKGROUND", ENABLED,
             "Enable background widget updates listening for widget holder");
@@ -268,10 +247,6 @@ public final class FeatureFlags {
             "SEPARATE_RECENTS_ACTIVITY", DISABLED,
             "Uses a separate recents activity instead of using the integrated recents+Launcher UI");
 
-    public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = getReleaseFlag(270393258,
-            "ENABLE_ENFORCED_ROUNDED_CORNERS", ENABLED,
-            "Enforce rounded corners on all App Widgets");
-
     public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(270394973,
             "USE_LOCAL_ICON_OVERRIDES", ENABLED,
             "Use inbuilt monochrome icons if app doesn't provide one");
@@ -285,20 +260,10 @@ public final class FeatureFlags {
                 com.android.wm.shell.Flags.enableSplitContextual();
     }
 
-    public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(271010401,
-            "ENABLE_TRACKPAD_GESTURE", ENABLED, "Enables trackpad gesture.");
-
     // TODO(Block 29): Clean up flags
     public static final BooleanFlag ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT = getDebugFlag(270393897,
             "ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT", DISABLED,
             "Enables displaying the all apps button in the hotseat.");
-
-    public static final BooleanFlag ENABLE_KEYBOARD_QUICK_SWITCH = getDebugFlag(270396844,
-            "ENABLE_KEYBOARD_QUICK_SWITCH", ENABLED, "Enables keyboard quick switching");
-
-    public static final BooleanFlag ENABLE_KEYBOARD_TASKBAR_TOGGLE = getDebugFlag(281726846,
-            "ENABLE_KEYBOARD_TASKBAR_TOGGLE", ENABLED,
-            "Enables keyboard taskbar stash toggling");
 
     // TODO(Block 30): Clean up flags
     public static final BooleanFlag USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES = getDebugFlag(270395010,
@@ -316,14 +281,6 @@ public final class FeatureFlags {
     public static boolean enableResponsiveWorkspace() {
         return ENABLE_RESPONSIVE_WORKSPACE.get() || Flags.enableResponsiveWorkspace();
     }
-
-    // TODO(Block 33): Clean up flags
-    public static final BooleanFlag ENABLE_ALL_APPS_RV_PREINFLATION = getDebugFlag(288161355,
-            "ENABLE_ALL_APPS_RV_PREINFLATION", ENABLED,
-            "Enables preinflating all apps icons to avoid scrolling jank.");
-    public static final BooleanFlag ALL_APPS_GONE_VISIBILITY = getDebugFlag(291651514,
-            "ALL_APPS_GONE_VISIBILITY", ENABLED,
-            "Set all apps container view's hidden visibility to GONE instead of INVISIBLE.");
 
     public static BooleanFlag getDebugFlag(
             int bugId, String key, BooleanFlag flagState, String description) {

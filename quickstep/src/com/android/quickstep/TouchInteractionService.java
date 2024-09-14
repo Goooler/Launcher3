@@ -30,7 +30,6 @@ import static com.android.launcher3.Launcher.INTENT_ACTION_ALL_APPS_TOGGLE;
 import static com.android.launcher3.LauncherPrefs.backedUpItem;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMotionEvent;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_TRACKPAD_GESTURE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.OnboardingPrefs.HOME_BOUNCE_SEEN;
@@ -228,7 +227,6 @@ public class TouchInteractionService extends Service {
         @BinderThread
         @Override
         public void onTaskbarToggled() {
-            if (!FeatureFlags.ENABLE_KEYBOARD_TASKBAR_TOGGLE.get()) return;
             MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis -> {
                 TaskbarActivityContext activityContext =
                         tis.mTaskbarManager.getCurrentActivityContext();
@@ -664,13 +662,11 @@ public class TouchInteractionService extends Service {
         mAllAppsActionManager = new AllAppsActionManager(
                 this, UI_HELPER_EXECUTOR, this::createAllAppsPendingIntent);
         mInputManager = getSystemService(InputManager.class);
-        if (ENABLE_TRACKPAD_GESTURE.get()) {
-            mInputManager.registerInputDeviceListener(mInputDeviceListener,
-                    UI_HELPER_EXECUTOR.getHandler());
-            int [] inputDevices = mInputManager.getInputDeviceIds();
-            for (int inputDeviceId : inputDevices) {
-                mInputDeviceListener.onInputDeviceAdded(inputDeviceId);
-            }
+        mInputManager.registerInputDeviceListener(mInputDeviceListener,
+                UI_HELPER_EXECUTOR.getHandler());
+        int [] inputDevices = mInputManager.getInputDeviceIds();
+        for (int inputDeviceId : inputDevices) {
+            mInputDeviceListener.onInputDeviceAdded(inputDeviceId);
         }
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
@@ -703,7 +699,7 @@ public class TouchInteractionService extends Service {
 
         if (mDeviceState.isButtonNavMode()
                 && !mDeviceState.supportsAssistantGestureInButtonNav()
-                && (!ENABLE_TRACKPAD_GESTURE.get() || mTrackpadsConnected.isEmpty())) {
+                && (mTrackpadsConnected.isEmpty())) {
             return;
         }
 
@@ -1271,7 +1267,7 @@ public class TouchInteractionService extends Service {
                         getBaseContext(), mDeviceState, mInputMonitorCompat);
             }
 
-            if (ENABLE_TRACKPAD_GESTURE.get() && mGestureState.isTrackpadGesture()
+            if (mGestureState.isTrackpadGesture()
                     && canStartSystemGesture && !previousGestureState.isRecentsAnimationRunning()) {
                 reasonString = newCompoundString(reasonPrefix)
                         .append(SUBSTRING_PREFIX)

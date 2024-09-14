@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.allapps;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_ALL_APPS_RV_PREINFLATION;
 import static com.android.launcher3.model.data.AppInfo.COMPONENT_KEY_COMPARATOR;
 import static com.android.launcher3.model.data.AppInfo.EMPTY_ARRAY;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK;
@@ -109,7 +108,7 @@ public class AllAppsStore<T extends Context & ActivityContext> {
         mPackageUserKeytoUidMap = map;
         // Preinflate all apps RV when apps has changed, which can happen after unlocking screen,
         // rotating screen, or downloading/upgrading apps.
-        if (shouldPreinflate && ENABLE_ALL_APPS_RV_PREINFLATION.get()) {
+        if (shouldPreinflate) {
             mAllAppsRecyclerViewPool.preInflateAllAppsViewHolders(mContext);
         }
     }

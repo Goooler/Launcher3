@@ -29,7 +29,6 @@ import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.Cuj
 import com.android.launcher3.Flags.enableOverviewCommandHelperTimeout
 import com.android.launcher3.PagedView
-import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.logger.LauncherAtom
 import com.android.launcher3.logging.StatsLogManager
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_3_BUTTON
@@ -248,7 +247,7 @@ constructor(
         recents: RecentsView<*, *>,
         taskView: TaskView?,
         command: CommandInfo,
-        onCallbackResult: () -> Unit
+        onCallbackResult: () -> Unit,
     ): Boolean {
         var callbackList: RunnableList? = null
         if (taskView != null) {
@@ -274,15 +273,14 @@ constructor(
 
     private fun executeWhenRecentsIsNotVisible(
         command: CommandInfo,
-        onCallbackResult: () -> Unit
+        onCallbackResult: () -> Unit,
     ): Boolean {
         val recentsViewContainer = activityInterface.getCreatedContainer() as? RecentsViewContainer
         val recentsView: RecentsView<*, *>? = recentsViewContainer?.getOverviewPanel()
         val deviceProfile = recentsViewContainer?.getDeviceProfile()
         val uiController = activityInterface.getTaskbarController()
         val allowQuickSwitch =
-            FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH.get() &&
-                uiController != null &&
+            uiController != null &&
                 deviceProfile != null &&
                 (deviceProfile.isTablet || deviceProfile.isTwoPanels)
 
@@ -349,13 +347,13 @@ constructor(
         val gestureState =
             touchInteractionService.createGestureState(
                 GestureState.DEFAULT_STATE,
-                GestureState.TrackpadGestureType.NONE
+                GestureState.TrackpadGestureType.NONE,
             )
         gestureState.isHandlingAtomicEvent = true
         val interactionHandler =
             touchInteractionService.swipeUpHandlerFactory.newHandler(
                 gestureState,
-                command.createTime
+                command.createTime,
             )
         interactionHandler.setGestureEndCallback {
             onTransitionComplete(command, interactionHandler, onCallbackResult)
@@ -366,7 +364,7 @@ constructor(
             object : RecentsAnimationCallbacks.RecentsAnimationListener {
                 override fun onRecentsAnimationStart(
                     controller: RecentsAnimationController,
-                    targets: RecentsAnimationTargets
+                    targets: RecentsAnimationTargets,
                 ) {
                     Log.d(TAG, "recents animation started: $command")
                     updateRecentsViewFocus(command)
@@ -418,7 +416,7 @@ constructor(
     private fun onTransitionComplete(
         command: CommandInfo,
         handler: AbsSwipeUpHandler<*, *, *>,
-        onCommandResult: () -> Unit
+        onCommandResult: () -> Unit,
     ) {
         Log.d(TAG, "switching via recents animation - onTransitionComplete: $command")
         command.removeListener(handler)
@@ -434,7 +432,7 @@ constructor(
             Log.d(
                 TAG,
                 "next task not scheduled. First pending command type " +
-                    "is ${commandQueue.firstOrNull()} - command type is: $command"
+                    "is ${commandQueue.firstOrNull()} - command type is: $command",
             )
             return
         }
@@ -527,7 +525,7 @@ constructor(
         val type: CommandType,
         var status: CommandStatus = CommandStatus.IDLE,
         val createTime: Long = SystemClock.elapsedRealtime(),
-        private var animationCallbacks: RecentsAnimationCallbacks? = null
+        private var animationCallbacks: RecentsAnimationCallbacks? = null,
     ) {
         fun setAnimationCallbacks(recentsAnimationCallbacks: RecentsAnimationCallbacks) {
             this.animationCallbacks = recentsAnimationCallbacks
@@ -545,7 +543,7 @@ constructor(
             IDLE,
             PROCESSING,
             COMPLETED,
-            CANCELED
+            CANCELED,
         }
     }
 

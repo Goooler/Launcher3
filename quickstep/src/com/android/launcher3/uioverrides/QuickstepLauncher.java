@@ -200,6 +200,8 @@ import com.android.systemui.unfold.progress.RemoteUnfoldTransitionReceiver;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
+import kotlin.Unit;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -211,8 +213,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import kotlin.Unit;
 
 public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         SystemShortcut.BubbleActivityStarter {
@@ -692,9 +692,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         }
         addMultiWindowModeChangedListener(mDepthController);
         initUnfoldTransitionProgressProvider();
-        if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
-            mViewCapture = ViewCaptureFactory.getInstance(this).startCapture(getWindow());
-        }
+        mViewCapture = ViewCaptureFactory.getInstance(this).startCapture(getWindow());
         getWindow().addPrivateFlags(PRIVATE_FLAG_OPTIMIZE_MEASURE);
         QuickstepOnboardingPrefs.setup(this);
         View.setTraceLayoutSteps(TRACE_LAYOUTS);

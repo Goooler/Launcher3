@@ -13,21 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.android.quickstep.dagger;
 
-package com.android.launcher3.dagger;
+import com.android.quickstep.logging.LoggingModule;
 
-import dagger.Component;
+import dagger.Module;
 
-/**
- * Root component for Dagger injection for Launcher AOSP.
- */
-@LauncherAppSingleton
-@Component
-public interface LauncherAppComponent extends LauncherBaseAppComponent {
-    /** Builder for aosp LauncherAppComponent. */
-    @Component.Builder
-    interface Builder extends LauncherBaseAppComponent.Builder {
-        LauncherAppComponent build();
-    }
+@Module(includes = {LoggingModule.class})
+public class QuickStepModule {
 }
-

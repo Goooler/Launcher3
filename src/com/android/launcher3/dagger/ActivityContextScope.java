@@ -16,22 +16,17 @@
 
 package com.android.launcher3.dagger;
 
-import android.content.Context;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
-import dagger.BindsInstance;
+import javax.inject.Scope;
 
 /**
- * Launcher base component for Dagger injection.
- *
- * This class is not actually annotated as a Dagger component, since it is not used directly as one.
- * Doing so generates unnecessary code bloat.
- *
- * See {@link LauncherAppComponent} for the one actually used by AOSP.
+ * Scope annotation for singletons associated with Launcher activity context.
  */
-public interface LauncherBaseAppComponent {
-    /** Builder for LauncherBaseAppComponent. */
-    interface Builder {
-        @BindsInstance Builder appContext(@ApplicationContext Context context);
-        LauncherBaseAppComponent build();
-    }
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Scope
+public @interface ActivityContextScope {
 }

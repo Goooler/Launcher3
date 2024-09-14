@@ -37,7 +37,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.quickstep.TouchInteractionService.TISBinder;
 import com.android.quickstep.interaction.TutorialController.TutorialType;
@@ -79,9 +78,7 @@ public class GestureSandboxActivity extends FragmentActivity {
         Bundle args = savedInstanceState == null ? getIntent().getExtras() : savedInstanceState;
 
         boolean gestureComplete = args != null && args.getBoolean(KEY_GESTURE_COMPLETE, false);
-        if (FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
-                && args != null
-                && args.getBoolean(KEY_USE_TUTORIAL_MENU, false)) {
+        if (args != null && args.getBoolean(KEY_USE_TUTORIAL_MENU, false)) {
             mTutorialSteps = null;
             TutorialType tutorialTypeOverride = (TutorialType) args.get(KEY_TUTORIAL_TYPE);
             mCurrentFragment = tutorialTypeOverride == null
@@ -101,9 +98,7 @@ public class GestureSandboxActivity extends FragmentActivity {
                 .add(R.id.gesture_tutorial_fragment_container, mCurrentFragment)
                 .commit();
 
-        if (FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
-            correctUserOrientation();
-        }
+        correctUserOrientation();
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
 
         initWindowInsets();
@@ -115,9 +110,7 @@ public class GestureSandboxActivity extends FragmentActivity {
         super.onConfigurationChanged(newConfig);
 
         // Ensure the prompt to rotate the screen is updated
-        if (FeatureFlags.ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
-            correctUserOrientation();
-        }
+        correctUserOrientation();
     }
 
     private void initWindowInsets() {

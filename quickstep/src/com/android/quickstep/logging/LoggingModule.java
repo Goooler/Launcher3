@@ -14,24 +14,21 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.dagger;
+package com.android.quickstep.logging;
 
 import android.content.Context;
 
-import dagger.BindsInstance;
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppSingleton;
 
-/**
- * Launcher base component for Dagger injection.
- *
- * This class is not actually annotated as a Dagger component, since it is not used directly as one.
- * Doing so generates unnecessary code bloat.
- *
- * See {@link LauncherAppComponent} for the one actually used by AOSP.
- */
-public interface LauncherBaseAppComponent {
-    /** Builder for LauncherBaseAppComponent. */
-    interface Builder {
-        @BindsInstance Builder appContext(@ApplicationContext Context context);
-        LauncherBaseAppComponent build();
+import dagger.Module;
+import dagger.Provides;
+
+@Module
+public class LoggingModule {
+    @Provides
+    @LauncherAppSingleton
+    SettingsChangeLogger provideSettingsChangeLogger(@ApplicationContext Context context) {
+        return SettingsChangeLogger.INSTANCE.get(context);
     }
 }

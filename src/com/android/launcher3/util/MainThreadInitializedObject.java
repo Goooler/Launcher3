@@ -35,6 +35,9 @@ import java.util.function.Consumer;
 
 /**
  * Utility class for defining singletons which are initiated on main thread.
+ *
+ * TODO(b/361850561): Do not delete MainThreadInitializedObject until we find a way to
+ * unregister and understand how singleton objects are destroyed in dagger graph.
  */
 public class MainThreadInitializedObject<T extends SafeCloseable> {
 

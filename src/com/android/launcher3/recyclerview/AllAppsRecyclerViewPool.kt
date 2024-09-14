@@ -24,7 +24,6 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.android.launcher3.BubbleTextView
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.allapps.BaseAllAppsAdapter
-import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.util.CancellableTask
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.Executors.VIEW_PREINFLATION_EXECUTOR
@@ -78,7 +77,7 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() {
             ActivityContextDelegate(
                 context.createConfigurationContext(context.resources.configuration),
                 Themes.getActivityThemeRes(context),
-                context
+                context,
             )
 
         // Because we perform onCreateViewHolder() on worker thread, we need a separate
@@ -91,7 +90,7 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() {
                     context,
                     context.appsView.layoutInflater.cloneInContext(allAppsPreInflationContext),
                     null,
-                    null
+                    null,
                 ) {
                 override fun setAppsPerRow(appsPerRow: Int) = Unit
 
@@ -124,7 +123,7 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() {
                     for (i in 0 until minOf(viewHolders.size, getPreinflateCount(context))) {
                         putRecycledView(viewHolders[i])
                     }
-                }
+                },
             )
         mCancellableTask = task
         VIEW_PREINFLATION_EXECUTOR.submit(mCancellableTask)
@@ -144,18 +143,15 @@ class AllAppsRecyclerViewPool<T> : RecycledViewPool() {
      * app icons plus [EXTRA_ICONS_COUNT] is the magic minimal count of app icons to preinflate to
      * suffice fast scrolling.
      *
-     * Note that if [FeatureFlags.ALL_APPS_GONE_VISIBILITY] is enabled, we need to preinfate extra
-     * app icons in size of one all apps pages, so that opening all apps don't need to inflate app
-     * icons.
+     * Note that we need to preinfate extra app icons in size of one all apps pages, so that opening
+     * all apps don't need to inflate app icons.
      */
     fun <T> getPreinflateCount(context: T): Int where T : Context, T : ActivityContext {
         var targetPreinflateCount =
             PREINFLATE_ICONS_ROW_COUNT * context.deviceProfile.numShownAllAppsColumns +
                 EXTRA_ICONS_COUNT
-        if (FeatureFlags.ALL_APPS_GONE_VISIBILITY.get()) {
-            val grid = ActivityContext.lookupContext<T>(context).deviceProfile
-            targetPreinflateCount += grid.maxAllAppsRowCount * grid.numShownAllAppsColumns
-        }
+        val grid = ActivityContext.lookupContext<T>(context).deviceProfile
+        targetPreinflateCount += grid.maxAllAppsRowCount * grid.numShownAllAppsColumns
         if (hasWorkProfile) {
             targetPreinflateCount *= 2
         }
