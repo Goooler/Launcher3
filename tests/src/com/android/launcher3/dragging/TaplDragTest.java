@@ -197,7 +197,6 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
     @PlatinumTest(focusArea = "launcher")
     @Test
     @PortraitLandscape
-    @ScreenRecordRule.ScreenRecord // b/343953783
     public void testDragAppIcon() {
 
         final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();

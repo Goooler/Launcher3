@@ -187,6 +187,9 @@ public class BubbleBarView extends FrameLayout {
     private BubbleView mDismissedByDragBubbleView;
     private float mAlphaDuringDrag = 1f;
 
+    /** Additional translation in the y direction that is applied to each bubble */
+    private float mBubbleOffsetY;
+
     private Controller mController;
 
     private int mPreviousLayoutDirection = LayoutDirection.UNDEFINED;
@@ -332,6 +335,16 @@ public class BubbleBarView extends FrameLayout {
      */
     public void setBackgroundAlpha(float alpha) {
         mBubbleBarBackground.setAlpha((int) (255 * alpha));
+    }
+
+    /**
+     * Sets offset of each bubble view in the y direction from the base position in the bar.
+     */
+    public void setBubbleOffsetY(float offsetY) {
+        mBubbleOffsetY = offsetY;
+        for (int i = 0; i < getChildCount(); i++) {
+            getChildAt(i).setTranslationY(getBubbleTranslationY());
+        }
     }
 
     /**
@@ -997,10 +1010,7 @@ public class BubbleBarView extends FrameLayout {
         final float expandedWidth = expandedWidth();
         final float collapsedWidth = collapsedWidth();
         int childCount = getChildCount();
-        float viewBottom = mBubbleBarBounds.height() + (isExpanded() ? mPointerSize : 0);
-        float bubbleBarAnimatedTop = viewBottom - getBubbleBarHeight();
-        // When translating X & Y the scale is ignored, so need to deduct it from the translations
-        final float ty = bubbleBarAnimatedTop + mBubbleBarPadding - getScaleIconShift();
+        final float ty = getBubbleTranslationY();
         final boolean onLeft = bubbleBarLocation.isOnLeft(isLayoutRtl());
         // elevation state is opposite to widthState - when expanded all icons are flat
         float elevationState = (1 - widthState);
@@ -1132,6 +1142,13 @@ public class BubbleBarView extends FrameLayout {
             }
         }
         return mBubbleBarPadding + translationX - getScaleIconShift();
+    }
+
+    private float getBubbleTranslationY() {
+        float viewBottom = mBubbleBarBounds.height() + (isExpanded() ? mPointerSize : 0);
+        float bubbleBarAnimatedTop = viewBottom - getBubbleBarHeight();
+        // When translating X & Y the scale is ignored, so need to deduct it from the translations
+        return mBubbleOffsetY + bubbleBarAnimatedTop + mBubbleBarPadding - getScaleIconShift();
     }
 
     /**

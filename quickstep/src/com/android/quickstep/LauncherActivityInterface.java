@@ -76,7 +76,7 @@ public final class LauncherActivityInterface extends
                 && DisplayController.getNavigationMode(context) != NavigationMode.NO_BUTTON) {
             return dp.isSeascape() ? outRect.left : (dp.widthPx - outRect.right);
         } else {
-            return LayoutUtils.getShelfTrackingDistance(context, dp, orientationHandler);
+            return LayoutUtils.getShelfTrackingDistance(context, dp, orientationHandler, this);
         }
     }
 

@@ -37,6 +37,7 @@ import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
 import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING;
 import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_FULLSCREEN;
+import static com.android.launcher3.taskbar.TaskbarStashController.SHOULD_BUBBLES_FOLLOW_DEFAULT_VALUE;
 import static com.android.launcher3.testing.shared.ResourceUtils.getBoolByName;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
@@ -1550,10 +1551,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     /**
      * Called when we want to unstash taskbar when user performs swipes up gesture.
+     * @param delayTaskbarBackground whether we will delay the taskbar background animation
      */
-    public void onSwipeToUnstashTaskbar() {
+    public void onSwipeToUnstashTaskbar(boolean delayTaskbarBackground) {
         boolean wasStashed = mControllers.taskbarStashController.isStashed();
-        mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(/* stash= */ false);
+        mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(/* stash= */ false,
+                SHOULD_BUBBLES_FOLLOW_DEFAULT_VALUE, delayTaskbarBackground);
         boolean isStashed = mControllers.taskbarStashController.isStashed();
         if (isStashed != wasStashed) {
             VibratorWrapper.INSTANCE.get(this).vibrateForTaskbarUnstash();

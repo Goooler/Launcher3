@@ -242,7 +242,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
         });
     }
 
-    @ScreenRecordRule.ScreenRecord // b/329935119
     @Test
     @PortraitLandscape
     public void testEmptyPageDoesNotGetRemovedIfPagePairIsNotEmpty() {

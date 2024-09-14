@@ -18,11 +18,8 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
-import static com.android.launcher3.taskbar.bubbles.BubbleView.STASH_TRANSLATION_Y;
-
 import android.animation.Animator;
 import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -97,6 +94,8 @@ public class BubbleBarViewController {
             this::updateBackgroundScaleY);
     private final AnimatedFloat mBubbleBarTranslationY = new AnimatedFloat(
             this::updateTranslationY);
+    private final AnimatedFloat mBubbleOffsetY = new AnimatedFloat(
+            this::updateBubbleOffsetY);
 
     // Modified when swipe up is happening on the bubble bar or task bar.
     private float mBubbleBarSwipeUpTranslationY;
@@ -297,6 +296,10 @@ public class BubbleBarViewController {
 
     public AnimatedFloat getBubbleBarTranslationY() {
         return mBubbleBarTranslationY;
+    }
+
+    public AnimatedFloat getBubbleOffsetY() {
+        return mBubbleOffsetY;
     }
 
     public float getBubbleBarCollapsedWidth() {
@@ -574,6 +577,10 @@ public class BubbleBarViewController {
 
     private void updateBubbleAlpha(float alpha) {
         mBarView.setBubbleAlpha(alpha);
+    }
+
+    private void updateBubbleOffsetY(float transY) {
+        mBarView.setBubbleOffsetY(transY);
     }
 
     private void updateBackgroundAlpha(float alpha) {
@@ -874,14 +881,9 @@ public class BubbleBarViewController {
         mBubbleStashController.getHandleBounds(stashedHandleBounds);
         int childCount = mBarView.getChildCount();
         float newChildWidth = (float) stashedHandleBounds.width() / childCount;
-        float stashTranslationY = -mBubbleStashController.getBubbleBarTranslationY();
         AnimatorSet animatorSet = new AnimatorSet();
         for (int i = 0; i < childCount; i++) {
             BubbleView child = (BubbleView) mBarView.getChildAt(i);
-            final float startTransY = isStashed ? 0f : stashTranslationY;
-            final float endTransY = isStashed ? stashTranslationY : 0f;
-            animatorSet.play(
-                    ObjectAnimator.ofFloat(child, STASH_TRANSLATION_Y, startTransY, endTransY));
             animatorSet.play(
                     createRevealAnimForBubble(child, isStashed, stashedHandleBounds,
                             newChildWidth));

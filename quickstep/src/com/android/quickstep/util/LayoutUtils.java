@@ -23,7 +23,7 @@ import android.view.ViewGroup;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
-import com.android.quickstep.LauncherActivityInterface;
+import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 
 public class LayoutUtils {
@@ -41,11 +41,14 @@ public class LayoutUtils {
         return swipeHeight;
     }
 
-    public static int getShelfTrackingDistance(Context context, DeviceProfile dp,
-            RecentsPagedOrientationHandler orientationHandler) {
+    public static int getShelfTrackingDistance(
+            Context context,
+            DeviceProfile dp,
+            RecentsPagedOrientationHandler orientationHandler,
+            BaseContainerInterface<?, ?> baseContainerInterface) {
         // Track the bottom of the window.
         Rect taskSize = new Rect();
-        LauncherActivityInterface.INSTANCE.calculateTaskSize(context, dp, taskSize,
+        baseContainerInterface.calculateTaskSize(context, dp, taskSize,
                 orientationHandler);
         return orientationHandler.getDistanceToBottomOfRect(dp, taskSize);
     }
