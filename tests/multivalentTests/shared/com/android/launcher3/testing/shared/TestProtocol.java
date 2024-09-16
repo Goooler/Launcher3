@@ -170,7 +170,7 @@ public final class TestProtocol {
     public static final String UIOBJECT_STALE_ELEMENT = "b/319501259";
     public static final String TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE = "b/326908466";
     public static final String WIDGET_CONFIG_NULL_EXTRA_INTENT = "b/324419890";
-    public static final String OVERVIEW_SELECT_TOOLTIP_MISALIGNED = "b/332485341";
+
     public static final String REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW = "enable-grid-only-overview";
     public static final String REQUEST_FLAG_ENABLE_APP_PAIRS = "enable-app-pairs";
 

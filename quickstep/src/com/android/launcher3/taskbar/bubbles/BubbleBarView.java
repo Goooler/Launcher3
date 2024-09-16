@@ -1135,10 +1135,13 @@ public class BubbleBarView extends FrameLayout {
                 translationX = 0f;
             }
         } else {
-            if (bubbleIndex == 1 && getBubbleChildCount() >= MAX_VISIBLE_BUBBLES_COLLAPSED) {
-                translationX = mIconOverlapAmount;
-            } else {
+            // when the bar is on the right, the first bubble always has translation 0. the only
+            // case where another bubble has translation 0 is when we only have 1 bubble and the
+            // overflow. otherwise all other bubbles should be shifted by the overlap amount.
+            if (bubbleIndex == 0 || getBubbleChildCount() == 1) {
                 translationX = 0f;
+            } else {
+                translationX = mIconOverlapAmount;
             }
         }
         return mBubbleBarPadding + translationX - getScaleIconShift();

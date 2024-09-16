@@ -49,9 +49,7 @@ class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
         recentsViewModel.setRunningTaskShowScreenshot(true)
         viewAttachedScope.launch {
             recentsViewModel.waitForRunningTaskShowScreenshotToUpdate()
-            if (updatedThumbnails != null) {
-                recentsViewModel.waitForThumbnailsToUpdate(updatedThumbnails)
-            }
+            recentsViewModel.waitForThumbnailsToUpdate(updatedThumbnails)
             ViewUtils.postFrameDrawn(taskView, onFinishRunnable)
         }
     }

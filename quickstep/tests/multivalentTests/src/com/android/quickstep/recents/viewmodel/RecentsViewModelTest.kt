@@ -70,6 +70,55 @@ class RecentsViewModelTest {
         assertThat(thumbnailDataFlow2.first()).isNull()
     }
 
+    @Test
+    fun updatesRunningTaskShowScreenshot() = runTest {
+        systemUnderTest.setRunningTaskShowScreenshot(true)
+        systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
+    }
+
+    @Test
+    fun waitForThumbnailsToUpdate() = runTest {
+        // Given taskRepository with visible 2 tasks containing thumbnailData
+        val thumbnailData1 = createThumbnailData().apply { snapshotId = 1 }
+        val thumbnailData2 = createThumbnailData().apply { snapshotId = 2 }
+        tasksRepository.seedTasks(tasks)
+        tasksRepository.seedThumbnailData(mapOf(1 to thumbnailData1, 2 to thumbnailData2))
+        systemUnderTest.updateVisibleTasks(listOf(1, 2))
+
+        val thumbnailDataFlow1 = tasksRepository.getThumbnailById(1)
+        val thumbnailDataFlow2 = tasksRepository.getThumbnailById(2)
+
+        // Then getThumbnailById should initially contains correct thumbnailData
+        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
+        assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
+
+        // When thumbnailData is updated in taskRepository
+        tasksRepository.seedThumbnailData(
+            mapOf(1 to thumbnailData1, 2 to createThumbnailData().apply { snapshotId = 3 })
+        )
+        // setVisibleTasks forces FakeTasksRepository to update the flows returned by
+        // getThumbnailById
+        tasksRepository.setVisibleTasks(listOf(1, 2))
+
+        // Then wait for thumbnailData should complete, and the previous getThumbnailById flow
+        // should return updated values
+        systemUnderTest.waitForThumbnailsToUpdate(
+            mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
+        )
+        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
+        assertThat(thumbnailDataFlow2.first()?.snapshotId).isEqualTo(3)
+    }
+
+    @Test
+    fun waitForThumbnailsToUpdate_emptyMap() = runTest {
+        systemUnderTest.waitForThumbnailsToUpdate(emptyMap())
+    }
+
+    @Test
+    fun waitForThumbnailsToUpdate_null() = runTest {
+        systemUnderTest.waitForThumbnailsToUpdate(null)
+    }
+
     private fun createTaskWithId(taskId: Int) =
         Task(Task.TaskKey(taskId, 0, Intent(), ComponentName("", ""), 0, 2000)).apply {
             colorBackground = Color.argb(taskId, taskId, taskId, taskId)

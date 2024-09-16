@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
+import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
@@ -440,11 +441,6 @@ public class TaskbarLauncherStateController {
         return animator;
     }
 
-    /** Returns {@code true} if launcher is currently presenting the home screen. */
-    public boolean isOnHome() {
-        return isInLauncher() && mLauncherState == LauncherState.NORMAL;
-    }
-
     private Animator onStateChangeApplied(int changedFlags, long duration, boolean start) {
         final boolean isInLauncher = isInLauncher();
         final boolean isIconAlignedWithHotseat = isIconAlignedWithHotseat();
@@ -456,9 +452,11 @@ public class TaskbarLauncherStateController {
                     + ", toAlignment: " + toAlignment);
         }
         mControllers.bubbleControllers.ifPresent(controllers -> {
-            // Show the bubble bar when on launcher home or in overview.
+            // Show the bubble bar when on launcher home (hotseat icons visible) or in overview
             boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
-            controllers.bubbleStashController.setBubblesShowingOnHome(isOnHome());
+            boolean hotseatIconsVisible = isInLauncher && mLauncherState.areElementsVisible(
+                    mLauncher, HOTSEAT_ICONS);
+            controllers.bubbleStashController.setBubblesShowingOnHome(hotseatIconsVisible);
             controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
         });
 

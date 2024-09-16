@@ -1,5 +1,5 @@
 package: "com.android.launcher3"
-container: "system_ext"
+container: "system"
 
 flag {
     name: "enable_expanding_pause_work_button"
@@ -397,4 +397,11 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_dismiss_prediction_undo"
+    namespace: "launcher"
+    description: "Show an 'Undo' snackbar when users dismiss a predicted hotseat item"
+    bug: "270394476"
 }

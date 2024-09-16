@@ -248,7 +248,6 @@ public class FallbackRecentsTest {
     }
 
     @Test
-    @ScreenRecordRule.ScreenRecord // b/355042336
     public void testOverview() throws IOException {
         startAppFast(getAppPackageName());
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));

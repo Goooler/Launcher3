@@ -1,5 +1,6 @@
 package com.android.launcher3.popup;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_DISMISS_PREDICTION_UNDO;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_PRIVATE_SPACE_INSTALL_SYSTEM_SHORTCUT_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_PRIVATE_SPACE_UNINSTALL_SYSTEM_SHORTCUT_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP;
@@ -41,6 +42,7 @@ import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.Snackbar;
 import com.android.launcher3.widget.WidgetsBottomSheet;
 import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 
@@ -336,6 +338,14 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
             mTarget.getStatsLogManager().logger()
                     .withItemInfo(mItemInfo)
                     .log(LAUNCHER_SYSTEM_SHORTCUT_DONT_SUGGEST_APP_TAP);
+            if (Flags.enableDismissPredictionUndo()) {
+                Snackbar.show(mTarget,
+                        view.getContext().getString(R.string.item_removed), R.string.undo,
+                        () -> { }, () ->
+                            mTarget.getStatsLogManager().logger()
+                                    .withItemInfo(mItemInfo)
+                                    .log(LAUNCHER_DISMISS_PREDICTION_UNDO));
+            }
         }
     }
 

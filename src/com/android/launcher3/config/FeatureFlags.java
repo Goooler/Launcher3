@@ -63,10 +63,6 @@ public final class FeatureFlags {
      * <p>
      */
     // TODO(Block 3): Clean up flags
-    public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(270394476,
-            "ENABLE_DISMISS_PREDICTION_UNDO", DISABLED,
-            "Show an 'Undo' snackbar when users dismiss a predicted hotseat item");
-
     public static final BooleanFlag ENABLE_WORKSPACE_LOADING_OPTIMIZATION = getDebugFlag(251502424,
             "ENABLE_WORKSPACE_LOADING_OPTIMIZATION", DISABLED,
             "load the current workspace screen visible to the user before the rest rather than "
