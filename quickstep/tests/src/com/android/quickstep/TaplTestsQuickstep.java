@@ -577,7 +577,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     public void testExcludeFromRecents() throws Exception {
         startExcludeFromRecentsTestActivity();
         OverviewTask currentTask = getAndAssertLaunchedApp().switchToOverview().getCurrentTask();
-        // TODO(b/326565120): the expected content description shouldn't be null but for now there
+        // TODO(b/342627272): the expected content description shouldn't be null but for now there
         // is a bug that causes it to sometimes be for excludeForRecents tasks.
         assertTrue("Can't find ExcludeFromRecentsTestActivity after entering Overview from it",
                 currentTask.containsContentDescription("ExcludeFromRecents")

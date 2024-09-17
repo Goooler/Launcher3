@@ -688,6 +688,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return mNavMode == NavigationMode.THREE_BUTTONS;
     }
 
+    /** Returns whether taskbar should start align. */
+    public boolean shouldStartAlignTaskbar() {
+        return isThreeButtonNav() && mDeviceProfile.startAlignTaskbar;
+    }
+
     public boolean isGestureNav() {
         return mNavMode == NavigationMode.NO_BUTTON;
     }
@@ -1690,7 +1695,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 duration);
 
         View allAppsButton = mControllers.taskbarViewController.getAllAppsButtonView();
-        if (allAppsButton != null && !FeatureFlags.ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.get()) {
+        if (allAppsButton != null && !FeatureFlags.enableAllAppsButtonInHotseat()) {
             ValueAnimator alphaOverride = ValueAnimator.ofFloat(0, 1);
             alphaOverride.setDuration(duration);
             alphaOverride.addUpdateListener(a -> {

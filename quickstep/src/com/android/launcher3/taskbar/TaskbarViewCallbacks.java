@@ -28,6 +28,7 @@ import androidx.annotation.Nullable;
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
@@ -126,5 +127,11 @@ public class TaskbarViewCallbacks {
             return bubbleBarViewController.getBubbleBarLocation();
         }
         return null;
+    }
+
+    /** Returns true if bubble bar controllers present and enabled in persistent taskbar. */
+    public boolean isBubbleBarEnabledInPersistentTaskbar() {
+        return Flags.enableBubbleBarInPersistentTaskBar()
+                && mControllers.bubbleControllers.isPresent();
     }
 }

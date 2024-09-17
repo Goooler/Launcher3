@@ -87,6 +87,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private final boolean mIsRtl;
 
     private final TaskbarActivityContext mActivityContext;
+    @Nullable private BubbleBarLocation mBubbleBarLocation = null;
 
     // Initialized in init.
     private TaskbarViewCallbacks mControllerCallbacks;
@@ -197,7 +198,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     @Override
     public void onDeviceProfileChanged(DeviceProfile dp) {
-        mShouldTryStartAlign = mActivityContext.isThreeButtonNav() && dp.startAlignTaskbar;
+        mShouldTryStartAlign = mActivityContext.shouldStartAlignTaskbar();
     }
 
     @Override
@@ -494,39 +495,60 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         icon.setOnHoverListener(mControllerCallbacks.getIconOnHoverListener(icon));
     }
 
+    /** Updates taskbar icons accordingly to the new bubble bar location. */
+    public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
+        if (mBubbleBarLocation == location) return;
+        mBubbleBarLocation = location;
+        requestLayout();
+    }
+
+    /**
+     * Returns translation X for the taskbar icons for provided {@link BubbleBarLocation}. If the
+     * bubble bar is not enabled, or location of the bubble bar is the same, or taskbar is not start
+     * aligned - returns 0.
+     */
+    public float getTranslationXForBubbleBarPosition(BubbleBarLocation location) {
+        if (!mControllerCallbacks.isBubbleBarEnabledInPersistentTaskbar()
+                || location == mBubbleBarLocation
+                || !mActivityContext.shouldStartAlignTaskbar()
+        ) {
+            return 0;
+        }
+        Rect iconsBounds = getIconLayoutBounds();
+        return getTaskBarIconsEndForBubbleBarLocation(location) - iconsBounds.right;
+    }
+
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        int count = getChildCount();
-        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         int spaceNeeded = getIconLayoutWidth();
-        int navSpaceNeeded = deviceProfile.hotseatBarEndOffset;
         boolean layoutRtl = isLayoutRtl();
-        int centerAlignIconEnd = right - (right - left - spaceNeeded) / 2;
-        int iconEnd;
-
+        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
+        int navSpaceNeeded = deviceProfile.hotseatBarEndOffset;
+        int centerAlignIconEnd = (right + left + spaceNeeded) / 2;
+        int iconEnd = centerAlignIconEnd;
         if (mShouldTryStartAlign) {
-            // Taskbar is aligned to the start
             int startSpacingPx = deviceProfile.inlineNavButtonsEndSpacingPx;
-
-            if (layoutRtl) {
-                iconEnd = right - startSpacingPx;
+            if (mControllerCallbacks.isBubbleBarEnabledInPersistentTaskbar()
+                    && mBubbleBarLocation != null
+                    && mActivityContext.shouldStartAlignTaskbar()) {
+                iconEnd = (int) getTaskBarIconsEndForBubbleBarLocation(mBubbleBarLocation);
             } else {
-                iconEnd = startSpacingPx + spaceNeeded;
+                if (layoutRtl) {
+                    iconEnd = right - startSpacingPx;
+                } else {
+                    iconEnd = startSpacingPx + spaceNeeded;
+                }
+                boolean needMoreSpaceForNav = layoutRtl
+                        ? navSpaceNeeded > (iconEnd - spaceNeeded)
+                        : iconEnd > (right - navSpaceNeeded);
+                if (needMoreSpaceForNav) {
+                    // Add offset to account for nav bar when taskbar is centered
+                    int offset = layoutRtl
+                            ? navSpaceNeeded - (centerAlignIconEnd - spaceNeeded)
+                            : (right - navSpaceNeeded) - centerAlignIconEnd;
+                    iconEnd = centerAlignIconEnd + offset;
+                }
             }
-        } else {
-            iconEnd = centerAlignIconEnd;
-        }
-
-        boolean needMoreSpaceForNav = layoutRtl
-                ? navSpaceNeeded > (iconEnd - spaceNeeded)
-                : iconEnd > (right - navSpaceNeeded);
-        if (needMoreSpaceForNav) {
-            // Add offset to account for nav bar when taskbar is centered
-            int offset = layoutRtl
-                    ? navSpaceNeeded - (centerAlignIconEnd - spaceNeeded)
-                    : (right - navSpaceNeeded) - centerAlignIconEnd;
-
-            iconEnd = centerAlignIconEnd + offset;
         }
 
         // Currently, we support only one device with display cutout and we only are concern about
@@ -558,6 +580,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mIconLayoutBounds.right = iconEnd;
         mIconLayoutBounds.top = (bottom - top - mIconTouchSize) / 2;
         mIconLayoutBounds.bottom = mIconLayoutBounds.top + mIconTouchSize;
+        int count = getChildCount();
         for (int i = count; i > 0; i--) {
             View child = getChildAt(i - 1);
             if (child == mQsb) {
@@ -769,5 +792,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
         }
         return mAllAppsButtonContainer;
+    }
+
+    /**
+     * This method only works for bubble bar enabled in persistent task bar and the taskbar is start
+     * aligned.
+     */
+    private float getTaskBarIconsEndForBubbleBarLocation(BubbleBarLocation location) {
+        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
+        boolean navbarOnRight = location.isOnLeft(isLayoutRtl());
+        int navSpaceNeeded = deviceProfile.hotseatBarEndOffset;
+        if (navbarOnRight) {
+            return getWidth() - navSpaceNeeded;
+        } else {
+            return navSpaceNeeded + getIconLayoutWidth();
+        }
     }
 }

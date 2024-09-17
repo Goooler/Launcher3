@@ -350,7 +350,6 @@
     <dimen name="taskbar_back_button_left_margin_kids">48dp</dimen>
     <dimen name="taskbar_home_button_left_margin_kids">48dp</dimen>
     <dimen name="taskbar_icon_size_kids">32dp</dimen>
-    <dimen name="taskbar_all_apps_button_translation_x_offset">6dp</dimen>
     <dimen name="taskbar_all_apps_search_button_translation_x_offset">6dp</dimen>
     <dimen name="taskbar_contextual_button_suw_margin">64dp</dimen>
     <dimen name="taskbar_contextual_button_suw_height">64dp</dimen>

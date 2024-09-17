@@ -23,6 +23,7 @@ import static android.view.View.VISIBLE;
 import static com.android.launcher3.BubbleTextView.DISPLAY_TASKBAR;
 import static com.android.launcher3.BubbleTextView.DISPLAY_WORKSPACE;
 import static com.android.launcher3.DeviceProfile.DEFAULT_SCALE;
+import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_PREVIEW_RENDERER;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
@@ -320,12 +321,12 @@ public class LauncherPreviewRenderer extends ContextWrapper
         mUiHandler.post(() -> {
             if (mDp.isTaskbarPresent) {
                 // hotseat icons on bottom
-                mHotseat.setIconsAlpha(hide ? 0 : 1);
+                mHotseat.setIconsAlpha(hide ? 0 : 1, ALPHA_CHANNEL_PREVIEW_RENDERER);
                 if (mDp.isQsbInline) {
-                    mHotseat.setQsbAlpha(hide ? 0 : 1);
+                    mHotseat.setQsbAlpha(hide ? 0 : 1, ALPHA_CHANNEL_PREVIEW_RENDERER);
                 }
             } else {
-                mHotseat.setQsbAlpha(hide ? 0 : 1);
+                mHotseat.setQsbAlpha(hide ? 0 : 1, ALPHA_CHANNEL_PREVIEW_RENDERER);
             }
         });
     }

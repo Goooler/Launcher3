@@ -76,7 +76,14 @@ public class BubbleControllers {
      * in constructors for now, as some controllers may still be waiting for init().
      */
     public void init(TaskbarControllers taskbarControllers) {
+        // TODO(b/346381754) add TaskbarLauncherStateController implementation to adjust the hotseat
+        BubbleBarLocationCompositeListener bubbleBarLocationListeners =
+                new BubbleBarLocationCompositeListener(
+                        taskbarControllers.navbarButtonsViewController,
+                        taskbarControllers.taskbarViewController
+                );
         bubbleBarController.init(this,
+                bubbleBarLocationListeners,
                 taskbarControllers.navbarButtonsViewController::isImeVisible);
         bubbleStashedHandleViewController.ifPresent(
                 controller -> controller.init(/* bubbleControllers = */ this));
@@ -102,7 +109,7 @@ public class BubbleControllers {
                 });
         bubbleDragController.init(/* bubbleControllers = */ this);
         bubbleDismissController.init(/* bubbleControllers = */ this);
-        bubbleBarPinController.init(this);
+        bubbleBarPinController.init(this, bubbleBarLocationListeners);
         bubblePinController.init(this);
 
         mPostInitRunnables.executeAllAndDestroy();
@@ -124,6 +131,7 @@ public class BubbleControllers {
     public void onDestroy() {
         bubbleStashedHandleViewController.ifPresent(BubbleStashedHandleViewController::onDestroy);
         bubbleBarController.onDestroy();
+        bubbleBarViewController.onDestroy();
     }
 
     /** Dumps bubble controllers state. */

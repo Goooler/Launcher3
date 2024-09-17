@@ -681,6 +681,7 @@ public abstract class RecentsView<
     protected int mRunningTaskViewId = -1;
     private int mTaskViewIdCount;
     protected boolean mRunningTaskTileHidden;
+    private boolean mNonRunningTaskCategoryHidden;
     @Nullable
     private Task[] mTmpRunningTasks;
     protected int mFocusedTaskViewId = INVALID_TASK_ID;
@@ -2094,14 +2095,10 @@ public abstract class RecentsView<
             simulator.fullScreenProgress.value = 0;
             simulator.recentsViewScale.value = 1;
         });
-        // Similar to setRunningTaskHidden below, reapply the state before runningTaskView is
-        // null.
-        if (!mRunningTaskShowScreenshot) {
-            setRunningTaskViewShowScreenshot(mRunningTaskShowScreenshot);
-        }
-        if (mRunningTaskTileHidden) {
-            setRunningTaskHidden(mRunningTaskTileHidden);
-        }
+        // Reapply runningTask related attributes as they might have been reset by
+        // resetViewTransforms().
+        setRunningTaskViewShowScreenshot(mRunningTaskShowScreenshot);
+        applyAttachAlpha();
 
         updateCurveProperties();
         // Update the set of visible task's data
@@ -2650,10 +2647,6 @@ public abstract class RecentsView<
         return getTaskViewFromTaskViewId(mFocusedTaskViewId);
     }
 
-    private @Nullable TaskView getFirstLargeTaskView() {
-        return mUtils.getFirstLargeTaskView(getTaskViews());
-    }
-
     @Nullable
     private TaskView getTaskViewFromTaskViewId(int taskViewId) {
         if (taskViewId == -1) {
@@ -2749,7 +2742,10 @@ public abstract class RecentsView<
         showCurrentTask(mActiveGestureRunningTasks);
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
-        setRunningTaskHidden(!shouldUpdateRunningTaskAlpha());
+        setRunningTaskHidden(true);
+        if (enableLargeDesktopWindowingTile()) {
+            setNonRunningTaskCategoryHidden(true);
+        }
         setTaskIconScaledDown(true);
     }
 
@@ -2888,6 +2884,9 @@ public abstract class RecentsView<
         setEnableDrawingLiveTile(mCurrentGestureEndTarget == GestureState.GestureEndTarget.RECENTS);
         Log.d(TAG, "onGestureAnimationEnd - mEnableDrawingLiveTile: " + mEnableDrawingLiveTile);
         setRunningTaskHidden(false);
+        if (enableLargeDesktopWindowingTile()) {
+            setNonRunningTaskCategoryHidden(false);
+        }
         animateUpTaskIconScale();
         animateActionsViewIn();
 
@@ -3043,11 +3042,25 @@ public abstract class RecentsView<
         if (runningTask == null) {
             return;
         }
-        runningTask.setStableAlpha(isHidden ? 0 : mContentAlpha);
+        applyAttachAlpha();
         if (!isHidden) {
             AccessibilityManagerCompat.sendCustomAccessibilityEvent(
                     runningTask, AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
         }
+    }
+
+    /**
+     * Hides the tasks that has a different category (Fullscreen/Desktop) from the running task.
+     */
+    public void setNonRunningTaskCategoryHidden(boolean isHidden) {
+        mNonRunningTaskCategoryHidden = isHidden;
+        updateMinAndMaxScrollX();
+        applyAttachAlpha();
+    }
+
+    private void applyAttachAlpha() {
+        mUtils.applyAttachAlpha(getTaskViews(), getRunningTaskView(), mRunningTaskTileHidden,
+                mNonRunningTaskCategoryHidden);
     }
 
     private void setRunningTaskViewShowScreenshot(boolean showScreenshot) {
@@ -4447,11 +4460,7 @@ public abstract class RecentsView<
         alpha = Utilities.boundToRange(alpha, 0, 1);
         mContentAlpha = alpha;
 
-        TaskView runningTaskView = getRunningTaskView();
         for (TaskView taskView : getTaskViews()) {
-            if (runningTaskView != null && mRunningTaskTileHidden && taskView == runningTaskView) {
-                continue;
-            }
             taskView.setStableAlpha(alpha);
         }
         mClearAllButton.setContentAlpha(mContentAlpha);
@@ -4564,7 +4573,7 @@ public abstract class RecentsView<
     /**
      * Returns the current list of [TaskView] children.
      */
-    private List<TaskView> getTaskViews() {
+    private Iterable<TaskView> getTaskViews() {
         return mUtils.getTaskViews(getTaskViewCount(), this::requireTaskViewAt);
     }
 
@@ -5794,26 +5803,42 @@ public abstract class RecentsView<
     }
 
     private int getFirstViewIndex() {
-        TaskView firstTaskView = mShowAsGridLastOnLayout ? getFirstLargeTaskView() : null;
-        return firstTaskView != null ? indexOfChild(firstTaskView) : 0;
+        final TaskView firstView;
+        if (mShowAsGridLastOnLayout) {
+            // For grid Overivew, it always start if a large tile (focused task or desktop task) if
+            // they exist, otherwise it start with the first task.
+            TaskView firstLargeTaskView = mUtils.getFirstLargeTaskView(getTaskViews());
+            if (firstLargeTaskView != null) {
+                firstView = firstLargeTaskView;
+            } else {
+                firstView = getTaskViewAt(0);
+            }
+        } else {
+            firstView = mUtils.getFirstTaskViewInCarousel(mNonRunningTaskCategoryHidden,
+                    getTaskViews(), getRunningTaskView());
+        }
+        return indexOfChild(firstView);
     }
 
     private int getLastViewIndex() {
+        final View lastView;
         if (!mDisallowScrollToClearAll) {
-            return indexOfChild(mClearAllButton);
+            // When ClearAllButton is present, it always end with ClearAllButton.
+            lastView = mClearAllButton;
+        } else if (mShowAsGridLastOnLayout) {
+            // When ClearAllButton is absent, for the grid Overview, it always end with a grid task
+            // if they exist, otherwise it ends with a large tile (focused task or desktop task).
+            TaskView lastGridTaskView = getLastGridTaskView();
+            if (lastGridTaskView != null) {
+                lastView = lastGridTaskView;
+            } else {
+                lastView = mUtils.getLastLargeTaskView(getTaskViews());
+            }
+        } else {
+            lastView = mUtils.getLastTaskViewInCarousel(mNonRunningTaskCategoryHidden,
+                    getTaskViews(), getRunningTaskView());
         }
-
-        if (!mShowAsGridLastOnLayout) {
-            return getTaskViewCount() - 1;
-        }
-
-        TaskView lastGridTaskView = getLastGridTaskView();
-        if (lastGridTaskView != null) {
-            return indexOfChild(lastGridTaskView);
-        }
-
-        // Returns focus task if there are no grid tasks.
-        return indexOfChild(getFirstLargeTaskView());
+        return indexOfChild(lastView);
     }
 
     /**

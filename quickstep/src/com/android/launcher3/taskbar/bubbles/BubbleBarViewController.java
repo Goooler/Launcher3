@@ -440,7 +440,7 @@ public class BubbleBarViewController {
             if (hidden) {
                 mBarView.setAlpha(0);
                 mBarView.setExpanded(false);
-                updatePersistentTaskbar(/* isBubbleBarExpanded = */ false);
+                adjustTaskbarAndHotseatToBubbleBarState(/* isBubbleBarExpanded = */ false);
             }
             mActivity.bubbleBarVisibilityChanged(!hidden);
         }
@@ -735,7 +735,7 @@ public class BubbleBarViewController {
     public void setExpanded(boolean isExpanded) {
         if (isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
-            updatePersistentTaskbar(isExpanded);
+            adjustTaskbarAndHotseatToBubbleBarState(isExpanded);
             if (!isExpanded) {
                 mSystemUiProxy.collapseBubbles();
             } else {
@@ -746,13 +746,20 @@ public class BubbleBarViewController {
         }
     }
 
-    private void updatePersistentTaskbar(boolean isBubbleBarExpanded) {
-        if (mBubbleStashController.isTransientTaskBar()) return;
-        boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
-        mTaskbarViewPropertiesProvider
-                .getIconsAlpha()
-                .animateToValue(hideTaskbar ? 0 : 1)
-                .start();
+    /**
+     * Hides the persistent taskbar if it is going to intersect with the expanded bubble bar if in
+     * app or overview. Set the hotseat stashed state if on launcher home screen.
+     */
+    private void adjustTaskbarAndHotseatToBubbleBarState(boolean isBubbleBarExpanded) {
+        if (mBubbleStashController.isBubblesShowingOnHome()) {
+            mTaskbarStashController.stashHotseat(isBubbleBarExpanded);
+        } else if (!mBubbleStashController.isTransientTaskBar()) {
+            boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
+            mTaskbarViewPropertiesProvider
+                    .getIconsAlpha()
+                    .animateToValue(hideTaskbar ? 0 : 1)
+                    .start();
+        }
     }
 
     /** Return {@code true} if expanded bubble bar would intersect the taskbar. */
@@ -869,6 +876,11 @@ public class BubbleBarViewController {
      */
     public void setBoundsChangeListener(@Nullable BubbleBarBoundsChangeListener listener) {
         mBoundsChangeListener = listener;
+    }
+
+    /** Called when the controller is destroyed. */
+    public void onDestroy() {
+        adjustTaskbarAndHotseatToBubbleBarState(/*isBubbleBarExpanded = */false);
     }
 
     /**

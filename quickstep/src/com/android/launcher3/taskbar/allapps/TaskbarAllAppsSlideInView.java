@@ -39,7 +39,6 @@ import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsViewController.TaskbarAllAppsCallbacks;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.util.Themes;
@@ -180,9 +179,7 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         mContent = mAppsView;
 
         // Setup header protection for search bar, if enabled.
-        if (FeatureFlags.ENABLE_ALL_APPS_SEARCH_IN_TASKBAR.get()) {
-            mAppsView.setOnInvalidateHeaderListener(this::invalidate);
-        }
+        mAppsView.setOnInvalidateHeaderListener(this::invalidate);
 
         DeviceProfile dp = mActivityContext.getDeviceProfile();
         setShiftRange(dp.allAppsShiftRange);

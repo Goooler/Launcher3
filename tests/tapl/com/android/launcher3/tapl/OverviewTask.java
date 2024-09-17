@@ -282,7 +282,7 @@ public final class OverviewTask {
      * Returns whether the given String is contained in this Task's contentDescription. Also returns
      * true if both Strings are null.
      *
-     * TODO(b/326565120): remove Nullable support once the bug causing it to be null is fixed.
+     * TODO(b/342627272): remove Nullable support once the bug causing it to be null is fixed.
      */
     public boolean containsContentDescription(@Nullable String expected,
             OverviewSplitTask overviewSplitTask) {

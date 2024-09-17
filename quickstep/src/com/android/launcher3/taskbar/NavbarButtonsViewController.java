@@ -91,6 +91,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarButton;
+import com.android.launcher3.taskbar.bubbles.BubbleBarController;
 import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory;
 import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory.NavButtonLayoutter;
 import com.android.launcher3.taskbar.navbutton.NearestTouchFrame;
@@ -106,6 +107,7 @@ import com.android.systemui.shared.rotation.RotationButton;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -115,7 +117,8 @@ import java.util.function.IntPredicate;
 /**
  * Controller for managing nav bar buttons in taskbar
  */
-public class NavbarButtonsViewController implements TaskbarControllers.LoggableTaskbarController {
+public class NavbarButtonsViewController implements TaskbarControllers.LoggableTaskbarController,
+        BubbleBarController.BubbleBarLocationListener {
 
     private final Rect mTempRect = new Rect();
 
@@ -397,6 +400,12 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             }
         };
         mSeparateWindowParent.recreateControllers();
+        if (com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar()
+                && mControllers.bubbleControllers.isPresent()) {
+            BubbleBarLocation bubblesLocation = mControllers.bubbleControllers.get()
+                    .bubbleBarViewController.getBubbleBarLocation();
+            onBubbleBarLocationUpdated(bubblesLocation);
+        }
     }
 
     private void initButtons(ViewGroup navContainer, ViewGroup endContainer,
@@ -1166,6 +1175,52 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
      */
     public void updateTaskbarAlignment(float alignment) {
         mHitboxExtender.onAnimationProgressToOverview(alignment);
+    }
+
+    /** Adjusts navigation buttons layout accordingly to the bubble bar position. */
+    @Override
+    public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
+        mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
+    }
+
+    /** Animates navigation buttons accordingly to the bubble bar position. */
+    @Override
+    public void onBubbleBarLocationAnimated(BubbleBarLocation location) {
+        // TODO(b/346381754) add the teleport animation similarly to the bubble bar
+        mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
+    }
+
+    private int getNavBarTranslationX(BubbleBarLocation location) {
+        boolean isNavbarOnRight = location.isOnLeft(mNavButtonsView.isLayoutRtl());
+        DeviceProfile dp = mContext.getDeviceProfile();
+        float navBarTargetStartX;
+        if (mContext.shouldStartAlignTaskbar()) {
+            int navBarSpacing = dp.inlineNavButtonsEndSpacingPx;
+            // If the taskbar is start aligned the navigation bar is aligned to the start or end of
+            // the container, depending on the bubble bar location
+            if (isNavbarOnRight) {
+                navBarTargetStartX = dp.widthPx - navBarSpacing - mNavButtonContainer.getWidth();
+            } else {
+                navBarTargetStartX = navBarSpacing;
+            }
+        } else {
+            // If the task bar is not start aligned, the navigation bar is located in the center
+            // between the taskbar and screen edges, depending on the bubble bar location.
+            float navbarWidth = mNavButtonContainer.getWidth();
+            Rect taskbarBounds = mControllers.taskbarViewController.getIconLayoutBounds();
+            if (isNavbarOnRight) {
+                if (mNavButtonsView.isLayoutRtl()) {
+                    float taskBarEnd = taskbarBounds.right;
+                    navBarTargetStartX = (dp.widthPx + taskBarEnd - navbarWidth) / 2;
+                } else {
+                    navBarTargetStartX = mNavButtonContainer.getLeft();
+                }
+            } else {
+                float taskBarStart = taskbarBounds.left;
+                navBarTargetStartX = (taskBarStart - navbarWidth) / 2;
+            }
+        }
+        return (int) navBarTargetStartX - mNavButtonContainer.getLeft();
     }
 
     private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {

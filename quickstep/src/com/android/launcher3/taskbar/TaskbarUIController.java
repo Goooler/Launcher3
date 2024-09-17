@@ -428,4 +428,8 @@ public class TaskbarUIController {
     public void setSkipLauncherVisibilityChange(boolean skip) {
         mSkipLauncherVisibilityChange = skip;
     }
+
+    /** Sets whether the hotseat is stashed */
+    public void stashHotseat(boolean stash) {
+    }
 }

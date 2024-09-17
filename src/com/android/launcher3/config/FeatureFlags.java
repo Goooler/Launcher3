@@ -73,16 +73,7 @@ public final class FeatureFlags {
             "changes the timing of the loading and binding of delegate items during "
                     + "data preparation for loading the home screen");
 
-    // TODO(Block 4): Cleanup flags
-    public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = getReleaseFlag(
-            270394468, "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", ENABLED,
-            "Enable option to show keyboard when going to all-apps");
-
     // TODO(Block 6): Clean up flags
-    public static final BooleanFlag ENABLE_ALL_APPS_SEARCH_IN_TASKBAR = getDebugFlag(270393900,
-            "ENABLE_ALL_APPS_SEARCH_IN_TASKBAR", ENABLED,
-            "Enables Search box in Taskbar All Apps.");
-
     public static final BooleanFlag SECONDARY_DRAG_N_DROP_TO_PIN = getDebugFlag(270395140,
             "SECONDARY_DRAG_N_DROP_TO_PIN", DISABLED,
             "Enable dragging and dropping to pin apps within secondary display");
@@ -144,27 +135,10 @@ public final class FeatureFlags {
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(270390012,
             "PROMISE_APPS_IN_ALL_APPS", DISABLED, "Add promise icon in all-apps");
 
-    public static final BooleanFlag ENABLE_DEVICE_SEARCH = getReleaseFlag(270390907,
-            "ENABLE_DEVICE_SEARCH", ENABLED, "Allows on device search in all apps");
-
-    public static final BooleanFlag ENABLE_HIDE_HEADER = getReleaseFlag(270390930,
-            "ENABLE_HIDE_HEADER", ENABLED, "Hide header on keyboard before typing in all apps");
-
     // Aconfig migration complete for ENABLE_EXPANDING_PAUSE_WORK_BUTTON.
     public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = getDebugFlag(270390779,
             "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", DISABLED,
             "Expand and collapse pause work button while scrolling");
-
-    // Aconfig migration complete for ENABLE_TWOLINE_ALLAPPS.
-    public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(270390937,
-            "ENABLE_TWOLINE_ALLAPPS", DISABLED, "Enables two line label inside all apps.");
-
-    public static final BooleanFlag IME_STICKY_SNACKBAR_EDU = getDebugFlag(270391693,
-            "IME_STICKY_SNACKBAR_EDU", ENABLED, "Show sticky IME edu in AllApps");
-
-    public static final BooleanFlag FOLDER_NAME_MAJORITY_RANKING = getDebugFlag(270391638,
-            "FOLDER_NAME_MAJORITY_RANKING", ENABLED,
-            "Suggests folder names based on majority based ranking.");
 
     public static final BooleanFlag INJECT_FALLBACK_APP_CORPUS_RESULTS = getReleaseFlag(270391706,
             "INJECT_FALLBACK_APP_CORPUS_RESULTS", DISABLED,
@@ -189,15 +163,6 @@ public final class FeatureFlags {
     public static boolean enableAppPairs() {
         return ENABLE_APP_PAIRS.get() || com.android.wm.shell.Flags.enableAppPairs();
     }
-
-    // TODO(Block 19): Clean up flags
-    public static final BooleanFlag SCROLL_TOP_TO_RESET = getReleaseFlag(270395177,
-            "SCROLL_TOP_TO_RESET", ENABLED,
-            "Bring up IME and focus on input when scroll to top if 'Always show keyboard'"
-                    + " is enabled or in prefix state");
-
-    public static final BooleanFlag ENABLE_SEARCH_UNINSTALLED_APPS = getReleaseFlag(270395269,
-            "ENABLE_SEARCH_UNINSTALLED_APPS", ENABLED, "Search uninstalled app results.");
 
     // TODO(Block 20): Clean up flags
     // Aconfig migration complete for ENABLE_HOME_TRANSITION_LISTENER.
@@ -257,9 +222,14 @@ public final class FeatureFlags {
     }
 
     // TODO(Block 29): Clean up flags
+    // Aconfig migration complete for ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.
     public static final BooleanFlag ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT = getDebugFlag(270393897,
             "ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT", DISABLED,
             "Enables displaying the all apps button in the hotseat.");
+
+    public static boolean enableAllAppsButtonInHotseat() {
+        return ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.get() || Flags.enableAllAppsButtonInHotseat();
+    }
 
     // TODO(Block 30): Clean up flags
     public static final BooleanFlag USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES = getDebugFlag(270395010,

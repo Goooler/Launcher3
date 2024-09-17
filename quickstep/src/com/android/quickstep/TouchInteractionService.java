@@ -15,7 +15,6 @@
  */
 package com.android.quickstep;
 
-import static android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_MOVE;
@@ -26,7 +25,6 @@ import static android.view.MotionEvent.ACTION_UP;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.Flags.enableHandleDelayedGestureCallbacks;
 import static com.android.launcher3.Flags.useActivityOverlay;
-import static com.android.launcher3.Launcher.INTENT_ACTION_ALL_APPS_TOGGLE;
 import static com.android.launcher3.LauncherPrefs.backedUpItem;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMotionEvent;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
@@ -91,7 +89,6 @@ import com.android.launcher3.EncryptionType;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.anim.AnimatedFloat;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -774,23 +771,14 @@ public class TouchInteractionService extends Service {
     }
 
     private PendingIntent createAllAppsPendingIntent() {
-        if (FeatureFlags.ENABLE_ALL_APPS_SEARCH_IN_TASKBAR.get()) {
-            return new PendingIntent(new IIntentSender.Stub() {
-                @Override
-                public void send(int code, Intent intent, String resolvedType,
-                        IBinder allowlistToken, IIntentReceiver finishedReceiver,
-                        String requiredPermission, Bundle options) {
-                    MAIN_EXECUTOR.execute(() -> mTaskbarManager.toggleAllApps());
-                }
-            });
-        } else {
-            return PendingIntent.getActivity(
-                    this,
-                    GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS,
-                    new Intent(mOverviewComponentObserver.getHomeIntent())
-                            .setAction(INTENT_ACTION_ALL_APPS_TOGGLE),
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        }
+        return new PendingIntent(new IIntentSender.Stub() {
+            @Override
+            public void send(int code, Intent intent, String resolvedType,
+                    IBinder allowlistToken, IIntentReceiver finishedReceiver,
+                    String requiredPermission, Bundle options) {
+                MAIN_EXECUTOR.execute(() -> mTaskbarManager.toggleAllApps());
+            }
+        });
     }
 
     @UiThread

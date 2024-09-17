@@ -115,7 +115,8 @@ public class TaskbarScrimViewController implements TaskbarControllers.LoggableTa
         return bubblesExpanded && !mControllers.navbarButtonsViewController.isImeVisible()
                 && !isShadeVisible
                 && !mControllers.taskbarStashController.isStashed()
-                && (mTaskbarVisible || showScrimForBubbles);
+                && (mTaskbarVisible || showScrimForBubbles)
+                && !mControllers.taskbarStashController.isHiddenForBubbles();
     }
 
     private float getScrimAlpha() {

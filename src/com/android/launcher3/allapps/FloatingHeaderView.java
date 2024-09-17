@@ -34,7 +34,6 @@ import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.views.ActivityContext;
 import com.android.systemui.plugins.AllAppsRow;
@@ -220,15 +219,12 @@ public class FloatingHeaderView extends LinearLayout implements
 
     @Override
     public View getFocusedChild() {
-        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
-            for (FloatingHeaderRow row : mAllRows) {
-                if (row.hasVisibleContent() && row.isVisible()) {
-                    return row.getFocusedChild();
-                }
+        for (FloatingHeaderRow row : mAllRows) {
+            if (row.hasVisibleContent() && row.isVisible()) {
+                return row.getFocusedChild();
             }
-            return null;
         }
-        return super.getFocusedChild();
+        return null;
     }
 
     void setup(AllAppsRecyclerView mainRV, AllAppsRecyclerView workRV, SearchRecyclerView searchRV,

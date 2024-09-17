@@ -30,7 +30,6 @@ import androidx.annotation.DrawableRes
 import androidx.core.view.setPadding
 import com.android.launcher3.R
 import com.android.launcher3.Utilities.dpToPx
-import com.android.launcher3.config.FeatureFlags.ENABLE_ALL_APPS_SEARCH_IN_TASKBAR
 import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarViewCallbacks
@@ -43,11 +42,8 @@ import com.android.quickstep.util.AssistStateManager
 /** Taskbar all apps button container for customizable taskbar. */
 class TaskbarAllAppsButtonContainer
 @JvmOverloads
-constructor(
-    context: Context,
-    attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0,
-) : IconButtonView(context, attrs), TaskbarContainer {
+constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) :
+    IconButtonView(context, attrs), TaskbarContainer {
 
     private val activityContext: TaskbarActivityContext = ActivityContext.lookupContext(context)
     private var allAppsTouchTriggered = false
@@ -101,23 +97,16 @@ constructor(
     private fun getAllAppsButton(isTransientTaskbar: Boolean): Int {
         val shouldSelectTransientIcon =
             isTransientTaskbar || (enableTaskbarPinning() && !activityContext.isThreeButtonNav)
-        return if (ENABLE_ALL_APPS_SEARCH_IN_TASKBAR.get()) {
-            if (shouldSelectTransientIcon) R.drawable.ic_transient_taskbar_all_apps_search_button
-            else R.drawable.ic_taskbar_all_apps_search_button
-        } else {
-            if (shouldSelectTransientIcon) R.drawable.ic_transient_taskbar_all_apps_button
-            else R.drawable.ic_taskbar_all_apps_button
-        }
+        return if (shouldSelectTransientIcon) R.drawable.ic_transient_taskbar_all_apps_search_button
+        else R.drawable.ic_taskbar_all_apps_search_button
     }
 
     @DimenRes
     fun getAllAppsButtonTranslationXOffset(isTransientTaskbar: Boolean): Int {
         return if (isTransientTaskbar) {
             R.dimen.transient_taskbar_all_apps_button_translation_x_offset
-        } else if (ENABLE_ALL_APPS_SEARCH_IN_TASKBAR.get()) {
-            R.dimen.taskbar_all_apps_search_button_translation_x_offset
         } else {
-            R.dimen.taskbar_all_apps_button_translation_x_offset
+            R.dimen.taskbar_all_apps_search_button_translation_x_offset
         }
     }
 

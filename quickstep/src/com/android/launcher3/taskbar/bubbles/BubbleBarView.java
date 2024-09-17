@@ -95,11 +95,11 @@ public class BubbleBarView extends FrameLayout {
 
     private static final long FADE_OUT_ANIM_ALPHA_DURATION_MS = 50L;
     private static final long FADE_OUT_ANIM_ALPHA_DELAY_MS = 50L;
-    private static final long FADE_OUT_ANIM_POSITION_DURATION_MS = 100L;
+    public static final long FADE_OUT_ANIM_POSITION_DURATION_MS = 100L;
     // During fade out animation we shift the bubble bar 1/80th of the screen width
     private static final float FADE_OUT_ANIM_POSITION_SHIFT = 1 / 80f;
 
-    private static final long FADE_IN_ANIM_ALPHA_DURATION_MS = 100L;
+    public static final long FADE_IN_ANIM_ALPHA_DURATION_MS = 100L;
     // Use STIFFNESS_MEDIUMLOW which is not defined in the API constants
     private static final float FADE_IN_ANIM_POSITION_SPRING_STIFFNESS = 400f;
     // During fade in animation we shift the bubble bar 1/60th of the screen width
@@ -689,7 +689,7 @@ public class BubbleBarView extends FrameLayout {
         }
         setAlphaDuringBubbleDrag(1f);
         setTranslationX(0f);
-        if (getBubbleChildCount() > 0) {
+        if (mIsBarExpanded && getBubbleChildCount() > 0) {
             setAlpha(1f);
         }
     }

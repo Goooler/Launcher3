@@ -405,3 +405,10 @@ flag {
     description: "Show an 'Undo' snackbar when users dismiss a predicted hotseat item"
     bug: "270394476"
 }
+
+flag {
+    name: "enable_all_apps_button_in_hotseat"
+    namespace: "launcher"
+    description: "Enables displaying the all apps button in the hotseat."
+    bug: "270393897"
+}

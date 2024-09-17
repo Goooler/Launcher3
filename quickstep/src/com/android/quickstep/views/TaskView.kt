@@ -82,7 +82,6 @@ import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
 import com.android.quickstep.recents.di.RecentsDependencies
 import com.android.quickstep.recents.di.get
-import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
@@ -397,7 +396,7 @@ constructor(
         }
         get() = taskViewAlpha.get(ALPHA_INDEX_STABLE).value
 
-    protected var attachAlpha
+    var attachAlpha
         set(value) {
             taskViewAlpha.get(ALPHA_INDEX_ATTACH).value = value
         }
@@ -606,6 +605,7 @@ constructor(
 
     override fun onRecycle() {
         resetPersistentViewTransforms()
+        attachAlpha = 1f
         // Clear any references to the thumbnail (it will be re-read either from the cache or the
         // system on next bind)
         if (!enableRefactorTaskThumbnail()) {
@@ -1587,10 +1587,7 @@ constructor(
         resetViewTransforms()
     }
 
-    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
-        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
-
-    open fun resetViewTransforms() {
+    fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
         // resetViewTransforms is called during QuickSwitch scrolling.
         dismissTranslationX = 0f
@@ -1606,7 +1603,6 @@ constructor(
         }
         dismissScale = 1f
         translationZ = 0f
-        attachAlpha = 1f
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
     }
