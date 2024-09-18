@@ -355,7 +355,10 @@ public class RecyclerViewFastScroller extends View {
         if (!sectionName.equals(mPopupSectionName)) {
             mPopupSectionName = sectionName;
             mPopupView.setText(sectionName);
-            performHapticFeedback(CLOCK_TICK);
+            // AllApps haptics are taken care of by AllAppsFastScrollHelper.
+            if (mFastScrollerLocation != ALL_APPS_SCROLLER) {
+                performHapticFeedback(CLOCK_TICK);
+            }
         }
         animatePopupVisibility(!TextUtils.isEmpty(sectionName));
         mLastTouchY = boundedY;

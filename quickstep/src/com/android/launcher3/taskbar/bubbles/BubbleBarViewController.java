@@ -748,7 +748,8 @@ public class BubbleBarViewController {
 
     /**
      * Hides the persistent taskbar if it is going to intersect with the expanded bubble bar if in
-     * app or overview. Set the hotseat stashed state if on launcher home screen.
+     * app or overview. Set the hotseat stashed state if on launcher home screen. If not on launcher
+     * home screen and hotseat is stashed immediately un-stashes the hotseat.
      */
     private void adjustTaskbarAndHotseatToBubbleBarState(boolean isBubbleBarExpanded) {
         if (mBubbleStashController.isBubblesShowingOnHome()) {
@@ -759,6 +760,10 @@ public class BubbleBarViewController {
                     .getIconsAlpha()
                     .animateToValue(hideTaskbar ? 0 : 1)
                     .start();
+        }
+        if (!mBubbleStashController.isBubblesShowingOnHome()
+                && mTaskbarStashController.isHiddenForBubbles()) {
+            mTaskbarStashController.unStashHotseatInstantly();
         }
     }
 

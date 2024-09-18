@@ -412,3 +412,10 @@ flag {
     description: "Enables displaying the all apps button in the hotseat."
     bug: "270393897"
 }
+
+flag {
+    name: "taskbar_quiet_mode_change_support"
+    namespace: "launcher"
+    description: "Support changing quiet mode for user profiles in taskbar."
+    bug: "345760034"
+}

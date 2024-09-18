@@ -163,6 +163,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         mTaskbarLauncherStateController.stashHotseat(stash);
     }
 
+    @Override
+    public void unStashHotseatInstantly() {
+        mTaskbarLauncherStateController.unStashHotseatInstantly();
+    }
+
     /**
      * Adds the Launcher resume animator to the given animator set.
      *

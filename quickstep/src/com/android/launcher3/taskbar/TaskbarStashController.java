@@ -402,6 +402,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         mControllers.uiController.stashHotseat(stash);
     }
 
+    /** Instantly un-stashes the hotseat. */
+    public void unStashHotseatInstantly() {
+        mControllers.uiController.unStashHotseatInstantly();
+    }
+
     /**
      * Returns whether the taskbar should be stashed in apps (e.g. user long pressed to stash).
      */

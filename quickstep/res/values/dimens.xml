@@ -479,6 +479,13 @@
     <dimen name="bubble_expanded_view_drop_target_padding">24dp</dimen>
     <dimen name="bubble_expanded_view_drop_target_margin">16dp</dimen>
 
+    <!-- Bubble bar flyout view -->
+    <dimen name="bubblebar_flyout_padding_horizontal">14dp</dimen>
+    <dimen name="bubblebar_flyout_padding_vertical">10dp</dimen>
+    <dimen name="bubblebar_flyout_elevation">4dp</dimen>
+    <dimen name="bubblebar_flyout_avatar_message_space">6dp</dimen>
+    <dimen name="bubblebar_flyout_max_width">96dp</dimen>
+
     <!-- Launcher splash screen -->
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->
     <!--     starting_surface_exit_animation_window_shift_length -->

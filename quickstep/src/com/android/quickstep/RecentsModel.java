@@ -56,6 +56,7 @@ import com.android.systemui.shared.system.TaskStackChangeListeners;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -76,7 +77,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     private static final Executor RECENTS_MODEL_EXECUTOR = Executors.newSingleThreadExecutor(
             new SimpleThreadFactory("TaskThumbnailIconCache-", THREAD_PRIORITY_BACKGROUND));
 
-    private final List<TaskVisualsChangeListener> mThumbnailChangeListeners = new ArrayList<>();
+    private final ConcurrentLinkedQueue<TaskVisualsChangeListener> mThumbnailChangeListeners =
+            new ConcurrentLinkedQueue<>();
     private final Context mContext;
 
     private final RecentTasksList mTaskList;
@@ -239,8 +241,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     public boolean onTaskSnapshotChanged(int taskId, ThumbnailData snapshot) {
         mThumbnailCache.updateTaskSnapShot(taskId, snapshot);
 
-        for (int i = mThumbnailChangeListeners.size() - 1; i >= 0; i--) {
-            Task task = mThumbnailChangeListeners.get(i).onTaskThumbnailChanged(taskId, snapshot);
+        for (TaskVisualsChangeListener listener : mThumbnailChangeListeners) {
+            Task task = listener.onTaskThumbnailChanged(taskId, snapshot);
             if (task != null) {
                 task.thumbnail = snapshot;
             }
@@ -269,8 +271,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     @Override
     public void onAppIconChanged(String packageName, UserHandle user) {
         mIconCache.invalidateCacheEntries(packageName, user);
-        for (int i = mThumbnailChangeListeners.size() - 1; i >= 0; i--) {
-            mThumbnailChangeListeners.get(i).onTaskIconChanged(packageName, user);
+        for (TaskVisualsChangeListener listener : mThumbnailChangeListeners) {
+            listener.onTaskIconChanged(packageName, user);
         }
     }
 

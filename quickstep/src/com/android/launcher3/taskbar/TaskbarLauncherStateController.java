@@ -16,9 +16,9 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
-import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_ALIGNMENT;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_STASH;
+import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
@@ -761,6 +761,14 @@ public class TaskbarLauncherStateController {
             // if we revert stashing make swap after taskbar animation is complete
             stashController.applyState(/* postApplyAction = */ swapHotseatWithTaskbar);
         }
+    }
+
+    protected void unStashHotseatInstantly() {
+        TaskbarStashController stashController = mControllers.taskbarStashController;
+        stashController.updateStateForFlag(FLAG_STASHED_FOR_BUBBLES, false);
+        stashController.applyState(/* duration = */ 0);
+        updateIconAlphaForHome(/* taskbarAlpha = */ 0,
+                ALPHA_CHANNEL_TASKBAR_STASH, /* updateTaskbarAlpha = */ false);
     }
 
     /**
