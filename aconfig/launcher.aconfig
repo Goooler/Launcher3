@@ -419,3 +419,10 @@ flag {
     description: "Support changing quiet mode for user profiles in taskbar."
     bug: "345760034"
 }
+
+flag {
+    name: "taskbar_overflow"
+    namespace: "launcher"
+    description: "Show recent apps in the taskbar overflow."
+    bug: "368119679"
+}

@@ -436,4 +436,10 @@ public class TaskbarUIController {
     /** Un-stash the hotseat instantly */
     public void unStashHotseatInstantly() {
     }
+
+    /**
+     * Called when we want to unstash taskbar when user performs swipes up gesture.
+     */
+    public void onSwipeToUnstashTaskbar() {
+    }
 }

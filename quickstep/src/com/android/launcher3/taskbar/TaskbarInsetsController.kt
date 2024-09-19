@@ -147,7 +147,11 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.bubbleBarBounds)
             }
         }
-        if (taskbarStashController.isInApp || taskbarStashController.isInOverview) {
+        if (
+            taskbarStashController.isInApp ||
+                taskbarStashController.isInOverview ||
+                DisplayController.showLockedTaskbarOnHome(context)
+        ) {
             // only add the taskbar touch region if not on home
             val bottom = windowLayoutParams.height
             val top = bottom - taskbarTouchableHeight

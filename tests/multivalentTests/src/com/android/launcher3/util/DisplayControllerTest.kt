@@ -38,6 +38,8 @@ import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
 import com.android.launcher3.util.window.CachedDisplayInfo
 import com.android.launcher3.util.window.WindowManagerProxy
+import junit.framework.Assert.assertFalse
+import junit.framework.Assert.assertTrue
 import kotlin.math.min
 import org.junit.Before
 import org.junit.Test
@@ -111,6 +113,7 @@ class DisplayControllerTest {
         whenever(windowManagerProxy.getRealBounds(any(), any())).thenAnswer { i ->
             bounds[i.getArgument<CachedDisplayInfo>(1).rotation]
         }
+        whenever(windowManagerProxy.showLockedTaskbarOnHome(any())).thenReturn(false)
 
         whenever(windowManagerProxy.getNavigationMode(any())).thenReturn(NavigationMode.NO_BUTTON)
         // Mock context
@@ -179,5 +182,21 @@ class DisplayControllerTest {
         displayController.handleInfoChange(display)
         verify(displayInfoChangeListener)
             .onDisplayInfoChanged(any(), any(), eq(CHANGE_TASKBAR_PINNING))
+    }
+
+    @Test
+    @UiThreadTest
+    fun testTaskbarPinningChangeInLockedTaskbarChange() {
+        whenever(windowManagerProxy.showLockedTaskbarOnHome(any())).thenReturn(true)
+        whenever(windowManagerProxy.isHomeVisible(any())).thenReturn(true)
+        whenever(windowManagerProxy.isInDesktopMode()).thenReturn(false)
+        whenever(launcherPrefs.get(TASKBAR_PINNING)).thenReturn(false)
+        DisplayController.enableTaskbarModePreferenceForTests(true)
+
+        assertTrue(displayController.getInfo().isTransientTaskbar())
+        displayController.handleInfoChange(display)
+        verify(displayInfoChangeListener)
+            .onDisplayInfoChanged(any(), any(), eq(CHANGE_TASKBAR_PINNING))
+        assertFalse(displayController.getInfo().isTransientTaskbar())
     }
 }

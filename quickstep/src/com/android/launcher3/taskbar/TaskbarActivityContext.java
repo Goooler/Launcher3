@@ -1559,6 +1559,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * @param delayTaskbarBackground whether we will delay the taskbar background animation
      */
     public void onSwipeToUnstashTaskbar(boolean delayTaskbarBackground) {
+        mControllers.uiController.onSwipeToUnstashTaskbar();
+
         boolean wasStashed = mControllers.taskbarStashController.isStashed();
         mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(/* stash= */ false,
                 SHOULD_BUBBLES_FOLLOW_DEFAULT_VALUE, delayTaskbarBackground);

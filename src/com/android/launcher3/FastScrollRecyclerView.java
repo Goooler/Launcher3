@@ -60,6 +60,7 @@ public abstract class FastScrollRecyclerView extends RecyclerView  {
         mScrollbar = scrollbar;
         mScrollbar.setRecyclerView(this);
         mScrollbar.setFastScrollerLocation(location);
+        scrollToTop();
         onUpdateScrollbar(0);
     }
 

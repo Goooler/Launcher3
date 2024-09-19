@@ -50,6 +50,7 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -210,6 +211,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     @Override
     public void onLauncherVisibilityChanged(boolean isVisible) {
+        if (DesktopModeStatus.enterDesktopByDefaultOnFreeformDisplay(mLauncher)) {
+            DisplayController.handleInfoChangeForLauncherVisibilityChanged(mLauncher);
+        }
         onLauncherVisibilityChanged(isVisible, false /* fromInit */);
     }
 
@@ -480,5 +484,14 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     @Override
     protected String getTaskbarUIControllerName() {
         return "LauncherTaskbarUIController";
+    }
+
+    @Override
+    public void onSwipeToUnstashTaskbar() {
+        // Once taskbar is unstashed, the user cannot return back to the overlay. We can
+        // clear it here to set the expected state once the user goes home.
+        if (mLauncher.getWorkspace().isOverlayShown()) {
+            mLauncher.getWorkspace().onOverlayScrollChanged(0);
+        }
     }
 }

@@ -45,12 +45,14 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import com.android.launcher3.R;
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.util.AssistUtils;
+import com.android.systemui.contextualeducation.GestureType;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
@@ -109,6 +111,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     private final Context mContext;
     private final TaskbarNavButtonCallbacks mCallbacks;
     private final SystemUiProxy mSystemUiProxy;
+    private final ContextualEduStatsManager mContextualEduStatsManager;
     private final Handler mHandler;
     private final AssistUtils mAssistUtils;
     @Nullable private StatsLogManager mStatsLogManager;
@@ -119,11 +122,13 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
             Context context,
             TaskbarNavButtonCallbacks callbacks,
             SystemUiProxy systemUiProxy,
+            ContextualEduStatsManager contextualEduStatsManager,
             Handler handler,
             AssistUtils assistUtils) {
         mContext = context;
         mCallbacks = callbacks;
         mSystemUiProxy = systemUiProxy;
+        mContextualEduStatsManager = contextualEduStatsManager;
         mHandler = handler;
         mAssistUtils = assistUtils;
     }
@@ -137,14 +142,20 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         switch (buttonType) {
             case BUTTON_BACK:
                 logEvent(LAUNCHER_TASKBAR_BACK_BUTTON_TAP);
+                mContextualEduStatsManager.updateEduStats(/* isTrackpadGesture= */ false,
+                        GestureType.BACK);
                 executeBack();
                 break;
             case BUTTON_HOME:
                 logEvent(LAUNCHER_TASKBAR_HOME_BUTTON_TAP);
+                mContextualEduStatsManager.updateEduStats(/* isTrackpadGesture= */ false,
+                        GestureType.HOME);
                 navigateHome();
                 break;
             case BUTTON_RECENTS:
                 logEvent(LAUNCHER_TASKBAR_OVERVIEW_BUTTON_TAP);
+                mContextualEduStatsManager.updateEduStats(/* isTrackpadGesture= */ false,
+                        GestureType.OVERVIEW);
                 navigateToOverview();
                 break;
             case BUTTON_IME_SWITCH:

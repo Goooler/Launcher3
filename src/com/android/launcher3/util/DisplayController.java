@@ -195,6 +195,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     }
 
     /**
+     * Handles info change for launcher visibility.
+     */
+    public static void handleInfoChangeForLauncherVisibilityChanged(Context context) {
+        INSTANCE.get(context).handleInfoChange(context.getDisplay());
+    }
+
+    /**
      * Enables transient taskbar status for tests.
      */
     @VisibleForTesting
@@ -215,6 +222,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
      */
     public static boolean isPinnedTaskbar(Context context) {
         return INSTANCE.get(context).getInfo().isPinnedTaskbar();
+    }
+
+    /**
+     * Returns whether the taskbar is forced to be pinned when home is visible.
+     */
+    public static boolean showLockedTaskbarOnHome(Context context) {
+        return INSTANCE.get(context).getInfo().showLockedTaskbarOnHome();
     }
 
     @Override
@@ -345,7 +359,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         }
         if ((newInfo.mIsTaskbarPinned != oldInfo.mIsTaskbarPinned)
                 || (newInfo.mIsTaskbarPinnedInDesktopMode
-                    != oldInfo.mIsTaskbarPinnedInDesktopMode)) {
+                    != oldInfo.mIsTaskbarPinnedInDesktopMode)
+                || newInfo.isPinnedTaskbar() != oldInfo.isPinnedTaskbar()) {
             change |= CHANGE_TASKBAR_PINNING;
         }
         if (newInfo.mIsInDesktopMode != oldInfo.mIsInDesktopMode) {
@@ -398,6 +413,9 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         private final boolean mIsTaskbarPinnedInDesktopMode;
 
         private final boolean mIsInDesktopMode;
+
+        private final boolean mShowLockedTaskbarOnHome;
+        private final boolean mIsHomeVisible;
 
         public Info(Context displayInfoContext) {
             /* don't need system overrides for external displays */
@@ -460,6 +478,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mIsTaskbarPinnedInDesktopMode = LauncherPrefs.get(displayInfoContext).get(
                     TASKBAR_PINNING_IN_DESKTOP_MODE);
             mIsInDesktopMode = wmProxy.isInDesktopMode();
+            mShowLockedTaskbarOnHome = wmProxy.showLockedTaskbarOnHome(displayInfoContext);
+            mIsHomeVisible = wmProxy.isHomeVisible(displayInfoContext);
         }
 
         /**
@@ -476,6 +496,10 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                 return sTransientTaskbarStatusForTests;
             }
             if (enableTaskbarPinning()) {
+                // If Launcher is visible on the freeform display, ensure the taskbar is pinned.
+                if (mShowLockedTaskbarOnHome && mIsHomeVisible) {
+                    return false;
+                }
                 if (mIsInDesktopMode) {
                     return !mIsTaskbarPinnedInDesktopMode;
                 }
@@ -542,6 +566,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             } else {
                 return TYPE_PHONE;
             }
+        }
+
+        /**
+         * Returns whether the taskbar is forced to be pinned when home is visible.
+         */
+        public boolean showLockedTaskbarOnHome() {
+            return mShowLockedTaskbarOnHome;
         }
     }
 

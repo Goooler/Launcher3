@@ -60,6 +60,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks;
@@ -247,6 +248,7 @@ public class TaskbarManager {
                 context,
                 navCallbacks,
                 SystemUiProxy.INSTANCE.get(mContext),
+                ContextualEduStatsManager.INSTANCE.get(mContext),
                 new Handler(),
                 AssistUtils.newInstance(mContext));
         mComponentCallbacks = new ComponentCallbacks() {

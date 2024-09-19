@@ -122,6 +122,20 @@ public class WindowManagerProxy implements ResourceBasedOverride, SafeCloseable 
     }
 
     /**
+     * Returns if the pinned taskbar should be shown when home is visible.
+     */
+    public boolean showLockedTaskbarOnHome(Context displayInfoContext) {
+        return false;
+    }
+
+    /**
+     * Returns if the home is visible.
+     */
+    public boolean isHomeVisible(Context context) {
+        return false;
+    }
+
+    /**
      * Returns the real bounds for the provided display after applying any insets normalization
      */
     public WindowBounds getRealBounds(Context displayInfoContext, CachedDisplayInfo info) {
