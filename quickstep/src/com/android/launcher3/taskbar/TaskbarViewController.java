@@ -140,10 +140,6 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final AnimatedFloat mTaskbarIconTranslationYForPinning = new AnimatedFloat(
             this::updateTranslationY);
 
-    private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
-            (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)
-                    -> updateTaskbarIconTranslationXForPinning();
-
 
     private AnimatedFloat mTaskbarNavButtonTranslationY;
     private AnimatedFloat mTaskbarNavButtonTranslationYForInAppDisplay;
@@ -157,6 +153,12 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
     // Initialized in init.
     private TaskbarControllers mControllers;
+
+    private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
+            (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                updateTaskbarIconTranslationXForPinning();
+                mControllers.navbarButtonsViewController.onTaskbarLayoutChange();
+            };
 
     // Animation to align icons with Launcher, created lazily. This allows the controller to be
     // active only during the animation and does not need to worry about layout changes.
@@ -829,6 +831,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
             View child = mTaskbarView.getChildAt(i);
             boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonContainer();
             boolean isTaskbarDividerView = child == mTaskbarView.getTaskbarDividerViewContainer();
+            boolean isTaskbarOverflowView = child == mTaskbarView.getTaskbarOverflowView();
             boolean isRecentTask = child.getTag() instanceof GroupTask;
             // TODO(b/343522351): show recents on the home screen.
             final boolean isRecentsInHotseat = false;
@@ -839,7 +842,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 setter.setViewAlpha(child, 0, Interpolators.clampToProgress(LINEAR, 0.8f, 1f));
             } else if ((isAllAppsButton && !FeatureFlags.enableAllAppsButtonInHotseat())
                     || (isTaskbarDividerView && enableTaskbarPinning())
-                    || (isRecentTask && !isRecentsInHotseat)) {
+                    || (isRecentTask && !isRecentsInHotseat)
+                    || isTaskbarOverflowView) {
                 if (!isToHome
                         && mIsHotseatIconOnTopWhenAligned
                         && mIsStashed) {

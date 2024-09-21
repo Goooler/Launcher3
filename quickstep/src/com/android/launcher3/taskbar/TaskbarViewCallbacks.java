@@ -134,4 +134,25 @@ public class TaskbarViewCallbacks {
         return Flags.enableBubbleBarInPersistentTaskBar()
                 && mControllers.bubbleControllers.isPresent();
     }
+
+    /** Returns on click listener for the taskbar overflow view. */
+    public View.OnClickListener getOverflowOnClickListener() {
+        return new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mControllers.keyboardQuickSwitchController.openQuickSwitchView();
+            }
+        };
+    }
+
+    /** Returns on long click listener for the taskbar overflow view. */
+    public View.OnLongClickListener getOverflowOnLongClickListener() {
+        return new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                mControllers.keyboardQuickSwitchController.openQuickSwitchView();
+                return true;
+            }
+        };
+    }
 }

@@ -58,8 +58,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * View that allows quick switching between recent tasks through keyboard alt-tab and alt-shift-tab
- * commands.
+ * View that allows quick switching between recent tasks.
+ *
+ * Can be access via:
+ * - keyboard alt-tab
+ * - alt-shift-tab
+ * - taskbar overflow button
  */
 public class KeyboardQuickSwitchView extends ConstraintLayout {
 

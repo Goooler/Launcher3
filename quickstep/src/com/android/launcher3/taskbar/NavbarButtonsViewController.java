@@ -400,12 +400,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             }
         };
         mSeparateWindowParent.recreateControllers();
-        if (com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar()
-                && mControllers.bubbleControllers.isPresent()) {
-            BubbleBarLocation bubblesLocation = mControllers.bubbleControllers.get()
-                    .bubbleBarViewController.getBubbleBarLocation();
-            onBubbleBarLocationUpdated(bubblesLocation);
-        }
     }
 
     private void initButtons(ViewGroup navContainer, ViewGroup endContainer,
@@ -1221,6 +1215,16 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             }
         }
         return (int) navBarTargetStartX - mNavButtonContainer.getLeft();
+    }
+
+    /** Adjusts the navigation buttons layout position according to the bubble bar location. */
+    public void onTaskbarLayoutChange() {
+        if (com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar()
+                && mControllers.bubbleControllers.isPresent()) {
+            BubbleBarLocation bubblesLocation = mControllers.bubbleControllers.get()
+                    .bubbleBarViewController.getBubbleBarLocation();
+            onBubbleBarLocationUpdated(bubblesLocation);
+        }
     }
 
     private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {

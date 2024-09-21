@@ -128,7 +128,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     protected void onDestroy() {
-        onLauncherVisibilityChanged(false);
+        onLauncherVisibilityChanged(false /* isVisible */, true /* fromInitOrDestroy */);
         super.onDestroy();
         mTaskbarLauncherStateController.onDestroy();
 
@@ -218,10 +218,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         onLauncherVisibilityChanged(isVisible, false /* fromInit */);
     }
 
-    private void onLauncherVisibilityChanged(boolean isVisible, boolean fromInit) {
+    private void onLauncherVisibilityChanged(boolean isVisible, boolean fromInitOrDestroy) {
         onLauncherVisibilityChanged(
                 isVisible,
-                fromInit,
+                fromInitOrDestroy,
                 /* startAnimation= */ true,
                 DisplayController.isTransientTaskbar(mLauncher)
                         ? TRANSIENT_TASKBAR_TRANSITION_DURATION
@@ -232,7 +232,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Nullable
     private Animator onLauncherVisibilityChanged(
-            boolean isVisible, boolean fromInit, boolean startAnimation, int duration) {
+            boolean isVisible, boolean fromInitOrDestroy, boolean startAnimation, int duration) {
         // Launcher is resumed during the swipe-to-overview gesture under shell-transitions, so
         // avoid updating taskbar state in that situation (when it's non-interactive -- or
         // "background") to avoid premature animations.
@@ -250,7 +250,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        if (fromInit || mControllers == null) {
+        if (fromInitOrDestroy) {
             duration = 0;
         }
         return mTaskbarLauncherStateController.applyState(duration, startAnimation);

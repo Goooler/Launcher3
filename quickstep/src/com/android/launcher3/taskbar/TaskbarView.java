@@ -46,6 +46,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -63,6 +64,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.IconButtonView;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
@@ -100,8 +102,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     // Only non-null when device supports having an All Apps button.
     @Nullable private final TaskbarAllAppsButtonContainer mAllAppsButtonContainer;
 
-    // Only non-null when device supports having an All Apps button.
+    // Only non-null when device supports having a Divider button.
     @Nullable private TaskbarDividerContainer mTaskbarDividerContainer;
+
+    // Only non-null when device supports having a Taskbar Overflow button.
+    @Nullable private IconButtonView mTaskbarOverflowView;
 
     /**
      * Whether the divider is between Hotseat icons and Recents,
@@ -171,6 +176,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             mTaskbarDividerContainer = new TaskbarDividerContainer(context);
         }
 
+        if (Flags.taskbarOverflow()) {
+            mTaskbarOverflowView = (IconButtonView) LayoutInflater.from(context)
+                    .inflate(R.layout.taskbar_overflow_button, this, false);
+            mTaskbarOverflowView.setIconDrawable(
+                    resources.getDrawable(R.drawable.taskbar_overflow_icon));
+            mTaskbarOverflowView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
+        }
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
     }
@@ -263,6 +275,12 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mTaskbarDividerContainer != null && callbacks.supportsDividerLongPress()) {
             mTaskbarDividerContainer.setUpCallbacks(callbacks);
         }
+        if (mTaskbarOverflowView != null) {
+            mTaskbarOverflowView.setOnClickListener(
+                    mControllerCallbacks.getOverflowOnClickListener());
+            mTaskbarOverflowView.setOnLongClickListener(
+                    mControllerCallbacks.getOverflowOnLongClickListener());
+        }
     }
 
     private void removeAndRecycle(View view) {
@@ -289,6 +307,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             if (mTaskbarDividerContainer != null) {
                 removeView(mTaskbarDividerContainer);
             }
+        }
+        if (mTaskbarOverflowView != null) {
+            removeView(mTaskbarOverflowView);
         }
         removeView(mQsb);
 
@@ -377,6 +398,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mTaskbarDividerContainer != null && !recentTasks.isEmpty()) {
             addView(mTaskbarDividerContainer, nextViewIndex++);
             mAddedDividerForRecents = true;
+            if (mTaskbarOverflowView != null) {
+                addView(mTaskbarOverflowView, nextViewIndex++);
+            }
         }
 
         // Add Recent/Running icons.
@@ -696,6 +720,14 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     @Nullable
     public TaskbarDividerContainer getTaskbarDividerViewContainer() {
         return mTaskbarDividerContainer;
+    }
+
+    /**
+     * Returns the taskbar overflow view in the taskbar.
+     */
+    @Nullable
+    public IconButtonView getTaskbarOverflowView() {
+        return mTaskbarOverflowView;
     }
 
     /**
