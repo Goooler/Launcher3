@@ -61,7 +61,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         AbstractFloatingView.closeOpenViews(
             launcher,
             true,
-            AbstractFloatingView.TYPE_ALL and AbstractFloatingView.TYPE_REBIND_SAFE.inv()
+            AbstractFloatingView.TYPE_ALL and AbstractFloatingView.TYPE_REBIND_SAFE.inv(),
         )
         workspaceLoading = true
 
@@ -76,7 +76,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
             TAG,
             "startBinding: " +
                 "hotseat layout was vertical: ${launcher.hotseat?.isHasVerticalHotseat}" +
-                " and is setting to ${launcher.deviceProfile.isVerticalBarLayout}"
+                " and is setting to ${launcher.deviceProfile.isVerticalBarLayout}",
         )
         launcher.hotseat?.resetLayout(launcher.deviceProfile.isVerticalBarLayout)
         TraceHelper.INSTANCE.endSection()
@@ -88,14 +88,12 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         pendingTasks: RunnableList,
         onCompleteSignal: RunnableList,
         workspaceItemCount: Int,
-        isBindSync: Boolean
+        isBindSync: Boolean,
     ) {
-        if (Utilities.ATLEAST_S) {
-            Trace.endAsyncSection(
-                TraceEvents.DISPLAY_WORKSPACE_TRACE_METHOD_NAME,
-                TraceEvents.DISPLAY_WORKSPACE_TRACE_COOKIE
-            )
-        }
+        Trace.endAsyncSection(
+            TraceEvents.DISPLAY_WORKSPACE_TRACE_METHOD_NAME,
+            TraceEvents.DISPLAY_WORKSPACE_TRACE_COOKIE,
+        )
         synchronouslyBoundPages = boundPages
         pagesToBindSynchronously = LIntSet()
         clearPendingBinds()
@@ -149,14 +147,14 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         // Cache one page worth of icons
         launcher.viewCache.setCacheSize(
             R.layout.folder_application,
-            deviceProfile.numFolderColumns * deviceProfile.numFolderRows
+            deviceProfile.numFolderColumns * deviceProfile.numFolderRows,
         )
         launcher.viewCache.setCacheSize(R.layout.folder_page, 2)
         TraceHelper.INSTANCE.endSection()
         launcher.workspace.removeExtraEmptyScreen(/* stripEmptyScreens= */ true)
         launcher.workspace.pageIndicator.setPauseScroll(
             /*pause=*/ false,
-            deviceProfile.isTwoPanels
+            deviceProfile.isTwoPanels,
         )
         TestEventEmitter.INSTANCE.get(launcher).sendEvent(TestEvent.WORKSPACE_FINISH_LOADING)
     }
@@ -182,7 +180,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         val snackbar =
             AbstractFloatingView.getOpenView<AbstractFloatingView>(
                 launcher,
-                AbstractFloatingView.TYPE_SNACKBAR
+                AbstractFloatingView.TYPE_SNACKBAR,
             )
         snackbar?.post { snackbar.close(true) }
     }
@@ -191,7 +189,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
     override fun bindAllApplications(
         apps: Array<AppInfo?>?,
         flags: Int,
-        packageUserKeytoUidMap: Map<PackageUserKey?, Int?>?
+        packageUserKeytoUidMap: Map<PackageUserKey?, Int?>?,
     ) {
         Preconditions.assertUIThread()
         val hadWorkApps = launcher.appsView.shouldShowTabs()
@@ -312,7 +310,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         val info =
             PendingAddWidgetInfo(
                 widgetsListBaseEntry.mWidgets[0].widgetInfo,
-                LauncherSettings.Favorites.CONTAINER_DESKTOP
+                LauncherSettings.Favorites.CONTAINER_DESKTOP,
             )
         launcher.addPendingItem(
             info,
@@ -320,14 +318,14 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
             WorkspaceLayoutManager.FIRST_SCREEN_ID,
             intArrayOf(0, 0),
             info.spanX,
-            info.spanY
+            info.spanY,
         )
     }
 
     override fun bindScreens(orderedScreenIds: LIntArray) {
         launcher.workspace.pageIndicator.setPauseScroll(
             /*pause=*/ true,
-            launcher.deviceProfile.isTwoPanels
+            launcher.deviceProfile.isTwoPanels,
         )
         val firstScreenPosition = 0
         if (
@@ -354,7 +352,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
     override fun bindAppsAdded(
         newScreens: LIntArray?,
         addNotAnimated: java.util.ArrayList<ItemInfo?>?,
-        addAnimated: java.util.ArrayList<ItemInfo?>?
+        addAnimated: java.util.ArrayList<ItemInfo?>?,
     ) {
         // Add the new screens
         if (newScreens != null) {

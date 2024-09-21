@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.dagger;
+package com.android.quickstep.dagger;
 
-
-import com.android.quickstep.dagger.QuickStepModule;
-import com.android.quickstep.dagger.QuickstepBaseAppComponent;
-
-import dagger.Component;
+import com.android.launcher3.dagger.LauncherAppComponent;
+import com.android.launcher3.dagger.LauncherBaseAppComponent;
+import com.android.quickstep.logging.SettingsChangeLogger;
 
 /**
- * Root component for Dagger injection for Launcher Quickstep.
+ * Launcher Quickstep base component for Dagger injection.
+ *
+ * This class is not actually annotated as a Dagger component, since it is not used directly as one.
+ * Doing so generates unnecessary code bloat.
+ *
+ * See {@link LauncherAppComponent} for the one actually used.
  */
-@LauncherAppSingleton
-@Component(modules = QuickStepModule.class)
-public interface LauncherAppComponent extends QuickstepBaseAppComponent {
-    /** Builder for quickstep LauncherAppComponent. */
-    @Component.Builder
-    interface Builder extends LauncherBaseAppComponent.Builder {
-        LauncherAppComponent build();
-    }
+public interface QuickstepBaseAppComponent extends LauncherBaseAppComponent {
+    SettingsChangeLogger getSettingsChangeLogger();
 }

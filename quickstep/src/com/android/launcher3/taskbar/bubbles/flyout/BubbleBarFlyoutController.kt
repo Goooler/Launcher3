@@ -28,12 +28,12 @@ class BubbleBarFlyoutController(
 ) {
 
     private var flyout: BubbleBarFlyoutView? = null
-    val horizontalMargin =
+    private val horizontalMargin =
         container.context.resources.getDimensionPixelSize(R.dimen.transient_taskbar_bottom_margin)
 
     fun setUpFlyout(message: BubbleBarFlyoutMessage) {
         flyout?.let(container::removeView)
-        val flyout = BubbleBarFlyoutView(container.context)
+        val flyout = BubbleBarFlyoutView(container.context, onLeft = positioner.isOnLeft)
 
         flyout.translationY = positioner.targetTy
 

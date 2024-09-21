@@ -56,10 +56,10 @@ class BubbleBarFlyoutViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
         )
 
     @Test
-    fun bubbleBarFlyoutView_noAvatar() {
-        screenshotRule.screenshotTest("bubbleBarFlyoutView_noAvatar") { activity ->
+    fun bubbleBarFlyoutView_noAvatar_onRight() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_noAvatar_onRight") { activity ->
             activity.actionBar?.hide()
-            val flyout = BubbleBarFlyoutView(context)
+            val flyout = BubbleBarFlyoutView(context, onLeft = false)
             flyout.setData(
                 BubbleBarFlyoutMessage(
                     senderAvatar = null,
@@ -73,15 +73,83 @@ class BubbleBarFlyoutViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     }
 
     @Test
-    fun bubbleBarFlyoutView_avatar() {
-        screenshotRule.screenshotTest("bubbleBarFlyoutView_avatar") { activity ->
+    fun bubbleBarFlyoutView_noAvatar_onLeft() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_noAvatar_onLeft") { activity ->
             activity.actionBar?.hide()
-            val flyout = BubbleBarFlyoutView(context)
+            val flyout = BubbleBarFlyoutView(context, onLeft = true)
+            flyout.setData(
+                BubbleBarFlyoutMessage(
+                    senderAvatar = null,
+                    senderName = "sender",
+                    message = "message",
+                    isGroupChat = false,
+                )
+            )
+            flyout
+        }
+    }
+
+    @Test
+    fun bubbleBarFlyoutView_noAvatar_longMessage() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_noAvatar_longMessage") { activity ->
+            activity.actionBar?.hide()
+            val flyout = BubbleBarFlyoutView(context, onLeft = true)
+            flyout.setData(
+                BubbleBarFlyoutMessage(
+                    senderAvatar = null,
+                    senderName = "sender",
+                    message = "really, really, really, really, really long message. like really.",
+                    isGroupChat = false,
+                )
+            )
+            flyout
+        }
+    }
+
+    @Test
+    fun bubbleBarFlyoutView_avatar_onRight() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_avatar_onRight") { activity ->
+            activity.actionBar?.hide()
+            val flyout = BubbleBarFlyoutView(context, onLeft = false)
             flyout.setData(
                 BubbleBarFlyoutMessage(
                     senderAvatar = ColorDrawable(Color.RED),
                     senderName = "sender",
                     message = "message",
+                    isGroupChat = true,
+                )
+            )
+            flyout
+        }
+    }
+
+    @Test
+    fun bubbleBarFlyoutView_avatar_onLeft() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_avatar_onLeft") { activity ->
+            activity.actionBar?.hide()
+            val flyout = BubbleBarFlyoutView(context, onLeft = true)
+            flyout.setData(
+                BubbleBarFlyoutMessage(
+                    senderAvatar = ColorDrawable(Color.RED),
+                    senderName = "sender",
+                    message = "message",
+                    isGroupChat = true,
+                )
+            )
+            flyout
+        }
+    }
+
+    @Test
+    fun bubbleBarFlyoutView_avatar_longMessage() {
+        screenshotRule.screenshotTest("bubbleBarFlyoutView_avatar_longMessage") { activity ->
+            activity.actionBar?.hide()
+            val flyout = BubbleBarFlyoutView(context, onLeft = true)
+            flyout.setData(
+                BubbleBarFlyoutMessage(
+                    senderAvatar = ColorDrawable(Color.RED),
+                    senderName = "sender",
+                    message = "really, really, really, really, really long message. like really.",
                     isGroupChat = true,
                 )
             )

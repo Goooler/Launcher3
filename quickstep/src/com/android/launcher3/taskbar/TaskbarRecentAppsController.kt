@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar
 
 import android.content.Context
+import android.window.flags.DesktopModeFlags
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
@@ -26,7 +27,6 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
@@ -40,7 +40,7 @@ class TaskbarRecentAppsController(context: Context, private val recentsModel: Re
 
     var canShowRunningApps =
         DesktopModeStatus.canEnterDesktopMode(context) &&
-            DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(context)
+            DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS.isTrue
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest

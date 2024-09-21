@@ -18,6 +18,8 @@ package com.android.launcher3.dagger;
 
 import android.content.Context;
 
+import com.android.launcher3.util.DaggerSingletonTracker;
+
 import dagger.BindsInstance;
 
 /**
@@ -29,6 +31,7 @@ import dagger.BindsInstance;
  * See {@link LauncherAppComponent} for the one actually used by AOSP.
  */
 public interface LauncherBaseAppComponent {
+    DaggerSingletonTracker getDaggerSingletonTracker();
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
         @BindsInstance Builder appContext(@ApplicationContext Context context);

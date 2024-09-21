@@ -104,7 +104,7 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
 
     @UiThread
     private void enforceRoundedCorners() {
-        if (mEnforcedCornerRadius <= 0 || !RoundedCornerEnforcement.isRoundedCornerEnabled()) {
+        if (mEnforcedCornerRadius <= 0) {
             resetRoundedCorners();
             return;
         }

@@ -80,14 +80,6 @@ constructor(
      */
     private var keyboardTaskFocusIndex = -1
 
-    /**
-     * Whether we should incoming toggle commands while a previous toggle command is still ongoing.
-     * This serves as a rate-limiter to prevent overlapping animations that can clobber each other
-     * and prevent clean-up callbacks from running. This thus prevents a recurring set of bugs with
-     * janky recents animations and unresponsive home and overview buttons.
-     */
-    private var waitForToggleCommandComplete = false
-
     private val activityInterface: BaseActivityInterface<*, *>
         get() = overviewComponentObserver.activityInterface
 
@@ -174,12 +166,6 @@ constructor(
      */
     @VisibleForTesting
     fun executeCommand(command: CommandInfo, onCallbackResult: () -> Unit): Boolean {
-        // This shouldn't happen if we execute 1 command per time.
-        if (waitForToggleCommandComplete && command.type == TOGGLE) {
-            Log.d(TAG, "executeCommand: $command - waiting for toggle command complete")
-            return true
-        }
-
         val recentsView = visibleRecentsView
         Log.d(TAG, "executeCommand: $command - visibleRecentsView: $recentsView")
         return if (recentsView != null) {
@@ -251,7 +237,6 @@ constructor(
     ): Boolean {
         var callbackList: RunnableList? = null
         if (taskView != null) {
-            waitForToggleCommandComplete = true
             taskView.isEndQuickSwitchCuj = true
             callbackList = taskView.launchWithAnimation()
         }
@@ -260,13 +245,11 @@ constructor(
             callbackList.add {
                 Log.d(TAG, "launching task callback: $command")
                 onCallbackResult()
-                waitForToggleCommandComplete = false
             }
             Log.d(TAG, "launching task - waiting for callback: $command")
             return false
         } else {
             recents.startHome()
-            waitForToggleCommandComplete = false
             return true
         }
     }
@@ -517,7 +500,6 @@ constructor(
             pw.println("    pendingCommandType=${commandQueue.first().type}")
         }
         pw.println("  keyboardTaskFocusIndex=$keyboardTaskFocusIndex")
-        pw.println("  waitForToggleCommandComplete=$waitForToggleCommandComplete")
     }
 
     @VisibleForTesting

@@ -14,21 +14,24 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.logging;
+package com.android.launcher3.util;
 
-import android.content.Context;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
-import com.android.launcher3.dagger.ApplicationContext;
-import com.android.launcher3.dagger.LauncherAppSingleton;
+import android.os.Looper;
 
-import dagger.Module;
-import dagger.Provides;
+import java.util.concurrent.ExecutionException;
 
-@Module
-public class LoggingModule {
-    @Provides
-    @LauncherAppSingleton
-    SettingsChangeLogger provideSettingsChangeLogger(@ApplicationContext Context context) {
-        return SettingsChangeLogger.INSTANCE.get(context);
+public final class ExecutorUtil {
+
+    /**
+     * Executes runnable on {@link Looper#getMainLooper()}, otherwise fails with an exception.
+     */
+    public static void executeSyncOnMainOrFail(Runnable runnable) {
+        try {
+            MAIN_EXECUTOR.submit(runnable).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

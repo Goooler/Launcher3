@@ -20,11 +20,12 @@
 
     <ImageView
         android:id="@+id/bubble_flyout_avatar"
-        android:layout_width="36dp"
+        android:layout_width="50dp"
         android:layout_height="36dp"
-        android:padding="@dimen/bubblebar_flyout_avatar_message_space"
+        android:paddingEnd="@dimen/bubblebar_flyout_avatar_message_space"
         android:scaleType="centerInside"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         tools:src="#ff0000"/>
 

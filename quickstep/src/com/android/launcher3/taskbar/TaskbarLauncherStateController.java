@@ -300,6 +300,7 @@ public class TaskbarLauncherStateController {
         stashController.updateStateForFlag(FLAG_IN_APP, false);
 
         updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, true);
+        mLauncherState = toState;
         animatorSet.play(stashController.createApplyStateAnimator(duration));
         animatorSet.play(applyState(duration, false));
 

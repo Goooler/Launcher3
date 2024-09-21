@@ -45,6 +45,9 @@
     <string name="split_app_info_accessibility">App info for %1$s</string>
     <string name="split_app_usage_settings">Usage settings for %1$s</string>
 
+    <!-- Title for an option to open a new window for a given app   -->
+    <string name="new_window_option_taskbar">New Window</string>
+
     <!-- App pairs -->
     <string name="save_app_pair">Save app pair</string>
     <!-- App pair default title -->

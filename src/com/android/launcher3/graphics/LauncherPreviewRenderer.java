@@ -69,7 +69,6 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.WorkspaceLayoutManager;
 import com.android.launcher3.apppairs.AppPairIcon;
@@ -207,15 +206,12 @@ public class LauncherPreviewRenderer extends ContextWrapper
             mWorkspaceScreens.put(Workspace.SECOND_SCREEN_ID, rightPanel);
         }
 
-        if (Utilities.ATLEAST_S) {
-            WallpaperColors wallpaperColors = wallpaperColorsOverride != null
-                    ? wallpaperColorsOverride
-                    : WallpaperManager.getInstance(context).getWallpaperColors(FLAG_SYSTEM);
-            mWallpaperColorResources = wallpaperColors != null ? LocalColorExtractor.newInstance(
-                    context).generateColorsOverride(wallpaperColors) : null;
-        } else {
-            mWallpaperColorResources = null;
-        }
+        WallpaperColors wallpaperColors = wallpaperColorsOverride != null
+                ? wallpaperColorsOverride
+                : WallpaperManager.getInstance(context).getWallpaperColors(FLAG_SYSTEM);
+        mWallpaperColorResources = wallpaperColors != null
+                ? LocalColorExtractor.newInstance(context).generateColorsOverride(wallpaperColors)
+                : null;
         mAppWidgetHost = new LauncherPreviewAppWidgetHost(context);
     }
 

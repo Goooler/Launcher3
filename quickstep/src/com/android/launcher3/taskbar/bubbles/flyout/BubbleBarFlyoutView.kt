@@ -21,14 +21,17 @@ import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.view.LayoutInflater
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.android.launcher3.R
+import com.android.launcher3.popup.RoundedArrowDrawable
 
 /** The flyout view used to notify the user of a new bubble notification. */
-class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
+class BubbleBarFlyoutView(context: Context, private val onLeft: Boolean) :
+    ConstraintLayout(context) {
 
     private val sender: TextView by
         lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_name) }
@@ -39,9 +42,36 @@ class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
     private val message: TextView by
         lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_text) }
 
-    private val flyoutHorizontalPadding by
+    private val flyoutPadding by
         lazy(LazyThreadSafetyMode.NONE) {
-            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding_horizontal)
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
+        }
+
+    private val triangleHeight by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_triangle_height)
+        }
+
+    private val triangleOverlap by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(
+                R.dimen.bubblebar_flyout_triangle_overlap_amount
+            )
+        }
+
+    private val triangleWidth by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_triangle_width)
+        }
+
+    private val triangleRadius by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_triangle_radius)
+        }
+
+    private val minFlyoutWidth by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_min_width)
         }
 
     private val maxFlyoutWidth by
@@ -50,6 +80,7 @@ class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
         }
 
     private val cornerRadius: Float
+    private val triangle: Path = Path()
     private var backgroundColor = Color.BLACK
 
     /**
@@ -69,13 +100,19 @@ class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
         clipChildren = false
         clipToPadding = false
 
-        val horizontalPadding =
-            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding_horizontal)
-        val verticalPadding =
-            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding_vertical)
-        setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
+        val padding = context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
+        // add extra padding to the bottom of the view to include the triangle
+        setPadding(padding, padding, padding, padding + triangleHeight - triangleOverlap)
         translationZ =
             context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_elevation).toFloat()
+
+        RoundedArrowDrawable.addDownPointingRoundedTriangleToPath(
+            triangleWidth.toFloat(),
+            triangleHeight.toFloat(),
+            triangleRadius.toFloat(),
+            triangle,
+        )
+
         applyConfigurationColors(resources.configuration)
     }
 
@@ -88,15 +125,28 @@ class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
             avatar.visibility = GONE
         }
 
-        val maxTextViewWidth = maxFlyoutWidth - flyoutHorizontalPadding * 2
+        val minTextViewWidth: Int
+        val maxTextViewWidth: Int
+        if (avatar.visibility == VISIBLE) {
+            minTextViewWidth = minFlyoutWidth - avatar.width - flyoutPadding * 2
+            maxTextViewWidth = maxFlyoutWidth - avatar.width - flyoutPadding * 2
+        } else {
+            // when there's no avatar, the width of the text view is constant, so we're setting the
+            // min and max to the same value
+            minTextViewWidth = minFlyoutWidth - flyoutPadding * 2
+            maxTextViewWidth = minTextViewWidth
+        }
+
         if (flyoutMessage.senderName.isEmpty()) {
             sender.visibility = GONE
         } else {
+            sender.minWidth = minTextViewWidth
             sender.maxWidth = maxTextViewWidth
             sender.text = flyoutMessage.senderName
             sender.visibility = VISIBLE
         }
 
+        message.minWidth = minTextViewWidth
         message.maxWidth = maxTextViewWidth
         message.text = flyoutMessage.message
     }
@@ -106,12 +156,21 @@ class BubbleBarFlyoutView(context: Context) : ConstraintLayout(context) {
             0f,
             0f,
             width.toFloat(),
-            height.toFloat(),
+            height.toFloat() - triangleHeight + triangleOverlap,
             cornerRadius,
             cornerRadius,
             backgroundPaint,
         )
+        drawTriangle(canvas)
         super.onDraw(canvas)
+    }
+
+    private fun drawTriangle(canvas: Canvas) {
+        canvas.save()
+        val triangleX = if (onLeft) cornerRadius else width - cornerRadius - triangleWidth
+        canvas.translate(triangleX, (height - triangleHeight).toFloat())
+        canvas.drawPath(triangle, backgroundPaint)
+        canvas.restore()
     }
 
     private fun applyConfigurationColors(configuration: Configuration) {

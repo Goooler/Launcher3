@@ -51,6 +51,7 @@ import android.window.IOnBackInvokedCallback;
 import android.window.RemoteTransition;
 import android.window.TaskSnapshot;
 import android.window.TransitionFilter;
+import android.window.flags.DesktopModeFlags;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
@@ -85,14 +86,13 @@ import com.android.wm.shell.desktopmode.IDesktopMode;
 import com.android.wm.shell.desktopmode.IDesktopTaskListener;
 import com.android.wm.shell.draganddrop.IDragAndDrop;
 import com.android.wm.shell.onehanded.IOneHanded;
-import com.android.wm.shell.recents.IRecentsAnimationController;
-import com.android.wm.shell.recents.IRecentsAnimationRunner;
 import com.android.wm.shell.recents.IRecentTasks;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.recents.IRecentsAnimationController;
+import com.android.wm.shell.recents.IRecentsAnimationRunner;
 import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.shared.split.SplitBounds;
@@ -1395,7 +1395,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
         return DesktopModeStatus.canEnterDesktopMode(mContext)
-                && DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(mContext);
+                && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS.isTrue();
     }
 
     private boolean handleMessageAsync(Message msg) {

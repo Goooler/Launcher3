@@ -15,10 +15,8 @@
  */
 package com.android.quickstep.dagger;
 
-import com.android.quickstep.logging.LoggingModule;
-
 import dagger.Module;
 
-@Module(includes = {LoggingModule.class})
+@Module
 public class QuickStepModule {
 }

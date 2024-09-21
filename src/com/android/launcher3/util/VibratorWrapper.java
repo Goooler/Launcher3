@@ -31,8 +31,6 @@ import android.provider.Settings;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.Utilities;
-
 /**
  * Wrapper around {@link Vibrator} to easily perform haptic feedback where necessary.
  */
@@ -129,7 +127,7 @@ public class VibratorWrapper implements SafeCloseable {
 
     /** Indicates that Taskbar has been invoked. */
     public void vibrateForTaskbarUnstash() {
-        if (Utilities.ATLEAST_S && mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
+        if (mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
             VibrationEffect primitiveLowTickEffect = VibrationEffect
                     .startComposition()
                     .addPrimitive(PRIMITIVE_LOW_TICK, LOW_TICK_SCALE)

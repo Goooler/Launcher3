@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.util;
 
-import static android.content.Intent.ACTION_CONFIGURATION_CHANGED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 
@@ -33,7 +32,6 @@ import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.Intent;
@@ -42,7 +40,6 @@ import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
-import android.os.Build;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
@@ -132,21 +129,15 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         }
 
         Display display = mDM.getDisplay(DEFAULT_DISPLAY);
-        if (Utilities.ATLEAST_S) {
-            mWindowContext = mContext.createWindowContext(display, TYPE_APPLICATION, null);
-            mWindowContext.registerComponentCallbacks(this);
-        } else {
-            mWindowContext = null;
-            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
-        }
+        mWindowContext = mContext.createWindowContext(display, TYPE_APPLICATION, null);
+        mWindowContext.registerComponentCallbacks(this);
 
         // Initialize navigation mode change listener
         mReceiver.registerPkgActions(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
 
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
-        Context displayInfoContext = getDisplayInfoContext(display);
-        mInfo = new Info(displayInfoContext, wmProxy,
-                wmProxy.estimateInternalDisplayBounds(displayInfoContext));
+        mInfo = new Info(mWindowContext, wmProxy,
+                wmProxy.estimateInternalDisplayBounds(mWindowContext));
         FileLog.i(TAG, "(CTOR) perDisplayBounds: " + mInfo.mPerDisplayBounds);
     }
 
@@ -161,7 +152,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                                     && mInfo.mIsTaskbarPinnedInDesktopMode != prefs.get(
                                     TASKBAR_PINNING_IN_DESKTOP_MODE);
                     if (isTaskbarPinningChanged || isTaskbarPinningDesktopModeChanged) {
-                        handleInfoChange(mWindowContext.getDisplay());
+                        handleInfoChange();
                     }
                 };
 
@@ -191,14 +182,14 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
      * Handles info change for desktop mode.
      */
     public static void handleInfoChangeForDesktopMode(Context context) {
-        INSTANCE.get(context).handleInfoChange(context.getDisplay());
+        INSTANCE.get(context).handleInfoChange();
     }
 
     /**
      * Handles info change for launcher visibility.
      */
     public static void handleInfoChangeForLauncherVisibilityChanged(Context context) {
-        INSTANCE.get(context).handleInfoChange(context.getDisplay());
+        INSTANCE.get(context).handleInfoChange();
     }
 
     /**
@@ -266,36 +257,22 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         if (mDestroyed) {
             return;
         }
-        boolean reconfigure = false;
         if (ACTION_OVERLAY_CHANGED.equals(intent.getAction())) {
-            reconfigure = true;
-        } else if (ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
-            Configuration config = mContext.getResources().getConfiguration();
-            reconfigure = mInfo.fontScale != config.fontScale
-                    || mInfo.densityDpi != config.densityDpi;
-        }
-
-        if (reconfigure) {
-            Log.d(TAG, "Configuration changed, notifying listeners");
-            Display display = mDM.getDisplay(DEFAULT_DISPLAY);
-            if (display != null) {
-                handleInfoChange(display);
-            }
+            Log.d(TAG, "Overlay changed, notifying listeners");
+            handleInfoChange();
         }
     }
 
     @UiThread
     @Override
-    @TargetApi(Build.VERSION_CODES.S)
     public final void onConfigurationChanged(Configuration config) {
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "DisplayController#onConfigurationChanged: " + config);
-        Display display = mWindowContext.getDisplay();
         if (config.densityDpi != mInfo.densityDpi
                 || config.fontScale != mInfo.fontScale
-                || display.getRotation() != mInfo.rotation
                 || !mInfo.mScreenSizeDp.equals(
-                        new PortraitSize(config.screenHeightDp, config.screenWidthDp))) {
-            handleInfoChange(display);
+                        new PortraitSize(config.screenHeightDp, config.screenWidthDp))
+                || mWindowContext.getDisplay().getRotation() != mInfo.rotation) {
+            handleInfoChange();
         }
     }
 
@@ -318,17 +295,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         return mInfo;
     }
 
-    private Context getDisplayInfoContext(Display display) {
-        return Utilities.ATLEAST_S ? mWindowContext : mContext.createDisplayContext(display);
-    }
-
     @AnyThread
     @VisibleForTesting
-    public void handleInfoChange(Display display) {
+    public void handleInfoChange() {
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(mContext);
         Info oldInfo = mInfo;
 
-        Context displayInfoContext = getDisplayInfoContext(display);
+        Context displayInfoContext = mWindowContext;
         Info newInfo = new Info(displayInfoContext, wmProxy, oldInfo.mPerDisplayBounds);
 
         if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale

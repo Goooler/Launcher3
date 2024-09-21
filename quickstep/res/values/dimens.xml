@@ -480,11 +480,15 @@
     <dimen name="bubble_expanded_view_drop_target_margin">16dp</dimen>
 
     <!-- Bubble bar flyout view -->
-    <dimen name="bubblebar_flyout_padding_horizontal">14dp</dimen>
-    <dimen name="bubblebar_flyout_padding_vertical">10dp</dimen>
+    <dimen name="bubblebar_flyout_padding">16dp</dimen>
     <dimen name="bubblebar_flyout_elevation">4dp</dimen>
-    <dimen name="bubblebar_flyout_avatar_message_space">6dp</dimen>
-    <dimen name="bubblebar_flyout_max_width">96dp</dimen>
+    <dimen name="bubblebar_flyout_avatar_message_space">14dp</dimen>
+    <dimen name="bubblebar_flyout_min_width">238dp</dimen>
+    <dimen name="bubblebar_flyout_max_width">276dp</dimen>
+    <dimen name="bubblebar_flyout_triangle_width">12dp</dimen>
+    <dimen name="bubblebar_flyout_triangle_height">10dp</dimen>
+    <dimen name="bubblebar_flyout_triangle_overlap_amount">1dp</dimen>
+    <dimen name="bubblebar_flyout_triangle_radius">2dp</dimen>
 
     <!-- Launcher splash screen -->
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->

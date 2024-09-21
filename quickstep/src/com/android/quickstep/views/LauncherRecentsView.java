@@ -16,6 +16,7 @@
 package com.android.quickstep.views;
 
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+import static android.window.flags.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.CLEAR_ALL_BUTTON;
@@ -26,7 +27,6 @@ import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SPLIT_SELECTION_EXIT_HOME;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -268,7 +268,8 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         super.onGestureAnimationStart(runningTasks, rotationTouchHelper);
         DesktopVisibilityController desktopVisibilityController =
                 mContainer.getDesktopVisibilityController();
-        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
+        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
+                && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureStart();
         }
@@ -291,7 +292,8 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
             }
         }
         super.onGestureAnimationEnd();
-        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
+        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
+                && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureEnd(endTarget);
         }

@@ -250,6 +250,7 @@ public class TaskbarModelCallbacks implements
             Map<PackageUserKey, Integer> packageUserKeytoUidMap) {
         Preconditions.assertUIThread();
         mControllers.taskbarAllAppsController.setApps(apps, flags, packageUserKeytoUidMap);
+        mControllers.taskbarPopupController.setApps(apps);
     }
 
     protected void dumpLogs(String prefix, PrintWriter pw) {

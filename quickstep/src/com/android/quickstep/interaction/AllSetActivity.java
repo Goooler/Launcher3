@@ -219,7 +219,7 @@ public class AllSetActivity extends Activity {
     }
 
     private void startBackgroundAnimation(boolean forTablet) {
-        if (!Utilities.ATLEAST_S || mVibrator == null) {
+        if (mVibrator == null) {
             return;
         }
         boolean supportsThud = mVibrator.areAllPrimitivesSupported(
