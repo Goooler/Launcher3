@@ -253,7 +253,7 @@ public class DesktopVisibilityController {
         for (DesktopVisibilityListener listener : mDesktopVisibilityListeners) {
             listener.onDesktopVisibilityChanged(areDesktopTasksVisible);
         }
-        DisplayController.handleInfoChangeForDesktopMode(mContext);
+        DisplayController.INSTANCE.get(mContext).notifyConfigChange();
     }
 
     private void notifyTaskbarDesktopModeListeners(boolean doesAnyTaskRequireTaskbarRounding) {

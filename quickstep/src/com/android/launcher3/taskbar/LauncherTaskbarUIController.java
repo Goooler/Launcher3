@@ -213,7 +213,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     @Override
     public void onLauncherVisibilityChanged(boolean isVisible) {
         if (DesktopModeStatus.enterDesktopByDefaultOnFreeformDisplay(mLauncher)) {
-            DisplayController.handleInfoChangeForLauncherVisibilityChanged(mLauncher);
+            DisplayController.INSTANCE.get(mLauncher).notifyConfigChange();
         }
         onLauncherVisibilityChanged(isVisible, false /* fromInit */);
     }

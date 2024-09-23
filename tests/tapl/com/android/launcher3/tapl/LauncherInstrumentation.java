@@ -2423,7 +2423,7 @@ public final class LauncherInstrumentation {
         eventChecker.setLogExclusionRule(event -> {
             Matcher matcher = Pattern.compile("KeyEvent.*flags=0x([0-9a-fA-F]+)").matcher(event);
             if (matcher.find()) {
-                int keyEventFlags = Integer.parseInt(matcher.group(1), 16);
+                long keyEventFlags = Long.parseLong(matcher.group(1), 16);
                 // ignore KeyEvents with FLAG_CANCELED
                 return (keyEventFlags & KeyEvent.FLAG_CANCELED) != 0;
             }

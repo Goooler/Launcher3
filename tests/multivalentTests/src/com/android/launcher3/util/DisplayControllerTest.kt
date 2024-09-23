@@ -178,7 +178,7 @@ class DisplayControllerTest {
     @UiThreadTest
     fun testTaskbarPinning() {
         whenever(launcherPrefs.get(TASKBAR_PINNING)).thenReturn(true)
-        displayController.handleInfoChange()
+        displayController.notifyConfigChange()
         verify(displayInfoChangeListener)
             .onDisplayInfoChanged(any(), any(), eq(CHANGE_TASKBAR_PINNING))
     }
@@ -187,7 +187,7 @@ class DisplayControllerTest {
     @UiThreadTest
     fun testTaskbarPinningChangeInDesktopMode() {
         whenever(launcherPrefs.get(TASKBAR_PINNING_IN_DESKTOP_MODE)).thenReturn(false)
-        displayController.handleInfoChange()
+        displayController.notifyConfigChange()
         verify(displayInfoChangeListener)
             .onDisplayInfoChanged(any(), any(), eq(CHANGE_TASKBAR_PINNING))
     }
@@ -202,7 +202,7 @@ class DisplayControllerTest {
         DisplayController.enableTaskbarModePreferenceForTests(true)
 
         assertTrue(displayController.getInfo().isTransientTaskbar())
-        displayController.handleInfoChange()
+        displayController.notifyConfigChange()
         verify(displayInfoChangeListener)
             .onDisplayInfoChanged(any(), any(), eq(CHANGE_TASKBAR_PINNING))
         assertFalse(displayController.getInfo().isTransientTaskbar())

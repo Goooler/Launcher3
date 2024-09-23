@@ -152,7 +152,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                                     && mInfo.mIsTaskbarPinnedInDesktopMode != prefs.get(
                                     TASKBAR_PINNING_IN_DESKTOP_MODE);
                     if (isTaskbarPinningChanged || isTaskbarPinningDesktopModeChanged) {
-                        handleInfoChange();
+                        notifyConfigChange();
                     }
                 };
 
@@ -176,20 +176,6 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
      */
     public static boolean isTransientTaskbar(Context context) {
         return INSTANCE.get(context).getInfo().isTransientTaskbar();
-    }
-
-    /**
-     * Handles info change for desktop mode.
-     */
-    public static void handleInfoChangeForDesktopMode(Context context) {
-        INSTANCE.get(context).handleInfoChange();
-    }
-
-    /**
-     * Handles info change for launcher visibility.
-     */
-    public static void handleInfoChangeForLauncherVisibilityChanged(Context context) {
-        INSTANCE.get(context).handleInfoChange();
     }
 
     /**
@@ -259,7 +245,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         }
         if (ACTION_OVERLAY_CHANGED.equals(intent.getAction())) {
             Log.d(TAG, "Overlay changed, notifying listeners");
-            handleInfoChange();
+            notifyConfigChange();
         }
     }
 
@@ -272,7 +258,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                 || !mInfo.mScreenSizeDp.equals(
                         new PortraitSize(config.screenHeightDp, config.screenWidthDp))
                 || mWindowContext.getDisplay().getRotation() != mInfo.rotation) {
-            handleInfoChange();
+            notifyConfigChange();
         }
     }
 
@@ -296,8 +282,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     }
 
     @AnyThread
-    @VisibleForTesting
-    public void handleInfoChange() {
+    public void notifyConfigChange() {
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(mContext);
         Info oldInfo = mInfo;
 
