@@ -184,7 +184,8 @@ interface RecentsPagedOrientationHandler : PagedOrientationHandler {
         parentHeight: Int,
         splitBoundsConfig: SplitConfigurationOptions.SplitBounds,
         dp: DeviceProfile,
-        isRtl: Boolean
+        isRtl: Boolean,
+        inSplitSelection: Boolean
     )
 
     /**
@@ -235,7 +236,8 @@ interface RecentsPagedOrientationHandler : PagedOrientationHandler {
         groupedTaskViewWidth: Int,
         isRtl: Boolean,
         deviceProfile: DeviceProfile,
-        splitConfig: SplitConfigurationOptions.SplitBounds
+        splitConfig: SplitConfigurationOptions.SplitBounds,
+        inSplitSelection: Boolean
     )
 
     /*

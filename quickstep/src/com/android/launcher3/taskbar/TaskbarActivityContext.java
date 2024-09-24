@@ -362,38 +362,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     /**
-     * Calculate the offsets needed to transform the transient taskbar bounds to the hotseat bounds.
-     * @return The offsets will be stored in a Rect
-     */
-    public Rect calculateTaskbarToHotseatOffsets(Rect hotseatBounds) {
-        Rect taskbar = getTransientTaskbarBounds();
-        Rect offsets = new Rect();
-
-        offsets.left = hotseatBounds.left - taskbar.left;
-        offsets.right = hotseatBounds.right - taskbar.right;
-
-        int heightDiff = hotseatBounds.height() - taskbar.height();
-        offsets.top = (taskbar.height() - heightDiff) / 2;
-
-        int gleanedTaskbarPadding = (mDeviceProfile.taskbarHeight
-                - getTransientTaskbarBounds().height()) / 2;
-        offsets.left -= gleanedTaskbarPadding;
-        offsets.top -= gleanedTaskbarPadding;
-        offsets.right += gleanedTaskbarPadding;
-
-        // Bottom is relative to the bottom of layout, so we can calculate it with padding included.
-        offsets.bottom = (hotseatBounds.height() - taskbar.height()) / 2;
-
-        // Update bounds in taskbar background
-        if (hotseatBounds.isEmpty()) {
-            mDragLayer.getTaskbarToHotseatOffsetRect().setEmpty();
-        } else {
-            mDragLayer.getTaskbarToHotseatOffsetRect().set(offsets);
-        }
-        return offsets;
-    }
-
-    /**
      * Copy the original DeviceProfile, match the number of hotseat icons and qsb width and update
      * the icon size
      */
@@ -1714,18 +1682,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         }
 
         return AnimatorPlaybackController.wrap(fullAnimation, duration);
-    }
-
-    /**
-     * Returns the bounds of launcher's hotseat (if exists).
-     */
-    public void getHotseatBounds(Rect hotseatBoundsOut) {
-        TaskbarUIController uiController = mControllers.uiController;
-        if (uiController instanceof LauncherTaskbarUIController launcherController) {
-            launcherController.getHotseatBounds(hotseatBoundsOut);
-        } else {
-            hotseatBoundsOut.setEmpty();
-        }
     }
 
     /**

@@ -65,31 +65,18 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val heightSize = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(widthSize, heightSize)
         val splitBoundsConfig = splitBoundsConfig ?: return
-        val initSplitTaskId = getThisTaskCurrentlyInSplitSelection()
-        if (initSplitTaskId == INVALID_TASK_ID) {
-            pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
-                taskContainers[0].snapshotView,
-                taskContainers[1].snapshotView,
-                widthSize,
-                heightSize,
-                splitBoundsConfig,
-                container.deviceProfile,
-                layoutDirection == LAYOUT_DIRECTION_RTL
-            )
-        } else {
-            // Currently being split with this taskView, let the non-split selected thumbnail
-            // take up full thumbnail area
-            taskContainers
-                .firstOrNull { it.task.key.id != initSplitTaskId }
-                ?.snapshotView
-                ?.measure(
-                    widthMeasureSpec,
-                    MeasureSpec.makeMeasureSpec(
-                        heightSize - container.deviceProfile.overviewTaskThumbnailTopMarginPx,
-                        MeasureSpec.EXACTLY
-                    )
-                )
-        }
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+        pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
+            taskContainers[0].snapshotView,
+            taskContainers[1].snapshotView,
+            widthSize,
+            heightSize,
+            splitBoundsConfig,
+            container.deviceProfile,
+            layoutDirection == LAYOUT_DIRECTION_RTL,
+            inSplitSelection,
+        )
+
         if (!enableOverviewIconMenu()) {
             updateIconPlacement()
         }
@@ -173,6 +160,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val splitBoundsConfig = splitBoundsConfig ?: return
         val taskIconHeight = container.deviceProfile.overviewTaskIconSizePx
         val isRtl = layoutDirection == LAYOUT_DIRECTION_RTL
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+
         if (enableOverviewIconMenu()) {
             val groupedTaskViewSizes =
                 pagedOrientationHandler.getGroupedTaskViewSizes(
@@ -191,7 +180,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 layoutParams.width,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection
             )
         } else {
             pagedOrientationHandler.setSplitIconParams(
@@ -204,7 +194,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 measuredWidth,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection
             )
         }
     }

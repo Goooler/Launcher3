@@ -1056,6 +1056,7 @@ public class DeviceProfile {
         return mHotseatColumnSpan;
     }
 
+    @VisibleForTesting
     public int getHotseatWidthPx() {
         return mHotseatWidthPx;
     }

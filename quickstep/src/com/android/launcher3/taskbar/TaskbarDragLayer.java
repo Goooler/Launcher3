@@ -22,7 +22,6 @@ import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UN
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Rect;
 import android.graphics.RectF;
 import android.media.permission.SafeCloseable;
 import android.util.AttributeSet;
@@ -258,11 +257,6 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     /** Returns the bounds in DragLayer coordinates of where the transient background was drawn. */
     protected RectF getLastDrawnTransientRect() {
         return mBackgroundRenderer.getLastDrawnTransientRect();
-    }
-
-    /** Returns the rect used to transform transient taskbar to the hotseat */
-    public Rect getTaskbarToHotseatOffsetRect() {
-        return mBackgroundRenderer.getTaskbarToHotseatOffsetRect();
     }
 
     @Override

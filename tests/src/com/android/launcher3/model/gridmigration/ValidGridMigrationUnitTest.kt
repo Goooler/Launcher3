@@ -114,17 +114,14 @@ class ValidGridMigrationUnitTest {
         }
     }
 
-    private fun migrate(
-        srcGrid: Grid,
-        dstGrid: Grid,
-    ): List<WorkspaceItem> {
+    private fun migrate(srcGrid: Grid, dstGrid: Grid): List<WorkspaceItem> {
         val userSerial = UserCache.INSTANCE[context].getSerialNumberForUser(Process.myUserHandle())
         val dbHelper =
             DatabaseHelper(
                 context,
                 null,
                 { UserCache.INSTANCE.get(context).getSerialNumberForUser(it) },
-                {}
+                {},
             )
 
         Favorites.addTableToDb(dbHelper.writableDatabase, userSerial, false, srcGrid.tableName)
@@ -135,12 +132,12 @@ class ValidGridMigrationUnitTest {
         LauncherDbUtils.SQLiteTransaction(dbHelper.writableDatabase).use {
             GridSizeMigrationUtil.migrate(
                 dbHelper,
-                GridSizeMigrationUtil.DbReader(it.db, srcGrid.tableName, context, MockSet(1)),
-                GridSizeMigrationUtil.DbReader(it.db, dstGrid.tableName, context, MockSet(1)),
+                GridSizeMigrationUtil.DbReader(it.db, srcGrid.tableName, context),
+                GridSizeMigrationUtil.DbReader(it.db, dstGrid.tableName, context),
                 dstGrid.size.x,
                 dstGrid.size,
                 srcGrid.toGridState(),
-                dstGrid.toGridState()
+                dstGrid.toGridState(),
             )
             it.commit()
         }
@@ -157,7 +154,7 @@ class ValidGridMigrationUnitTest {
                 Grid(
                     tableName = Favorites.TMP_TABLE,
                     size = testCase.srcSize,
-                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER)
+                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER),
                 )
             val dstGrid =
                 Grid(tableName = Favorites.TABLE_NAME, size = testCase.targetSize, items = listOf())
@@ -175,13 +172,13 @@ class ValidGridMigrationUnitTest {
                 Grid(
                     tableName = Favorites.TMP_TABLE,
                     size = testCase.srcSize,
-                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER)
+                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER),
                 )
             val dstGrid =
                 Grid(
                     tableName = Favorites.TABLE_NAME,
                     size = testCase.targetSize,
-                    items = generateItemsForTest(testCase.destBoards, REPEAT_AFTER_DST)
+                    items = generateItemsForTest(testCase.destBoards, REPEAT_AFTER_DST),
                 )
             validate(srcGrid, dstGrid, migrate(srcGrid, dstGrid))
         }
@@ -199,7 +196,7 @@ class ValidGridMigrationUnitTest {
                 Grid(
                     tableName = Favorites.TMP_TABLE,
                     size = testCase.srcSize,
-                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER)
+                    items = generateItemsForTest(testCase.boards, REPEAT_AFTER),
                 )
             val dstGrid =
                 Grid(tableName = Favorites.TABLE_NAME, size = testCase.targetSize, items = listOf())

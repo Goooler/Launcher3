@@ -4994,7 +4994,8 @@ public abstract class RecentsView<
             mSplitSelectStateController.getSplitAnimationController()
                     .addInitialSplitFromPair(taskContainer, builder,
                             mContainer.getDeviceProfile(),
-                            mSplitHiddenTaskView.getWidth(), mSplitHiddenTaskView.getHeight(),
+                            mSplitHiddenTaskView.getLayoutParams().width,
+                            mSplitHiddenTaskView.getLayoutParams().height,
                             primaryTaskSelected);
             builder.addOnFrameCallback(() -> {
                 if (!enableRefactorTaskThumbnail()) {

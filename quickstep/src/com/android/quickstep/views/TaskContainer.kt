@@ -160,6 +160,8 @@ class TaskContainer(
         if (enableRefactorTaskThumbnail()) {
             taskView.removeView(thumbnailView)
         }
+        snapshotView.scaleX = 1f
+        snapshotView.scaleY = 1f
         overlay.destroy()
     }
 

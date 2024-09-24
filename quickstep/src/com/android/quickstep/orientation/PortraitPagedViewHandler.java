@@ -530,10 +530,16 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
         }
     }
 
+    /**
+     * @param inSplitSelection Whether user currently has a task from this task group staged for
+     *                         split screen. If true, we have custom translations/scaling in place
+     *                         for the remaining snapshot, so we'll skip setting translation/scale
+     *                         here.
+     */
     @Override
     public void measureGroupedTaskViewThumbnailBounds(View primarySnapshot, View secondarySnapshot,
             int parentWidth, int parentHeight, SplitBounds splitBoundsConfig,
-            DeviceProfile dp, boolean isRtl) {
+            DeviceProfile dp, boolean isRtl, boolean inSplitSelection) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
 
         FrameLayout.LayoutParams primaryParams =
@@ -541,11 +547,10 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
         FrameLayout.LayoutParams secondaryParams =
                 (FrameLayout.LayoutParams) secondarySnapshot.getLayoutParams();
 
-        // Reset margin and translations that aren't used in this method, but are used in other
+        // Reset margins that aren't used in this method, but are used in other
         // `RecentsPagedOrientationHandler` variants.
         secondaryParams.topMargin = 0;
         primaryParams.topMargin = spaceAboveSnapshot;
-        primarySnapshot.setTranslationY(0);
 
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
         float dividerScale = splitBoundsConfig.appsStackedVertically
@@ -553,28 +558,35 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
                 : splitBoundsConfig.dividerWidthPercent;
         Pair<Point, Point> taskViewSizes =
                 getGroupedTaskViewSizes(dp, splitBoundsConfig, parentWidth, parentHeight);
-        if (dp.isLeftRightSplit) {
-            int scaledDividerBar = Math.round(parentWidth * dividerScale);
-            if (isRtl) {
-                int translationX = taskViewSizes.second.x + scaledDividerBar;
-                primarySnapshot.setTranslationX(-translationX);
-                secondarySnapshot.setTranslationX(0);
+        if (!inSplitSelection) {
+            // Reset translations that aren't used in this method, but are used in other
+            // `RecentsPagedOrientationHandler` variants.
+            primarySnapshot.setTranslationY(0);
+
+            if (dp.isLeftRightSplit) {
+                int scaledDividerBar = Math.round(parentWidth * dividerScale);
+                if (isRtl) {
+                    int translationX = taskViewSizes.second.x + scaledDividerBar;
+                    primarySnapshot.setTranslationX(-translationX);
+                    secondarySnapshot.setTranslationX(0);
+                } else {
+                    int translationX = taskViewSizes.first.x + scaledDividerBar;
+                    secondarySnapshot.setTranslationX(translationX);
+                    primarySnapshot.setTranslationX(0);
+                }
+                secondarySnapshot.setTranslationY(spaceAboveSnapshot);
             } else {
-                int translationX = taskViewSizes.first.x + scaledDividerBar;
-                secondarySnapshot.setTranslationX(translationX);
+                float finalDividerHeight = Math.round(totalThumbnailHeight * dividerScale);
+                float translationY =
+                        taskViewSizes.first.y + spaceAboveSnapshot + finalDividerHeight;
+                secondarySnapshot.setTranslationY(translationY);
+
+                // Reset unused translations.
+                secondarySnapshot.setTranslationX(0);
                 primarySnapshot.setTranslationX(0);
             }
-
-            secondarySnapshot.setTranslationY(spaceAboveSnapshot);
-        } else {
-            float finalDividerHeight = Math.round(totalThumbnailHeight * dividerScale);
-            float translationY = taskViewSizes.first.y + spaceAboveSnapshot + finalDividerHeight;
-            secondarySnapshot.setTranslationY(translationY);
-
-            // Reset unused translations.
-            secondarySnapshot.setTranslationX(0);
-            primarySnapshot.setTranslationX(0);
         }
+
         primarySnapshot.measure(
                 View.MeasureSpec.makeMeasureSpec(taskViewSizes.first.x, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(taskViewSizes.first.y, View.MeasureSpec.EXACTLY));
@@ -582,10 +594,6 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
                 View.MeasureSpec.makeMeasureSpec(taskViewSizes.second.x, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(taskViewSizes.second.y,
                         View.MeasureSpec.EXACTLY));
-        primarySnapshot.setScaleX(1);
-        secondarySnapshot.setScaleX(1);
-        primarySnapshot.setScaleY(1);
-        secondarySnapshot.setScaleY(1);
     }
 
     @Override
@@ -662,11 +670,16 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
         iconAppChipView.setRotation(getDegreesRotated());
     }
 
+    /**
+     * @param inSplitSelection Whether user currently has a task from this task group staged for
+     *                         split screen. If true, we have custom translations in place for the
+     *                         remaining icon, so we'll skip setting translations here.
+     */
     @Override
     public void setSplitIconParams(View primaryIconView, View secondaryIconView,
             int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             int groupedTaskViewHeight, int groupedTaskViewWidth, boolean isRtl,
-            DeviceProfile deviceProfile, SplitBounds splitConfig) {
+            DeviceProfile deviceProfile, SplitBounds splitConfig, boolean inSplitSelection) {
         FrameLayout.LayoutParams primaryIconParams =
                 (FrameLayout.LayoutParams) primaryIconView.getLayoutParams();
         FrameLayout.LayoutParams secondaryIconParams = enableOverviewIconMenu()
@@ -680,20 +693,23 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
             secondaryIconParams.gravity = TOP | START;
             secondaryIconParams.topMargin = primaryIconParams.topMargin;
             secondaryIconParams.setMarginStart(primaryIconParams.getMarginStart());
-            if (deviceProfile.isLeftRightSplit) {
-                if (isRtl) {
-                    int secondarySnapshotWidth = groupedTaskViewWidth - primarySnapshotWidth;
-                    primaryAppChipView.setSplitTranslationX(-secondarySnapshotWidth);
+            if (!inSplitSelection) {
+                if (deviceProfile.isLeftRightSplit) {
+                    if (isRtl) {
+                        int secondarySnapshotWidth = groupedTaskViewWidth - primarySnapshotWidth;
+                        primaryAppChipView.setSplitTranslationX(-secondarySnapshotWidth);
+                    } else {
+                        secondaryAppChipView.setSplitTranslationX(primarySnapshotWidth);
+                    }
                 } else {
-                    secondaryAppChipView.setSplitTranslationX(primarySnapshotWidth);
+                    primaryAppChipView.setSplitTranslationX(0);
+                    secondaryAppChipView.setSplitTranslationX(0);
+                    int dividerThickness = Math.min(splitConfig.visualDividerBounds.width(),
+                            splitConfig.visualDividerBounds.height());
+                    secondaryAppChipView.setSplitTranslationY(
+                            primarySnapshotHeight + (deviceProfile.isTablet ? 0
+                                    : dividerThickness));
                 }
-            } else {
-                primaryAppChipView.setSplitTranslationX(0);
-                secondaryAppChipView.setSplitTranslationX(0);
-                int dividerThickness = Math.min(splitConfig.visualDividerBounds.width(),
-                        splitConfig.visualDividerBounds.height());
-                secondaryAppChipView.setSplitTranslationY(
-                        primarySnapshotHeight + (deviceProfile.isTablet ? 0 : dividerThickness));
             }
         } else if (deviceProfile.isLeftRightSplit) {
             // We calculate the "midpoint" of the thumbnail area, and place the icons there.
@@ -716,45 +732,52 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
             if (deviceProfile.isSeascape()) {
                 primaryIconParams.gravity = TOP | (isRtl ? END : START);
                 secondaryIconParams.gravity = TOP | (isRtl ? END : START);
-                if (splitConfig.initiatedFromSeascape) {
-                    // if the split was initiated from seascape,
-                    // the task on the right (secondary) is slightly larger
-                    primaryIconView.setTranslationX(bottomToMidpointOffset - taskIconHeight);
-                    secondaryIconView.setTranslationX(bottomToMidpointOffset);
-                } else {
-                    // if not,
-                    // the task on the left (primary) is slightly larger
-                    primaryIconView.setTranslationX(bottomToMidpointOffset + insetOffset
-                            - taskIconHeight);
-                    secondaryIconView.setTranslationX(bottomToMidpointOffset + insetOffset);
+                if (!inSplitSelection) {
+                    if (splitConfig.initiatedFromSeascape) {
+                        // if the split was initiated from seascape,
+                        // the task on the right (secondary) is slightly larger
+                        primaryIconView.setTranslationX(bottomToMidpointOffset - taskIconHeight);
+                        secondaryIconView.setTranslationX(bottomToMidpointOffset);
+                    } else {
+                        // if not,
+                        // the task on the left (primary) is slightly larger
+                        primaryIconView.setTranslationX(bottomToMidpointOffset + insetOffset
+                                - taskIconHeight);
+                        secondaryIconView.setTranslationX(bottomToMidpointOffset + insetOffset);
+                    }
                 }
             } else {
                 primaryIconParams.gravity = TOP | (isRtl ? START : END);
                 secondaryIconParams.gravity = TOP | (isRtl ? START : END);
-                if (!splitConfig.initiatedFromSeascape) {
-                    // if the split was initiated from landscape,
-                    // the task on the left (primary) is slightly larger
-                    primaryIconView.setTranslationX(-bottomToMidpointOffset);
-                    secondaryIconView.setTranslationX(-bottomToMidpointOffset + taskIconHeight);
-                } else {
-                    // if not,
-                    // the task on the right (secondary) is slightly larger
-                    primaryIconView.setTranslationX(-bottomToMidpointOffset - insetOffset);
-                    secondaryIconView.setTranslationX(-bottomToMidpointOffset - insetOffset
-                            + taskIconHeight);
+                if (!inSplitSelection) {
+                    if (!splitConfig.initiatedFromSeascape) {
+                        // if the split was initiated from landscape,
+                        // the task on the left (primary) is slightly larger
+                        primaryIconView.setTranslationX(-bottomToMidpointOffset);
+                        secondaryIconView.setTranslationX(-bottomToMidpointOffset + taskIconHeight);
+                    } else {
+                        // if not,
+                        // the task on the right (secondary) is slightly larger
+                        primaryIconView.setTranslationX(-bottomToMidpointOffset - insetOffset);
+                        secondaryIconView.setTranslationX(-bottomToMidpointOffset - insetOffset
+                                + taskIconHeight);
+                    }
                 }
             }
         } else {
             primaryIconParams.gravity = TOP | CENTER_HORIZONTAL;
-            // shifts icon half a width left (height is used here since icons are square)
-            primaryIconView.setTranslationX(-(taskIconHeight / 2f));
             secondaryIconParams.gravity = TOP | CENTER_HORIZONTAL;
-            secondaryIconView.setTranslationX(taskIconHeight / 2f);
+            if (!inSplitSelection) {
+                // shifts icon half a width left (height is used here since icons are square)
+                primaryIconView.setTranslationX(-(taskIconHeight / 2f));
+                secondaryIconView.setTranslationX(taskIconHeight / 2f);
+            }
         }
-        if (!enableOverviewIconMenu()) {
+        if (!enableOverviewIconMenu() && !inSplitSelection) {
             primaryIconView.setTranslationY(0);
             secondaryIconView.setTranslationY(0);
         }
+
 
         primaryIconView.setLayoutParams(primaryIconParams);
         secondaryIconView.setLayoutParams(secondaryIconParams);

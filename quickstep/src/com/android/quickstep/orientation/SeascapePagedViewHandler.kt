@@ -277,6 +277,10 @@ class SeascapePagedViewHandler : LandscapePagedViewHandler() {
         iconAppChipView.setRotation(degreesRotated)
     }
 
+    /**
+     * @param inSplitSelection Whether user currently has a task from this task group staged for
+     * split screen. Currently this state is not reachable in fake seascape.
+     */
     override fun measureGroupedTaskViewThumbnailBounds(
         primarySnapshot: View,
         secondarySnapshot: View,
@@ -284,7 +288,8 @@ class SeascapePagedViewHandler : LandscapePagedViewHandler() {
         parentHeight: Int,
         splitBoundsConfig: SplitBounds,
         dp: DeviceProfile,
-        isRtl: Boolean
+        isRtl: Boolean,
+        inSplitSelection: Boolean
     ) {
         val primaryParams = primarySnapshot.layoutParams as FrameLayout.LayoutParams
         val secondaryParams = secondarySnapshot.layoutParams as FrameLayout.LayoutParams

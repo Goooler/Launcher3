@@ -453,6 +453,10 @@ open class LandscapePagedViewHandler : RecentsPagedOrientationHandler {
         }
     }
 
+    /**
+     * @param inSplitSelection Whether user currently has a task from this task group staged for
+     * split screen. Currently this state is not reachable in fake landscape.
+     */
     override fun measureGroupedTaskViewThumbnailBounds(
         primarySnapshot: View,
         secondarySnapshot: View,
@@ -460,7 +464,8 @@ open class LandscapePagedViewHandler : RecentsPagedOrientationHandler {
         parentHeight: Int,
         splitBoundsConfig: SplitBounds,
         dp: DeviceProfile,
-        isRtl: Boolean
+        isRtl: Boolean,
+        inSplitSelection: Boolean
     ) {
         val primaryParams = primarySnapshot.layoutParams as FrameLayout.LayoutParams
         val secondaryParams = secondarySnapshot.layoutParams as FrameLayout.LayoutParams
@@ -569,6 +574,10 @@ open class LandscapePagedViewHandler : RecentsPagedOrientationHandler {
         iconAppChipView.setRotation(degreesRotated)
     }
 
+    /**
+     * @param inSplitSelection Whether user currently has a task from this task group staged for
+     * split screen. Currently this state is not reachable in fake landscape.
+     */
     override fun setSplitIconParams(
         primaryIconView: View,
         secondaryIconView: View,
@@ -579,7 +588,8 @@ open class LandscapePagedViewHandler : RecentsPagedOrientationHandler {
         groupedTaskViewWidth: Int,
         isRtl: Boolean,
         deviceProfile: DeviceProfile,
-        splitConfig: SplitBounds
+        splitConfig: SplitBounds,
+        inSplitSelection: Boolean
     ) {
         val spaceAboveSnapshot = deviceProfile.overviewTaskThumbnailTopMarginPx
         val totalThumbnailHeight = groupedTaskViewHeight - spaceAboveSnapshot

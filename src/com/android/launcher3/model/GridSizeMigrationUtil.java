@@ -28,8 +28,6 @@ import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
@@ -47,7 +45,6 @@ import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.provider.LauncherDbUtils.SQLiteTransaction;
 import com.android.launcher3.util.ContentWriter;
 import com.android.launcher3.util.GridOccupancy;
@@ -100,7 +97,7 @@ public class GridSizeMigrationUtil {
     @VisibleForTesting
     public static List<DbEntry> readAllEntries(SQLiteDatabase db, String tableName,
             Context context) {
-        DbReader dbReader = new DbReader(db, tableName, context, getValidPackages(context));
+        DbReader dbReader = new DbReader(db, tableName, context);
         List<DbEntry> result = dbReader.loadAllWorkspaceEntries();
         result.addAll(dbReader.loadHotseatEntries());
         return result;
@@ -144,11 +141,10 @@ public class GridSizeMigrationUtil {
         }
         copyTable(source, TABLE_NAME, target.getWritableDatabase(), TMP_TABLE, context);
 
-        HashSet<String> validPackages = getValidPackages(context);
         long migrationStartTime = System.currentTimeMillis();
         try (SQLiteTransaction t = new SQLiteTransaction(target.getWritableDatabase())) {
-            DbReader srcReader = new DbReader(t.getDb(), TMP_TABLE, context, validPackages);
-            DbReader destReader = new DbReader(t.getDb(), TABLE_NAME, context, validPackages);
+            DbReader srcReader = new DbReader(t.getDb(), TMP_TABLE, context);
+            DbReader destReader = new DbReader(t.getDb(), TABLE_NAME, context);
 
             Point targetSize = new Point(destDeviceState.getColumns(), destDeviceState.getRows());
             migrate(target, srcReader, destReader, destDeviceState.getNumHotseat(),
@@ -348,23 +344,6 @@ public class GridSizeMigrationUtil {
                 Utilities.createDbSelectionQuery(LauncherSettings.Favorites._ID, entryIds), null);
     }
 
-    private static HashSet<String> getValidPackages(Context context) {
-        // Initialize list of valid packages. This contain all the packages which are already on
-        // the device and packages which are being installed. Any item which doesn't belong to
-        // this set is removed.
-        // Since the loader removes such items anyway, removing these items here doesn't cause
-        // any extra data loss and gives us more free space on the grid for better migration.
-        HashSet<String> validPackages = new HashSet<>();
-        for (PackageInfo info : context.getPackageManager()
-                .getInstalledPackages(PackageManager.GET_UNINSTALLED_PACKAGES)) {
-            validPackages.add(info.packageName);
-        }
-        InstallSessionHelper.INSTANCE.get(context)
-                .getActiveSessions().keySet()
-                .forEach(packageUserKey -> validPackages.add(packageUserKey.mPackageName));
-        return validPackages;
-    }
-
     private static void solveGridPlacement(@NonNull final DatabaseHelper helper,
             @NonNull final DbReader srcReader, @NonNull final DbReader destReader,
             final int screenId, final int trgX, final int trgY,
@@ -461,18 +440,15 @@ public class GridSizeMigrationUtil {
         private final SQLiteDatabase mDb;
         private final String mTableName;
         private final Context mContext;
-        private final Set<String> mValidPackages;
         private int mLastScreenId = -1;
 
         private final Map<Integer, ArrayList<DbEntry>> mWorkspaceEntriesByScreenId =
                 new ArrayMap<>();
 
-        public DbReader(SQLiteDatabase db, String tableName, Context context,
-                Set<String> validPackages) {
+        public DbReader(SQLiteDatabase db, String tableName, Context context) {
             mDb = db;
             mTableName = tableName;
             mContext = context;
-            mValidPackages = validPackages;
         }
 
         protected List<DbEntry> loadHotseatEntries() {
@@ -504,7 +480,6 @@ public class GridSizeMigrationUtil {
                         case LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT:
                         case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION: {
                             entry.mIntent = c.getString(indexIntent);
-                            verifyIntent(c.getString(indexIntent));
                             break;
                         }
                         case LauncherSettings.Favorites.ITEM_TYPE_FOLDER: {
@@ -586,14 +561,12 @@ public class GridSizeMigrationUtil {
                         case LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT:
                         case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION: {
                             entry.mIntent = c.getString(indexIntent);
-                            verifyIntent(entry.mIntent);
                             break;
                         }
                         case LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET: {
                             entry.mProvider = c.getString(indexAppWidgetProvider);
                             entry.appWidgetId = c.getInt(indexAppWidgetId);
                             ComponentName cn = ComponentName.unflattenFromString(entry.mProvider);
-                            verifyPackage(cn.getPackageName());
 
                             LauncherAppWidgetProviderInfo pInfo = widgetManagerHelper
                                     .getLauncherAppWidgetInfo(entry.appWidgetId, cn);
@@ -656,7 +629,6 @@ public class GridSizeMigrationUtil {
                 try {
                     int id = c.getInt(0);
                     String intent = c.getString(1);
-                    verifyIntent(intent);
                     total++;
                     if (!entry.mFolderItems.containsKey(intent)) {
                         entry.mFolderItems.put(intent, new HashSet<>());
@@ -672,27 +644,6 @@ public class GridSizeMigrationUtil {
 
         private Cursor queryWorkspace(String[] columns, String where) {
             return mDb.query(mTableName, columns, where, null, null, null, null);
-        }
-
-        /** Verifies if the mIntent should be restored. */
-        private void verifyIntent(String intentStr)
-                throws Exception {
-            Intent intent = Intent.parseUri(intentStr, 0);
-            if (intent.getComponent() != null) {
-                verifyPackage(intent.getComponent().getPackageName());
-            } else if (intent.getPackage() != null) {
-                // Only verify package if the component was null.
-                verifyPackage(intent.getPackage());
-            }
-        }
-
-        /** Verifies if the package should be restored */
-        private void verifyPackage(String packageName)
-                throws Exception {
-            if (!mValidPackages.contains(packageName)) {
-                // TODO(b/151468819): Handle promise app icon restoration during grid migration.
-                throw new Exception("Package not available");
-            }
         }
     }
 

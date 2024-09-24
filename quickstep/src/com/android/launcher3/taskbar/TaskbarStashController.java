@@ -42,7 +42,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.app.RemoteAction;
-import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.os.SystemClock;
 import android.util.Log;
@@ -209,7 +208,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * by not scaling the height of the taskbar background.
      */
     private static final int TRANSITION_UNSTASH_SUW_MANUAL = 3;
-    private static final Rect EMPTY_RECT = new Rect();
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(value = {
@@ -771,7 +769,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         fullLengthAnimatorSet.play(mControllers.stashedHandleViewController
-                .createRevealAnimToIsStashed(isStashed, EMPTY_RECT));
+                .createRevealAnimToIsStashed(isStashed));
         // Return the stashed handle to its default scale in case it was changed as part of the
         // feedforward hint. Note that the reveal animation above also visually scales it.
         fullLengthAnimatorSet.play(mTaskbarStashedHandleHintScale.animateToValue(1f));
@@ -819,19 +817,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 }
 
             }
-        }
-
-
-        Rect taskbarToHotseatOffsets = new Rect();
-        if (enableScalingRevealHomeAnimation() && animationType == TRANSITION_HOME_TO_APP) {
-            Rect hotseatRect = new Rect();
-            mActivity.getHotseatBounds(hotseatRect);
-
-            // Calculate and store offsets so that we can sync with the taskbar stashed handle
-            taskbarToHotseatOffsets.set(
-                    mActivity.calculateTaskbarToHotseatOffsets(hotseatRect));
-            as.addListener(AnimatorListeners.forEndCallback(
-                    () -> mActivity.calculateTaskbarToHotseatOffsets(EMPTY_RECT)));
         }
 
         play(as, mTaskbarStashedHandleAlpha.animateToValue(stashedHandleAlphaTarget),
@@ -882,12 +867,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         mControllers.taskbarViewController.addRevealAnimToIsStashed(skippable, isStashed, duration,
-                EMPHASIZED, animationType == TRANSITION_UNSTASH_SUW_MANUAL,
-                animationType == TRANSITION_HOME_TO_APP);
+                EMPHASIZED, animationType == TRANSITION_UNSTASH_SUW_MANUAL);
 
         play(skippable, mControllers.stashedHandleViewController
-                .createRevealAnimToIsStashed(isStashed, taskbarToHotseatOffsets), 0, duration,
-                EMPHASIZED);
+                .createRevealAnimToIsStashed(isStashed), 0, duration, EMPHASIZED);
 
         // Return the stashed handle to its default scale in case it was changed as part of the
         // feedforward hint. Note that the reveal animation above also visually scales it.
