@@ -91,7 +91,7 @@ public class PreviewSurfaceRenderer {
     private final int mDisplayId;
     private final Display mDisplay;
     private final WallpaperColors mWallpaperColors;
-    private final RunnableList mOnDestroyCallbacks = new RunnableList();
+    private final RunnableList mLifeCycleTracker;
 
     private final SurfaceControlViewHost mSurfaceControlViewHost;
 
@@ -100,8 +100,10 @@ public class PreviewSurfaceRenderer {
     private boolean mHideQsb;
     @Nullable private FrameLayout mViewRoot = null;
 
-    public PreviewSurfaceRenderer(Context context, Bundle bundle) throws Exception {
+    public PreviewSurfaceRenderer(
+            Context context, RunnableList lifecycleTracker, Bundle bundle) throws Exception {
         mContext = context;
+        mLifeCycleTracker = lifecycleTracker;
         mGridName = bundle.getString("name");
         bundle.remove("name");
         if (mGridName == null) {
@@ -120,11 +122,13 @@ public class PreviewSurfaceRenderer {
             throw new IllegalArgumentException("Display ID does not match any displays.");
         }
 
-        mSurfaceControlViewHost = MAIN_EXECUTOR.submit(() ->
-                new SurfaceControlViewHost(mContext, context.getSystemService(DisplayManager.class)
-                        .getDisplay(DEFAULT_DISPLAY), mHostToken)
-        ).get(5, TimeUnit.SECONDS);
-        mOnDestroyCallbacks.add(mSurfaceControlViewHost::release);
+        mSurfaceControlViewHost = MAIN_EXECUTOR.submit(() -> new MySurfaceControlViewHost(
+                mContext,
+                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY),
+                mHostToken,
+                mLifeCycleTracker))
+                .get(5, TimeUnit.SECONDS);
+        mLifeCycleTracker.add(this::destroy);
     }
 
     public int getDisplayId() {
@@ -139,25 +143,18 @@ public class PreviewSurfaceRenderer {
         return mSurfaceControlViewHost.getSurfacePackage();
     }
 
-    /**
-     * Destroys the preview and all associated data
-     */
-    @UiThread
-    public void destroy() {
+    private void destroy() {
         mDestroyed = true;
-        mOnDestroyCallbacks.executeAllAndDestroy();
     }
 
     /**
      * A function that queries for the launcher app widget span info
      *
-     * @param context The context to get the content resolver from, should be related to launcher
      * @return A SparseArray with the app widget id being the key and the span info being the values
      */
     @WorkerThread
     @Nullable
-    public SparseArray<Size> getLoadedLauncherWidgetInfo(
-            @NonNull final Context context) {
+    public SparseArray<Size> getLoadedLauncherWidgetInfo() {
         final SparseArray<Size> widgetInfo = new SparseArray<>();
         final String query = LauncherSettings.Favorites.ITEM_TYPE + " = "
                 + LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
@@ -276,13 +273,11 @@ public class PreviewSurfaceRenderer {
                     }
                     loadWorkspace(new ArrayList<>(), query, null, null);
 
-                    final SparseArray<Size> spanInfo =
-                            getLoadedLauncherWidgetInfo(previewContext.getBaseContext());
-
+                    final SparseArray<Size> spanInfo = getLoadedLauncherWidgetInfo();
                     MAIN_EXECUTOR.execute(() -> {
                         renderView(previewContext, mBgDataModel, mWidgetProvidersMap, spanInfo,
                                 idp);
-                        mOnDestroyCallbacks.add(previewContext::onDestroy);
+                        mLifeCycleTracker.add(previewContext::onDestroy);
                     });
                 }
             }.run();
@@ -355,4 +350,24 @@ public class PreviewSurfaceRenderer {
             mViewRoot.addView(view);
         }
     }
+
+    private static class MySurfaceControlViewHost extends SurfaceControlViewHost {
+
+        private final RunnableList mLifecycleTracker;
+
+        MySurfaceControlViewHost(Context context, Display display, IBinder hostToken,
+                RunnableList lifeCycleTracker) {
+            super(context, display, hostToken);
+            mLifecycleTracker = lifeCycleTracker;
+            mLifecycleTracker.add(this::release);
+        }
+
+        @Override
+        public void release() {
+            super.release();
+            // RunnableList ensures that the callback is only called once
+            MAIN_EXECUTOR.execute(mLifecycleTracker::executeAllAndDestroy);
+        }
+    }
+
 }
