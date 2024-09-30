@@ -185,7 +185,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     // Duration for which an unlock event is considered "current", as other events are received
     // asynchronously.
-    private static final long UNLOCK_TRANSITION_MEMOIZATION_MS = 200;
+    public static final long UNLOCK_TRANSITION_MEMOIZATION_MS = 200;
 
     /**
      * The default stash animation, morphing the taskbar into the navbar.
