@@ -228,10 +228,13 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
         }
 
         float velocityYPxPerS = mVelocityTracker.getYVelocity();
+        float dY = Math.abs(mLastPos.y - mDownPos.y);
         if (mCanPlayTaskbarBgAlphaAnimation
                 && mMotionMoveCount >= NUM_MOTION_MOVE_THRESHOLD // Arbitrary value
                 && velocityYPxPerS != 0 // Ignore these
-                && velocityYPxPerS >= mTaskbarSlowVelocityYThreshold) {
+                && velocityYPxPerS >= mTaskbarSlowVelocityYThreshold
+                && dY != 0
+                && dY > mTouchSlop) {
             mTaskbarActivityContext.playTaskbarBackgroundAlphaAnimation();
             mCanPlayTaskbarBgAlphaAnimation = false;
         }
