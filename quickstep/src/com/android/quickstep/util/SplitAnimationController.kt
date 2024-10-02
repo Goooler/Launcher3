@@ -238,7 +238,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 taskViewHeight,
             )
         val snapshotViewSize =
-            if (isPrimaryTaskSplitting) primarySnapshotViewSize else secondarySnapshotViewSize
+            if (isPrimaryTaskSplitting) secondarySnapshotViewSize else primarySnapshotViewSize
         if (deviceProfile.isLeftRightSplit) {
             // Center view first so scaling happens uniformly, alternatively we can move pivotX to 0
             val centerThumbnailTranslationX: Float = (taskViewWidth - snapshotViewSize.x) / 2f
