@@ -16,15 +16,23 @@
 
 package com.android.quickstep;
 
+import static com.android.quickstep.AbsSwipeUpHandler.STATE_HANDLER_INVALIDATED;
+
+import static junit.framework.TestCase.assertFalse;
+import static junit.framework.TestCase.assertTrue;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.animation.ValueAnimator;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
@@ -54,6 +62,7 @@ import com.android.systemui.shared.system.InputConsumerController;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -207,7 +216,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
         runOnMainSync(() -> {
             absSwipeUpHandler.startNewTask(unused -> {});
-            verify(mRecentsAnimationController).finish(anyBoolean(), any());
+            verifyRecentsAnimationFinishedAndCallCallback();
         });
     }
 
@@ -217,8 +226,55 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
         runOnMainSync(() -> {
             verify(mRecentsAnimationController).detachNavigationBarFromApp(true);
-            verify(mRecentsAnimationController).finish(anyBoolean(), any(), anyBoolean());
+            verifyRecentsAnimationFinishedAndCallCallback();
         });
+    }
+
+    @Test
+    public void testHomeGesture_invalidatesHandlerAfterParallelAnim() {
+        ValueAnimator parallelAnim = new ValueAnimator();
+        parallelAnim.setRepeatCount(ValueAnimator.INFINITE);
+        when(mActivityInterface.getParallelAnimationToLauncher(any(), anyLong(), any()))
+                .thenReturn(parallelAnim);
+        SWIPE_HANDLER handler = createSwipeUpHandlerForGesture(GestureState.GestureEndTarget.HOME);
+        runOnMainSync(() -> {
+            parallelAnim.start();
+            verifyRecentsAnimationFinishedAndCallCallback();
+            assertFalse(handler.mStateCallback.hasStates(STATE_HANDLER_INVALIDATED));
+            parallelAnim.end();
+            assertTrue(handler.mStateCallback.hasStates(STATE_HANDLER_INVALIDATED));
+        });
+    }
+
+    @Test
+    public void testHomeGesture_invalidatesHandlerIfNoParallelAnim() {
+        when(mActivityInterface.getParallelAnimationToLauncher(any(), anyLong(), any()))
+                .thenReturn(null);
+        SWIPE_HANDLER handler = createSwipeUpHandlerForGesture(GestureState.GestureEndTarget.HOME);
+        runOnMainSync(() -> {
+            verifyRecentsAnimationFinishedAndCallCallback();
+            assertTrue(handler.mStateCallback.hasStates(STATE_HANDLER_INVALIDATED));
+        });
+    }
+
+    /**
+     * Verifies that RecentsAnimationController#finish() is called, and captures and runs any
+     * callback that was passed to it. This ensures that STATE_CURRENT_TASK_FINISHED is correctly
+     * set for example.
+     */
+    private void verifyRecentsAnimationFinishedAndCallCallback() {
+        ArgumentCaptor<Runnable> finishCallback = ArgumentCaptor.forClass(Runnable.class);
+        // Check if the 2 parameter method is called.
+        verify(mRecentsAnimationController, atLeast(0)).finish(
+                anyBoolean(), finishCallback.capture());
+        if (finishCallback.getAllValues().isEmpty()) {
+            // Check if the 3 parameter method is called.
+            verify(mRecentsAnimationController).finish(
+                    anyBoolean(), finishCallback.capture(), anyBoolean());
+        }
+        if (finishCallback.getValue() != null) {
+            finishCallback.getValue().run();
+        }
     }
 
     private SWIPE_HANDLER createSwipeUpHandlerForGesture(GestureState.GestureEndTarget endTarget) {
