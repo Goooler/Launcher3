@@ -23,6 +23,7 @@ import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_OVERVIEW;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_STASHED_FOR_BUBBLES;
+import static com.android.launcher3.taskbar.TaskbarStashController.UNLOCK_TRANSITION_MEMOIZATION_MS;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
@@ -160,7 +161,12 @@ public class TaskbarLauncherStateController {
     private boolean mSkipNextRecentsAnimEnd;
 
     // Time when FLAG_TASKBAR_HIDDEN was last cleared, SystemClock.elapsedRealtime (milliseconds).
-    private long mLastUnlockTimeMs = 0;
+    private long mLastRemoveTaskbarHiddenTimeMs = 0;
+    /**
+     * Time when FLAG_DEVICE_LOCKED was last cleared, plus
+     * {@link TaskbarStashController#UNLOCK_TRANSITION_MEMOIZATION_MS}
+     */
+    private long mLastUnlockTransitionTimeout;
 
     private @Nullable TaskBarRecentsAnimationListener mTaskBarRecentsAnimationListener;
 
@@ -524,7 +530,7 @@ public class TaskbarLauncherStateController {
 
         if (hasAnyFlag(changedFlags, FLAG_TASKBAR_HIDDEN) && !hasAnyFlag(FLAG_TASKBAR_HIDDEN)) {
             // Take note of the current time, as the taskbar is made visible again.
-            mLastUnlockTimeMs = SystemClock.elapsedRealtime();
+            mLastRemoveTaskbarHiddenTimeMs = SystemClock.elapsedRealtime();
         }
 
         boolean isHidden = hasAnyFlag(FLAG_TASKBAR_HIDDEN);
@@ -550,7 +556,8 @@ public class TaskbarLauncherStateController {
                 // with a fingerprint reader. This should only be done when the device was woken
                 // up via fingerprint reader, however since this information is currently not
                 // available, opting to always delay the fade-in a bit.
-                long durationSinceLastUnlockMs = SystemClock.elapsedRealtime() - mLastUnlockTimeMs;
+                long durationSinceLastUnlockMs = SystemClock.elapsedRealtime()
+                        - mLastRemoveTaskbarHiddenTimeMs;
                 taskbarVisibility.setStartDelay(
                         Math.max(0, TASKBAR_SHOW_DELAY_MS - durationSinceLastUnlockMs));
             }
@@ -620,6 +627,15 @@ public class TaskbarLauncherStateController {
         boolean isUnlockTransition =
                 hasAnyFlag(changedFlags, FLAG_DEVICE_LOCKED) && !hasAnyFlag(FLAG_DEVICE_LOCKED);
         if (isUnlockTransition) {
+            // the launcher might not be resumed at the time the device is considered
+            // unlocked (when the keyguard goes away), but possibly shortly afterwards.
+            // To play the unlock transition at the time the unstash animation actually happens,
+            // this memoizes the state transition for UNLOCK_TRANSITION_MEMOIZATION_MS.
+            mLastUnlockTransitionTimeout =
+                    SystemClock.elapsedRealtime() + UNLOCK_TRANSITION_MEMOIZATION_MS;
+        }
+        boolean isInUnlockTimeout = SystemClock.elapsedRealtime() < mLastUnlockTransitionTimeout;
+        if (isUnlockTransition || isInUnlockTimeout) {
             // When transitioning to unlocked, ensure the hotseat is fully visible from the
             // beginning. The hotseat itself is animated by LauncherUnlockAnimationController.
             mIconAlignment.cancelAnimation();

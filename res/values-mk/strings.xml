@@ -31,6 +31,7 @@
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Поделен екран"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Податоци за апликација за %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Поставки за користење за %1$s"</string>
+    <string name="new_window_option_taskbar" msgid="6448780542727767211">"Нов прозорец"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"Зачувај го парот апликации"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Паров апликации не е поддржан на уредов"</string>
