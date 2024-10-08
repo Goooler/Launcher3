@@ -1130,6 +1130,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 if (itemInfo.isDisabled()) {
                     setContentDescription(getContext().getString(R.string.disabled_app_label,
                             itemInfo.contentDescription));
+                } else if (itemInfo instanceof WorkspaceItemInfo wai && wai.isArchived()) {
+                    setContentDescription(
+                            getContext().getString(R.string.app_archived_title, itemInfo.title));
                 } else if (hasDot()) {
                     int count = mDotInfo.getNotificationCount();
                     setContentDescription(
@@ -1142,8 +1145,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void setDownloadStateContentDescription(ItemInfoWithIcon info, int progressLevel) {
-        if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_ARCHIVED) != 0 && progressLevel == 0) {
-            setContentDescription(getContext().getString(R.string.app_archived_title, info.title));
+        if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_ARCHIVED) != 0
+                && progressLevel == 0) {
+            if (mIcon instanceof PreloadIconDrawable) {
+                // Tell user that download is pending and not to tap to download again.
+                setContentDescription(getContext().getString(
+                        R.string.app_waiting_download_title, info.title));
+            } else {
+                setContentDescription(getContext().getString(
+                        R.string.app_archived_title, info.title));
+            }
         } else if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK)
                 != 0) {
             String percentageString = NumberFormat.getPercentInstance()
