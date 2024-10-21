@@ -17,6 +17,8 @@ package com.android.launcher3.taskbar;
 
 import static android.window.flags.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
+import static com.android.launcher3.QuickstepTransitionManager.TASKBAR_TO_APP_DURATION;
+import static com.android.launcher3.QuickstepTransitionManager.getTaskbarToHomeDuration;
 import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
@@ -32,7 +34,6 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.logging.InstanceId;
@@ -204,11 +205,17 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 isVisible,
                 fromInitOrDestroy,
                 /* startAnimation= */ true,
-                DisplayController.isTransientTaskbar(mLauncher)
-                        ? TRANSIENT_TASKBAR_TRANSITION_DURATION
-                        : (!isVisible
-                                ? QuickstepTransitionManager.TASKBAR_TO_APP_DURATION
-                                : QuickstepTransitionManager.getTaskbarToHomeDuration()));
+                getTaskbarAnimationDuration(isVisible));
+    }
+
+    private int getTaskbarAnimationDuration(boolean isVisible) {
+        if (isVisible && !mLauncher.getPredictiveBackToHomeInProgress()) {
+            return getTaskbarToHomeDuration();
+        } else {
+            return DisplayController.isTransientTaskbar(mLauncher)
+                    ? TRANSIENT_TASKBAR_TRANSITION_DURATION
+                    : TASKBAR_TO_APP_DURATION;
+        }
     }
 
     @Nullable

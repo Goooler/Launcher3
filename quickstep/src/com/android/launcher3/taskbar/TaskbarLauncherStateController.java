@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_ALIGNMENT;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_STASH;
 import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
@@ -39,6 +40,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.animation.Interpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -58,6 +60,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
+import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
 import com.android.quickstep.util.SystemUiFlagUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.animation.ViewRootSync;
@@ -666,7 +669,9 @@ public class TaskbarLauncherStateController {
             animatorSet.play(iconAlignAnim);
         }
 
-        animatorSet.setInterpolator(EMPHASIZED);
+        Interpolator interpolator = enableScalingRevealHomeAnimation()
+                ? ScalingWorkspaceRevealAnim.SCALE_INTERPOLATOR : EMPHASIZED;
+        animatorSet.setInterpolator(interpolator);
 
         if (start) {
             animatorSet.start();
