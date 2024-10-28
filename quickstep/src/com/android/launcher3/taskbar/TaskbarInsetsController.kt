@@ -149,7 +149,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         }
         if (
             taskbarStashController.isInApp ||
-                taskbarStashController.isInOverview ||
+                controllers.uiController.isInOverviewUi ||
                 DisplayController.showLockedTaskbarOnHome(context)
         ) {
             // only add the taskbar touch region if not on home
