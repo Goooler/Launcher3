@@ -182,6 +182,11 @@ class ScalingWorkspaceRevealAnim(
         animation.addListener(
             AnimatorListeners.forEndCallback(
                 Runnable {
+                    // The workspace might stay at a transparent state when the animation is
+                    // cancelled, and the alpha will not be recovered (this doesn't apply to scales
+                    // somehow). Resetting the alpha for the workspace here.
+                    workspace.alpha = 1.0F
+
                     workspace.setLayerType(View.LAYER_TYPE_NONE, null)
                     hotseat.setLayerType(View.LAYER_TYPE_NONE, null)
                 }
