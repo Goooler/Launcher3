@@ -20,10 +20,15 @@ import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURC
 import static android.content.Context.RECEIVER_EXPORTED;
 
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
+import static com.android.launcher3.InvariantDeviceProfile.GRID_NAME_PREFS_KEY;
+import static com.android.launcher3.LauncherPrefs.DB_FILE;
+import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.ICON_STATE;
 import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+import static com.android.launcher3.model.DeviceGridState.KEY_DB_FILE;
 import static com.android.launcher3.model.LoaderTask.SMARTSPACE_ON_HOME_SCREEN;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SettingsCache.NOTIFICATION_BADGING_URI;
 import static com.android.launcher3.util.SettingsCache.PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI;
 
@@ -46,7 +51,9 @@ import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.IconProvider;
 import com.android.launcher3.icons.LauncherIconProvider;
 import com.android.launcher3.icons.LauncherIcons;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.ModelLauncherCallbacks;
+import com.android.launcher3.model.WidgetsFilterDataProvider;
 import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.InstallSessionTracker;
@@ -63,8 +70,12 @@ import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
+import java.util.Locale;
+import java.util.Objects;
+
 public class LauncherAppState implements SafeCloseable {
 
+    public static final String TAG = "LauncherAppState";
     public static final String ACTION_FORCE_ROLOAD = "force-reload-launcher";
 
     // We do not need any synchronization for this variable as its only written on UI thread.
@@ -111,18 +122,30 @@ public class LauncherAppState implements SafeCloseable {
         if (BuildCompat.isAtLeastV() && Flags.enableSupportForArchiving()) {
             ArchiveCompatibilityParams params = new ArchiveCompatibilityParams();
             params.setEnableUnarchivalConfirmation(false);
+            params.setEnableIconOverlay(!Flags.useNewIconForArchivedApps());
             launcherApps.setArchiveCompatibility(params);
         }
 
         SimpleBroadcastReceiver modelChangeReceiver =
-                new SimpleBroadcastReceiver(mModel::onBroadcastIntent);
-        modelChangeReceiver.register(mContext, Intent.ACTION_LOCALE_CHANGED,
+                new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, mModel::onBroadcastIntent);
+        final Locale oldLocale = mContext.getResources().getConfiguration().locale;
+        modelChangeReceiver.register(
+                mContext,
+                () -> {
+                    // if local has changed before receiver is registered on bg thread,
+                    // mModel needs to reload.
+                    Locale newLocale = mContext.getResources().getConfiguration().locale;
+                    if (!Objects.equals(oldLocale, newLocale)) {
+                        mModel.forceReload();
+                    }
+                },
+                Intent.ACTION_LOCALE_CHANGED,
                 ACTION_DEVICE_POLICY_RESOURCE_UPDATED);
         if (BuildConfig.IS_STUDIO_BUILD) {
             mContext.registerReceiver(modelChangeReceiver, new IntentFilter(ACTION_FORCE_ROLOAD),
                     RECEIVER_EXPORTED);
         }
-        mOnTerminateCallback.add(() -> mContext.unregisterReceiver(modelChangeReceiver));
+        mOnTerminateCallback.add(() -> modelChangeReceiver.unregisterReceiverSafely(mContext));
 
         SafeCloseable userChangeListener = UserCache.INSTANCE.get(mContext)
                 .addUserEventListener(mModel::onUserEvent);
@@ -147,8 +170,7 @@ public class LauncherAppState implements SafeCloseable {
 
         LockedUserState.get(context).runOnUserUnlocked(() -> {
             CustomWidgetManager cwm = CustomWidgetManager.INSTANCE.get(mContext);
-            cwm.setWidgetRefreshCallback(mModel::refreshAndBindWidgetsAndShortcuts);
-            mOnTerminateCallback.add(() -> cwm.setWidgetRefreshCallback(null));
+            mOnTerminateCallback.add(cwm.addWidgetRefreshCallback(mModel::rebindCallbacks)::close);
 
             IconObserver observer = new IconObserver();
             SafeCloseable iconChangeTracker = mIconProvider.registerIconChangeListener(
@@ -160,7 +182,7 @@ public class LauncherAppState implements SafeCloseable {
                     () -> LauncherPrefs.get(mContext).removeListener(observer, THEMED_ICONS));
 
             InstallSessionTracker installSessionTracker =
-                    InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(mModel);
+                    InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(callbacks);
             mOnTerminateCallback.add(installSessionTracker::unregister);
         });
 
@@ -182,7 +204,8 @@ public class LauncherAppState implements SafeCloseable {
         mIconProvider = new LauncherIconProvider(context);
         mIconCache = new IconCache(mContext, mInvariantDeviceProfile,
                 iconCacheFileName, mIconProvider);
-        mModel = new LauncherModel(context, this, mIconCache, new AppFilter(mContext),
+        mModel = new LauncherModel(context, this, mIconCache,
+                WidgetsFilterDataProvider.Companion.newInstance(context), new AppFilter(mContext),
                 PackageManagerHelper.INSTANCE.get(context), iconCacheFileName != null);
         mOnTerminateCallback.add(mIconCache::close);
         mOnTerminateCallback.add(mModel::destroy);
@@ -250,7 +273,7 @@ public class LauncherAppState implements SafeCloseable {
     }
 
     private class IconObserver
-            implements IconProvider.IconChangeListener, OnSharedPreferenceChangeListener {
+            implements IconProvider.IconChangeListener, LauncherPrefChangeListener {
 
         @Override
         public void onAppIconChanged(String packageName, UserHandle user) {
@@ -272,10 +295,16 @@ public class LauncherAppState implements SafeCloseable {
         }
 
         @Override
-        public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
+        public void onPrefChanged(String key) {
             if (Themes.KEY_THEMED_ICONS.equals(key)) {
                 mIconProvider.setIconThemeSupported(Themes.isThemedIconEnabled(mContext));
                 verifyIconChanged();
+            } else if (GRID_NAME_PREFS_KEY.equals(key)) {
+                FileLog.d(TAG, "onPrefChanged GRID_NAME changed: "
+                        + LauncherPrefs.get(mContext).get(GRID_NAME));
+            } else if (KEY_DB_FILE.equals(key)) {
+                FileLog.d(TAG, "onPrefChanged DB_FILE changed: "
+                        + LauncherPrefs.get(mContext).get(DB_FILE));
             }
         }
     }

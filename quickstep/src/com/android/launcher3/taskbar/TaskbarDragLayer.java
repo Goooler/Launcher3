@@ -18,7 +18,6 @@ package com.android.launcher3.taskbar;
 import static android.view.KeyEvent.ACTION_UP;
 import static android.view.KeyEvent.KEYCODE_BACK;
 
-import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 
 import android.content.Context;
@@ -42,7 +41,6 @@ import com.android.app.viewcapture.ViewCaptureFactory;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.launcher3.views.BaseDragLayer;
@@ -101,20 +99,16 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     public TaskbarDragLayer(@NonNull Context context, @Nullable AttributeSet attrs,
             int defStyleAttr, int defStyleRes) {
         super(context, attrs, 1 /* alphaChannelCount */);
-        mBackgroundRenderer = new TaskbarBackgroundRenderer(mActivity);
+        mBackgroundRenderer = new TaskbarBackgroundRenderer(mContainer);
 
         mTaskbarBackgroundAlpha = new MultiPropertyFactory<>(this, BG_ALPHA, INDEX_COUNT,
                 (a, b) -> a * b, 1f);
         mTaskbarBackgroundAlpha.get(INDEX_ALL_OTHER_STATES).setValue(0);
-        mTaskbarBackgroundAlpha.get(INDEX_STASH_ANIM).setValue(
-                enableScalingRevealHomeAnimation() && DisplayController.isTransientTaskbar(context)
-                        ? 0
-                        : 1);
     }
 
     public void init(TaskbarDragLayerController.TaskbarDragLayerCallbacks callbacks) {
         mControllerCallbacks = callbacks;
-        mBackgroundRenderer.updateStashedHandleWidth(mActivity, getResources());
+        mBackgroundRenderer.updateStashedHandleWidth(mContainer, getResources());
         recreateControllers();
     }
 
@@ -268,6 +262,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         TestLogging.recordMotionEvent(TestProtocol.SEQUENCE_MAIN, "Touch event", ev);
+        mControllerCallbacks.onDispatchTouchEvent(ev);
         return super.dispatchTouchEvent(ev);
     }
 
@@ -275,7 +270,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == ACTION_UP && event.getKeyCode() == KEYCODE_BACK) {
-            AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mActivity);
+            AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mContainer);
             if (topView != null && topView.canHandleBack()) {
                 topView.onBackInvoked();
                 // Handled by the floating view.

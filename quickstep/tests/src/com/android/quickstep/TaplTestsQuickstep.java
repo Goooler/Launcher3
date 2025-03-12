@@ -47,6 +47,7 @@ import com.android.launcher3.tapl.OverviewTask;
 import com.android.launcher3.tapl.SelectModeButtons;
 import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
+import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.TestStabilityRule;
@@ -145,7 +146,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         assertNotNull("OverviewTask.open returned null", task.open());
         assertTrue("Test activity didn't open from Overview", mDevice.wait(Until.hasObject(
                         By.pkg(getAppPackageName()).text("TestActivity2")),
-                DEFAULT_UI_TIMEOUT));
+                TestUtil.DEFAULT_UI_TIMEOUT));
         executeOnLauncher(launcher -> assertTrue(
                 "Launcher activity is the top activity; expecting another activity to be the top "
                         + "one",
@@ -266,9 +267,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         return launcher.<RecentsView>getOverviewPanel().getBottomRowTaskCountForTablet();
     }
 
-    // Staging; will be promoted to presubmit if stable
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
-
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
@@ -292,9 +290,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
             mLauncher.setIgnoreTaskbarVisibility(false);
         }
     }
-
-    // Staging; will be promoted to presubmit if stable
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
 
     @Test
     @NavigationModeSwitch
@@ -454,7 +449,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 mDevice.wait(Until.hasObject(By.pkg(getAppPackageName()).text(
                                 mLauncher.isGridOnlyOverviewEnabled() ? "TestActivity12"
                                         : "TestActivity13")),
-                        DEFAULT_UI_TIMEOUT));
+                        TestUtil.DEFAULT_UI_TIMEOUT));
 
         // Scroll the task offscreen as it is now first
         overview = mLauncher.goHome().switchToOverview();
@@ -482,7 +477,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 //        assertTrue("Launcher internal state didn't remain in Overview",
 //                isInState(() -> LauncherState.OVERVIEW));
 //        overview.getCurrentTask().dismiss();
-//        executeOnLauncher(launcher -> assertTrue("Grid did not rebalance after multiple dismissals",
+//        executeOnLauncher(launcher -> assertTrue("Grid did not rebalance after multiple
+//        dismissals",
 //                (Math.abs(getTopRowTaskCountForTablet(launcher) - getBottomRowTaskCountForTablet(
 //                        launcher)) <= 1)));
 
@@ -568,7 +564,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
             mLauncher.getDevice().setOrientationLeft();
             startTestActivity(7);
             Wait.atMost("Device should not be in natural orientation",
-                    () -> !mDevice.isNaturalOrientation(), DEFAULT_UI_TIMEOUT, mLauncher);
+                    () -> !mDevice.isNaturalOrientation(), mLauncher);
             mLauncher.goHome();
         } finally {
             mLauncher.setExpectedRotationCheckEnabled(true);
@@ -581,7 +577,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     public void testExcludeFromRecents() throws Exception {
         startExcludeFromRecentsTestActivity();
         OverviewTask currentTask = getAndAssertLaunchedApp().switchToOverview().getCurrentTask();
-        // TODO(b/326565120): the expected content description shouldn't be null but for now there
+        // TODO(b/342627272): the expected content description shouldn't be null but for now there
         // is a bug that causes it to sometimes be for excludeForRecents tasks.
         assertTrue("Can't find ExcludeFromRecentsTestActivity after entering Overview from it",
                 currentTask.containsContentDescription("ExcludeFromRecents")
@@ -591,7 +587,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         if (overview.hasTasks()) {
             currentTask = overview.getCurrentTask();
             assertFalse("Found ExcludeFromRecentsTestActivity after entering Overview from Home",
-                    currentTask.containsContentDescription("ExcludeFromRecents")
+                    currentTask.containsContentDescription(
+                            "ExcludeFromRecents")
                             || currentTask.containsContentDescription(null));
         } else {
             // Presumably the test started with 0 tasks and remains that way after going home.

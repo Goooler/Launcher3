@@ -71,12 +71,15 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.CellAndSpan;
 import com.android.launcher3.util.GridOccupancy;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.ParcelableSparseArray;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
+
+import com.google.android.msdl.data.model.MSDLToken;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -86,7 +89,7 @@ import java.util.Stack;
 
 public class CellLayout extends ViewGroup {
     private static final String TAG = "CellLayout";
-    private static final boolean LOGD = false;
+    private static final boolean LOGD = true;
 
     /** The color of the "leave-behind" shape when a folder is opened from Hotseat. */
     private static final int FOLDER_LEAVE_BEHIND_COLOR = Color.argb(160, 245, 245, 245);
@@ -166,6 +169,7 @@ public class CellLayout extends ViewGroup {
     private final int[] mDragCellSpan = new int[2];
 
     private boolean mDragging = false;
+    public boolean mHasOnLayoutBeenCalled = false;
 
     private final TimeInterpolator mEaseOutInterpolator;
     protected final ShortcutAndWidgetContainer mShortcutsAndWidgets;
@@ -203,6 +207,8 @@ public class CellLayout extends ViewGroup {
 
     private static final Paint sPaint = new Paint();
 
+    private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+
     // Related to accessible drag and drop
     DragAndDropAccessibilityDelegate mTouchHelper;
 
@@ -235,6 +241,8 @@ public class CellLayout extends ViewGroup {
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.CellLayout, defStyle, 0);
         mContainerType = a.getInteger(R.styleable.CellLayout_containerType, WORKSPACE);
         a.recycle();
+
+        mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context);
 
         // A ViewGroup usually does not draw, but CellLayout needs to draw a rectangle to show
         // the user where a dragged item will land when dropped.
@@ -1009,6 +1017,7 @@ public class CellLayout extends ViewGroup {
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        mHasOnLayoutBeenCalled = true; // b/349929393 - is the required call to onLayout not done?
         int left = getPaddingLeft();
         left += (int) Math.ceil(getUnusedHorizontalSpace() / 2f);
         int right = r - l - getPaddingRight();
@@ -1151,6 +1160,9 @@ public class CellLayout extends ViewGroup {
             DropTarget.DragObject dragObject) {
         if (mDragCell[0] != cellX || mDragCell[1] != cellY || mDragCellSpan[0] != spanX
                 || mDragCellSpan[1] != spanY) {
+            if (Flags.msdlFeedback()) {
+                mMSDLPlayerWrapper.playToken(MSDLToken.DRAG_INDICATOR_DISCRETE);
+            }
             mDragCell[0] = cellX;
             mDragCell[1] = cellY;
             mDragCellSpan[0] = spanX;

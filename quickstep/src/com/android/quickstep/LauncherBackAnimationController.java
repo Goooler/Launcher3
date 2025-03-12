@@ -24,10 +24,10 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.BaseActivity.INVISIBLE_ALL;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_PENDING_FLAGS;
 import static com.android.launcher3.BaseActivity.PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION;
+import static com.android.window.flags.Flags.predictiveBackThreeButtonNav;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.content.ComponentCallbacks;
 import android.content.res.Configuration;
@@ -38,7 +38,6 @@ import android.graphics.RectF;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.util.Log;
-import android.util.Pair;
 import android.view.Choreographer;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.IRemoteAnimationRunner;
@@ -50,8 +49,8 @@ import android.view.animation.Interpolator;
 import android.window.BackEvent;
 import android.window.BackMotionEvent;
 import android.window.BackProgressAnimator;
+import android.window.IBackAnimationHandoffHandler;
 import android.window.IOnBackInvokedCallback;
-
 import com.android.app.animation.Interpolators;
 import com.android.internal.policy.SystemBarUtils;
 import com.android.internal.view.AppearanceRegion;
@@ -62,8 +61,10 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
-import com.android.quickstep.util.RectFSpringAnim;
+import com.android.quickstep.util.BackAnimState;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import java.lang.ref.WeakReference;
@@ -109,8 +110,6 @@ public class LauncherBackAnimationController {
     private RemoteAnimationTarget mLauncherTarget;
     private View mLauncherTargetView;
     private final SurfaceControl.Transaction mTransaction = new SurfaceControl.Transaction();
-    private boolean mSpringAnimationInProgress = false;
-    private boolean mAnimatorSetInProgress = false;
     private float mBackProgress = 0;
     private boolean mBackInProgress = false;
     private OnBackInvokedCallbackStub mBackCallback;
@@ -226,6 +225,12 @@ public class LauncherBackAnimationController {
         public void setTriggerBack(boolean triggerBack) {
             // TODO(b/261654570): track touch from the Launcher process.
         }
+
+        @Override
+        public void setHandoffHandler(IBackAnimationHandoffHandler unused) {
+            // For now, Launcher handles this internally so it doesn't need to hand off the
+            // animation.
+        }
     }
 
     private static class RemoteAnimationRunnerStub extends IRemoteAnimationRunner.Stub {
@@ -299,8 +304,11 @@ public class LauncherBackAnimationController {
 
         mStartRect.set(appTarget.windowConfiguration.getMaxBounds());
 
-        // inset bottom in case of pinned taskbar being present
-        mStartRect.inset(0, 0, 0, appTarget.contentInsets.bottom);
+        // inset bottom in case of taskbar being present
+        if (!predictiveBackThreeButtonNav() || mLauncher.getDeviceProfile().isTaskbarPresent
+                || DisplayController.getNavigationMode(mLauncher) == NavigationMode.NO_BUTTON) {
+            mStartRect.inset(0, 0, 0, appTarget.contentInsets.bottom);
+        }
 
         mLauncherTargetView = mQuickstepTransitionManager.findLauncherView(
                 new RemoteAnimationTarget[]{ mBackTarget });
@@ -341,7 +349,9 @@ public class LauncherBackAnimationController {
         mTransaction
                 .setColor(mScrimLayer, colorComponents)
                 .setAlpha(mScrimLayer, mScrimAlpha)
-                .show(mScrimLayer);
+                .show(mScrimLayer)
+                // Ensure the scrim layer occludes opening task & wallpaper
+                .setLayer(mScrimLayer, 1000);
     }
 
     void removeScrimLayer() {
@@ -380,10 +390,11 @@ public class LauncherBackAnimationController {
         // Move the window along the Y axis.
         float top = (screenHeight - height) * 0.5f + deltaY;
         // Move the window along the X axis.
-        float left = event.getSwipeEdge() == BackEvent.EDGE_RIGHT
-                ? progress * mWindowScaleMarginX
-                : screenWidth - progress * mWindowScaleMarginX - width;
-
+        float left = switch (event.getSwipeEdge()) {
+            case BackEvent.EDGE_RIGHT -> progress * mWindowScaleMarginX;
+            case BackEvent.EDGE_LEFT -> screenWidth - progress * mWindowScaleMarginX - width;
+            default -> (screenWidth - width) / 2;
+        };
         mCurrentRect.set(left, top, left + width, top + height);
         float cornerRadius = Utilities.mapRange(
                 progress, mWindowScaleStartCornerRadius, mWindowScaleEndCornerRadius);
@@ -446,15 +457,15 @@ public class LauncherBackAnimationController {
         mQuickstepTransitionManager.transferRectToTargetCoordinate(
                 mBackTarget, mCurrentRect, true, resolveRectF);
 
-        Pair<RectFSpringAnim, AnimatorSet> pair =
+        BackAnimState backAnim =
                 mQuickstepTransitionManager.createWallpaperOpenAnimations(
                     new RemoteAnimationTarget[]{mBackTarget},
                     new RemoteAnimationTarget[0],
-                    false /* fromUnlock */,
+                    new RemoteAnimationTarget[0],
                     resolveRectF,
                     cornerRadius,
                     mBackInProgress /* fromPredictiveBack */);
-        startTransitionAnimations(pair.first, pair.second);
+        startTransitionAnimations(backAnim);
         mLauncher.clearForceInvisibleFlag(INVISIBLE_ALL);
         customizeStatusBarAppearance(true);
     }
@@ -469,8 +480,6 @@ public class LauncherBackAnimationController {
         mCurrentRect.setEmpty();
         mStartRect.setEmpty();
         mInitialTouchPos.set(0, 0);
-        mAnimatorSetInProgress = false;
-        mSpringAnimationInProgress = false;
         setLauncherTargetViewVisible(true);
         mLauncherTargetView = null;
         // We don't call customizeStatusBarAppearance here to prevent the status bar update with
@@ -493,27 +502,8 @@ public class LauncherBackAnimationController {
         }
     }
 
-    private void startTransitionAnimations(RectFSpringAnim springAnim, AnimatorSet anim) {
-        mAnimatorSetInProgress = anim != null;
-        mSpringAnimationInProgress = springAnim != null;
-        if (springAnim != null) {
-            springAnim.addAnimatorListener(
-                    new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            mSpringAnimationInProgress = false;
-                            tryFinishBackAnimation();
-                        }
-                    }
-            );
-        }
-        anim.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mAnimatorSetInProgress = false;
-                tryFinishBackAnimation();
-            }
-        });
+    private void startTransitionAnimations(BackAnimState backAnim) {
+        backAnim.addOnAnimCompleteCallback(this::finishAnimation);
         if (mScrimLayer == null) {
             // Scrim hasn't been attached yet. Let's attach it.
             addScrimLayer();
@@ -533,7 +523,7 @@ public class LauncherBackAnimationController {
             }
         });
         mScrimAlphaAnimator.setDuration(SCRIM_FADE_DURATION).start();
-        anim.start();
+        backAnim.start();
     }
 
     private void loadResources() {
@@ -564,12 +554,6 @@ public class LauncherBackAnimationController {
     private void resetScrim() {
         removeScrimLayer();
         mScrimAlpha = 0;
-    }
-
-    private void tryFinishBackAnimation() {
-        if (!mSpringAnimationInProgress && !mAnimatorSetInProgress) {
-            finishAnimation();
-        }
     }
 
     private void customizeStatusBarAppearance(boolean overridingStatusBarFlags) {

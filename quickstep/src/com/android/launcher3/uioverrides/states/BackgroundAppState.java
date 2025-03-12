@@ -15,9 +15,9 @@
  */
 package com.android.launcher3.uioverrides.states;
 
+import static com.android.launcher3.Flags.enableDesktopWindowingCarouselDetach;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -51,9 +51,11 @@ public class BackgroundAppState extends OverviewState {
             return super.getVerticalProgress(launcher);
         }
         RecentsView recentsView = launcher.getOverviewPanel();
-        int transitionLength = LayoutUtils.getShelfTrackingDistance(launcher,
+        int transitionLength = LayoutUtils.getShelfTrackingDistance(
+                launcher,
                 launcher.getDeviceProfile(),
-                recentsView.getPagedOrientationHandler());
+                recentsView.getPagedOrientationHandler(),
+                recentsView.getSizeStrategy());
         AllAppsTransitionController controller = launcher.getAllAppsController();
         float scrollRange = Math.max(controller.getShiftRange(), 1);
         float progressDelta = (transitionLength / scrollRange);
@@ -89,6 +91,11 @@ public class BackgroundAppState extends OverviewState {
     }
 
     @Override
+    public boolean detachDesktopCarousel() {
+        return enableDesktopWindowingCarouselDetach();
+    }
+
+    @Override
     protected float getDepthUnchecked(Context context) {
         if (Launcher.getLauncher(context).areDesktopTasksVisible()) {
             // Don't blur the background while desktop tasks are visible
@@ -107,8 +114,7 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     public boolean isTaskbarAlignedWithHotseat(Launcher launcher) {
-        if (ENABLE_SHELL_TRANSITIONS) return false;
-        return super.isTaskbarAlignedWithHotseat(launcher);
+        return false;
     }
 
     @Override

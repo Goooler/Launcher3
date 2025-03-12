@@ -35,8 +35,7 @@ class DropTargetHandler(launcher: Launcher) {
                     target?.let {
                         deferred.mPackageName = it.packageName
                         mLauncher.addEventCallback(EVENT_RESUMED) { deferred.onLauncherResume() }
-                    }
-                        ?: deferred.sendFailure()
+                    } ?: deferred.sendFailure()
                 }
             }
         }
@@ -47,17 +46,8 @@ class DropTargetHandler(launcher: Launcher) {
         mLauncher.appWidgetHolder.startConfigActivity(
             mLauncher,
             widgetId,
-            ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET
+            ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET,
         )
-    }
-
-    fun dismissPrediction(
-        announcement: CharSequence,
-        onActionClicked: Runnable,
-        onDismiss: Runnable?
-    ) {
-        mLauncher.dragLayer.announceForAccessibility(announcement)
-        Snackbar.show(mLauncher, R.string.item_removed, R.string.undo, onDismiss, onActionClicked)
     }
 
     fun getViewUnderDrag(info: ItemInfo): View? {
@@ -75,6 +65,7 @@ class DropTargetHandler(launcher: Launcher) {
     }
 
     fun onDeleteComplete(item: ItemInfo) {
+        removeItemAndStripEmptyScreens(null /* view */, item)
         var pageItem: ItemInfo = item
         if (item.container <= 0) {
             val v = mLauncher.workspace.getHomescreenIconByItemId(item.container)
@@ -95,16 +86,12 @@ class DropTargetHandler(launcher: Launcher) {
             R.string.item_removed,
             R.string.undo,
             mLauncher.modelWriter::commitDelete,
-            onUndoClicked
+            onUndoClicked,
         )
     }
 
     fun onAccessibilityDelete(view: View?, item: ItemInfo, announcement: CharSequence) {
-        // Remove the item from launcher and the db, we can ignore the containerInfo in this call
-        // because we already remove the drag view from the folder (if the drag originated from
-        // a folder) in Folder.beginDrag()
-        mLauncher.removeItem(view, item, true /* deleteFromDb */, "removed by accessibility drop")
-        mLauncher.workspace.stripEmptyScreens()
+        removeItemAndStripEmptyScreens(view, item)
         mLauncher.dragLayer.announceForAccessibility(announcement)
     }
 
@@ -114,5 +101,13 @@ class DropTargetHandler(launcher: Launcher) {
 
     fun onClick(buttonDropTarget: ButtonDropTarget) {
         mLauncher.accessibilityDelegate.handleAccessibleDrop(buttonDropTarget, null, null)
+    }
+
+    private fun removeItemAndStripEmptyScreens(view: View?, item: ItemInfo) {
+        // Remove the item from launcher and the db, we can ignore the containerInfo in this call
+        // because we already remove the drag view from the folder (if the drag originated from
+        // a folder) in Folder.beginDrag()
+        mLauncher.removeItem(view, item, true /* deleteFromDb */, "removed by accessibility drop")
+        mLauncher.workspace.stripEmptyScreens()
     }
 }

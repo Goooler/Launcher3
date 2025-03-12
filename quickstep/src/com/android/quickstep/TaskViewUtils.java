@@ -47,19 +47,21 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.Pair;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.window.TransitionInfo;
+import android.window.WindowAnimationState;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.app.animation.Interpolators;
 import com.android.internal.jank.Cuj;
-import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimationSuccessListener;
@@ -68,6 +70,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
@@ -80,7 +83,7 @@ import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.TaskThumbnailViewDeprecated;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.animation.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.recents.model.Task;
@@ -156,8 +159,9 @@ public final class TaskViewUtils {
         return taskView;
     }
 
-    public static void createRecentsWindowAnimator(
-            @NonNull RecentsView recentsView,
+    public static <T extends Context & RecentsViewContainer & StatefulContainer<?>>
+    void createRecentsWindowAnimator(
+            @NonNull RecentsView<T, ?> recentsView,
             @NonNull TaskView v,
             boolean skipViewChanges,
             @NonNull RemoteAnimationTarget[] appTargets,
@@ -205,8 +209,9 @@ public final class TaskViewUtils {
 
         int taskIndex = recentsView.indexOfChild(v);
         Context context = v.getContext();
-        BaseActivity baseActivity = BaseActivity.fromContext(context);
-        DeviceProfile dp = baseActivity.getDeviceProfile();
+
+        T container = RecentsViewContainer.containerFromContext(context);
+        DeviceProfile dp = container.getDeviceProfile();
         boolean showAsGrid = dp.isTablet;
         boolean parallaxCenterAndAdjacentTask =
                 !showAsGrid && taskIndex != recentsView.getCurrentPage();
@@ -233,9 +238,13 @@ public final class TaskViewUtils {
                         TaskViewSimulator::setTaskRectTranslation, taskRectTranslationPrimary,
                         taskRectTranslationSecondary);
 
-                // Fade in the task during the initial 20% of the animation
-                out.addFloat(targetHandle.getTransformParams(), TransformParams.TARGET_ALPHA, 0, 1,
-                        clampToProgress(LINEAR, 0, 0.2f));
+                if (v instanceof DesktopTaskView) {
+                    targetHandle.getTransformParams().setTargetAlpha(1f);
+                } else {
+                    // Fade in the task during the initial 20% of the animation
+                    out.addFloat(targetHandle.getTransformParams(), TransformParams.TARGET_ALPHA, 0,
+                            1, clampToProgress(LINEAR, 0, 0.2f));
+                }
             }
         }
 
@@ -301,14 +310,6 @@ public final class TaskViewUtils {
                         }
                     }
                 });
-            } else {
-                // There is no transition animation for app launch from recent in live tile mode so
-                // we have to trigger the navigation bar animation from system here.
-                final RecentsAnimationController controller =
-                        recentsView.getRecentsAnimationController();
-                if (controller != null) {
-                    controller.animateNavigationBarToApp(RECENTS_LAUNCH_DURATION);
-                }
             }
             topMostSimulators = remoteTargetHandles;
         }
@@ -334,7 +335,7 @@ public final class TaskViewUtils {
             // During animation we apply transformation on the thumbnailView (and not the rootView)
             // to follow the TaskViewSimulator. So the final matrix applied on the thumbnailView is:
             //    Mt K(0)` K(t) Mt`
-            TaskThumbnailViewDeprecated[] thumbnails = v.getThumbnailViews();
+            View[] thumbnails = v.getSnapshotViews();
 
             // In case simulator copies and thumbnail size do no match, ensure we get the lesser.
             // This ensures we do not create arrays with empty elements or attempt to references
@@ -344,7 +345,7 @@ public final class TaskViewUtils {
             Matrix[] mt = new Matrix[matrixSize];
             Matrix[] mti = new Matrix[matrixSize];
             for (int i = 0; i < matrixSize; i++) {
-                TaskThumbnailViewDeprecated ttv = thumbnails[i];
+                View ttv = thumbnails[i];
                 RectF localBounds = new RectF(0, 0,  ttv.getWidth(), ttv.getHeight());
                 float[] tvBoundsMapped = new float[]{0, 0,  ttv.getWidth(), ttv.getHeight()};
                 getDescendantCoordRelativeToAncestor(ttv, ttv.getRootView(), tvBoundsMapped, false);
@@ -391,7 +392,7 @@ public final class TaskViewUtils {
             out.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    for (TaskThumbnailViewDeprecated ttv : thumbnails) {
+                    for (View ttv : thumbnails) {
                         ttv.setAnimationMatrix(null);
                     }
                 }
@@ -422,7 +423,8 @@ public final class TaskViewUtils {
 
         if (depthController != null) {
             out.setFloat(depthController.stateDepth, MULTI_PROPERTY_VALUE,
-                    BACKGROUND_APP.getDepth(baseActivity), TOUCH_RESPONSE);
+                    BACKGROUND_APP.getDepth(container),
+                    TOUCH_RESPONSE);
         }
     }
 
@@ -559,8 +561,8 @@ public final class TaskViewUtils {
     /**
      * Start recents to desktop animation
      */
-    public static void composeRecentsDesktopLaunchAnimator(
-            @NonNull DesktopTaskView launchingTaskView,
+    public static AnimatorSet composeRecentsDesktopLaunchAnimator(
+            @NonNull TaskView launchingTaskView,
             @NonNull StateManager stateManager, @Nullable DepthController depthController,
             @NonNull TransitionInfo transitionInfo,
             SurfaceControl.Transaction t, @NonNull Runnable finishCallback) {
@@ -589,7 +591,7 @@ public final class TaskViewUtils {
                 true /* launcherClosing */, stateManager, launchingTaskView.getRecentsView(),
                 depthController);
 
-        animatorSet.start();
+        return animatorSet;
     }
 
     public static void composeRecentsLaunchAnimator(@NonNull AnimatorSet anim, @NonNull View v,
@@ -784,5 +786,45 @@ public final class TaskViewUtils {
         dockFadeAnimator.setDuration(SPLIT_DIVIDER_ANIM_DURATION);
         animatorHandler.accept(dockFadeAnimator);
         return dockFadeAnimator;
+    }
+
+    /**
+     * Creates an array of {@link RemoteAnimationTarget}s and a matching array of
+     * {@link WindowAnimationState}s from the provided handles.
+     * Important: the ordering of the two arrays is the same, so the state at each index of the
+     * second applies to the target in the same index of the first.
+     *
+     * @param handles The handles wrapping each target.
+     * @param timestamp The start time of the current frame.
+     * @param velocityPxPerMs The current velocity of the target animations.
+     */
+    @NonNull
+    public static Pair<RemoteAnimationTarget[], WindowAnimationState[]> extractTargetsAndStates(
+            @NonNull RemoteTargetHandle[] handles, long timestamp,
+            @NonNull PointF velocityPxPerMs) {
+        RemoteAnimationTarget[] targets = new RemoteAnimationTarget[handles.length];
+        WindowAnimationState[] animationStates = new WindowAnimationState[handles.length];
+
+        for (int i = 0; i < handles.length; i++) {
+            targets[i] = handles[i].getTransformParams().getTargetSet().apps[i];
+
+            TaskViewSimulator taskViewSimulator = handles[i].getTaskViewSimulator();
+            RectF startRect = taskViewSimulator.getCurrentRect();
+            float cornerRadius = taskViewSimulator.getCurrentCornerRadius();
+
+            WindowAnimationState state = new WindowAnimationState();
+            state.timestamp = timestamp;
+            state.bounds = new RectF(
+                    startRect.left, startRect.top, startRect.right, startRect.bottom);
+            state.topLeftRadius = cornerRadius;
+            state.topRightRadius = cornerRadius;
+            state.bottomRightRadius = cornerRadius;
+            state.bottomLeftRadius = cornerRadius;
+            state.velocityPxPerMs = velocityPxPerMs;
+
+            animationStates[i] = state;
+        }
+
+        return new Pair<>(targets, animationStates);
     }
 }

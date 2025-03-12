@@ -166,6 +166,11 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
+    public boolean detachDesktopCarousel() {
+        return false;
+    }
+
+    @Override
     public boolean disallowTaskbarGlobalDrag() {
         // Disable global drag in overview
         return true;
@@ -209,7 +214,7 @@ public class OverviewState extends LauncherState {
         TaskView taskView = recentsView.getRunningTaskView();
         if (taskView != null) {
             if (recentsView.isTaskViewFullyVisible(taskView)) {
-                taskView.launchTasks();
+                taskView.launchWithAnimation();
             } else {
                 recentsView.snapToPage(recentsView.indexOfChild(taskView));
             }

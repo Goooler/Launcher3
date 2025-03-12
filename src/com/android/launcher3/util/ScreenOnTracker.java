@@ -19,30 +19,56 @@ import static android.content.Intent.ACTION_SCREEN_OFF;
 import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.content.Intent.ACTION_USER_PRESENT;
 
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
 import android.content.Context;
 import android.content.Intent;
 
+import androidx.annotation.VisibleForTesting;
+
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppSingleton;
+import com.android.launcher3.dagger.LauncherBaseAppComponent;
+
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import javax.inject.Inject;
 
 /**
  * Utility class for tracking if the screen is currently on or off
  */
+@LauncherAppSingleton
 public class ScreenOnTracker implements SafeCloseable {
 
-    public static final MainThreadInitializedObject<ScreenOnTracker> INSTANCE =
-            new MainThreadInitializedObject<>(ScreenOnTracker::new);
+    public static final DaggerSingletonObject<ScreenOnTracker> INSTANCE =
+            new DaggerSingletonObject<>(LauncherBaseAppComponent::getScreenOnTracker);
 
-    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onReceive);
+    private final SimpleBroadcastReceiver mReceiver;
     private final CopyOnWriteArrayList<ScreenOnListener> mListeners = new CopyOnWriteArrayList<>();
 
     private final Context mContext;
     private boolean mIsScreenOn;
 
-    private ScreenOnTracker(Context context) {
+    @Inject
+    ScreenOnTracker(@ApplicationContext Context context, DaggerSingletonTracker tracker) {
         // Assume that the screen is on to begin with
         mContext = context;
+        mReceiver = new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, this::onReceive);
+        init(tracker);
+    }
+
+    @VisibleForTesting
+    ScreenOnTracker(@ApplicationContext Context context, SimpleBroadcastReceiver receiver,
+            DaggerSingletonTracker tracker) {
+        mContext = context;
+        mReceiver = receiver;
+        init(tracker);
+    }
+
+    private void init(DaggerSingletonTracker tracker) {
         mIsScreenOn = true;
-        mReceiver.register(context, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
+        mReceiver.register(mContext, ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT);
+        tracker.addCloseable(this);
     }
 
     @Override
@@ -50,7 +76,8 @@ public class ScreenOnTracker implements SafeCloseable {
         mReceiver.unregisterReceiverSafely(mContext);
     }
 
-    private void onReceive(Intent intent) {
+    @VisibleForTesting
+    void onReceive(Intent intent) {
         String action = intent.getAction();
         if (ACTION_SCREEN_ON.equals(action)) {
             mIsScreenOn = true;

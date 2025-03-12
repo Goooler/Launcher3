@@ -73,7 +73,27 @@ public final class SplitConfigurationOptions {
      */
     public static final int STAGE_TYPE_SIDE = 1;
 
-    @IntDef({STAGE_TYPE_UNDEFINED, STAGE_TYPE_MAIN, STAGE_TYPE_SIDE})
+    /**
+     * Position independent stage identifier for a given Stage
+     */
+    public static final int STAGE_TYPE_A = 2;
+    /**
+     * Position independent stage identifier for a given Stage
+     */
+    public static final int STAGE_TYPE_B = 3;
+    /**
+     * Position independent stage identifier for a given Stage
+     */
+    public static final int STAGE_TYPE_C = 4;
+
+    @IntDef({
+            STAGE_TYPE_UNDEFINED,
+            STAGE_TYPE_MAIN,
+            STAGE_TYPE_SIDE,
+            STAGE_TYPE_A,
+            STAGE_TYPE_B,
+            STAGE_TYPE_C
+    })
     public @interface StageType {}
     ///////////////////////////////////
 
@@ -186,12 +206,6 @@ public final class SplitConfigurationOptions {
         public int stagePosition = STAGE_POSITION_UNDEFINED;
         @StageType
         public int stageType = STAGE_TYPE_UNDEFINED;
-
-        @Override
-        public String toString() {
-            return "SplitStageInfo { taskId=" + taskId
-                    + ", stagePosition=" + stagePosition + ", stageType=" + stageType + " }";
-        }
     }
 
     public static StatsLogManager.EventEnum getLogEventForPosition(@StagePosition int position) {
@@ -217,7 +231,7 @@ public final class SplitConfigurationOptions {
         private Drawable drawable;
         public final Intent intent;
         public final SplitPositionOption position;
-        public final ItemInfo itemInfo;
+        private ItemInfo itemInfo;
         public final StatsLogManager.EventEnum splitEvent;
         /** Represents the taskId of the first app to start in split screen */
         public int alreadyRunningTaskId = INVALID_TASK_ID;
@@ -244,6 +258,10 @@ public final class SplitConfigurationOptions {
 
         public View getView() {
             return view;
+        }
+
+        public ItemInfo getItemInfo() {
+            return itemInfo;
         }
     }
 }

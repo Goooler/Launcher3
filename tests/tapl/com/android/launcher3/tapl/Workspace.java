@@ -25,8 +25,6 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_SCROLLED;
 import static com.android.launcher3.testing.shared.TestProtocol.ALL_APPS_STATE_ORDINAL;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_ORDINAL;
-import static com.android.launcher3.testing.shared.TestProtocol.TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE;
-import static com.android.launcher3.testing.shared.TestProtocol.UIOBJECT_STALE_ELEMENT;
 
 import static junit.framework.TestCase.assertNotNull;
 import static junit.framework.TestCase.assertTrue;
@@ -34,7 +32,6 @@ import static junit.framework.TestCase.assertTrue;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.SystemClock;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
@@ -345,23 +342,35 @@ public final class Workspace extends Home {
      * @return map of text -> center of the view. In case of icons with the same name, the one with
      * lower x coordinate is selected.
      */
-    public Map<String, Point> getWorkspaceIconsPositions() {
+    public Map<String, Point> getAllWorkspaceIconsPositions() {
         final UiObject2 workspace = verifyActiveContainer();
-        mLauncher.waitForLauncherInitialized(); // b/319501259
         List<UiObject2> workspaceIcons =
                 mLauncher.waitForObjectsInContainer(workspace, AppIcon.getAnyAppIconSelector());
-        return workspaceIcons.stream()
+        return getIconPositionMap(workspaceIcons);
+    }
+
+    /**
+     * @return point where icon is found for given the app name,
+     * point is visible center of the icon.
+     */
+    @NonNull
+    public Point getWorkspaceIconPosition(String appName) {
+        final UiObject2 workspace = verifyActiveContainer();
+
+        UiObject2 workspaceIcon =
+                mLauncher.waitForObjectInContainer(workspace,
+                        AppIcon.getAppIconSelector(appName, mLauncher));
+        return workspaceIcon.getVisibleCenter();
+    }
+
+    private Map<String, Point> getIconPositionMap(List<UiObject2> icons) {
+        return icons.stream()
                 .collect(
                         Collectors.toMap(
                                 /* keyMapper= */ uiObject21 -> {
-                                    Log.d(UIOBJECT_STALE_ELEMENT, "keyText: " +
-                                            uiObject21.getText());
                                     return uiObject21.getText();
                                 },
                                 /* valueMapper= */ uiObject2 -> {
-                                    Log.d(UIOBJECT_STALE_ELEMENT, uiObject2.getText() +
-                                            " dispId" + uiObject2.getDisplayId() +
-                                            " parent" + uiObject2.getParent());
                                     return uiObject2.getVisibleCenter();
                                 },
                                 /* mergeFunction= */ (p1, p2) -> p1.x < p2.x ? p1 : p2));
@@ -629,8 +638,6 @@ public final class Workspace extends Home {
         try (LauncherInstrumentation.Closable ignored = launcher.addContextLayer(
                 "want to drag icon to workspace")) {
             final long downTime = SystemClock.uptimeMillis();
-            Log.d(TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE,
-                    "Workspace.dragIconToWorkspace: starting drag | downtime: " + downTime);
             Point dragStart = launchable.startDrag(
                     downTime,
                     expectLongClickEvents,

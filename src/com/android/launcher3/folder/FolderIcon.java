@@ -19,6 +19,7 @@ package com.android.launcher3.folder;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
+import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.folder.PreviewItemManager.INITIAL_ITEM_ANIMATION_DURATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_AUTO_LABELED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_AUTO_LABELING_SKIPPED_EMPTY_PRIMARY;
@@ -82,7 +83,7 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.IconLabelDotView;
+import com.android.launcher3.views.FloatingIconViewCompanion;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.util.ArrayList;
@@ -92,7 +93,7 @@ import java.util.function.Predicate;
 /**
  * An icon that can appear on in the workspace representing an {@link Folder}.
  */
-public class FolderIcon extends FrameLayout implements FolderListener, IconLabelDotView,
+public class FolderIcon extends FrameLayout implements FolderListener, FloatingIconViewCompanion,
         DraggableView, Reorderable {
 
     private final MultiTranslateDelegate mTranslateDelegate = new MultiTranslateDelegate(this);
@@ -176,12 +177,16 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
         FolderIcon icon = inflateIcon(resId, activityContext, group, folderInfo);
         folder.setFolderIcon(icon);
         folder.bind(folderInfo);
+
         icon.setFolder(folder);
+        folderInfo.addListener(icon);
         return icon;
     }
 
     /**
-     * Builds a FolderIcon to be added to the Launcher
+     * Builds a FolderIcon to be added to the activity.
+     * This method doesn't add any listeners to the FolderInfo, and hence any changes to the info
+     * will not be reflected in the folder.
      */
     public static FolderIcon inflateIcon(int resId, ActivityContext activity,
             @Nullable ViewGroup group, FolderInfo folderInfo) {
@@ -223,11 +228,9 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         icon.setAccessibilityDelegate(activity.getAccessibilityDelegate());
 
-        icon.mPreviewVerifier = new FolderGridOrganizer(activity.getDeviceProfile());
+        icon.mPreviewVerifier = createFolderGridOrganizer(activity.getDeviceProfile());
         icon.mPreviewVerifier.setFolderInfo(folderInfo);
         icon.updatePreviewItems(false);
-
-        folderInfo.addListener(icon);
 
         return icon;
     }
@@ -458,7 +461,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         mInfo.setTitle(newTitle, mFolder.mLauncherDelegate.getModelWriter());
         onTitleChanged(mInfo.title);
-        mFolder.mFolderName.setText(mInfo.title);
+        mFolder.getFolderName().setText(mInfo.title);
 
         // Logging for folder creation flow
         StatsLogManager.newInstance(getContext()).logger()

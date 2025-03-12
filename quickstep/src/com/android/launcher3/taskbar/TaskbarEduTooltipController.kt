@@ -33,6 +33,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import androidx.annotation.IntDef
 import androidx.annotation.LayoutRes
+import androidx.annotation.VisibleForTesting
 import androidx.core.text.HtmlCompat
 import androidx.core.view.updateLayoutParams
 import com.airbnb.lottie.LottieAnimationView
@@ -48,6 +49,7 @@ import com.android.launcher3.util.OnboardingPrefs.TASKBAR_SEARCH_EDU_SEEN
 import com.android.launcher3.util.ResourceBasedOverride
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.BaseDragLayer
+import com.android.quickstep.util.ContextualSearchInvoker
 import com.android.quickstep.util.LottieAnimationColorUtils
 import java.io.PrintWriter
 
@@ -79,7 +81,11 @@ open class TaskbarEduTooltipController(context: Context) :
     ResourceBasedOverride, LoggableTaskbarController {
 
     protected val activityContext: TaskbarActivityContext = ActivityContext.lookupContext(context)
-    open val shouldShowSearchEdu = false
+    open val shouldShowSearchEdu: Boolean
+        get() =
+            ContextualSearchInvoker(activityContext)
+                .runContextualSearchInvocationChecksAndLogFailures()
+
     private val isTooltipEnabled: Boolean
         get() {
             return !Utilities.isRunningInTestHarness() &&
@@ -87,7 +93,7 @@ open class TaskbarEduTooltipController(context: Context) :
                 !activityContext.isTinyTaskbar
         }
 
-    private val isOpen: Boolean
+    val isTooltipOpen: Boolean
         get() = tooltip?.isOpen ?: false
 
     val isBeforeTooltipFeaturesStep: Boolean
@@ -96,7 +102,8 @@ open class TaskbarEduTooltipController(context: Context) :
     private lateinit var controllers: TaskbarControllers
 
     // Keep track of whether the user has seen the Search Edu
-    private var userHasSeenSearchEdu: Boolean
+    @VisibleForTesting
+    var userHasSeenSearchEdu: Boolean
         get() {
             return TASKBAR_SEARCH_EDU_SEEN.get(activityContext)
         }
@@ -258,7 +265,8 @@ open class TaskbarEduTooltipController(context: Context) :
                 !DisplayController.isPinnedTaskbar(activityContext) ||
                 !isTooltipEnabled ||
                 !shouldShowSearchEdu ||
-                userHasSeenSearchEdu
+                userHasSeenSearchEdu ||
+                !controllers.taskbarStashController.isTaskbarVisibleAndNotStashing
         ) {
             return
         }
@@ -349,19 +357,19 @@ open class TaskbarEduTooltipController(context: Context) :
             overlayContext.layoutInflater.inflate(
                 R.layout.taskbar_edu_tooltip,
                 overlayContext.dragLayer,
-                false
+                false,
             ) as TaskbarEduTooltip
 
         controllers.taskbarAutohideSuspendController.updateFlag(
             FLAG_AUTOHIDE_SUSPEND_EDU_OPEN,
-            true
+            true,
         )
 
         tooltip.onCloseCallback = {
             this.tooltip = null
             controllers.taskbarAutohideSuspendController.updateFlag(
                 FLAG_AUTOHIDE_SUSPEND_EDU_OPEN,
-                false
+                false,
             )
             controllers.taskbarStashController.updateAndAnimateTransientTaskbar(true)
         }
@@ -376,7 +384,7 @@ open class TaskbarEduTooltipController(context: Context) :
             override fun performAccessibilityAction(
                 host: View,
                 action: Int,
-                args: Bundle?
+                args: Bundle?,
             ): Boolean {
                 if (action == R.id.close) {
                     hide()
@@ -394,13 +402,13 @@ open class TaskbarEduTooltipController(context: Context) :
 
             override fun onInitializeAccessibilityNodeInfo(
                 host: View,
-                info: AccessibilityNodeInfo
+                info: AccessibilityNodeInfo,
             ) {
                 super.onInitializeAccessibilityNodeInfo(host, info)
                 info.addAction(
                     AccessibilityNodeInfo.AccessibilityAction(
                         R.id.close,
-                        host.context?.getText(R.string.taskbar_edu_close)
+                        host.context?.getText(R.string.taskbar_edu_close),
                     )
                 )
             }
@@ -409,7 +417,7 @@ open class TaskbarEduTooltipController(context: Context) :
     override fun dumpLogs(prefix: String?, pw: PrintWriter?) {
         pw?.println(prefix + "TaskbarEduTooltipController:")
         pw?.println("$prefix\tisTooltipEnabled=$isTooltipEnabled")
-        pw?.println("$prefix\tisOpen=$isOpen")
+        pw?.println("$prefix\tisOpen=$isTooltipOpen")
         pw?.println("$prefix\ttooltipStep=$tooltipStep")
     }
 
@@ -419,7 +427,7 @@ open class TaskbarEduTooltipController(context: Context) :
             return ResourceBasedOverride.Overrides.getObject(
                 TaskbarEduTooltipController::class.java,
                 context,
-                R.string.taskbar_edu_tooltip_controller_class
+                R.string.taskbar_edu_tooltip_controller_class,
             )
         }
     }

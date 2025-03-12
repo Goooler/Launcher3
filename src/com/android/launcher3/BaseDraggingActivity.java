@@ -82,8 +82,12 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     private void updateTheme() {
         if (mThemeRes != Themes.getActivityThemeRes(this)) {
-            recreate();
+            recreateToUpdateTheme();
         }
+    }
+
+    protected void recreateToUpdateTheme() {
+        recreate();
     }
 
     @Override
@@ -140,15 +144,11 @@ public abstract class BaseDraggingActivity extends BaseActivity
     }
 
     protected void onDeviceProfileInitiated() {
-        if (mDeviceProfile.isVerticalBarLayout()) {
-            mDeviceProfile.updateIsSeascape(this);
-        }
     }
 
     @Override
     public void onDisplayInfoChanged(Context context, Info info, int flags) {
         if ((flags & CHANGE_ROTATION) != 0 && mDeviceProfile.isVerticalBarLayout()) {
-            mDeviceProfile.updateIsSeascape(this);
             reapplyUi();
         }
     }

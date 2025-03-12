@@ -34,48 +34,62 @@ import android.view.RemoteAnimationTarget;
 import android.view.View;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.BaseState;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.views.ScrimView;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
-import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
+import com.android.quickstep.util.ContextInitListener;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_TYPE>,
-        CONTAINER_TYPE extends RecentsViewContainer> {
+        CONTAINER_TYPE extends RecentsViewContainer & StatefulContainer<STATE_TYPE>> {
 
     public boolean rotationSupportedByActivity = false;
+    protected final STATE_TYPE mBackgroundState;
+
+    protected BaseContainerInterface(STATE_TYPE backgroundState) {
+        mBackgroundState = backgroundState;
+    }
+
+    @UiThread
+    @Nullable
+    public abstract <T extends RecentsView<?,?>> T getVisibleRecentsView();
+
+    @UiThread
+    public abstract boolean switchToRecentsIfVisible(Animator.AnimatorListener animatorListener);
 
     @Nullable
     public abstract CONTAINER_TYPE getCreatedContainer();
 
+    @Nullable
+    protected Runnable mOnInitBackgroundStateUICallback = null;
+
     public abstract boolean isInLiveTileMode();
 
     public abstract void onAssistantVisibilityChanged(float assistantVisibility);
-
-    public abstract boolean allowMinimizeSplitScreen();
 
     public abstract boolean isResumed();
 
     public abstract boolean isStarted();
     public abstract boolean deferStartingActivity(RecentsAnimationDeviceState deviceState,
             MotionEvent ev);
-
-    /** @return whether to allow going to All Apps from Overview. */
-    public abstract boolean allowAllAppsFromOverview();
 
     /**
      * Returns the color of the scrim behind overview when at rest in this state.
@@ -91,11 +105,36 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
     @Nullable
     public abstract TaskbarUIController getTaskbarController();
 
-    public abstract BaseActivityInterface.AnimationFactory prepareRecentsUI(
+    public interface AnimationFactory {
+
+        void createContainerInterface(long transitionLength);
+
+        /**
+         * @param attached Whether to show RecentsView alongside the app window. If false, recents
+         *                 will be hidden by some property we can animate, e.g. alpha.
+         * @param animate Whether to animate recents to/from its new attached state.
+         * @param updateRunningTaskAlpha Whether to update the running task's attached alpha
+         */
+        default void setRecentsAttachedToAppWindow(
+                boolean attached, boolean animate, boolean updateRunningTaskAlpha) { }
+
+        default boolean isRecentsAttachedToAppWindow() {
+            return false;
+        }
+
+        default boolean hasRecentsEverAttachedToAppWindow() {
+            return false;
+        }
+
+        /** Called when the gesture ends and we know what state it is going towards */
+        default void setEndTarget(GestureState.GestureEndTarget endTarget) { }
+    }
+
+    public abstract BaseContainerInterface.AnimationFactory prepareRecentsUI(
             RecentsAnimationDeviceState deviceState, boolean activityVisible,
             Consumer<AnimatorControllerWithResistance> callback);
 
-    public abstract ActivityInitListener createActivityInitListener(
+    public abstract ContextInitListener createActivityInitListener(
             Predicate<Boolean> onInitListener);
     /**
      * Returns the expected STATE_TYPE from the provided GestureEndTarget.
@@ -129,9 +168,22 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
         return false;
     }
 
+    public void runOnInitBackgroundStateUI(Runnable callback) {
+        StatefulContainer container = getCreatedContainer();
+        if (container != null
+                && container.getStateManager().getState() == mBackgroundState) {
+            callback.run();
+            onInitBackgroundStateUI();
+            return;
+        }
+        mOnInitBackgroundStateUICallback = callback;
+    }
+
     @Nullable
     public DesktopVisibilityController getDesktopVisibilityController() {
-        return null;
+        CONTAINER_TYPE container = getCreatedContainer();
+
+        return container == null ? null : container.getDesktopVisibilityController();
     }
 
     /**
@@ -269,8 +321,11 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
         } else {
             Rect portraitInsets = dp.getInsets();
             DisplayController displayController = DisplayController.INSTANCE.get(context);
-            Rect deviceRotationInsets = displayController.getInfo().getCurrentBounds().get(
-                    orientationHandler.getRotation()).insets;
+            @Nullable List<WindowBounds> windowBounds =
+                    displayController.getInfo().getCurrentBounds();
+            Rect deviceRotationInsets = windowBounds != null
+                    ? windowBounds.get(orientationHandler.getRotation()).insets
+                    : new Rect();
             // Obtain the landscape/seascape insets, and rotate it to portrait perspective.
             orientationHandler.rotateInsets(deviceRotationInsets, outRect);
             // Then combine with portrait's insets to leave space for status bar/nav bar in
@@ -400,5 +455,12 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
                 Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM,
                 outRect,
                 orientationHandler);
+    }
+
+    protected void onInitBackgroundStateUI() {
+        if (mOnInitBackgroundStateUICallback != null) {
+            mOnInitBackgroundStateUICallback.run();
+            mOnInitBackgroundStateUICallback = null;
+        }
     }
 }

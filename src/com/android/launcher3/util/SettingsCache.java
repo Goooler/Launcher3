@@ -18,18 +18,29 @@ package com.android.launcher3.util;
 
 import static android.provider.Settings.System.ACCELEROMETER_ROTATION;
 
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
+
+import androidx.annotation.UiThread;
+
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppSingleton;
+import com.android.launcher3.dagger.LauncherBaseAppComponent;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import javax.inject.Inject;
 
 /**
  * ContentObserver over Settings keys that also has a caching layer.
@@ -45,6 +56,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * Cache will also be updated if a key queried is missing (even if it has no listeners registered).
  */
+@LauncherAppSingleton
 public class SettingsCache extends ContentObserver implements SafeCloseable {
 
     /** Hidden field Settings.Secure.NOTIFICATION_BADGING */
@@ -77,17 +89,19 @@ public class SettingsCache extends ContentObserver implements SafeCloseable {
     /**
      * Singleton instance
      */
-    public static MainThreadInitializedObject<SettingsCache> INSTANCE =
-            new MainThreadInitializedObject<>(SettingsCache::new);
+    public static final DaggerSingletonObject<SettingsCache> INSTANCE =
+            new DaggerSingletonObject<>(LauncherBaseAppComponent::getSettingsCache);
 
-    private SettingsCache(Context context) {
-        super(new Handler());
+    @Inject
+    SettingsCache(@ApplicationContext Context context, DaggerSingletonTracker tracker) {
+        super(new Handler(Looper.getMainLooper()));
         mResolver = context.getContentResolver();
+        tracker.addCloseable(this);
     }
 
     @Override
     public void close() {
-        mResolver.unregisterContentObserver(this);
+        UI_HELPER_EXECUTOR.execute(() -> mResolver.unregisterContentObserver(this));
     }
 
     @Override
@@ -128,14 +142,17 @@ public class SettingsCache extends ContentObserver implements SafeCloseable {
      * Does not de-dupe if you add same listeners for the same key multiple times.
      * Unregister once complete using {@link #unregister(Uri, OnChangeListener)}
      */
+    @UiThread
     public void register(Uri uri, OnChangeListener changeListener) {
+        Preconditions.assertUIThread();
         if (mListenerMap.containsKey(uri)) {
             mListenerMap.get(uri).add(changeListener);
         } else {
             CopyOnWriteArrayList<OnChangeListener> l = new CopyOnWriteArrayList<>();
             l.add(changeListener);
             mListenerMap.put(uri, l);
-            mResolver.registerContentObserver(uri, false, this);
+            UI_HELPER_EXECUTOR.execute(
+                    () -> mResolver.registerContentObserver(uri, false, this));
         }
     }
 

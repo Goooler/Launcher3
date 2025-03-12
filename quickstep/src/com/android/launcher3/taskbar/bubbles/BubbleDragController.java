@@ -27,8 +27,8 @@ import androidx.annotation.Nullable;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.wm.shell.common.bubbles.BaseBubblePinController.LocationChangeListener;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BaseBubblePinController.LocationChangeListener;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
  * Controls bubble bar drag interactions.
@@ -76,6 +76,8 @@ public class BubbleDragController {
     private BubbleDismissController mBubbleDismissController;
     private BubbleBarPinController mBubbleBarPinController;
     private BubblePinController mBubblePinController;
+
+    private boolean mIsDragging;
 
     public BubbleDragController(TaskbarActivityContext activity) {
         mActivity = activity;
@@ -153,12 +155,14 @@ public class BubbleDragController {
             @Override
             protected void onDragDismiss() {
                 mBubblePinController.onDragEnd();
+                mBubbleBarViewController.onBubbleDismissed(bubbleView);
                 mBubbleBarViewController.onBubbleDragEnd();
             }
 
             @Override
             void onDragEnd() {
-                mBubbleBarController.updateBubbleBarLocation(mReleasedLocation);
+                mBubbleBarController.updateBubbleBarLocation(mReleasedLocation,
+                        BubbleBarLocation.UpdateSource.DRAG_BUBBLE);
                 mBubbleBarViewController.onBubbleDragEnd();
                 mBubblePinController.setListener(null);
             }
@@ -223,7 +227,8 @@ public class BubbleDragController {
             @Override
             void onDragEnd() {
                 // Make sure to update location as the first thing. Pivot update causes a relayout
-                mBubbleBarController.updateBubbleBarLocation(mReleasedLocation);
+                mBubbleBarController.updateBubbleBarLocation(mReleasedLocation,
+                        BubbleBarLocation.UpdateSource.DRAG_BAR);
                 bubbleBarView.setIsDragging(false);
                 // Restoring the initial pivot for the bubble bar view
                 bubbleBarView.setRelativePivot(initialRelativePivot.x, initialRelativePivot.y);
@@ -237,6 +242,16 @@ public class BubbleDragController {
                         getInitialPosition(), mReleasedLocation);
             }
         });
+    }
+
+    /** Whether there is an item being dragged or not. */
+    public boolean isDragging() {
+        return mIsDragging;
+    }
+
+    /** Sets whether something is being dragged or not. */
+    public void setIsDragging(boolean isDragging) {
+        mIsDragging = isDragging;
     }
 
     /**
@@ -435,6 +450,7 @@ public class BubbleDragController {
 
         private void startDragging(@NonNull View view) {
             onDragStart();
+            BubbleDragController.this.setIsDragging(true);
             mActivity.setTaskbarWindowFullscreen(true);
             mAnimator = new BubbleDragAnimator(view);
             mAnimator.animateFocused();
@@ -451,6 +467,7 @@ public class BubbleDragController {
         }
 
         private void stopDragging(@NonNull View view, @NonNull MotionEvent event) {
+            BubbleDragController.this.setIsDragging(false);
             Runnable onComplete = () -> {
                 mActivity.setTaskbarWindowFullscreen(false);
                 cleanUp(view);

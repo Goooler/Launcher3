@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.AbstractFloatingView.TYPE_WIDGET_RESIZE_FRAME;
 import static com.android.launcher3.BubbleTextView.DISPLAY_FOLDER;
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
@@ -80,6 +81,8 @@ import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.celllayout.CellPosMapper;
 import com.android.launcher3.celllayout.CellPosMapper.CellPos;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.debug.TestEvent;
+import com.android.launcher3.debug.TestEventEmitter;
 import com.android.launcher3.dot.FolderDotInfo;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -113,6 +116,7 @@ import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.IntSparseArrayMap;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.OverlayEdgeEffect;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.RunnableList;
@@ -129,6 +133,8 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayCallbacks;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayTouchProxy;
+
+import com.google.android.msdl.data.model.MSDLToken;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -233,6 +239,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     boolean mChildrenLayersEnabled = true;
 
     private boolean mStripScreensOnPageStopMoving = false;
+    public boolean mHasOnLayoutBeenCalled = false;
 
     private boolean mWorkspaceFadeInAdjacentScreens;
 
@@ -295,6 +302,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     private final StatsLogManager mStatsLogManager;
 
+    private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+
     /**
      * Used to inflate the Workspace from XML.
      *
@@ -314,7 +323,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      */
     public Workspace(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-
         mLauncher = Launcher.getLauncher(context);
         mStateTransitionAnimation = new WorkspaceStateTransitionAnimation(mLauncher, this);
         mWallpaperManager = WallpaperManager.getInstance(context);
@@ -328,6 +336,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         setMotionEventSplittingEnabled(true);
         setOnTouchListener(new WorkspaceTouchListener(mLauncher, this));
         mStatsLogManager = StatsLogManager.newInstance(context);
+        mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context);
     }
 
     @Override
@@ -1121,6 +1130,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return super.onTouchEvent(ev);
     }
 
+    @Override
+    protected void onDisallowSwipeToMinusOnePage() {
+        mLauncher.getOverlayManager().onDisallowSwipeToMinusOnePage();
+    }
+
     /**
      * Called directly from a CellLayout (not by the framework), after we've been added as a
      * listener via setOnInterceptTouchEventListener(). This allows us to tell the CellLayout
@@ -1215,6 +1229,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     protected void onPageBeginTransition() {
+        // Widget resize frame doesn't receive events to close when talkback is enabled. For that
+        // case, close it here.
+        AbstractFloatingView.closeOpenViews(mLauncher, false, TYPE_WIDGET_RESIZE_FRAME);
+
         super.onPageBeginTransition();
         updateChildrenLayersEnabled();
     }
@@ -1444,6 +1462,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        mHasOnLayoutBeenCalled = true; // b/349929393 - is the required call to onLayout not done?
         if (mUnlockWallpaperFromDefaultPageOnLayout) {
             mWallpaperOffset.setLockToDefaultPage(false);
             mUnlockWallpaperFromDefaultPageOnLayout = false;
@@ -2218,6 +2237,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         if (d.stateAnnouncer != null && !droppedOnOriginalCell) {
             d.stateAnnouncer.completeAction(R.string.item_moved);
         }
+        TestEventEmitter.INSTANCE.get(getContext()).sendEvent(TestEvent.WORKSPACE_ON_DROP);
     }
 
     @Nullable
@@ -2665,7 +2685,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         ItemInfo info = dragObject.dragInfo;
         boolean userFolderPending = willCreateUserFolder(info, mDragOverView, false);
         if (mDragMode == DRAG_MODE_NONE && userFolderPending) {
-
+            if (Flags.msdlFeedback()) {
+                mMSDLPlayerWrapper.playToken(MSDLToken.DRAG_INDICATOR_DISCRETE);
+            }
             mFolderCreateBg = new PreviewBackground(getContext());
             mFolderCreateBg.setup(mLauncher, mLauncher, null,
                     mDragOverView.getMeasuredWidth(), mDragOverView.getPaddingTop());
