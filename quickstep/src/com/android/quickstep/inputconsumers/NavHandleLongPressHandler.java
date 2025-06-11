@@ -88,7 +88,7 @@ public class NavHandleLongPressHandler implements ResourceBasedOverride {
      */
     @Nullable
     @VisibleForTesting
-    final Runnable getLongPressRunnable(NavHandle navHandle) {
+    final Runnable getLongPressRunnable(NavHandle navHandle, int displayId) {
         if (!isContextualSearchEntrypointEnabled(navHandle)) {
             Log.i(TAG, "Contextual Search invocation failed: entry point disabled");
             mVibratorWrapper.cancelVibrate();
@@ -116,7 +116,7 @@ public class NavHandleLongPressHandler implements ResourceBasedOverride {
                 Log.i(TAG, "Contextual Search invocation successful");
 
                 String runningPackage = TopTaskTracker.INSTANCE.get(mContext).getCachedTopTask(
-                        /* filterOnlyVisibleRecents */ true).getPackageName();
+                        /* filterOnlyVisibleRecents */ true, displayId).getPackageName();
                 mStatsLogManager.logger().withPackageName(runningPackage)
                         .log(LAUNCHER_LAUNCH_ASSISTANT_SUCCESSFUL_NAV_HANDLE);
             } else {

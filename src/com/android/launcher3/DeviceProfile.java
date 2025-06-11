@@ -24,16 +24,13 @@ import static com.android.launcher3.InvariantDeviceProfile.INDEX_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_PORTRAIT;
 import static com.android.launcher3.Utilities.dpiFromPx;
-import static com.android.launcher3.Utilities.isEnglishLanguage;
 import static com.android.launcher3.Utilities.pxFromSp;
-import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
-import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.testing.shared.ResourceUtils.pxFromDp;
 import static com.android.launcher3.testing.shared.ResourceUtils.roundPxValueFromFloat;
 import static com.android.wm.shell.Flags.enableBubbleBar;
-import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
+import static com.android.wm.shell.Flags.enableBubbleBarOnPhones;
 import static com.android.wm.shell.Flags.enableTinyTaskbar;
 
 import android.annotation.SuppressLint;
@@ -55,8 +52,9 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.CellLayout.ContainerType;
 import com.android.launcher3.DevicePaddings.DevicePadding;
+import com.android.launcher3.folder.ClippedFolderIconLayoutRule;
+import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.responsive.CalculatedCellSpec;
 import com.android.launcher3.responsive.CalculatedHotseatSpec;
@@ -389,7 +387,8 @@ public class DeviceProfile {
     }
 
     /** TODO: Once we fully migrate to staged split, remove "isMultiWindowMode" */
-    DeviceProfile(Context context, InvariantDeviceProfile inv, Info info, WindowBounds windowBounds,
+    DeviceProfile(Context context, InvariantDeviceProfile inv, Info info,
+            WindowManagerProxy wmProxy, ThemeManager themeManager, WindowBounds windowBounds,
             SparseArray<DotRenderer> dotRendererCache, boolean isMultiWindowMode,
             boolean transposeLayoutWithOrientation, boolean isMultiDisplay, boolean isGestureMode,
             @NonNull final ViewScaleProvider viewScaleProvider,
@@ -421,8 +420,10 @@ public class DeviceProfile {
         isTablet = info.isTablet(windowBounds);
         isPhone = !isTablet;
         isTwoPanels = isTablet && isMultiDisplay;
-        isTaskbarPresent = (isTablet || (enableTinyTaskbar() && isGestureMode))
-                && WindowManagerProxy.INSTANCE.get(context).isTaskbarDrawnInProcess();
+        boolean taskbarOrBubbleBarOnPhones = enableTinyTaskbar()
+                || (enableBubbleBar() && enableBubbleBarOnPhones());
+        isTaskbarPresent = (isTablet || (taskbarOrBubbleBarOnPhones && isGestureMode))
+                && wmProxy.isTaskbarDrawnInProcess();
 
         // Some more constants.
         context = getContext(context, info, inv.isFixedLandscape
@@ -507,9 +508,11 @@ public class DeviceProfile {
 
         bottomSheetOpenDuration = res.getInteger(R.integer.config_bottomSheetOpenDuration);
         bottomSheetCloseDuration = res.getInteger(R.integer.config_bottomSheetCloseDuration);
-        if (isTablet) {
+        if (shouldShowAllAppsOnSheet()) {
             bottomSheetWorkspaceScale = workspaceContentScale;
-            if (isMultiDisplay) {
+            if (Flags.allAppsBlur()) {
+                bottomSheetDepth = 2f;
+            } else if (isMultiDisplay) {
                 // TODO(b/259893832): Revert to use maxWallpaperScale to calculate bottomSheetDepth
                 // when screen recorder bug is fixed.
                 if (enableScalingRevealHomeAnimation()) {
@@ -794,8 +797,7 @@ public class DeviceProfile {
         int leftRightSplitPortraitResId = Resources.getSystem().getIdentifier(
                 "config_leftRightSplitInPortrait", "bool", "android");
         boolean allowLeftRightSplitInPortrait =
-                com.android.wm.shell.Flags.enableLeftRightSplitInPortrait()
-                    && leftRightSplitPortraitResId > 0
+                    leftRightSplitPortraitResId > 0
                     && res.getBoolean(leftRightSplitPortraitResId);
         if (allowLeftRightSplitInPortrait && isTablet) {
             isLeftRightSplit = !isLandscape;
@@ -848,8 +850,8 @@ public class DeviceProfile {
         dimensionOverrideProvider.accept(this);
 
         // This is done last, after iconSizePx is calculated above.
-        mDotRendererWorkSpace = createDotRenderer(context, iconSizePx, dotRendererCache);
-        mDotRendererAllApps = createDotRenderer(context, allAppsIconSizePx, dotRendererCache);
+        mDotRendererWorkSpace = createDotRenderer(themeManager, iconSizePx, dotRendererCache);
+        mDotRendererAllApps = createDotRenderer(themeManager, allAppsIconSizePx, dotRendererCache);
     }
 
     /**
@@ -871,10 +873,12 @@ public class DeviceProfile {
     }
 
     private static DotRenderer createDotRenderer(
-            @NonNull Context context, int size, @NonNull SparseArray<DotRenderer> cache) {
+            @NonNull ThemeManager themeManager, int size, @NonNull SparseArray<DotRenderer> cache) {
         DotRenderer renderer = cache.get(size);
         if (renderer == null) {
-            renderer = new DotRenderer(size, getShapePath(context, DEFAULT_DOT_SIZE),
+            renderer = new DotRenderer(
+                    size,
+                    themeManager.getIconShape().getPath(DEFAULT_DOT_SIZE),
                     DEFAULT_DOT_SIZE);
             cache.put(size, renderer);
         }
@@ -1091,7 +1095,7 @@ public class DeviceProfile {
         dotRendererCache.put(iconSizePx, mDotRendererWorkSpace);
         dotRendererCache.put(allAppsIconSizePx, mDotRendererAllApps);
 
-        return new Builder(context, inv, mInfo)
+        return inv.newDPBuilder(context, mInfo)
                 .setWindowBounds(bounds)
                 .setIsMultiDisplay(isMultiDisplay)
                 .setMultiWindowMode(isMultiWindowMode)
@@ -1229,7 +1233,7 @@ public class DeviceProfile {
     }
 
     private int getIconSizeWithOverlap(int iconSize) {
-        return (int) Math.ceil(iconSize * ICON_OVERLAP_FACTOR);
+        return (int) Math.ceil(iconSize * ClippedFolderIconLayoutRule.getIconOverlapFactor());
     }
 
     /**
@@ -1363,22 +1367,15 @@ public class DeviceProfile {
         if (isVerticalLayout && !mIsResponsiveGrid) {
             hideWorkspaceLabelsIfNotEnoughSpace();
         }
-        if ((Flags.enableTwolineToggle()
-                && LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE.get(context))) {
-            if (!isEnglishLanguage(context)) {
-                // Set toggle preference value to false if not english here as it's possible the
-                // preference is stale after language change.
-                LauncherPrefs.get(context).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, false);
-            } else {
-                // Add extra textHeight to the existing allAppsCellHeight.
-                allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
-            }
+        if (inv.enableTwoLinesInAllApps) {
+            // Add extra textHeight to the existing allAppsCellHeight.
+            allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
         }
 
         updateHotseatSizes(iconSizePx);
 
         // Folder icon
-        folderIconSizePx = IconNormalizer.getNormalizedCircleSize(iconSizePx);
+        folderIconSizePx = Math.round(iconSizePx * ICON_VISIBLE_AREA_FACTOR);
         folderIconOffsetYPx = (iconSizePx - folderIconSizePx) / 2;
 
         // Update widget padding:
@@ -1835,10 +1832,17 @@ public class DeviceProfile {
                         workspacePageIndicatorHeight - mWorkspacePageIndicatorOverlapWorkspace;
             }
             int paddingTop = workspaceTopPadding + (mIsScalableGrid ? 0 : edgeMarginPx);
-            // On isFixedLandscapeMode on phones we already have padding because of the camera hole
-            int paddingSide = inv.isFixedLandscape ? 0 : desiredWorkspaceHorizontalMarginPx;
+            int paddingLeft = desiredWorkspaceHorizontalMarginPx;
+            int paddingRight = desiredWorkspaceHorizontalMarginPx;
 
-            padding.set(paddingSide, paddingTop, paddingSide, paddingBottom);
+            // In fixed Landscape we don't need padding on the side next to the cutout because
+            // the cutout is already adding padding to all of Launcher, we only need on the other
+            // side
+            if (inv.isFixedLandscape) {
+                paddingLeft = isSeascape() ? desiredWorkspaceHorizontalMarginPx : 0;
+                paddingRight = isSeascape() ? 0 : desiredWorkspaceHorizontalMarginPx;
+            }
+            padding.set(paddingLeft, paddingTop, paddingRight, paddingBottom);
         }
         insetPadding(workspacePadding, cellLayoutPaddingPx);
     }
@@ -1936,7 +1940,29 @@ public class DeviceProfile {
                 hotseatBarPadding.set(mHotseatBarWorkspaceSpacePx, paddingTop,
                         mInsets.right + mHotseatBarEdgePaddingPx, paddingBottom);
             }
-        } else if (isTaskbarPresent || inv.isFixedLandscape) {
+        } else if (inv.isFixedLandscape) {
+            // Center the QSB vertically with hotseat
+            int hotseatBarBottomPadding = getHotseatBarBottomPadding();
+            int hotseatPlusQSBWidth = getHotseatRequiredWidth();
+            int qsbWidth = getAdditionalQsbSpace();
+            int availableWidthPxForHotseat = availableWidthPx - Math.abs(workspacePadding.width())
+                    - Math.abs(cellLayoutPaddingPx.width());
+            int remainingSpaceOnSide = (availableWidthPxForHotseat - hotseatPlusQSBWidth) / 2;
+
+            hotseatBarPadding.set(
+                    remainingSpaceOnSide + mInsets.left + workspacePadding.left
+                            + cellLayoutPaddingPx.left,
+                    hotseatBarSizePx - hotseatBarBottomPadding - hotseatCellHeightPx,
+                    remainingSpaceOnSide + mInsets.right + workspacePadding.right
+                            + cellLayoutPaddingPx.right,
+                    hotseatBarBottomPadding
+            );
+            if (Utilities.isRtl(context.getResources())) {
+                hotseatBarPadding.right += qsbWidth;
+            } else {
+                hotseatBarPadding.left += qsbWidth;
+            }
+        } else if (isTaskbarPresent) {
             // Center the QSB vertically with hotseat
             int hotseatBarBottomPadding = getHotseatBarBottomPadding();
             int hotseatBarTopPadding =
@@ -1954,11 +1980,6 @@ public class DeviceProfile {
                 endSpacing = startSpacing;
             }
             startSpacing += getAdditionalQsbSpace();
-
-            if (inv.isFixedLandscape) {
-                endSpacing += mInsets.right;
-                startSpacing +=  mInsets.left;
-            }
 
             hotseatBarPadding.top = hotseatBarTopPadding;
             hotseatBarPadding.bottom = hotseatBarBottomPadding;
@@ -2061,7 +2082,7 @@ public class DeviceProfile {
      * Returns the number of pixels the hotseat is translated from the bottom of the screen.
      */
     private int getHotseatBarBottomPadding() {
-        if (isTaskbarPresent) { // QSB on top or inline
+        if (isTaskbarPresent || isQsbInline) { // QSB on top or inline
             return hotseatBarBottomSpacePx - (Math.abs(hotseatCellHeightPx - iconSizePx) / 2);
         } else {
             return hotseatBarSizePx - hotseatCellHeightPx;
@@ -2169,7 +2190,8 @@ public class DeviceProfile {
     }
 
     public boolean isSeascape() {
-        return rotationHint == Surface.ROTATION_270 && isVerticalBarLayout();
+        return rotationHint == Surface.ROTATION_270
+                && (isVerticalBarLayout() || inv.isFixedLandscape);
     }
 
     public boolean shouldFadeAdjacentWorkspaceScreens() {
@@ -2433,7 +2455,6 @@ public class DeviceProfile {
      */
     public boolean shouldAdjustHotseatOnNavBarLocationUpdate(Context context) {
         return enableBubbleBar()
-                && enableBubbleBarInPersistentTaskBar()
                 && !DisplayController.getNavigationMode(context).hasGestures;
     }
 
@@ -2482,9 +2503,11 @@ public class DeviceProfile {
     }
 
     public static class Builder {
-        private Context mContext;
-        private InvariantDeviceProfile mInv;
-        private Info mInfo;
+        private final Context mContext;
+        private final InvariantDeviceProfile mInv;
+        private final Info mInfo;
+        private final WindowManagerProxy mWMProxy;
+        private final ThemeManager mThemeManager;
 
         private WindowBounds mWindowBounds;
         private boolean mIsMultiDisplay;
@@ -2500,10 +2523,13 @@ public class DeviceProfile {
 
         private boolean mIsTransientTaskbar;
 
-        public Builder(Context context, InvariantDeviceProfile inv, Info info) {
+        public Builder(Context context, InvariantDeviceProfile inv, Info info,
+                WindowManagerProxy wmProxy, ThemeManager themeManager) {
             mContext = context;
             mInv = inv;
             mInfo = info;
+            mWMProxy = wmProxy;
+            mThemeManager = themeManager;
             mIsTransientTaskbar = info.isTransientTaskbar();
         }
 
@@ -2584,7 +2610,8 @@ public class DeviceProfile {
             if (mOverrideProvider == null) {
                 mOverrideProvider = DEFAULT_DIMENSION_PROVIDER;
             }
-            return new DeviceProfile(mContext, mInv, mInfo, mWindowBounds, mDotRendererCache,
+            return new DeviceProfile(mContext, mInv, mInfo, mWMProxy, mThemeManager,
+                    mWindowBounds, mDotRendererCache,
                     mIsMultiWindowMode, mTransposeLayoutWithOrientation, mIsMultiDisplay,
                     mIsGestureMode, mViewScaleProvider, mOverrideProvider, mIsTransientTaskbar);
         }
