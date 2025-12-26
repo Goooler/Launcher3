@@ -30,7 +30,7 @@ okhttp-logInterceptor = { module = "com.squareup.okhttp3:logging-interceptor", v
 networkresult = "at.connyduck:networkresult-calladapter:1.2.0"
 
 ktlint = "com.pinterest.ktlint:ktlint-cli:1.8.0"
-composeRules = "io.nlopez.compose.rules:ktlint:0.4.22"
+composeRules = "io.nlopez.compose.rules:ktlint:0.5.3"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
