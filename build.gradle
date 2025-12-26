@@ -171,7 +171,7 @@ allprojects {
 }
 
 dependencies {
-    def ANDROID_X_VERSION = '1.1.0'
+    def ANDROID_X_VERSION = '1.4.0'
     implementation "androidx.dynamicanimation:dynamicanimation:${ANDROID_X_VERSION}"
     implementation "androidx.recyclerview:recyclerview:${ANDROID_X_VERSION}"
     implementation "androidx.preference:preference:${ANDROID_X_VERSION}"
