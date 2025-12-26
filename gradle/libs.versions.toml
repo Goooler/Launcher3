@@ -1,6 +1,6 @@
 [versions]
 agp = "8.13.2"
-kotlin = "2.1.10"
+kotlin = "2.3.0"
 lifecycle = "2.10.0"
 okhttp = "4.12.0"
 retrofit = "2.11.0"
