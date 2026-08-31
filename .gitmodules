@@ -5,3 +5,4 @@
 [submodule "aosp-android-jar"]
 	path = aosp-android-jar
 	url = https://github.com/Reginer/aosp-android-jar
+	branch = 37
