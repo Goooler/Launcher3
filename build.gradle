@@ -7,6 +7,7 @@ plugins {
     alias libs.plugins.android.library apply false
     alias libs.plugins.kotlin.android
     alias libs.plugins.kotlin.kapt
+    alias libs.plugins.kotlin.compose
     alias libs.plugins.protobuf
 }
 
@@ -19,6 +20,12 @@ android {
     defaultConfig {
         versionCode 1
         versionName "1.0"
+        buildConfigField "boolean", "WIDGETS_ENABLED", "true"
+    }
+
+    buildFeatures {
+        buildConfig true
+        compose true
     }
 
     androidResources {
@@ -74,7 +81,7 @@ android {
     sourceSets {
         main {
             res.srcDirs = ['res']
-            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src', 'modules/concurrent/src']
+            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src', 'modules/concurrent/src', 'tests/shared']
             manifest.srcFile 'AndroidManifest-common.xml'
             proto {
                 srcDirs = ['protos/', 'protos_overrides/']
@@ -213,7 +220,15 @@ dependencies {
     implementation libs.kotlinx.coroutines.android
     implementation libs.guava
 
+    implementation platform(libs.androidx.compose.bom)
+    implementation libs.androidx.compose.ui
+    implementation libs.androidx.compose.material3
+    implementation libs.androidx.compose.foundation
+    implementation libs.androidx.compose.ui.tooling.preview
+    implementation libs.androidx.activity.compose
+
     implementation project(':IconLoader')
+    implementation project(':AnimationLib')
     implementation project(':SharedLibWrapper')
 
     // Recents lib dependency

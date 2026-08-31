@@ -7,6 +7,7 @@ android {
 
     sourceSets {
         named("main") {
+            java.setSrcDirs(listOf("src/main/java"))
             res.setSrcDirs(listOf("res"))
         }
     }

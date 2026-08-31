@@ -31,6 +31,9 @@ project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 include ':UserTypeLib'
 project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
 
+include ':AnimationLib'
+project(':AnimationLib').projectDir = new File(rootDir, 'systemui/animationlib')
+
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'
 include ':NexusLauncher:Flags'
