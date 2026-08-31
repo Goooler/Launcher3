@@ -28,7 +28,10 @@ android {
             'com.android.server.ui_latency_stats.ui_latency_stats_service=false',
             'com.android.window.flags.grant_manage_key_gestures_to_recents=false'
         ].join(',')
-        additionalParameters += ['--feature-flags', xmlFlags]
+        additionalParameters += [
+            '--feature-flags', xmlFlags,
+            '-I', "${rootDir}/aosp-android-jar/android-37/android.jar"
+        ]
     }
 
     // The flavor dimensions for build variants (e.g. aospWithQuickstep, aospWithoutQuickstep)
@@ -193,6 +196,8 @@ allprojects {
 }
 
 dependencies {
+    compileOnly files("${rootDir}/aosp-android-jar/android-37/android.jar")
+
     implementation libs.androidx.dynamicanimation
     implementation libs.androidx.recyclerview
     implementation libs.androidx.preference
@@ -204,6 +209,7 @@ dependencies {
     implementation libs.lottie
 
     implementation project(':IconLoader')
+    implementation project(':DynamicColors')
     withQuickstepImplementation project(':SharedLibWrapper')
 
     // Recents lib dependency

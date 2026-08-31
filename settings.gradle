@@ -31,6 +31,9 @@ project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 include ':UserTypeLib'
 project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
 
+include ':DynamicColors'
+project(':DynamicColors').projectDir = new File(rootDir, 'systemui/dynamiccolors')
+
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'
 include ':NexusLauncher:Flags'
