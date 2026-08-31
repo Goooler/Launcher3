@@ -11,6 +11,10 @@ plugins {
     alias libs.plugins.protobuf
 }
 
+kapt {
+    correctErrorTypes = true
+}
+
 final String ANDROID_TOP = "${rootDir}/../../.."
 final String FRAMEWORK_PREBUILTS_DIR = "${ANDROID_TOP}/prebuilts/framework_intermediates/"
 
@@ -21,6 +25,7 @@ android {
         versionCode 1
         versionName "1.0"
         buildConfigField "boolean", "WIDGETS_ENABLED", "true"
+        buildConfigField "boolean", "IS_STUDIO_BUILD", "false"
     }
 
     buildFeatures {
@@ -81,7 +86,7 @@ android {
     sourceSets {
         main {
             res.srcDirs = ['res']
-            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src', 'modules/concurrent/src', 'tests/shared']
+            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src', 'modules/concurrent/src', 'shared/src']
             manifest.srcFile 'AndroidManifest-common.xml'
             proto {
                 srcDirs = ['protos/', 'protos_overrides/']
@@ -207,12 +212,14 @@ dependencies {
     compileOnly files("${rootDir}/aosp-android-jar/android-37/android.jar")
 
     implementation libs.androidx.dynamicanimation
+    implementation libs.androidx.core.animation
     implementation libs.androidx.recyclerview
     implementation libs.androidx.preference
     implementation libs.androidx.cardview
     implementation libs.androidx.constraintlayout
     implementation libs.androidx.fragment
     implementation libs.androidx.window
+    implementation libs.androidx.slice.view
     implementation libs.material
     implementation libs.lottie
     implementation libs.dagger
@@ -225,10 +232,16 @@ dependencies {
     implementation libs.androidx.compose.material3
     implementation libs.androidx.compose.foundation
     implementation libs.androidx.compose.ui.tooling.preview
+    implementation libs.androidx.compose.material.icons.core
+    implementation libs.androidx.compose.material.icons.extended
     implementation libs.androidx.activity.compose
+    implementation libs.androidx.navigation.compose
+    implementation libs.androidx.lifecycle.viewmodel.compose
+    implementation libs.androidx.graphics.shapes
 
     implementation project(':IconLoader')
     implementation project(':AnimationLib')
+    implementation project(':WidgetPicker')
     implementation project(':SharedLibWrapper')
 
     // Recents lib dependency
@@ -236,5 +249,9 @@ dependencies {
 
     // Required for AOSP to compile. This is already included in the sysui_shared.jar
     withoutQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/libs", include: 'plugin_core.jar')
+}
+
+tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+    enabled = false
 }
 

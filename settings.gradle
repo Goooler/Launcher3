@@ -7,6 +7,7 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
+        mavenCentral()
         gradlePluginPortal()
     }
 }
@@ -33,6 +34,9 @@ project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
 
 include ':AnimationLib'
 project(':AnimationLib').projectDir = new File(rootDir, 'systemui/animationlib')
+
+include ':WidgetPicker'
+project(':WidgetPicker').projectDir = new File(rootDir, 'modules/widgetpicker')
 
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'

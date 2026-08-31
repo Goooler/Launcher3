@@ -15,128 +15,62 @@
  */
 
 plugins {
-    id(libs.plugins.android.library.get().pluginId)
-    id(libs.plugins.kotlin.android.get().pluginId)
-    id(libs.plugins.kotlin.kapt.get().pluginId)
-    id(libs.plugins.compose.compiler.get().pluginId)
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.kotlin.compose)
 }
-
-// For the screenshot testing lib dependencies
-apply<ResourceFixerPlugin>()
-
-val androidTop = extra["ANDROID_TOP"].toString()
-val robolibBuildDir = project(":RobolectricLib").layout.buildDirectory.toString()
-val widgetPickerDir = "$androidTop/packages/apps/Launcher3/modules/widgetpicker"
-
-android.buildFeatures.compose = true
 
 android {
     namespace = "com.android.launcher3.widgetpicker"
-    testNamespace = "com.android.launcher3.widgetpicker.tests"
-    defaultConfig {
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testApplicationId = "com.android.launcher3.widgetpicker.tests"
-    }
-    sourceSets {
-        named("main") {
-            java.setSrcDirs(listOf("$widgetPickerDir/src"))
-            manifest.srcFile("$widgetPickerDir/AndroidManifest.xml")
-            res.setSrcDirs(listOf("$widgetPickerDir/res"))
-        }
-        named("androidTest") {
-            java.setSrcDirs(
-                listOf(
-                    "$widgetPickerDir/tests/multivalentScreenshotTests/src",
-                    "$widgetPickerDir/tests/multivalentTestsForDevice/src",
-                )
-            )
-            res.setSrcDirs(listOf(
-                "$widgetPickerDir/tests/multivalentScreenshotTests/res",
-                "$widgetPickerDir/res"
-            ))
-            manifest.srcFile("$widgetPickerDir/tests/AndroidManifest.xml")
-        }
-        named("test") {
-            java.setSrcDirs(listOf("$widgetPickerDir/tests/multivalentTests/src"))
-            resources.setSrcDirs(listOf("$widgetPickerDir/tests/config"))
-            manifest.srcFile("$widgetPickerDir/tests/AndroidManifest.xml")
-            res.setSrcDirs(listOf("$widgetPickerDir/tests/multivalentScreenshotTests/res"))
-        }
-    }
-    signingConfigs {
-        getByName("debug") {
-            // This is necessary or the private APIs from the studiow-generate SDK won't work.
-            // Without the platform keystore, it will crash with:
-            // "java.lang.NoSuchMethodError: No static method asyncTraceForTrackBegin"
-            storeFile = file("$androidTop/vendor/google/certs/devkeys/platform.keystore")
-        }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
+    kotlinOptions {
+        jvmTarget = "21"
+        freeCompilerArgs = listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+        )
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    sourceSets {
+        named("main") {
+            java.srcDirs("src")
+            kotlin.srcDirs("src", "${rootDir}/SharedLibWrapper/src/main/kotlin")
+            res.setSrcDirs(listOf("res"))
+            manifest.srcFile("AndroidManifest.xml")
         }
     }
-    // Exclude META-INF for running test with android studio
-    packagingOptions.resources.excludes.add("META-INF/versions/9/OSGI-INF/MANIFEST.MF")
 }
 
 dependencies {
+    compileOnly(files("${rootDir}/aosp-android-jar/android-37/android.jar"))
+    implementation(project(":SharedLibWrapper"))
     implementation(libs.androidx.core)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
-    kapt(libs.dagger.android.processor)
-    kaptAndroidTest(libs.dagger.compiler)
-    kaptAndroidTest(libs.dagger.android.processor)
 
-    // Compose UI dependencies
-    implementation(libs.compose.ui)
-    implementation(libs.compose.runtime)
-    implementation(libs.compose.foundation.layout)
-    implementation(libs.compose.material3)
-    implementation(libs.androidx.activity.compose)
-
-    // Other UI dependencies
-    implementation(libs.androidx.material3.window.size.cls)
-    implementation(libs.androidx.window)
-
-    // Compose android studio preview support
-    implementation(libs.compose.material.icons.extended)
-    implementation(libs.compose.ui.tooling.preview)
-    debugImplementation(libs.compose.ui.tooling)
-
-    // Testing
-    // this needs to be modern to support JDK-17 + asm byte code.
-    testImplementation(libs.mockito.robolectric.bytebuddy.agent)
-    testImplementation(libs.mockito.robolectric.bytebuddy)
-    testImplementation(libs.mockito.robolectric)
-    testImplementation(libs.mockito.kotlin)
-    testImplementation(libs.junit)
-    testImplementation(libs.google.truth)
-    testImplementation(libs.androidx.test.runner)
-    testImplementation(libs.androidx.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-
-    androidTestImplementation(libs.google.truth)
-    androidTestImplementation(libs.mockito.kotlin)
-    androidTestImplementation(libs.androidx.test.rules)
-    androidTestImplementation(libs.kotlinx.coroutines.test)
-
-    // Compose UI Tests
-    testApi(libs.compose.ui.test.junit4)
-    androidTestApi(libs.compose.ui.test.junit4)
-    debugApi(libs.compose.ui.test.manifest)
-
-    // Shared testing libs
-    testImplementation(project(":RobolectricLib"))
-    testImplementation(project(":SharedTestLib"))
-    androidTestImplementation(project(":SharedTestLib"))
-    androidTestImplementation(project(":PlatformParameterizedLib"))
-    androidTestImplementation(project(":ScreenshotLib"))
-    androidTestImplementation(project(":ScreenshotComposeLib"))
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 }
 
-// Work around for kotlin bug with symlinked source: http://b/316363701
-tasks.matching { it.name.matches(Regex("widgetpicker.*compile.*TestKotlin")) }.configureEach {
-    inputs.dir("$widgetPickerDir/tests/multivalentTests/src")
+tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+    enabled = false
 }
