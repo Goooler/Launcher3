@@ -20,6 +20,17 @@ android {
         versionName "1.0"
     }
 
+    androidResources {
+        def xmlFlags = [
+            'android.security.app_lock_apis=false',
+            'com.android.launcher3.enable_widget_picker_blur=false',
+            'com.android.launcher3.show_files_on_home_screen=false',
+            'com.android.server.ui_latency_stats.ui_latency_stats_service=false',
+            'com.android.window.flags.grant_manage_key_gestures_to_recents=false'
+        ].join(',')
+        additionalParameters += ['--feature-flags', xmlFlags]
+    }
+
     // The flavor dimensions for build variants (e.g. aospWithQuickstep, aospWithoutQuickstep)
     // See: https://developer.android.com/studio/build/build-variants#flavor-dimensions
     flavorDimensions += ["app", "recents"]
