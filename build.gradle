@@ -1,4 +1,6 @@
 import com.android.build.gradle.api.AndroidBasePlugin
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias libs.plugins.android.application
@@ -56,7 +58,7 @@ android {
     sourceSets {
         main {
             res.srcDirs = ['res']
-            java.srcDirs = ['src', 'src_plugins']
+            java.srcDirs = ['src', 'src_plugins', 'dagger/src']
             manifest.srcFile 'AndroidManifest-common.xml'
             proto {
                 srcDirs = ['protos/', 'protos_overrides/']
@@ -100,13 +102,16 @@ android {
         }
 
         withoutQuickstep {
-            java.srcDirs = ['src_ui_overrides']
+            java.srcDirs = ['src_no_quickstep']
         }
 
         withQuickstep {
-            res.srcDirs = ['quickstep/res', 'quickstep/recents_ui_overrides/res']
-            java.srcDirs = ['quickstep/src', 'quickstep/recents_ui_overrides/src']
+            res.srcDirs = ['quickstep/res']
+            java.srcDirs = ['quickstep/src', 'quickstep/dagger']
             manifest.srcFile "quickstep/AndroidManifest.xml"
+            proto {
+                srcDirs = ['quickstep/protos_overrides/']
+            }
         }
     }
 }
@@ -132,18 +137,24 @@ allprojects {
                 checkReleaseBuilds false
             }
             compileOptions {
-                sourceCompatibility JavaVersion.VERSION_1_8
-                targetCompatibility JavaVersion.VERSION_1_8
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+
+        tasks.withType(KotlinCompile).configureEach {
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_17)
+                freeCompilerArgs.add("-Xjvm-default=all")
             }
         }
     }
 
     plugins.withId('com.google.protobuf') {
-        def protocVersion = '4.36.0'
         protobuf {
             // Configure the protoc executable
             protoc {
-                artifact = "com.google.protobuf:protoc:${protocVersion}"
+                artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
             }
             generateProtoTasks {
                 all().configureEach { task ->
@@ -157,24 +168,22 @@ allprojects {
             }
         }
         dependencies {
-            implementation "com.google.protobuf:protobuf-javalite:$protocVersion"
-        }
-    }
-
-    configurations.configureEach {
-        resolutionStrategy.eachDependency {
-            if ("${requested.group}:${requested.name}" == "androidx.core:core") {
-                useVersion("1.15.0")
-            }
+            implementation libs.protobuf.javalite
         }
     }
 }
 
 dependencies {
-    def ANDROID_X_VERSION = '1.4.0'
-    implementation "androidx.dynamicanimation:dynamicanimation:${ANDROID_X_VERSION}"
-    implementation "androidx.recyclerview:recyclerview:${ANDROID_X_VERSION}"
-    implementation "androidx.preference:preference:${ANDROID_X_VERSION}"
+    implementation libs.androidx.dynamicanimation
+    implementation libs.androidx.recyclerview
+    implementation libs.androidx.preference
+    implementation libs.androidx.cardview
+    implementation libs.androidx.constraintlayout
+    implementation libs.androidx.fragment
+    implementation libs.androidx.window
+    implementation libs.material
+    implementation libs.lottie
+
     implementation project(':IconLoader')
     withQuickstepImplementation project(':SharedLibWrapper')
 
@@ -183,6 +192,5 @@ dependencies {
 
     // Required for AOSP to compile. This is already included in the sysui_shared.jar
     withoutQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/libs", include: 'plugin_core.jar')
-
-    api 'com.airbnb.android:lottie:6.7.1'
 }
+
