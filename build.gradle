@@ -74,7 +74,7 @@ android {
     sourceSets {
         main {
             res.srcDirs = ['res']
-            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src']
+            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src', 'modules/concurrent/src']
             manifest.srcFile 'AndroidManifest-common.xml'
             proto {
                 srcDirs = ['protos/', 'protos_overrides/']
@@ -211,6 +211,7 @@ dependencies {
     implementation libs.dagger
     kapt libs.dagger.compiler
     implementation libs.kotlinx.coroutines.android
+    implementation libs.guava
 
     implementation project(':IconLoader')
     implementation project(':SharedLibWrapper')
