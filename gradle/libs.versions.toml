@@ -16,4 +16,4 @@ kotlinx-coroutines-android = "org.jetbrains.kotlinx:kotlinx-coroutines-android:1
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-protobuf = "com.google.protobuf:0.9.6"
+protobuf = "com.google.protobuf:0.10.0"
