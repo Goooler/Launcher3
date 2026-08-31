@@ -7,6 +7,7 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
+        mavenCentral()
         gradlePluginPortal()
     }
 }
@@ -28,7 +29,17 @@ dependencyResolutionManagement {
 include ':IconLoader'
 project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 
+include ':UserTypeLib'
+project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
+
+include ':AnimationLib'
+project(':AnimationLib').projectDir = new File(rootDir, 'systemui/animationlib')
+
+include ':WidgetPicker'
+project(':WidgetPicker').projectDir = new File(rootDir, 'modules/widgetpicker')
+
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'
 include ':NexusLauncher:Flags'
 include ':frameworks:base:packages:SystemUI:SystemUISharedFlags'
+

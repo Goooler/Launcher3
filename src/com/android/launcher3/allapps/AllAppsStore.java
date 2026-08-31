@@ -39,6 +39,7 @@ import com.android.launcher3.model.repository.AppsListRepository;
 import com.android.launcher3.popup.PopupContainer;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.views.ActivityContext;
 
 import kotlin.Unit;
 

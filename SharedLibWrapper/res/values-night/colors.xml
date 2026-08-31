@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    
-    <color name="home_screen_files_folder_icon_color">@color/system_primary_dark</color>
-<color name="materialColorBackground">@android:color/system_background_dark</color>
+<resources><color name="materialColorBackground">@android:color/system_background_dark</color>
     <color name="materialColorControlActivated">@android:color/system_control_activated_dark</color>
     <color name="materialColorControlHighlight">@android:color/system_control_highlight_dark</color>
     <color name="materialColorControlNormal">@android:color/system_control_normal_dark</color>
