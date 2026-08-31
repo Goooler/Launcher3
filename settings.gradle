@@ -28,7 +28,11 @@ dependencyResolutionManagement {
 include ':IconLoader'
 project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 
+include ':UserTypeLib'
+project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
+
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'
 include ':NexusLauncher:Flags'
 include ':frameworks:base:packages:SystemUI:SystemUISharedFlags'
+
