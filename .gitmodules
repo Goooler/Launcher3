@@ -2,3 +2,6 @@
 	path = systemui
 	url = https://android.googlesource.com/platform/frameworks/libs/systemui
 	branch = android-17.0.0_r1
+[submodule "aosp-android-jar"]
+	path = aosp-android-jar
+	url = https://github.com/Reginer/aosp-android-jar
