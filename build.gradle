@@ -30,7 +30,8 @@ android {
         ].join(',')
         additionalParameters += [
             '--feature-flags', xmlFlags,
-            '-I', "${rootDir}/aosp-android-jar/android-37/android.jar"
+            '-I', "${rootDir}/aosp-android-jar/android-37/android.jar",
+            '--auto-add-overlay'
         ]
     }
 
@@ -209,8 +210,7 @@ dependencies {
     implementation libs.lottie
 
     implementation project(':IconLoader')
-    implementation project(':DynamicColors')
-    withQuickstepImplementation project(':SharedLibWrapper')
+    implementation project(':SharedLibWrapper')
 
     // Recents lib dependency
     withQuickstepImplementation fileTree(dir: "${FRAMEWORK_PREBUILTS_DIR}/quickstep/libs", include: 'sysui_shared.jar')

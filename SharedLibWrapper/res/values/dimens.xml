@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="floating_dismiss_icon_size">24dp</dimen>
+    <dimen name="floating_dismiss_background_size">64dp</dimen>
+    <dimen name="desktop_windowing_freeform_rounded_corner_radius">16dp</dimen>
+</resources>
