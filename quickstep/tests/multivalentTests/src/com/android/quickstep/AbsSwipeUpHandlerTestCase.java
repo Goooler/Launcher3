@@ -59,8 +59,6 @@ import android.content.res.Configuration;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Bundle;
-import android.os.SystemClock;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.RemoteAnimationTarget;
@@ -68,21 +66,24 @@ import android.view.SurfaceControl;
 import android.view.ViewTreeObserver;
 
 import androidx.annotation.NonNull;
-import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.annotation.UiThread;
 
 import com.android.app.displaylib.fakes.FakePerDisplayRepository;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StatefulContainer;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.ImmediateAnimator;
 import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.SandboxApplication;
 import com.android.launcher3.util.SystemUiController;
+import com.android.launcher3.util.ThreadedAnimator;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ContextInitListener;
 import com.android.quickstep.util.MotionPauseDetector;
@@ -94,6 +95,9 @@ import com.android.systemui.shared.system.InputConsumerController;
 import com.android.wm.shell.shared.split.SplitBounds;
 
 import com.google.android.msdl.data.model.MSDLToken;
+
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -300,10 +304,6 @@ public abstract class AbsSwipeUpHandlerTestCase<
         when(mActivityInterface.prepareRecentsUI(anyBoolean(), any()))
                 .thenReturn(mAnimationFactory);
         doReturn(recentsContainer).when(mActivityInterface).getCreatedContainer();
-        doAnswer(answer -> {
-            answer.<Runnable>getArgument(0).run();
-            return this;
-        }).when(recentsContainer).runOnBindToTouchInteractionService(any());
 
         mStateManager = spy(new StateManager<>(recentsContainer, getBaseState()));
 
@@ -327,6 +327,20 @@ public abstract class AbsSwipeUpHandlerTestCase<
         runOnMainSync(() -> {
             verify(mContextInitListener)
                     .unregister(eq("AbsSwipeUpHandler.onRecentsAnimationCanceled"));
+            assertTrue(swipeHandler.mStateCallback.hasStates(
+                    STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED));
+        });
+    }
+
+    @Test
+    public void testOnRecentsAnimationStartTimedOut_unregistersActivityInitListener() {
+        SWIPE_HANDLER swipeHandler = createSwipeHandler();
+
+        swipeHandler.onRecentsAnimationStartTimedOut();
+
+        runOnMainSync(() -> {
+            verify(mContextInitListener)
+                    .unregister(eq("AbsSwipeUpHandler.onRecentsAnimationStartTimedOut"));
             assertTrue(swipeHandler.mStateCallback.hasStates(
                     STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED));
         });
@@ -413,6 +427,21 @@ public abstract class AbsSwipeUpHandlerTestCase<
     }
 
     @Test
+    public void testOnRecentsAnimationStartTimedOut_midQuickSwitch_launchesCorrectTask() {
+        SWIPE_HANDLER swipeHandler = createSwipeHandler();
+
+        when(mGestureState.getEndTarget()).thenReturn(GestureState.GestureEndTarget.NEW_TASK);
+
+        swipeHandler.onActivityInit(/* alreadyOnHome= */ false);
+        swipeHandler.onRecentsAnimationStartTimedOut();
+
+        runOnMainSync(() -> {
+            verify(mCurrentPageTaskView, never()).launchWithoutAnimation(anyBoolean(), any());
+            verify(mNextPageTaskView).launchWithoutAnimation(anyBoolean(), any());
+        });
+    }
+
+    @Test
     public void testHomeGesture_finishesRecentsAnimationController() {
         createSwipeUpHandlerForGesture(GestureState.GestureEndTarget.HOME);
 
@@ -436,35 +465,22 @@ public abstract class AbsSwipeUpHandlerTestCase<
     }
 
     @Test
-    @EnableFlags({com.android.window.flags.Flags.FLAG_ENABLE_REJECT_HOME_TRANSITION})
-    public void getHomeTarget_onSecondaryDisplay_withFlagEnabled() {
+    public void getHomeTarget_onSecondaryDisplay() {
         mDisplayId = DEFAULT_DISPLAY + 1; // Simulate a secondary display
         SWIPE_HANDLER handler = createSwipeHandler();
 
         GestureState.GestureEndTarget target = handler.getHomeTarget();
-        assertEquals("Expected REJECT_HOME on secondary display when reject home is enabled",
+        assertEquals("Expected REJECT_HOME on secondary display",
                 GestureState.GestureEndTarget.REJECT_HOME, target);
     }
 
     @Test
-    @EnableFlags({com.android.window.flags.Flags.FLAG_ENABLE_REJECT_HOME_TRANSITION})
-    public void getHomeTarget_onDefaultDisplay_withFlagEnabled() {
+    public void getHomeTarget_onDefaultDisplay() {
         mDisplayId = DEFAULT_DISPLAY;
         SWIPE_HANDLER handler = createSwipeHandler();
 
         GestureState.GestureEndTarget target = handler.getHomeTarget();
         assertEquals("Expected HOME on default display",
-                GestureState.GestureEndTarget.HOME, target);
-    }
-
-    @Test
-    @DisableFlags({com.android.window.flags.Flags.FLAG_ENABLE_REJECT_HOME_TRANSITION})
-    public void getHomeTarget_onSecondaryDisplay_withFlagDisabled() {
-        mDisplayId = DEFAULT_DISPLAY + 1; // Simulate a secondary display
-        SWIPE_HANDLER handler = createSwipeHandler();
-
-        GestureState.GestureEndTarget target = handler.getHomeTarget();
-        assertEquals("Expected HOME on secondary display when reject home is disabled",
                 GestureState.GestureEndTarget.HOME, target);
     }
 
@@ -481,9 +497,10 @@ public abstract class AbsSwipeUpHandlerTestCase<
     @Test
     public void testHomeGesture_invalidatesHandlerAfterParallelAnim() {
         ValueAnimator parallelAnim = new ValueAnimator();
+        ThreadedAnimator threadedAnimator = new ImmediateAnimator(parallelAnim);
         parallelAnim.setRepeatCount(ValueAnimator.INFINITE);
         when(mActivityInterface.getParallelAnimationToGestureEndTarget(any(), anyLong(), any()))
-                .thenReturn(parallelAnim);
+                .thenReturn(threadedAnimator);
         SWIPE_HANDLER handler = createSwipeUpHandlerForGesture(GestureState.GestureEndTarget.HOME);
         runOnMainSync(() -> {
             parallelAnim.start();
@@ -517,7 +534,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
     }
 
     @Test
-    @EnableFlags(com.android.launcher3.Flags.FLAG_MSDL_FEEDBACK)
+    @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
     public void onMotionPauseDetected_playsSwipeThresholdToken() {
         SWIPE_HANDLER handler = createSwipeHandler();
         MotionPauseDetector.OnMotionPauseListener listener = handler.getMotionPauseListener();
@@ -540,15 +557,15 @@ public abstract class AbsSwipeUpHandlerTestCase<
         verify(container)
                 .addEventCallback(eq(EVENT_DESTROYED), onContainerDestroyCallbackCaptor.capture());
 
-        assertNotNull(swipeHandler.mRecentsView);
-        assertNotNull(swipeHandler.mContainer);
-
-        onContainerDestroyCallbackCaptor.getValue().run();
-
-        assertNull(swipeHandler.mRecentsView);
-        assertNull(swipeHandler.mContainer);
-        verify(mTaskAnimationManager).onLauncherDestroyed();
         runOnMainSync(() -> {
+            assertNotNull(swipeHandler.mRecentsView);
+            assertNotNull(swipeHandler.mContainer);
+
+            onContainerDestroyCallbackCaptor.getValue().run();
+
+            assertNull(swipeHandler.mRecentsView);
+            assertNull(swipeHandler.mContainer);
+            verify(mTaskAnimationManager).onLauncherDestroyed();
             verify(mContextInitListener).unregister(any());
             assertTrue(
                     "Swipe handler wasn't invalidated on container destroyed",
@@ -562,33 +579,6 @@ public abstract class AbsSwipeUpHandlerTestCase<
         // AbsSwipeUpHandler.mContainer are null
         createSwipeUpHandlerForGesture(
                 GestureState.GestureEndTarget.HOME, /* triggerOnActivityInit= */ false);
-    }
-
-    @Test
-    public void testWindowAnimationToHome_setsAndResetsTaskViewClickableState_whenSuccessful() {
-        SWIPE_HANDLER swipeHandler = createSwipeHandler();
-        ArgumentCaptor<Runnable> callbackCaptor = ArgumentCaptor.forClass(Runnable.class);
-
-        // Call onActivityInit to set RecentsView
-        swipeHandler.onActivityInit(/* isHomeStarted= */ false);
-
-        AnimationSuccessListener listener = swipeHandler.getWindowAnimationToHomeListener();
-
-        runOnMainSync(() -> {
-            listener.onAnimationStart(new AnimatorSet());
-
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(false));
-            verify(mCurrentPageTaskView, never()).setClickable(eq(true));
-
-            listener.onAnimationEnd(new AnimatorSet());
-
-            verify(getRecentsView()).post(callbackCaptor.capture());
-
-            callbackCaptor.getValue().run();
-
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(false));
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(true));
-        });
     }
 
     @Test
@@ -615,63 +605,12 @@ public abstract class AbsSwipeUpHandlerTestCase<
     }
 
     @Test
-    public void testWindowAnimationToHome_setsAndResetsTaskViewClickableState_whenCanceled() {
-        SWIPE_HANDLER swipeHandler = createSwipeHandler();
-        ArgumentCaptor<Runnable> callbackCaptor = ArgumentCaptor.forClass(Runnable.class);
-
-        // Call onActivityInit to set RecentsView
-        swipeHandler.onActivityInit(/* isHomeStarted= */ false);
-
-        AnimationSuccessListener listener = swipeHandler.getWindowAnimationToHomeListener();
-
-        runOnMainSync(() -> {
-            listener.onAnimationStart(new AnimatorSet());
-
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(false));
-            verify(mCurrentPageTaskView, never()).setClickable(eq(true));
-
-            listener.onAnimationCancel(new AnimatorSet());
-            listener.onAnimationEnd(new AnimatorSet());
-
-            verify(getRecentsView()).post(callbackCaptor.capture());
-
-            callbackCaptor.getValue().run();
-
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(false));
-            verify(mCurrentPageTaskView, times(1)).setClickable(eq(true));
-        });
-    }
-
-    @Test
-    public void testWindowAnimationToHome_neverSetsTaskViewClickableState_ifNeverStarted() {
-        SWIPE_HANDLER swipeHandler = createSwipeHandler();
-        ArgumentCaptor<Runnable> callbackCaptor = ArgumentCaptor.forClass(Runnable.class);
-
-        // Call onActivityInit to set RecentsView
-        swipeHandler.onActivityInit(/* isHomeStarted= */ false);
-
-        AnimationSuccessListener listener = swipeHandler.getWindowAnimationToHomeListener();
-
-        runOnMainSync(() -> {
-            listener.onAnimationEnd(new AnimatorSet());
-
-            verify(getRecentsView()).post(callbackCaptor.capture());
-
-            callbackCaptor.getValue().run();
-
-            verify(mCurrentPageTaskView, never()).setClickable(eq(false));
-            verify(mCurrentPageTaskView, never()).setClickable(eq(true));
-        });
-    }
-
-    @Test
     public void test3ButtonMode_shouldUpdateBackgroundAlphaForRunningTask_UpdatesBackgroundAlpha() {
         SWIPE_HANDLER swipeHandler = createSwipeHandler();
         when(mDeviceState.isFullyGesturalNavMode()).thenReturn(false);
         when(mGestureState.isTrackpadGesture()).thenReturn(false);
         when(getRecentsView().getPagedViewOrientedState()).thenReturn(
-                new RecentsOrientedState(mContext, swipeHandler.mContainerInterface, (r) -> {
-                }));
+                new RecentsOrientedState(mContext, swipeHandler.mContainerInterface));
         when(getRecentsView().shouldUpdateRunningTaskAlpha()).thenReturn(true);
         swipeHandler.onActivityInit(/*isHomeStarted= */ true);
         swipeHandler.onGestureStarted(/*isLikelyToStartNewTask =*/ true);
@@ -691,8 +630,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
         when(mDeviceState.isFullyGesturalNavMode()).thenReturn(false);
         when(mGestureState.isTrackpadGesture()).thenReturn(false);
         when(getRecentsView().getPagedViewOrientedState()).thenReturn(
-                new RecentsOrientedState(mContext, swipeHandler.mContainerInterface, (r) -> {
-                }));
+                new RecentsOrientedState(mContext, swipeHandler.mContainerInterface));
         when(getRecentsView().shouldUpdateRunningTaskAlpha()).thenReturn(false);
         swipeHandler.onActivityInit(/*isHomeStarted= */ true);
         swipeHandler.onGestureStarted(/*isLikelyToStartNewTask =*/ true);
@@ -706,11 +644,94 @@ public abstract class AbsSwipeUpHandlerTestCase<
         verify(getRecentsView(), never()).moveRunningTaskToExpectedPosition();
     }
 
+    @Test
+    public void testDeferLifecycleOnDestroyFlags_cleanedUp_OnSwipeHandlerInvalidated() {
+        SWIPE_HANDLER handler = createSwipeHandler();
+
+        assertEquals(
+                /* message= */ "AbsSwipeUpHandler.mDeferLifecycleOnDestroyFlags was not initialized"
+                        + " properly",
+                /* expected= */ AbsSwipeUpHandler.HANDLER_VALID,
+                /* actual= */ handler.mDeferLifecycleOnDestroyFlags);
+
+        runOnMainSync(() -> handler.mStateCallback.setState(STATE_HANDLER_INVALIDATED));
+
+        assertEquals(
+                /* message= */ "State flag NOT_INVALIDATED was not cleaned up from "
+                        + "AbsSwipeUpHandler.mDeferLifecycleOnDestroyFlags on invalidate",
+                /* expected= */ 0,
+                /* actual= */ handler.mDeferLifecycleOnDestroyFlags);
+    }
+
+    @Test
+    public void testDeferLifecycleOnDestroyFlags_cleanedUp_afterLaunchWithoutAnimationCallback() {
+        SWIPE_HANDLER handler = createSwipeHandler();
+        ArgumentCaptor<Function1<Boolean, Unit>> callbackCaptor =
+                ArgumentCaptor.forClass(Function1.class);
+
+        handler.startNewTask(mNextPageTaskView, unused -> {});
+        verify(mNextPageTaskView).launchWithoutAnimation(anyBoolean(), callbackCaptor.capture());
+
+        assertEquals(
+                /* message= */ "AbsSwipeUpHandler.mDeferLifecycleOnDestroyFlags not initialized "
+                        + "properly",
+                /* expected= */ AbsSwipeUpHandler.HANDLER_VALID
+                        | AbsSwipeUpHandler.LAUNCH_WITHOUT_ANIMATION_CALLBACK_PENDING,
+                /* actual= */ handler.mDeferLifecycleOnDestroyFlags);
+
+        runOnMainSync(() -> handler.mStateCallback.setState(STATE_HANDLER_INVALIDATED));
+
+        assertEquals(
+                /* message= */ "State flag NOT_INVALIDATED was not cleaned up from "
+                        + "AbsSwipeUpHandler.mDeferLifecycleOnDestroyFlags on invalidate",
+                /* expected= */ AbsSwipeUpHandler.LAUNCH_WITHOUT_ANIMATION_CALLBACK_PENDING,
+                /* actual= */ handler.mDeferLifecycleOnDestroyFlags);
+
+        callbackCaptor.getValue().invoke(true);
+
+        assertEquals(
+                /* message= */ "State flag LAUNCH_WITHOUT_ANIMATION_CALLBACK_PENDING was not "
+                        + "cleaned up from AbsSwipeUpHandler.mDeferLifecycleOnDestroyFlags on "
+                        + "launchWithoutAnimation callback",
+                /* expected= */ 0,
+                /* actual= */ handler.mDeferLifecycleOnDestroyFlags);
+    }
+
+    @Test
+    public void testContainerDestroyed_stillCallsInvalidateHandlerWithLauncher() {
+        SWIPE_HANDLER swipeHandler = createSwipeHandler();
+        RECENTS_VIEW recentsView = getRecentsView();
+
+        // Call onActivityInit to set RecentsView and set STATE_LAUNCHER_PRESENT
+        swipeHandler.onActivityInit(/* isHomeStarted= */ false);
+
+        runOnMainSync(() -> {
+            onContainerDestroyed();
+
+            verify(recentsView).onGestureAnimationEnd();
+            verify(recentsView).removeOnScrollChangedListener(any());
+        });
+    }
+
+    @Test
+    public void testTaskViewOnlyInteractiveInOverviewState() {
+        for (STATE_TYPE state : getAllStates()) {
+            if (state == getOverviewState()) {
+                assertTrue("Overview state does not allow interactive TaskViews: state=" + state,
+                        state.isTaskViewInteractive());
+            } else {
+                assertFalse("Non-overview state allows interactive TaskViews: state=" + state,
+                        state.isTaskViewInteractive());
+            }
+        }
+    }
+
     /**
      * Verifies that RecentsAnimationController#finish() is called, and captures and runs any
      * callback that was passed to it. This ensures that STATE_CURRENT_TASK_FINISHED is correctly
      * set for example.
      */
+    @UiThread
     private void verifyRecentsAnimationFinishedAndCallCallback() {
         ArgumentCaptor<Runnable> finishCallback = ArgumentCaptor.forClass(Runnable.class);
         // Check if the 2 parameter method is called.
@@ -741,7 +762,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
         when(mGestureState.getEndTarget()).thenReturn(endTarget);
         when(mGestureState.isRecentsAnimationRunning()).thenReturn(isQuickSwitch);
 
-        SWIPE_HANDLER swipeHandler = createSwipeHandler(SystemClock.uptimeMillis(), isQuickSwitch);
+        SWIPE_HANDLER swipeHandler = createSwipeHandler(isQuickSwitch);
 
         if (triggerOnActivityInit) {
             swipeHandler.onActivityInit(/* alreadyOnHome= */ false);
@@ -753,8 +774,8 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
         float xVelocityPxPerMs = isQuickSwitch ? 100 : 0;
         float yVelocityPxPerMs = isQuickSwitch ? 0 : -100;
-        swipeHandler.onGestureEnded(
-                yVelocityPxPerMs, new PointF(xVelocityPxPerMs, yVelocityPxPerMs), isQuickSwitch);
+        runOnMainSync(() -> swipeHandler.onGestureEnded(
+                yVelocityPxPerMs, new PointF(xVelocityPxPerMs, yVelocityPxPerMs), isQuickSwitch));
         swipeHandler.onCalculateEndTarget();
         runOnMainSync(swipeHandler::onSettledOnEndTarget);
 
@@ -773,6 +794,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
                 remoteAnimationTargets, /* transitionInfo= */ null));
     }
 
+    @UiThread
     private void onContainerDestroyed() {
         RECENTS_CONTAINER container = getRecentsContainer();
         ArgumentCaptor<Runnable> onContainerDestroyCallbackCaptor =
@@ -785,9 +807,8 @@ public abstract class AbsSwipeUpHandlerTestCase<
     }
 
     protected static void runOnMainSync(Runnable runnable) {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(runnable);
         try {
-            Executors.MAIN_EXECUTOR.submit(() -> null).get();
+            Executors.MAIN_EXECUTOR.submit(runnable).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
@@ -795,12 +816,20 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
     @NonNull
     private SWIPE_HANDLER createSwipeHandler() {
-        return createSwipeHandler(SystemClock.uptimeMillis(), false);
+        return createSwipeHandler(false);
     }
 
     @NonNull
-    protected abstract SWIPE_HANDLER createSwipeHandler(
-            long touchTimeMs, boolean continuingLastGesture);
+    private SWIPE_HANDLER createSwipeHandler(boolean continuingLastGesture) {
+        try {
+            return Executors.MAIN_EXECUTOR.submit(
+                    () -> createSwipeHandlerInternal(continuingLastGesture)).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @NonNull
+    protected abstract SWIPE_HANDLER createSwipeHandlerInternal(boolean continuingLastGesture);
 
     @NonNull
     protected abstract RECENTS_CONTAINER getRecentsContainer();
@@ -810,6 +839,12 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
     @NonNull
     protected abstract STATE_TYPE getBaseState();
+
+    @NonNull
+    protected abstract STATE_TYPE[] getAllStates();
+
+    @NonNull
+    protected abstract STATE_TYPE getOverviewState();
 
     protected TopTaskTracker.CachedTaskInfo getTaskInfo() {
         return new TopTaskTracker.CachedTaskInfo(

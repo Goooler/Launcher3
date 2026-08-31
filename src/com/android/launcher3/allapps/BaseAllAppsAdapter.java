@@ -43,6 +43,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
+import com.android.launcher3.touch.CustomActionsListener;
 import com.android.launcher3.views.ActivityContext;
 
 /**
@@ -138,7 +139,19 @@ public abstract class BaseAllAppsAdapter
          * Returns true if the items represent the same object
          */
         public boolean isSameAs(AdapterItem other) {
-            return (other.viewType == viewType) && (other.getClass() == getClass());
+            if (other == null || other.viewType != viewType || other.getClass() != getClass()) {
+                return false;
+            }
+            if (viewType == VIEW_TYPE_ICON || viewType == VIEW_TYPE_PRIVATE_SPACE_APP_ICON) {
+                if (itemInfo == null || other.itemInfo == null) {
+                    return itemInfo == other.itemInfo;
+                }
+                // Both itemInfo and other.itemInfo are non-null here
+                return java.util.Objects.equals(itemInfo.user, other.itemInfo.user)
+                        && java.util.Objects.equals(itemInfo.getTargetComponent(),
+                                other.itemInfo.getTargetComponent());
+            }
+            return true;
         }
 
         /**
@@ -171,6 +184,7 @@ public abstract class BaseAllAppsAdapter
     protected final LayoutInflater mLayoutInflater;
     protected final OnClickListener mOnIconClickListener;
     protected final OnLongClickListener mOnIconLongClickListener;
+    protected final CustomActionsListener mIconCustomActionsListener;
     protected OnFocusChangeListener mIconFocusListener;
 
     public BaseAllAppsAdapter(ActivityContext activityContext, LayoutInflater inflater,
@@ -181,6 +195,7 @@ public abstract class BaseAllAppsAdapter
 
         mOnIconClickListener = mActivityContext.getItemOnClickListener();
         mOnIconLongClickListener = mActivityContext.getAllAppsItemLongClickListener();
+        mIconCustomActionsListener = mActivityContext.getAllAppsItemCustomActionsListener();
 
         mAdapterProvider = adapterProvider;
     }
@@ -350,6 +365,7 @@ public abstract class BaseAllAppsAdapter
         icon.setOnFocusChangeListener(mIconFocusListener);
         icon.setOnClickListener(mOnIconClickListener);
         icon.setOnLongClickListener(mOnIconLongClickListener);
+        icon.setCustomActionsListener(mIconCustomActionsListener);
         // Ensure the all apps icon height matches the workspace icons in portrait mode.
         icon.getLayoutParams().height =
                 mActivityContext.getDeviceProfile().getAllAppsProfile().getCellHeightPx();

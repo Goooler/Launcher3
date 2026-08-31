@@ -44,8 +44,8 @@
     <dimen name="task_thumbnail_icon_drawable_size">44dp</dimen>
     <!--  The splash icon size on in Overview when a task is settled in the list -->
     <dimen name="task_thumbnail_splash_icon_size">52dp</dimen>
-    <!--  The border width shown when task is hovered  -->
-    <dimen name="task_hover_border_width">4dp</dimen>
+    <!--  The lock icon size in Overview when a task belongs to a locked package -->
+    <dimen name="task_thumbnail_app_lock_icon_size">36dp</dimen>
     <!--  The space under the focused task icon  -->
     <dimen name="overview_task_margin">16dp</dimen>
     <!--  The horizontal space between tasks  -->
@@ -97,7 +97,8 @@
     <dimen name="task_thumbnail_header_icon_size">18dp</dimen>
     <dimen name="task_header_close_button_size">20dp</dimen>
     <dimen name="task_thumbnail_header_close_button_hit_rect_size">48dp</dimen>
-    <dimen name="task_thumbnail_header_round_corner_radius">16dp</dimen>
+    <dimen name="task_thumbnail_header_round_corner_radius">
+        @dimen/desktop_windowing_freeform_rounded_corner_radius</dimen>
     <!-- The size for non-overlapping layout in desktop tile -->
     <dimen name="desktop_vertical_padding_between_tasks">24dp</dimen>
     <dimen name="desktop_horizontal_padding_between_tasks">24dp</dimen>
@@ -107,6 +108,8 @@
     <dimen name="desktop_bottom_margin_multi_rows">24dp</dimen>
     <dimen name="desktop_left_right_margin_multi_rows">24dp</dimen>
     <dimen name="desktop_min_task_width">72dp</dimen>
+    <dimen name="task_hover_focus_border_width">3dp</dimen>
+    <dimen name="task_hover_focus_offset_size">2dp</dimen>
     <integer name="desktop_layout_max_rows">5</integer>
     <!-- The length of the fading edge (gradient) of the task header title -->
     <dimen name="task_header_title_fading_edge_length">28dp</dimen>
@@ -161,6 +164,9 @@
     <dimen name="motion_pause_detector_speed_trackpad_somewhat_fast">0.7dp</dimen>
     <dimen name="motion_pause_detector_speed_fast">1.4dp</dimen>
     <dimen name="motion_pause_detector_min_displacement_from_app">36dp</dimen>
+    <!-- Note: gesture_nav_window_attach_threshold must always be greater than 0, and smaller than
+               motion_pause_detector_min_displacement_from_app  -->
+    <dimen name="gesture_nav_window_attach_threshold">35.99dp</dimen>
     <dimen name="quickstep_fling_threshold_speed">0.5dp</dimen>
 
     <!-- Launcher app transition -->
@@ -170,7 +176,11 @@
     <dimen name="quick_switch_scaling_scroll_threshold">100dp</dimen>
 
     <dimen name="recents_empty_message_text_size">14sp</dimen>
-    <dimen name="recents_empty_message_text_padding">16dp</dimen>
+    <dimen name="recents_empty_message_text_padding">32dp</dimen>
+    <dimen name="recents_empty_message_drawable_padding">16dp</dimen>
+    <dimen name="recents_empty_message_icon_size">60dp</dimen>
+    <dimen name="recents_empty_message_background_size">190dp</dimen>
+    <dimen name="recents_empty_message_background_size_large">288dp</dimen>
 
     <dimen name="max_shadow_radius">0dp</dimen>
 
@@ -427,6 +437,8 @@
     <dimen name="taskbar_minimized_app_indicator_width">6dp</dimen>
     <dimen name="taskbar_line_indicator_width_spring">20dp</dimen>
     <dimen name="taskbar_app_translate_y_spring">4dp</dimen>
+    <!-- This should be set to a value larger than all possible drop targets, including abstract floating views and bubbles-->
+    <dimen name="taskbar_dragged_icon_elevation">5dp</dimen>
 
     <!-- Transient taskbar -->
     <dimen name="transient_taskbar_padding">12dp</dimen>
@@ -442,6 +454,8 @@
     <dimen name="taskbar_tooltip_vertical_padding">8dp</dimen>
     <dimen name="taskbar_tooltip_horizontal_padding">16dp</dimen>
     <dimen name="taskbar_tooltip_y_offset">4dp</dimen>
+    <dimen name="persistent_taskbar_icon_size">44dp</dimen>
+    <dimen name="transient_taskbar_icon_size">57dp</dimen>
 
     <!-- An additional touch slop to prevent x-axis movement during the swipe up to show taskbar -->
     <dimen name="transient_taskbar_clamped_offset_bound">16dp</dimen>
@@ -466,10 +480,18 @@
 
     <!--  Taskbar 3 button spacing  -->
     <dimen name="taskbar_button_space_inbetween">24dp</dimen>
+    <!-- This is half of taskbar_button_space_inbetween -->
+    <dimen name="taskbar_nav_button_space_inbetween">12dp</dimen>
     <dimen name="taskbar_button_space_inbetween_phone">40dp</dimen>
     <dimen name="taskbar_button_margin_split">48dp</dimen>
     <dimen name="taskbar_button_margin_6_5">75dp</dimen>
     <dimen name="taskbar_button_margin_default">48dp</dimen>
+
+    <!--  Taskbar contextual button group pill  -->
+    <dimen name="taskbar_contextual_group_padding_start">12dp</dimen>
+    <dimen name="taskbar_contextual_group_padding_end">10dp</dimen>
+    <dimen name="taskbar_contextual_group_padding_top">10dp</dimen>
+    <dimen name="taskbar_contextual_group_padding_bottom">12dp</dimen>
 
     <!-- Taskbar education tooltip -->
     <dimen name="taskbar_edu_tooltip_elevation">14dp</dimen>
@@ -498,9 +520,6 @@
     <!--- The minimum insets size for the IME to be considered docked. -->
     <dimen name="ime_docked_threshold">80dp</dimen>
 
-    <!-- Recents overview -->
-    <dimen name="recents_filter_icon_size">30dp</dimen>
-
     <!-- Bubble bar -->
     <dimen name="bubblebar_size">72dp</dimen>
     <dimen name="bubblebar_stashed_handle_width">55dp</dimen>
@@ -528,8 +547,10 @@
     <dimen name="bubblebar_icon_overlap">12dp</dimen>
     <dimen name="bubblebar_icon_spacing">6dp</dimen>
     <dimen name="bubblebar_icon_spacing_large">8dp</dimen>
-    <dimen name="bubblebar_icon_spacing_persistent_taskbar">@dimen/bubblebar_icon_spacing</dimen>
+    <dimen name="bubblebar_icon_spacing_persistent_taskbar">10dp</dimen>
     <dimen name="bubblebar_expanded_icon_spacing">12dp</dimen>
+    <dimen name="bubblebar_expanded_icon_spacing_persistent_taskbar">20dp</dimen>
+    <dimen name="bubblebar_background_margin_persistent_taskbar">4dp</dimen>
     <dimen name="bubblebar_icon_elevation">1dp</dimen>
     <dimen name="bubblebar_transient_taskbar_min_distance">12dp</dimen>
 
@@ -538,6 +559,7 @@
     <dimen name="bubblebar_dismiss_target_small_size">60dp</dimen>
     <dimen name="bubblebar_dismiss_target_icon_size">@dimen/floating_dismiss_icon_size</dimen>
     <dimen name="bubblebar_dismiss_target_bottom_margin">60dp</dimen>
+    <dimen name="bubblebar_dismiss_target_bottom_margin_above_bubble_bar">120dp</dimen>
     <dimen name="bubblebar_dismiss_floating_gradient_height">548dp</dimen>
     <dimen name="bubblebar_dismiss_zone_width">192dp</dimen>
     <dimen name="bubblebar_dismiss_zone_height">242dp</dimen>

@@ -25,6 +25,7 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.content.res.Resources
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -34,6 +35,8 @@ import com.android.launcher3.pm.InstallSessionTracker
 import com.android.launcher3.pm.PackageInstallInfo
 import com.android.launcher3.pm.PackageInstallInfo.Companion.STATUS_INSTALLED
 import com.android.launcher3.qsb.OSEManager.Companion.OVERLAY_ACTION
+import com.android.launcher3.qsb.OSEManager.OSEInfo
+import com.android.launcher3.testutil.rule.LazyInitRule.Companion.lazyRule
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
 import com.android.launcher3.util.SafeCloseable
 import com.android.launcher3.util.SandboxApplication
@@ -67,8 +70,10 @@ import org.mockito.kotlin.whenever
 class OSEManagerTest {
 
     @get:Rule val mockitoRule = MockitoJUnit.rule()
+    @get:Rule val contextRule = lazyRule { spy(SandboxApplication()) }
 
-    val context = spy(SandboxApplication())
+    private val context: SandboxApplication by contextRule
+
     private val settingsObserver: SecureStringObserver = mock()
     private val installSessionHelper: InstallSessionHelper = mock()
     private lateinit var launcherApps: LauncherApps
@@ -81,7 +86,8 @@ class OSEManagerTest {
         OSEManager(context, settingsObserver, installSessionHelper, UI_HELPER_EXECUTOR)
     }
     val sessionTrackerCaptor = argumentCaptor<OSEManager.SessionTrackerCallback>()
-    val res = spy(context.resources)
+    private lateinit var res: Resources
+
     lateinit var listenableRefClosable: SafeCloseable
     val mockCallback: (OSEManager.OSEInfo) -> Unit = mock()
 
@@ -94,6 +100,7 @@ class OSEManagerTest {
 
     @Before
     fun setUp() {
+        res = spy(context.resources)
         doReturn(res).whenever(context).resources
         searchManager = context.spyService(SearchManager::class.java)
         doReturn(BING_PKG).whenever(componentName).packageName
@@ -120,12 +127,28 @@ class OSEManagerTest {
     }
 
     @Test
-    fun testOsePkgIsNull() {
+    fun testOseSettingsIsNull() {
         doReturn(null).whenever(settingsObserver).getValue()
 
         TestUtil.runOnExecutorSync(UI_HELPER_EXECUTOR) { oseManager.reloadOse() }
 
         assertThat(oseManager.oseInfo.value.pkg).isEqualTo(BING_PKG)
+        verifyNoInteractions(installSessionHelper)
+    }
+
+    @Test
+    fun testOseSettingsIsNull_defaultSearchPackageDisabled() {
+        doReturn(null).whenever(settingsObserver).getValue()
+        val appInfoDisabled = ApplicationInfo()
+        appInfoDisabled.enabled = false
+        launcherApps = context.spyService(LauncherApps::class.java)
+        doReturn(appInfoDisabled)
+            .whenever(launcherApps)
+            .getApplicationInfo(eq(BING_PKG), anyInt(), eq(Process.myUserHandle()))
+
+        TestUtil.runOnExecutorSync(UI_HELPER_EXECUTOR) { oseManager.reloadOse() }
+
+        assertThat(oseManager.oseInfo.value.pkg).isEqualTo(null)
         verifyNoInteractions(installSessionHelper)
     }
 
@@ -385,6 +408,21 @@ class OSEManagerTest {
             .isEqualTo(oseManager.oseInfo.value.pkg)
         assertThat(oseManager.oseInfo.value.installPending).isTrue()
         assertThat(oseManager.tracker).isEqualTo(tracker3)
+    }
+
+    @Test
+    fun oseInfo_compares_overlay() {
+        val base = OSEInfo(pkg = GOOGLE_PACKAGE)
+        assertThat(base.overlayPackage).isEqualTo(GOOGLE_PACKAGE)
+        assertThat(base.isDifferentFrom(OSEInfo(pkg = BING_PKG))).isTrue()
+
+        val other =
+            OSEInfo(
+                pkg = GOOGLE_PACKAGE,
+                overlayTarget = ActivityInfo().apply { packageName = GOOGLE_PACKAGE },
+            )
+        assertThat(other.overlayPackage).isEqualTo(GOOGLE_PACKAGE)
+        assertThat(base.isDifferentFrom(other)).isTrue()
     }
 
     private fun mockResolverInfo(pkg: String) =

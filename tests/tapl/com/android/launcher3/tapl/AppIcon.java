@@ -16,7 +16,6 @@
 
 package com.android.launcher3.tapl;
 
-
 import android.graphics.Point;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -26,6 +25,7 @@ import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.UiObject2;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.testing.shared.TestProtocol;
 
 import java.util.regex.Pattern;
@@ -97,9 +97,22 @@ public abstract class AppIcon extends Launchable {
      * Long-clicks the icon to open its menu, and looks at the deep shortcuts container only.
      */
     public AppIconMenu openDeepShortcutMenu() {
-        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
-            return createMenu(mLauncher.clickAndGet(
-                    mObject, /* resName= */ "deep_shortcuts_container", getLongClickEvent()));
+        if (Flags.expandableLongPressMenu()) {
+            try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
+                final UiObject2 popupContainer = mLauncher
+                        .clickAndGet(mObject, "popup_container", getLongClickEvent());
+                final UiObject2 expandAppShortcuts = popupContainer.findObject(
+                        By.text("Shortcuts"));
+                if (expandAppShortcuts != null) {
+                    expandAppShortcuts.click();
+                }
+
+                return createMenu(
+                        mLauncher.waitForLauncherObject(TestProtocol.DEEP_SHORTCUTS_CONTAINER));
+            }
+        } else {
+            return createMenu(mLauncher.clickAndGet(mObject,
+                    /* resName= */ TestProtocol.DEEP_SHORTCUTS_CONTAINER, getLongClickEvent()));
         }
     }
 

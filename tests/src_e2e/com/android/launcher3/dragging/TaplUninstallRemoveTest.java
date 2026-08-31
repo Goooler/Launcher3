@@ -25,6 +25,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import android.graphics.Point;
 import android.platform.test.annotations.PlatinumTest;
+import android.platform.test.rule.SkipOnDesktop;
 import android.view.View;
 
 import com.android.launcher3.Launcher;
@@ -32,8 +33,6 @@ import com.android.launcher3.tapl.HomeAllApps;
 import com.android.launcher3.tapl.HomeAppIcon;
 import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.util.TestUtil;
-import com.android.launcher3.util.Wait;
-import com.android.launcher3.util.rule.ScreenRecordRule;
 import com.android.launcher3.util.ui.AbstractLauncherUiTest;
 import com.android.launcher3.util.ui.PortraitLandscapeRunner.PortraitLandscape;
 
@@ -46,6 +45,7 @@ import java.util.Arrays;
  * Test runs in Out of process (Oop) and In process (Ipc)
  * Test the behaviour of uninstalling and removing apps both from AllApps, Workspace and Hotseat.
  */
+@SkipOnDesktop  // There is no hotseat and remove/uninstall drop targets on desktop.
 public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher, View> {
 
     /**
@@ -66,8 +66,8 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher, Vi
 
     private void verifyAppUninstalledFromAllApps(Workspace workspace, String appName) {
         final HomeAllApps allApps = workspace.switchToAllApps();
-        Wait.atMost(appName + " app was found on all apps after being uninstalled",
-                () -> allApps.tryGetAppIcon(appName) == null, mLauncher);
+        mLauncher.waitForCondition(appName + " app was found on all apps after being uninstalled",
+                TestUtil.DEFAULT_UI_TIMEOUT, () -> allApps.tryGetAppIcon(appName) == null);
     }
 
     private void installDummyAppAndWaitForUIUpdate() throws IOException {
@@ -127,7 +127,6 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher, Vi
      */
     @Test
     @PlatinumTest(focusArea = "launcher")
-    @ScreenRecordRule.ScreenRecord // TODO(b/425692064): remove when closing bug
     public void uninstallWorkspaceIcon() throws IOException {
         Point[] gridPositions = TestUtil.getCornersAndCenterPositions(mLauncher);
         StringBuilder sb = new StringBuilder();

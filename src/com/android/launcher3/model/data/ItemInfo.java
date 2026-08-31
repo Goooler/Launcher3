@@ -17,10 +17,10 @@
 package com.android.launcher3.model.data;
 
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
-import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SETTINGS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SHORTCUTS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_TASKSWITCHER;
@@ -30,6 +30,8 @@ import static com.android.launcher3.LauncherSettings.Favorites.EXTENDED_CONTAINE
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FILE;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FOLDER;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_TASK;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.CONTAINER_NOT_SET;
 import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
@@ -94,7 +96,7 @@ public class ItemInfo {
      * One of {@link Favorites#ITEM_TYPE_APPLICATION},
      * {@link Favorites#ITEM_TYPE_DEEP_SHORTCUT}
      * {@link Favorites#ITEM_TYPE_FOLDER},
-     * {@link Favorites#ITEM_TYPE_APP_PAIR},
+     * {@link Favorites#ITEM_TYPE_APP_GROUP},
      * {@link Favorites#ITEM_TYPE_APPWIDGET} or
      * {@link Favorites#ITEM_TYPE_CUSTOM_APPWIDGET}.
      * {@link Favorites#ITEM_TYPE_TASK}.
@@ -442,6 +444,12 @@ public class ItemInfo {
                                         .setComponentName(component.flattenToShortString())
                                         .setIndex(screenId))
                                 .orElse(LauncherAtom.Task.newBuilder()));
+                break;
+            case ITEM_TYPE_FILE_SYSTEM_FILE:
+                itemBuilder.addItemAttributes(Attribute.FILE_SYSTEM_FILE_ITEM);
+                break;
+            case ITEM_TYPE_FILE_SYSTEM_FOLDER:
+                itemBuilder.addItemAttributes(Attribute.FILE_SYSTEM_FOLDER_ITEM);
                 break;
             default:
                 break;

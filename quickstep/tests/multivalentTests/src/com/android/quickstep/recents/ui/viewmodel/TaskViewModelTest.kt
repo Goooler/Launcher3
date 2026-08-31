@@ -16,6 +16,8 @@
 
 package com.android.quickstep.recents.ui.viewmodel
 
+import android.content.ComponentName
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ShapeDrawable
@@ -26,15 +28,20 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT
 import com.android.launcher3.util.SystemUiController.FLAG_LIGHT_NAV
 import com.android.launcher3.util.SystemUiController.FLAG_LIGHT_STATUS
-import com.android.launcher3.util.TestDispatcherProvider
 import com.android.quickstep.recents.data.FakeRecentsRotationStateRepository
+import com.android.quickstep.recents.domain.model.TaskLayoutConfig
+import com.android.quickstep.recents.domain.model.TaskLayoutState.DesktopTaskLayoutState
 import com.android.quickstep.recents.domain.model.TaskModel
+import com.android.quickstep.recents.domain.model.TaskPosition
+import com.android.quickstep.recents.domain.usecase.GetDesktopTaskLayoutStateUseCase
 import com.android.quickstep.recents.domain.usecase.GetSysUiStatusNavFlagsUseCase
 import com.android.quickstep.recents.domain.usecase.GetTaskUseCase
 import com.android.quickstep.recents.domain.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.domain.usecase.IsThumbnailValidUseCase
 import com.android.quickstep.recents.viewmodel.RecentsViewData
 import com.android.quickstep.views.TaskViewType
+import com.android.systemui.shared.recents.model.Task
+import com.android.systemui.shared.recents.model.Task.*
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.wm.shell.shared.split.SplitBounds
 import com.android.wm.shell.shared.split.SplitScreenConstants
@@ -52,8 +59,10 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
+import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
@@ -68,6 +77,7 @@ class TaskViewModelTest {
     private val getThumbnailPositionUseCase = mock<GetThumbnailPositionUseCase>()
     private val isThumbnailValidUseCase =
         spy(IsThumbnailValidUseCase(FakeRecentsRotationStateRepository()))
+    private val getDesktopTaskLayoutStateUseCase = mock<GetDesktopTaskLayoutStateUseCase>()
     private lateinit var sut: TaskViewModel
 
     @Before
@@ -78,6 +88,8 @@ class TaskViewModelTest {
         whenever(getTaskUseCase.invoke(TASK_MODEL_3.id)).thenReturn(flow { emit(TASK_MODEL_3) })
         whenever(getTaskUseCase.invoke(TASK_MODEL_MINIMIZED.id))
             .thenReturn(flow { emit(TASK_MODEL_MINIMIZED) })
+        whenever(getTaskUseCase.invoke(TASK_MODEL_APP_LOCKED.id))
+            .thenReturn(flow { emit(TASK_MODEL_APP_LOCKED) })
         whenever(getTaskUseCase.invoke(INVALID_TASK_ID)).thenReturn(flow { emit(null) })
         recentsViewData.runningTaskIds.value = emptySet()
     }
@@ -115,7 +127,8 @@ class TaskViewModelTest {
                         getSysUiStatusNavFlagsUseCase = GetSysUiStatusNavFlagsUseCase(),
                         isThumbnailValidUseCase = isThumbnailValidUseCase,
                         getThumbnailPositionUseCase = getThumbnailPositionUseCase,
-                        dispatcherProvider = TestDispatcherProvider(unconfinedTestDispatcher),
+                        getDesktopTaskLayoutStateUseCase = getDesktopTaskLayoutStateUseCase,
+                        lightweightBackgroundDispatcher = unconfinedTestDispatcher,
                     )
                 sut.bind(type, TASK_MODEL_1.id)
                 assertThat(sut.state.first().hasHeader).isEqualTo(expectedResult)
@@ -351,6 +364,28 @@ class TaskViewModelTest {
         }
 
     @Test
+    fun isAppLocked_when_TaskIsAppLocked() =
+        testScope.runTest {
+            sut.bind(TaskViewType.SINGLE, TASK_MODEL_APP_LOCKED.id)
+
+            val state = sut.state.first()
+            val taskData = state.tasks.first() as TaskData.Data
+
+            assertThat(taskData.isAppLocked).isTrue()
+        }
+
+    @Test
+    fun isNotAppLocked_when_TaskIsNotAppLocked() =
+        testScope.runTest {
+            sut.bind(TaskViewType.SINGLE, TASK_MODEL_1.id)
+
+            val state = sut.state.first()
+            val taskData = state.tasks.first() as TaskData.Data
+
+            assertThat(taskData.isAppLocked).isFalse()
+        }
+
+    @Test
     fun shouldShowSplash_calls_useCase() {
         val splitBounds =
             SplitBounds(
@@ -379,6 +414,94 @@ class TaskViewModelTest {
             )
     }
 
+    @Test
+    fun updateTasksLayouts_desktopConfig_delegatesToUseCase() {
+        val tasks = emptyList<Task>()
+        val layoutConfig = TEST_LAYOUT_CONFIG
+        val expectedResult = emptyMap<Int, DesktopTaskLayoutState>()
+        whenever(getDesktopTaskLayoutStateUseCase(eq(tasks), eq(layoutConfig), any(), isNull()))
+            .thenReturn(expectedResult)
+
+        sut.updateTasksLayouts(tasks, layoutConfig)
+
+        verify(getDesktopTaskLayoutStateUseCase)
+            .invoke(eq(tasks), eq(layoutConfig), any(), isNull())
+        assertThat(sut.taskLayoutStateMap).isEqualTo(expectedResult)
+    }
+
+    @Test
+    fun updateTasksLayouts_dismissedTaskId_delegatesToUseCase() {
+        val tasks = emptyList<Task>()
+        val layoutConfig = TEST_LAYOUT_CONFIG
+        val expectedResult = emptyMap<Int, DesktopTaskLayoutState>()
+        whenever(getDesktopTaskLayoutStateUseCase(eq(tasks), eq(layoutConfig), any(), isNull()))
+            .thenReturn(expectedResult)
+        val dismissedTaskId = -1
+
+        sut.updateTasksLayouts(tasks, layoutConfig, dismissedTaskId)
+
+        verify(getDesktopTaskLayoutStateUseCase)
+            .invoke(eq(tasks), eq(layoutConfig), any(), eq(dismissedTaskId))
+        assertThat(sut.taskLayoutStateMap).isEqualTo(expectedResult)
+    }
+
+    @Test
+    fun updateTasksLayouts_withOldTaskLayoutStateMap_delegatesToUseCase() {
+        val tasks = listOf(createTask(NEW_TASK_ID_1, NEW_TASK_BOUNDS_1))
+        val layoutConfig = TEST_LAYOUT_CONFIG
+        val expectedResult =
+            mapOf(
+                NEW_TASK_ID_1 to
+                    DesktopTaskLayoutState(
+                        fullscreenPosition = TaskPosition.Hidden(NEW_TASK_ID_1),
+                        overviewPosition = TaskPosition.Hidden(NEW_TASK_ID_1),
+                    )
+            )
+        whenever(getDesktopTaskLayoutStateUseCase(eq(tasks), eq(layoutConfig), any(), isNull()))
+            .thenReturn(expectedResult)
+
+        val oldTaskLayoutState =
+            mapOf(
+                NEW_TASK_ID_1 to
+                    DesktopTaskLayoutState(
+                        fullscreenPosition = TaskPosition.Hidden(NEW_TASK_ID_1),
+                        overviewPosition = TaskPosition.Rendered(NEW_TASK_ID_1, NEW_TASK_BOUNDS_1),
+                    )
+            )
+        sut.taskLayoutStateMap = oldTaskLayoutState
+
+        sut.updateTasksLayouts(tasks, layoutConfig)
+
+        val expectedOldOverviewPositions =
+            mapOf(NEW_TASK_ID_1 to TaskPosition.Rendered(NEW_TASK_ID_1, NEW_TASK_BOUNDS_1))
+        verify(getDesktopTaskLayoutStateUseCase)
+            .invoke(eq(tasks), eq(layoutConfig), eq(expectedOldOverviewPositions), isNull())
+        assertThat(sut.taskLayoutStateMap).isEqualTo(expectedResult)
+    }
+
+    private fun createTask(
+        id: Int,
+        appBounds: Rect?,
+        isMinimized: Boolean = false,
+        isActivityStackTransparent: Boolean = false,
+        windowingMode: Int = 0,
+    ) =
+        Task().apply {
+            key =
+                TaskKey(
+                    id,
+                    windowingMode,
+                    Intent(),
+                    ComponentName("", ""),
+                    /* userId */ 0,
+                    /* lastActiveTime */ 0,
+                )
+            this.appBounds = appBounds
+            this.key.numActivities = 1
+            this.key.isActivityStackTransparent = isActivityStackTransparent
+            this.isMinimized = isMinimized
+        }
+
     private fun TaskModel.toUiState(isLiveTile: Boolean = false) =
         TaskData.Data(
             taskId = id,
@@ -391,6 +514,7 @@ class TaskViewModelTest {
             isLocked = isLocked,
             isLiveTile = isLiveTile,
             remainingAppTimerDuration = remainingAppDuration,
+            isAppLocked = isAppLocked,
         )
 
     private fun createTaskViewModel() =
@@ -400,10 +524,25 @@ class TaskViewModelTest {
             getSysUiStatusNavFlagsUseCase = GetSysUiStatusNavFlagsUseCase(),
             isThumbnailValidUseCase = isThumbnailValidUseCase,
             getThumbnailPositionUseCase = getThumbnailPositionUseCase,
-            dispatcherProvider = TestDispatcherProvider(unconfinedTestDispatcher),
+            getDesktopTaskLayoutStateUseCase = getDesktopTaskLayoutStateUseCase,
+            lightweightBackgroundDispatcher = unconfinedTestDispatcher,
         )
 
     private companion object {
+        private val TEST_LAYOUT_CONFIG =
+            TaskLayoutConfig.DesktopLayoutConfig(
+                desktopBounds = Rect(0, 0, 1000, 2000),
+                topBottomMarginOneRow = 20,
+                topMarginMultiRows = 20,
+                bottomMarginMultiRows = 20,
+                leftRightMarginOneRow = 20,
+                leftRightMarginMultiRows = 20,
+                horizontalPaddingBetweenTasks = 10,
+                verticalPaddingBetweenTasks = 10,
+                minTaskWidth = 100,
+                maxRows = 4,
+            )
+
         const val PACKAGE_NAME = "com.test"
         const val INVALID_TASK_ID = -1
         const val FLAGS_APPEARANCE_LIGHT_THEME = FLAG_LIGHT_STATUS or FLAG_LIGHT_NAV
@@ -425,6 +564,7 @@ class TaskViewModelTest {
                 isLocked = false,
                 isMinimized = false,
                 remainingAppDuration = Duration.ofMillis(30),
+                isAppLocked = false,
             )
         val TASK_MODEL_2 =
             TaskModel(
@@ -438,6 +578,7 @@ class TaskViewModelTest {
                 isLocked = true,
                 isMinimized = false,
                 remainingAppDuration = Duration.ofHours(5).plusMinutes(2),
+                isAppLocked = false,
             )
         val TASK_MODEL_3 =
             TaskModel(
@@ -451,6 +592,7 @@ class TaskViewModelTest {
                 isLocked = false,
                 isMinimized = false,
                 remainingAppDuration = null,
+                isAppLocked = false,
             )
         val TASK_MODEL_MINIMIZED =
             TaskModel(
@@ -464,6 +606,24 @@ class TaskViewModelTest {
                 isLocked = false,
                 isMinimized = true,
                 remainingAppDuration = null,
+                isAppLocked = false,
             )
+        val TASK_MODEL_APP_LOCKED =
+            TaskModel(
+                5,
+                PACKAGE_NAME,
+                "Title 5",
+                "Content Description 5",
+                ShapeDrawable(),
+                ThumbnailData(appearance = APPEARANCE_LIGHT_THEME),
+                Color.GREEN,
+                isLocked = false,
+                isMinimized = false,
+                remainingAppDuration = null,
+                isAppLocked = true,
+            )
+
+        const val NEW_TASK_ID_1 = 1
+        val NEW_TASK_BOUNDS_1 = Rect(0, 0, 1, 1)
     }
 }

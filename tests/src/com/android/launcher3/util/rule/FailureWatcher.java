@@ -64,8 +64,10 @@ public class FailureWatcher extends TestWatcher {
             @Override
             public void evaluate() throws Throwable {
                 try {
+                    mLauncher.setEnableRegisterEventNotFromTest(true);
                     FailureWatcher.super.apply(base, description).evaluate();
                 } finally {
+                    mLauncher.setEnableRegisterEventNotFromTest(false);
                     // Detect touch events coming from physical screen.
                     if (mLauncher.hadNontestEvents()) {
                         throw new AssertionError(
@@ -99,6 +101,14 @@ public class FailureWatcher extends TestWatcher {
     /** Action executed when an error condition is expected. Saves artifacts. */
     private static void onErrorImpl(LauncherInstrumentation launcher, Description description,
             boolean skipBugreport) {
+        // 1. Handle bugreport first. This is saved only once per test run.
+        if (!sSavedBugreport && !skipBugreport) {
+            dumpCommand("bugreportz -s", diagFile(description, "Bugreport", "zip"));
+            // Not saving bugreport for each failure for time and space economy.
+            sSavedBugreport = true;
+        }
+
+        // 2. Handle other artifacts (screenshot, hierarchy). These are saved once per test.
         if (description.equals(sDescriptionForLastSavedArtifacts)) {
             // This test has already saved its artifacts.
             return;
@@ -134,13 +144,6 @@ public class FailureWatcher extends TestWatcher {
             device.dumpWindowHierarchy(diagFile(description, "AccessibilityHierarchy", "uix"));
         } catch (IOException ex) {
             Log.e(TAG, "Failed to save accessibility hierarchy", ex);
-        }
-
-        // Dump bugreport
-        if (!sSavedBugreport && !skipBugreport) {
-            dumpCommand("bugreportz -s", diagFile(description, "Bugreport", "zip"));
-            // Not saving bugreport for each failure for time and space economy.
-            sSavedBugreport = true;
         }
     }
 

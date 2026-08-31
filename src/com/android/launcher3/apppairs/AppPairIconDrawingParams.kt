@@ -73,7 +73,7 @@ class AppPairIconDrawingParams(val context: Context, container: Int) {
         val dp = activity.deviceProfile
         iconSize =
             if (container == DISPLAY_FOLDER) dp.folderProfile.childIconSizePx
-            else dp.workspaceIconProfile.iconSizePx
+            else dp.workspaceProfile.iconSizePx
         standardIconPadding = iconSize * STANDARD_ICON_PADDING
         outerPadding = iconSize * OUTER_PADDING_SCALE
         backgroundSize = iconSize * STANDARD_ICON_SHRINK - (outerPadding * 2)
@@ -88,7 +88,7 @@ class AppPairIconDrawingParams(val context: Context, container: Int) {
 
     /** Checks the device orientation and updates isLeftRightSplit accordingly. */
     fun updateOrientation(dp: DeviceProfile) {
-        isLeftRightSplit = dp.isLeftRightSplit
+        isLeftRightSplit = dp.sysuiProfile.isLeftRightSplit
     }
 
     fun updateBgColor(container: Int) {

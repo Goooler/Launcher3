@@ -16,34 +16,69 @@
  */
 package com.android.launcher3.taskbar
 
+import com.android.launcher3.BubbleTextView
 import com.android.launcher3.model.data.ItemInfo
 
 /**
  * Controller of the container that contains the overflown pinned apps which don't fit in the main
  * taskbar. This is activated by toggling the overflow icon on the taskbar.
  */
-class OverflownAppsContainerController(private val activityContext: TaskbarActivityContext) {
+class OverflownAppsContainerController(
+    private val activityContext: TaskbarActivityContext,
+    private val runningAppStateController: TaskbarRunningAppStateAnimationController,
+) {
     private var overflownAppsViewController: OverflownAppsViewController? = null
     private lateinit var viewCallbacks: TaskbarViewCallbacks
+    private lateinit var onClosedCallback: Runnable
+    val overflownApps: List<BubbleTextView>
+        get() = overflownAppsViewController?.overflownApps ?: emptyList()
 
     fun init(callbacks: TaskbarViewCallbacks) {
         viewCallbacks = callbacks
+        onClosedCallback = Runnable { viewCallbacks.onOverflownAppsContainerClosed() }
     }
 
-    fun toggleOverflownAppsView(
+    fun toggleOverflownAppsView(overflowIcon: TaskbarOverflowView) {
+        toggleOverflownAppsView(overflowIcon, overflowIcon.overflowInfoList)
+    }
+
+    fun toggleOverflownAppsView(overflowIcon: TaskbarOverflowView, overflownApps: List<ItemInfo>) {
+        if (overflownAppsViewController != null) {
+            closeOverflownAppsView()
+            return
+        }
+
+        openOverflownAppsView(overflowIcon, overflownApps)
+    }
+
+    fun openOverflownAppsView(overflowIcon: TaskbarOverflowView) {
+        openOverflownAppsView(overflowIcon, overflowIcon.overflowInfoList)
+    }
+
+    private fun openOverflownAppsView(
         overflowIcon: TaskbarOverflowView,
         overflownApps: List<ItemInfo>,
-        onClosed: Runnable,
     ) {
-        overflownAppsViewController?.let {
-            return it.close(true)
+        if (overflownAppsViewController != null) {
+            return
         }
 
         overflownAppsViewController =
-            OverflownAppsViewController(activityContext, viewCallbacks, overflowIcon) {
+            OverflownAppsViewController(
+                activityContext,
+                runningAppStateController,
+                viewCallbacks,
+                overflowIcon,
+            ) {
                 overflownAppsViewController = null
-                onClosed.run()
+                onClosedCallback.run()
             }
         overflownAppsViewController?.show(overflownApps)
     }
+
+    fun closeOverflownAppsView() {
+        overflownAppsViewController?.close(true)
+    }
+
+    fun isOpen(): Boolean = overflownAppsViewController != null
 }

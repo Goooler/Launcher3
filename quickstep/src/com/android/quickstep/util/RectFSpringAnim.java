@@ -35,7 +35,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.DynamicResource;
-import com.android.quickstep.RemoteAnimationTargets.ReleaseCheck;
+import com.android.quickstep.SurfaceReleaseCheck;
 import com.android.systemui.plugins.ResourceProvider;
 
 import java.lang.annotation.Retention;
@@ -47,7 +47,7 @@ import java.util.List;
  * Applies spring forces to animate from a starting rect to a target rect,
  * while providing update callbacks to the caller.
  */
-public class RectFSpringAnim extends ReleaseCheck {
+public class RectFSpringAnim extends SurfaceReleaseCheck {
 
     private static final FloatPropertyCompat<RectFSpringAnim> RECT_CENTER_X =
             new FloatPropertyCompat<RectFSpringAnim>("rectCenterXSpring") {
@@ -236,38 +236,33 @@ public class RectFSpringAnim extends ReleaseCheck {
         yVelocityPxPerS = adjustVelocity(
                 yVelocityPxPerS, minVelocityYPxPerS, maxVelocityYPxPerS, fallOffFactor);
 
-        float stiffnessX = rp.getFloat(R.dimen.swipe_up_rect_x_stiffness);
-        float dampingX = rp.getFloat(R.dimen.swipe_up_rect_x_damping_ratio);
         mRectXSpring =
                 new SpringAnimation(this, RECT_CENTER_X)
                         .setSpring(
                                 new SpringForce(endX)
-                                        .setStiffness(stiffnessX)
-                                        .setDampingRatio(dampingX)
+                                        .setStiffness(mStiffnessX)
+                                        .setDampingRatio(mDampingX)
                         ).setStartValue(startX)
                         .setStartVelocity(xVelocityPxPerS)
                         .addEndListener(onXEndListener);
 
-        float stiffnessY = rp.getFloat(R.dimen.swipe_up_rect_y_stiffness);
-        float dampingY = rp.getFloat(R.dimen.swipe_up_rect_y_damping_ratio);
         mRectYSpring =
                 new SpringAnimation(this, RECT_Y)
                         .setSpring(
                                 new SpringForce(endY)
-                                        .setStiffness(stiffnessY)
-                                        .setDampingRatio(dampingY)
+                                        .setStiffness(mStiffnessY)
+                                        .setDampingRatio(mDampingY)
                         )
                         .setStartValue(startY)
                         .setStartVelocity(yVelocityPxPerS)
                         .addEndListener(onYEndListener);
 
-        float stiffnessZ = rp.getFloat(R.dimen.swipe_up_rect_scale_stiffness_v2);
         float dampingZ = rp.getFloat(R.dimen.swipe_up_rect_scale_damping_ratio_v2);
         mRectScaleAnim =
                 new SpringAnimation(this, RECT_SCALE_PROGRESS)
                         .setSpring(
                                 new SpringForce(1f)
-                                        .setStiffness(stiffnessZ)
+                                        .setStiffness(mRectStiffness)
                                         .setDampingRatio(dampingZ))
                         .setStartVelocity(velocityPxPerMs.y * minVisibleChange)
                         .setMaxValue(1f)
@@ -446,21 +441,14 @@ public class RectFSpringAnim extends ReleaseCheck {
 
             ResourceProvider rp = DynamicResource.provider(context);
             tracking = getDefaultTracking(deviceProfile);
-            stiffnessX = rp.getFloat(R.dimen.swipe_up_rect_xy_stiffness);
-            stiffnessY = rp.getFloat(R.dimen.swipe_up_rect_xy_stiffness);
-            dampingX = rp.getFloat(R.dimen.swipe_up_rect_xy_damping_ratio);
-            dampingY = rp.getFloat(R.dimen.swipe_up_rect_xy_damping_ratio);
+            stiffnessX = rp.getFloat(R.dimen.swipe_up_rect_x_stiffness);
+            stiffnessY = rp.getFloat(R.dimen.swipe_up_rect_y_stiffness);
+            dampingX = rp.getFloat(R.dimen.swipe_up_rect_x_damping_ratio);
+            dampingY = rp.getFloat(R.dimen.swipe_up_rect_y_damping_ratio);
+            rectStiffness = rp.getFloat(R.dimen.swipe_up_rect_scale_stiffness_v2);
 
             this.startRect = startRect;
             this.targetRect = targetRect;
-
-            // Increase the stiffness for devices where we want the window size to transform
-            // quicker.
-            boolean shouldUseHigherStiffness = deviceProfile != null
-                    && (deviceProfile.getDeviceProperties().isLandscape() || deviceProfile.getDeviceProperties().isTablet());
-            rectStiffness = shouldUseHigherStiffness
-                    ? rp.getFloat(R.dimen.swipe_up_rect_scale_higher_stiffness)
-                    : rp.getFloat(R.dimen.swipe_up_rect_scale_stiffness);
         }
 
         private @Tracking int getDefaultTracking(@Nullable DeviceProfile deviceProfile) {
@@ -471,7 +459,7 @@ public class RectFSpringAnim extends ReleaseCheck {
                         : TRACKING_TOP;
             } else {
                 int heightPx = deviceProfile.getDeviceProperties().getHeightPx();
-                Rect padding = deviceProfile.mWorkspaceProfile.getWorkspacePadding();
+                Rect padding = deviceProfile.getWorkspaceProfile().getWorkspacePadding();
 
                 final float topThreshold = heightPx / 3f;
                 final float bottomThreshold = deviceProfile.getDeviceProperties().getHeightPx() - padding.bottom;
@@ -489,20 +477,27 @@ public class RectFSpringAnim extends ReleaseCheck {
     }
 
     /**
+     * Spring configuration parameters for widgets.
+     */
+    public static class WidgetSpringConfig extends DefaultSpringConfig {
+        public WidgetSpringConfig(Context context, DeviceProfile deviceProfile,
+                RectF startRect, RectF targetRect) {
+            super(context, deviceProfile, startRect, targetRect);
+            ResourceProvider rp = DynamicResource.provider(context);
+            stiffnessX = rp.getFloat(R.dimen.widget_x_stiffness);
+            stiffnessY = rp.getFloat(R.dimen.widget_y_stiffness);
+            rectStiffness = rp.getFloat(R.dimen.widget_rect_scale_stiffness);
+        }
+    }
+
+    /**
      * Spring configuration parameters for Taskbar/Hotseat items on devices that have a taskbar.
      */
-    public static class TaskbarHotseatSpringConfig extends SpringConfig {
-
-        public TaskbarHotseatSpringConfig(Context context, RectF start, RectF target) {
-            super(context, start, target);
-
-            ResourceProvider rp = DynamicResource.provider(context);
+    public static class TaskbarHotseatSpringConfig extends DefaultSpringConfig {
+        public TaskbarHotseatSpringConfig(Context context, DeviceProfile deviceProfile,
+                RectF start, RectF target) {
+            super(context, deviceProfile, start, target);
             tracking = TRACKING_CENTER;
-            stiffnessX = rp.getFloat(R.dimen.taskbar_swipe_up_rect_x_stiffness);
-            stiffnessY = rp.getFloat(R.dimen.taskbar_swipe_up_rect_y_stiffness);
-            dampingX = rp.getFloat(R.dimen.taskbar_swipe_up_rect_x_damping);
-            dampingY = rp.getFloat(R.dimen.taskbar_swipe_up_rect_y_damping);
-            rectStiffness = rp.getFloat(R.dimen.taskbar_swipe_up_rect_scale_stiffness);
         }
     }
 

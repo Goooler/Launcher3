@@ -27,7 +27,6 @@ import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 
@@ -177,18 +176,10 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     }
 
     @Override
-    public void onViewRemoved(View child) {
-        super.onViewRemoved(child);
-        if (mControllerCallbacks != null) {
-            mControllerCallbacks.onDragLayerViewRemoved();
-        }
-    }
-
-    @Override
     protected void dispatchDraw(Canvas canvas) {
         if (mContainer.isDestroyed()) return;
         float backgroundHeight = mControllerCallbacks.getTaskbarBackgroundHeight()
-                * (1f - mTaskbarBackgroundOffset);
+                * Math.max(1f - mTaskbarBackgroundOffset, 0f);
         mBackgroundRenderer.setBackgroundHeight(backgroundHeight);
         mBackgroundRenderer.setBackgroundProgress(mTaskbarBackgroundProgress);
         mBackgroundRenderer.draw(canvas);
@@ -275,7 +266,11 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     /** Called while Taskbar window is focusable, e.g. when pressing back while a folder is open */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == ACTION_UP && event.getKeyCode() == KEYCODE_BACK) {
+        final boolean backEvent =
+                event.getAction() == ACTION_UP && event.getKeyCode() == KEYCODE_BACK;
+        final boolean escEvent = event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE && event.hasNoModifiers();
+        if (backEvent || escEvent) {
             AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mContainer);
             if (topView != null && topView.canHandleBack()) {
                 topView.onBackInvoked();

@@ -26,7 +26,6 @@ import android.view.WindowManager.LayoutParams.PRIVATE_FLAG_CONSUME_IME_INSETS
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.util.BaseContext
-import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Themes
 
 /**
@@ -35,13 +34,16 @@ import com.android.launcher3.util.Themes
  * <p>
  * Overlays have their own window and need a window context.
  */
-abstract class RecentsWindowContext(windowContext: Context, wallpaperColorHints: Int) :
+abstract class RecentsWindowContext(
+    windowContext: Context,
+    wallpaperColorHints: Int,
+    private val invariantDeviceProfile: InvariantDeviceProfile,
+) :
     BaseContext(
         base = windowContext,
         themeResId = Themes.getActivityThemeRes(windowContext, wallpaperColorHints),
         destroyOnDetach = false,
-    ),
-    DisplayController.DisplayInfoChangeListener {
+    ) {
 
     private var deviceProfile: DeviceProfile? = null
 
@@ -56,20 +58,10 @@ abstract class RecentsWindowContext(windowContext: Context, wallpaperColorHints:
 
     open fun onRootViewDispatchKeyEvent(event: KeyEvent?): Boolean = false
 
-    init {
-        DisplayController.INSTANCE.get(this).addChangeListener(this)
-    }
-
-    override fun destroy() {
-        super.destroy()
-        DisplayController.INSTANCE.get(this).removeChangeListener(this)
-    }
-
     fun initDeviceProfile() {
         deviceProfile =
-            if (displayId == Display.DEFAULT_DISPLAY)
-                InvariantDeviceProfile.INSTANCE[this].getDeviceProfile(this)
-            else InvariantDeviceProfile.INSTANCE[this].createDeviceProfileForSecondaryDisplay(this)
+            if (displayId == Display.DEFAULT_DISPLAY) invariantDeviceProfile.getDeviceProfile(this)
+            else invariantDeviceProfile.createDeviceProfileForSecondaryDisplay(this)
     }
 
     override fun getDeviceProfile(): DeviceProfile {

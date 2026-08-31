@@ -18,9 +18,6 @@ package com.android.launcher3.nonquickstep
 import androidx.test.filters.SmallTest
 import com.android.launcher3.AbstractDeviceProfileTest
 import com.android.launcher3.DeviceProfile
-import com.android.launcher3.Flags
-import com.android.launcher3.util.rule.setFlags
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -33,16 +30,11 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
 
     @Parameterized.Parameter lateinit var instance: TestCase
 
-    @Before
-    fun setUp() {
-        setFlagsRule.setFlags(false, Flags.FLAG_ONE_GRID_SPECS)
-    }
-
     @Test
     fun dumpPortraitGesture() {
         initializeDevice(instance.deviceName, isGestureMode = true, isLandscape = false)
         val dp = context.appComponent.idp.getDeviceProfile(context)
-        dp.isTaskbarPresentInApps = instance.isTaskbarPresentInApps
+        dp.updateIsTaskbarPresentInApps(instance.isTaskbarPresentInApps)
 
         assertDump(dp, instance.filename("Portrait"))
     }
@@ -51,7 +43,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
     fun dumpPortrait3Button() {
         initializeDevice(instance.deviceName, isGestureMode = false, isLandscape = false)
         val dp = context.appComponent.idp.getDeviceProfile(context)
-        dp.isTaskbarPresentInApps = instance.isTaskbarPresentInApps
+        dp.updateIsTaskbarPresentInApps(instance.isTaskbarPresentInApps)
 
         assertDump(dp, instance.filename("Portrait3Button"))
     }
@@ -60,7 +52,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
     fun dumpLandscapeGesture() {
         initializeDevice(instance.deviceName, isGestureMode = true, isLandscape = true)
         val dp = context.appComponent.idp.getDeviceProfile(context)
-        dp.isTaskbarPresentInApps = instance.isTaskbarPresentInApps
+        dp.updateIsTaskbarPresentInApps(instance.isTaskbarPresentInApps)
 
         val testName =
             if (instance.deviceName == "phone") {
@@ -75,7 +67,7 @@ class DeviceProfileDumpTest : AbstractDeviceProfileTest() {
     fun dumpLandscape3Button() {
         initializeDevice(instance.deviceName, isGestureMode = false, isLandscape = true)
         val dp = context.appComponent.idp.getDeviceProfile(context)
-        dp.isTaskbarPresentInApps = instance.isTaskbarPresentInApps
+        dp.updateIsTaskbarPresentInApps(instance.isTaskbarPresentInApps)
 
         val testName =
             if (instance.deviceName == "phone") {

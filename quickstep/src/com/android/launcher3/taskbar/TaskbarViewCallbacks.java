@@ -16,13 +16,16 @@
 
 package com.android.launcher3.taskbar;
 
-import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_LAUNCH_OMNI_SUCCESSFUL_META;
 import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW;
 
 import android.annotation.SuppressLint;
+import android.app.contextualsearch.ContextualSearchConfig;
+import android.app.contextualsearch.ContextualSearchManager;
 import android.content.Context;
+import android.graphics.Rect;
 import android.view.GestureDetector;
 import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
@@ -33,7 +36,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.jank.Cuj;
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.touch.CustomActionsListener;
+import com.android.quickstep.TopTaskTracker;
+import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
@@ -46,6 +55,8 @@ public class TaskbarViewCallbacks {
     private final TaskbarControllers mControllers;
     private final TaskbarView mTaskbarView;
     private final GestureDetector mGestureDetector;
+    private final Rect mTempRect = new Rect();
+    private final CustomActionsListener mCustomActionsListener;
 
     public TaskbarViewCallbacks(TaskbarActivityContext activity, TaskbarControllers controllers,
             TaskbarView taskbarView) {
@@ -53,10 +64,15 @@ public class TaskbarViewCallbacks {
         mControllers = controllers;
         mTaskbarView = taskbarView;
         mGestureDetector = new GestureDetector(activity, new TaskbarViewGestureListener());
+        mCustomActionsListener = new TaskbarCustomActionsListener(mActivity);
     }
 
     public View.OnClickListener getIconOnClickListener() {
         return mActivity.getItemOnClickListener();
+    }
+
+    public CustomActionsListener getIconCustomActionsListener() {
+        return mCustomActionsListener;
     }
 
     /** Trigger All Apps button click action. */
@@ -64,8 +80,7 @@ public class TaskbarViewCallbacks {
         InteractionJankMonitorWrapper.begin(v, Cuj.CUJ_LAUNCHER_OPEN_ALL_APPS,
                 /* tag= */ "TASKBAR_BUTTON");
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP);
-        if (mActivity.showLockedTaskbarOnHome()
-                || mActivity.showDesktopTaskbarForFreeformDisplay()) {
+        if (mActivity.showDesktopTaskbarForFreeformDisplay()) {
             // If the taskbar can be shown on the home screen, use mAllAppsToggler to toggle all
             // apps, which will toggle the launcher activity all apps when on home screen.
             // TODO(b/395913143): Reconsider this if a gap in taskbar all apps functionality that
@@ -79,11 +94,30 @@ public class TaskbarViewCallbacks {
     /** Trigger All Apps button long click action. */
     public void triggerAllAppsButtonLongClick() {
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS);
+
+        mTaskbarView.getAllAppsButtonContainer().getBoundsOnScreen(mTempRect);
+        ContextualSearchConfig config = new ContextualSearchConfig.Builder()
+                .setSourceBounds(mTempRect)
+                .setDisplayId(mActivity.getDisplayId())
+                .build();
+        boolean contextualSearchInvoked = new ContextualSearchInvoker(mActivity)
+                .show(ContextualSearchManager.ENTRYPOINT_LONG_PRESS_META, config);
+        if (contextualSearchInvoked) {
+            mActivity.toggleTaskbarStash();
+            String runningPackage = TopTaskTracker.INSTANCE.get(mActivity).getCachedTopTask(
+                            /* filterOnlyVisibleRecents= */ true,
+                            mActivity.getDisplayId())
+                    .getPackageName();
+            mActivity.getStatsLogManager()
+                .logger()
+                .withPackageName(runningPackage)
+                .log(LAUNCHER_LAUNCH_OMNI_SUCCESSFUL_META);
+        }
     }
 
     /** @return true if haptic feedback should occur when long pressing the all apps button. */
     public boolean isAllAppsButtonHapticFeedbackEnabled(Context context) {
-        return false;
+        return true;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -93,6 +127,7 @@ public class TaskbarViewCallbacks {
 
     public View.OnLongClickListener getTaskbarDividerLongClickListener() {
         return v -> {
+            TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onTaskbarItemLongClick");
             mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
             return true;
         };
@@ -121,9 +156,7 @@ public class TaskbarViewCallbacks {
 
     /** Callback invoked before Taskbar icons are laid out. */
     void onPreLayoutChildren() {
-        if (enableTaskbarPinning()) {
-            mControllers.taskbarViewController.updateTaskbarIconTranslationXForPinning();
-        }
+        mControllers.taskbarViewController.updateTaskbarIconTranslationXForPinning();
     }
 
     /**
@@ -173,7 +206,10 @@ public class TaskbarViewCallbacks {
 
     /** Returns on click listener for the taskbar overflow view. */
     public View.OnClickListener getRecentsOverflowOnClickListener() {
-        return v -> toggleKeyboardQuickSwitchView();
+        return v -> {
+            mActivity.collapseSysUiPanels();
+            toggleKeyboardQuickSwitchView();
+        };
     }
 
     /** Returns on long click listener for the taskbar overflow view. */
@@ -186,7 +222,10 @@ public class TaskbarViewCallbacks {
 
     /** Returns on click listener for the taskbar overflow view. */
     public View.OnClickListener getPinnedOverflowOnClickListener() {
-        return this::togglePinnedOverflowView;
+        return v -> {
+            mActivity.collapseSysUiPanels();
+            togglePinnedOverflowView(v);
+        };
     }
 
     /** Returns on long click listener for the taskbar overflow view. */
@@ -195,6 +234,10 @@ public class TaskbarViewCallbacks {
             togglePinnedOverflowView(v);
             return true;
         };
+    }
+
+    void updateDescriptionWithRunningState(BubbleTextView btv) {
+        mControllers.taskbarViewController.updateDescriptionWithRunningState(btv);
     }
 
     private void toggleKeyboardQuickSwitchView() {
@@ -219,25 +262,26 @@ public class TaskbarViewCallbacks {
     }
 
     private void togglePinnedOverflowView(View view) {
-        if (!(view instanceof TaskbarOverflowView overflowIcon)
+        if (!(view instanceof TaskbarOverflowView)
                 || mTaskbarView.getTaskbarPinnedOverflowView() == null) {
             return;
         }
-        mTaskbarView.getTaskbarPinnedOverflowView().setIsActive(
-                !mTaskbarView.getTaskbarPinnedOverflowView().getIsActive());
+        TaskbarOverflowView overflowView = (TaskbarOverflowView) view;
+        overflowView.setIsActive(!overflowView.getIsActive());
         mControllers.taskbarAutohideSuspendController
                 .updateFlag(FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW,
-                        mTaskbarView.getTaskbarPinnedOverflowView().getIsActive());
+                        overflowView.getIsActive());
         mControllers.taskbarViewController.getOverflownAppsContainerController()
-                .toggleOverflownAppsView(
-                        overflowIcon,
-                        mTaskbarView.getTaskbarPinnedOverflowView().getOverflowInfoList(),
-                        this::onOverflownAppsContainerClosed);
+                .toggleOverflownAppsView(overflowView);
     }
 
-    private void onOverflownAppsContainerClosed() {
-        if (mTaskbarView.getTaskbarPinnedOverflowView() != null) {
-            mTaskbarView.getTaskbarPinnedOverflowView().setIsActive(false);
+    protected void onOverflownAppsContainerClosed() {
+        TaskbarOverflowView overflowView = mTaskbarView.getTaskbarHotseatIconsContainer() != null
+                ? mTaskbarView.getTaskbarHotseatIconsContainer().getOverflowView()
+                : mTaskbarView.getTaskbarPinnedOverflowView();
+
+        if (overflowView != null) {
+            overflowView.setIsActive(false);
         }
         mControllers.taskbarAutohideSuspendController.updateFlag(
                 FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW, false);
@@ -263,6 +307,7 @@ public class TaskbarViewCallbacks {
 
         @Override
         public boolean onSingleTapUp(@NonNull MotionEvent event) {
+            mActivity.collapseSysUiPanels();
             return true;
         }
 

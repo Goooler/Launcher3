@@ -66,11 +66,6 @@ public final class FeatureFlags {
     public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(270395274,
             "FOLDABLE_SINGLE_PAGE", DISABLED, "Use a single page for the workspace");
 
-    // TODO(Block 12): Clean up flags
-    public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(270396680,
-            "ENABLE_MULTI_INSTANCE", DISABLED,
-            "Enables creation and filtering of multiple task instances in overview");
-
     // TODO(Block 13): Clean up flags
     public static final BooleanFlag ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING = getReleaseFlag(
             270391397, "ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING", DISABLED,
@@ -90,27 +85,6 @@ public final class FeatureFlags {
     public static final BooleanFlag INJECT_FALLBACK_APP_CORPUS_RESULTS = getReleaseFlag(270391706,
             "INJECT_FALLBACK_APP_CORPUS_RESULTS", DISABLED,
             "Inject fallback app corpus result when AiAi fails to return it.");
-
-    // TODO(Block 17): Clean up flags
-    // Aconfig migration complete for ENABLE_TASKBAR_PINNING.
-    private static final BooleanFlag ENABLE_TASKBAR_PINNING = getDebugFlag(296231746,
-            "ENABLE_TASKBAR_PINNING", DISABLED,
-            "Enables taskbar pinning to allow user to switch between transient and persistent "
-                    + "taskbar flavors");
-
-    public static boolean enableTaskbarPinning() {
-        return ENABLE_TASKBAR_PINNING.get() || Flags.enableTaskbarPinning();
-    }
-
-    // TODO(Block 20): Clean up flags
-    // Aconfig migration complete for ENABLE_HOME_TRANSITION_LISTENER.
-    public static final BooleanFlag ENABLE_HOME_TRANSITION_LISTENER = getDebugFlag(306053414,
-            "ENABLE_HOME_TRANSITION_LISTENER", DISABLED,
-            "Enables launcher to listen to all transitions that include home activity.");
-
-    public static boolean enableHomeTransitionListener() {
-        return ENABLE_HOME_TRANSITION_LISTENER.get() || Flags.enableHomeTransitionListener();
-    }
 
     // TODO(Block 21): Clean up flags
     public static final BooleanFlag ENABLE_APP_ICON_FOR_INLINE_SHORTCUTS = getDebugFlag(270395087,

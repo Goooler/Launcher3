@@ -16,12 +16,14 @@
 
 package com.android.launcher3.taskbar.handoff
 
-import android.companion.datatransfer.continuity.RemoteTask
+import android.companion.Flags.taskContinuity
 import android.companion.datatransfer.continuity.TaskContinuityManager
-import android.os.Handler
 import android.util.Log
+import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
 import com.android.launcher3.taskbar.TaskbarActivityContext
+import com.android.launcher3.taskbar.TaskbarControllers
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
+import com.android.launcher3.util.SafeCloseable
 import java.io.PrintWriter
 
 /**
@@ -31,67 +33,59 @@ import java.io.PrintWriter
  * (label and icon) for them. It also updates the suggestions in the UI when the metadata is loaded.
  */
 class TaskbarHandoffController(val taskbarActivityContext: TaskbarActivityContext) :
-    LoggableTaskbarController, TaskContinuityManager.RemoteTaskListener {
+    LoggableTaskbarController {
 
-    private var taskContinuityManager: TaskContinuityManager? = null
-    private val suggestionList = HandoffSuggestionList()
-    private val suggestionMetadataLoader =
-        HandoffSuggestionMetadataLoader(
-            taskbarActivityContext,
-            Handler(taskbarActivityContext.mainLooper),
-        )
+    private val handoffSuggestionRepository =
+        taskbarActivityContext.appComponent.handoffSuggestionRepository
+    private lateinit var taskbarControllers: TaskbarControllers
+    private var handoffSuggestionLauncher: HandoffSuggestionLauncher? = null
+    private var handoffRepositoryListener: SafeCloseable? = null
 
     /** A list of currently active Handoff suggestions. */
-    public val suggestions: List<HandoffSuggestion>
+    val suggestions: List<HandoffSuggestion>
         get() {
-            return suggestionList.suggestions
+            val suggestion = handoffSuggestionRepository.suggestion.value
+            return if (suggestion != null) {
+                listOf(suggestion)
+            } else {
+                emptyList()
+            }
         }
 
     /** Starts the controller. */
-    public fun init() {
-        if (android.companion.Flags.enableTaskContinuity()) {
-            taskContinuityManager =
-                taskbarActivityContext.applicationContext.getSystemService(
-                    TaskContinuityManager::class.java
-                )
+    fun init(taskbarControllers: TaskbarControllers) {
+        this.taskbarControllers = taskbarControllers
+        if (taskContinuity()) {
+            taskbarActivityContext.applicationContext
+                .getSystemService(TaskContinuityManager::class.java)
+                ?.let {
+                    handoffSuggestionLauncher =
+                        HandoffSuggestionLauncher(it, taskbarActivityContext.mainExecutor)
+                }
 
-            taskContinuityManager?.registerRemoteTaskListener(
-                taskbarActivityContext.mainExecutor,
-                this,
-            )
+            handoffRepositoryListener =
+                handoffSuggestionRepository.suggestion.forEach(
+                    taskbarActivityContext.mainExecutor,
+                    { _ -> taskbarControllers.taskbarViewController.commitHandoffSuggestionsToUI() },
+                )
         }
     }
 
     /** Stops the controller. */
-    public fun onDestroy() {
+    fun onDestroy() {
         if (DEBUG) {
             Log.d(TAG, "Stopping controller.")
         }
-
-        suggestionMetadataLoader.cancelPendingLoads()
-        suggestionList.clear()
-        taskContinuityManager?.unregisterRemoteTaskListener(this)
+        handoffRepositoryListener?.close()
     }
 
-    public override fun onRemoteTasksChanged(remoteTasks: List<RemoteTask>) {
-        if (DEBUG) {
-            Log.d(TAG, "onRemoteTasksChanged: updating suggestions.")
-        }
-
-        suggestionList.updateSuggestions(remoteTasks)
-        suggestionMetadataLoader.loadMetadata(suggestionList.suggestions) { suggestion ->
-            if (DEBUG) {
-                Log.d(
-                    TAG,
-                    "HandoffSuggestion metadata updated for deviceId ${suggestion.deviceId}.")
-            }
-            // TODO: joeantonetti - Update the suggestion in the UI.
-        }
+    fun launch(suggestion: HandoffSuggestion) {
+        handoffSuggestionLauncher?.launch(suggestion)
     }
 
     override fun dumpLogs(prefix: String, pw: PrintWriter) {
         pw.println(prefix + "TaskbarHandoffController:")
-        pw.println(prefix + "\tsuggestions=" + suggestionList.suggestions)
+        pw.println(prefix + "\tsuggestions=" + suggestions)
     }
 
     private companion object {

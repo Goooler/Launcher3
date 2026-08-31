@@ -17,25 +17,27 @@ package com.android.quickstep.fallback
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Rect
+import android.os.SystemProperties
 import androidx.annotation.FloatRange
 import com.android.app.animation.Interpolators
 import com.android.launcher3.DeviceProfile
-import com.android.launcher3.Flags
 import com.android.launcher3.LauncherState
 import com.android.launcher3.LauncherState.FLAG_CLOSE_POPUPS
 import com.android.launcher3.R
 import com.android.launcher3.anim.AnimatorPlaybackController
 import com.android.launcher3.anim.PendingAnimation
+import com.android.launcher3.statehandlers.DepthController.DEPTH_0_PERCENT
+import com.android.launcher3.statehandlers.DepthController.DEPTH_70_PERCENT
+import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.BaseState
-import com.android.launcher3.statemanager.BaseState.FLAG_DISABLE_RESTORE
-import com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview
+import com.android.launcher3.statemanager.BaseState.FLAG_DISABLE_RESTORE_ABSOLUTE
+import com.android.launcher3.statemanager.BaseState.FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE
+import com.android.launcher3.statemanager.BaseState.FLAG_IS_TASK_VIEW_INTERACTIVE
 import com.android.launcher3.util.Themes
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.ScrimColors
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
-import kotlin.math.min
 
 /** State definition for Fallback recents */
 open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
@@ -54,6 +56,7 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
             HOME_STATE_ORDINAL -> "RECENTS_HOME"
             BG_LAUNCHER_ORDINAL -> "RECENTS_BG_LAUNCHER"
             OVERVIEW_SPLIT_SELECT_ORDINAL -> "RECENTS_SPLIT_SELECT"
+            HIDDEN_ORDINAL -> "RECENTS_HIDDEN"
             else -> "RECENTS Unknown Ordinal-$ordinal"
         }
 
@@ -86,10 +89,10 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
     /** For this state, what color scrim should be drawn behind overview. */
     fun getScrimColor(context: Context) =
         ScrimColors(
-            /* backgroundColor= */ if (hasFlag(FLAG_SCRIM))
-                Themes.getAttrColor(context, R.attr.overviewScrimColor)
-            else Color.TRANSPARENT,
-            /* foregroundColor= */ Color.TRANSPARENT,
+            backgroundColor =
+                if (hasFlag(FLAG_SCRIM)) Themes.getAttrColor(context, R.attr.overviewScrimColor)
+                else Color.TRANSPARENT,
+            foregroundColor = Color.TRANSPARENT,
         )
 
     open fun getOverviewScaleAndOffset(container: RecentsViewContainer) =
@@ -97,12 +100,11 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
 
     /** For this state, whether tasks should layout as a grid rather than a list. */
     override fun displayOverviewTasksAsGrid(deviceProfile: DeviceProfile) =
-        hasFlag(FLAG_SHOW_AS_GRID) && deviceProfile.deviceProperties.isTablet
+        hasFlag(FLAG_SHOW_AS_GRID) && deviceProfile.deviceProperties.isLargeScreen
 
     override fun showTaskThumbnailSplash() = hasFlag(FLAG_TASK_THUMBNAIL_SPLASH)
 
-    override fun showExplodedDesktopView() =
-        hasFlag(FLAG_SHOW_EXPLODED_DESKTOP_VIEW) && Flags.enableDesktopExplodedView()
+    override fun isInOverview() = hasFlag(FLAG_IS_IN_OVERVIEW)
 
     /** True if the state has overview panel visible. */
     fun isRecentsViewVisible() = hasFlag(FLAG_RECENTS_VIEW_VISIBLE)
@@ -180,27 +182,12 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
         backAnimationController?.setPlayFraction(backProgress)
     }
 
+    override fun getDepth(context: ActivityContext) =
+        if (SYSTEM_OVERVIEW_BLUR_ENABLED) DEPTH_70_PERCENT else DEPTH_0_PERCENT
+
     private class ModalState(id: Int, flags: Int) : RecentsState(id, flags) {
-        override fun getOverviewScaleAndOffset(container: RecentsViewContainer): FloatArray =
-            if (enableGridOnlyOverview()) {
-                super.getOverviewScaleAndOffset(container)
-            } else getOverviewScaleAndOffsetForModalState(container.getOverviewPanel())
-
-        private fun getOverviewScaleAndOffsetForModalState(
-            recentsView: RecentsView<*, *>
-        ): FloatArray {
-            val taskSize = recentsView.selectedTaskBounds
-            val modalTaskSize = Rect().apply { recentsView.getModalTaskSize(this) }
-            val scale =
-                min(
-                    modalTaskSize.height().toFloat() / taskSize.height(),
-                    modalTaskSize.width().toFloat() / taskSize.width(),
-                )
-            return floatArrayOf(scale, LauncherState.NO_OFFSET)
-        }
-
         override fun onBackInvoked(container: RecentsViewContainer) {
-            container.goToRecentsState(DEFAULT, true)
+            container.goToRecentsState(DEFAULT, true, /* listener= */ null)
         }
 
         override fun onBackStarted(container: RecentsViewContainer) {
@@ -226,9 +213,22 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
                 container.getOverviewPanel<RecentsView<*, *>>().maxScaleForFullScreen,
                 LauncherState.NO_OFFSET,
             )
+
+        override fun getDepth(context: ActivityContext) =
+            if (
+                DesktopVisibilityController.INSTANCE.get(context.asContext())
+                    .isInDesktopMode(context.asContext().displayId)
+            )
+                DEPTH_0_PERCENT
+            else DEPTH_70_PERCENT
     }
 
     private class BgLauncherState(id: Int, flags: Int) : RecentsState(id, flags) {
+        override fun getOverviewScaleAndOffset(container: RecentsViewContainer) =
+            floatArrayOf(NO_SCALE, 1f)
+    }
+
+    private class HiddenState(id: Int, flags: Int) : RecentsState(id, flags) {
         override fun getOverviewScaleAndOffset(container: RecentsViewContainer) =
             floatArrayOf(NO_SCALE, 1f)
     }
@@ -251,7 +251,7 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
         private val FLAG_RECENTS_VIEW_VISIBLE = BaseState.getFlag(7)
         private val FLAG_TASK_THUMBNAIL_SPLASH = BaseState.getFlag(8)
         private val FLAG_ADD_DESK_BUTTON = BaseState.getFlag(9)
-        private val FLAG_SHOW_EXPLODED_DESKTOP_VIEW = BaseState.getFlag(10)
+        private val FLAG_IS_IN_OVERVIEW = BaseState.getFlag(10)
 
         private const val PREDICTIVE_BACK_DURATION = 1000L
         private const val PREDICTIVE_BACK_MAX_RECENTS_SCALE_LAUNCH = 1.1f
@@ -266,14 +266,15 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
         const val HOME_STATE_ORDINAL = 3
         const val BG_LAUNCHER_ORDINAL = 4
         const val OVERVIEW_SPLIT_SELECT_ORDINAL = 5
+        const val HIDDEN_ORDINAL = 6
 
-        private val sAllStates = arrayOfNulls<RecentsState>(6)
+        private val sAllStates = arrayOfNulls<RecentsState>(7)
 
         @JvmField
         val DEFAULT: RecentsState =
             RecentsState(
                 DEFAULT_STATE_ORDINAL,
-                (FLAG_DISABLE_RESTORE or
+                (FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE or
                     FLAG_CLEAR_ALL_BUTTON or
                     FLAG_OVERVIEW_ACTIONS or
                     FLAG_SHOW_AS_GRID or
@@ -281,33 +282,38 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
                     FLAG_LIVE_TILE or
                     FLAG_RECENTS_VIEW_VISIBLE or
                     FLAG_ADD_DESK_BUTTON or
-                    FLAG_SHOW_EXPLODED_DESKTOP_VIEW),
+                    FLAG_IS_IN_OVERVIEW or
+                    FLAG_IS_TASK_VIEW_INTERACTIVE),
             )
         @JvmField
         val MODAL_TASK: RecentsState =
             ModalState(
                 MODAL_TASK_ORDINAL,
-                (FLAG_DISABLE_RESTORE or
+                (FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE or
                     FLAG_OVERVIEW_ACTIONS or
                     FLAG_MODAL or
                     FLAG_SHOW_AS_GRID or
                     FLAG_SCRIM or
                     FLAG_LIVE_TILE or
                     FLAG_RECENTS_VIEW_VISIBLE or
-                    FLAG_SHOW_EXPLODED_DESKTOP_VIEW),
+                    FLAG_IS_IN_OVERVIEW),
             )
         @JvmField
         val BACKGROUND_APP: RecentsState =
             BackgroundAppState(
                 BACKGROUND_APP_ORDINAL,
-                (FLAG_DISABLE_RESTORE or
+                (FLAG_DISABLE_RESTORE_ABSOLUTE or
                     BaseState.FLAG_NON_INTERACTIVE or
                     FLAG_FULL_SCREEN or
                     FLAG_RECENTS_VIEW_VISIBLE or
                     FLAG_TASK_THUMBNAIL_SPLASH),
             )
-        @JvmField val HOME: RecentsState = RecentsState(HOME_STATE_ORDINAL, 0)
-        @JvmField val BG_LAUNCHER: RecentsState = BgLauncherState(BG_LAUNCHER_ORDINAL, 0)
+        @Deprecated("Use HIDDEN instead for RecentsWindowManager")
+        @JvmField
+        val HOME: RecentsState = RecentsState(HOME_STATE_ORDINAL, 0)
+        @Deprecated("Use HIDDEN instead for RecentsWindowManager")
+        @JvmField
+        val BG_LAUNCHER: RecentsState = BgLauncherState(BG_LAUNCHER_ORDINAL, 0)
         @JvmField
         val OVERVIEW_SPLIT_SELECT: RecentsState =
             RecentsState(
@@ -316,12 +322,18 @@ open class RecentsState(@JvmField val ordinal: Int, private val mFlags: Int) :
                     FLAG_SCRIM or
                     FLAG_RECENTS_VIEW_VISIBLE or
                     FLAG_CLOSE_POPUPS or
-                    FLAG_DISABLE_RESTORE or
-                    FLAG_SHOW_EXPLODED_DESKTOP_VIEW),
+                    FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE or
+                    FLAG_IS_IN_OVERVIEW),
             )
+        @JvmField val HIDDEN: RecentsState = HiddenState(HIDDEN_ORDINAL, flags = 0)
+
+        private val SYSTEM_OVERVIEW_BLUR_ENABLED =
+            SystemProperties.getBoolean("ro.launcher.depth.overview", true)
 
         /** Returns the corresponding RecentsState from ordinal provided */
         @JvmStatic fun stateFromOrdinal(ordinal: Int) = sAllStates[ordinal]!!
+
+        @JvmStatic fun values() = sAllStates.copyOf(sAllStates.size)
 
         private const val NO_OFFSET = 0f
         private const val NO_SCALE = 1f

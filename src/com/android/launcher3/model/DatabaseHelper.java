@@ -81,8 +81,6 @@ public class DatabaseHelper extends SQLiteOpenHelper implements
     private final Runnable mOnEmptyDbCreateCallback;
     private final AtomicInteger mMaxItemId = new AtomicInteger(-1);
 
-    public boolean mHotseatRestoreTableExists;
-
     /**
      * Constructor used in tests and for restore.
      */
@@ -109,13 +107,6 @@ public class DatabaseHelper extends SQLiteOpenHelper implements
         // Fresh and clean launcher DB.
         mMaxItemId.set(initializeMaxItemId(db));
         mOnEmptyDbCreateCallback.run();
-    }
-
-    public void onAddOrDeleteOp(SQLiteDatabase db) {
-        if (mHotseatRestoreTableExists) {
-            dropTable(db, Favorites.HYBRID_HOTSEAT_BACKUP_TABLE);
-            mHotseatRestoreTableExists = false;
-        }
     }
 
     private long getDefaultUserSerial() {
@@ -469,22 +460,19 @@ public class DatabaseHelper extends SQLiteOpenHelper implements
 
     @Override
     public int insertAndCheck(SQLiteDatabase db, ContentValues values) {
-        return dbInsertAndCheck(db, Favorites.TABLE_NAME, values);
-    }
-
-    public int dbInsertAndCheck(SQLiteDatabase db, String table, ContentValues values) {
         if (values == null) {
             throw new RuntimeException("Error: attempting to insert null values");
         }
         if (!values.containsKey(LauncherSettings.Favorites._ID)) {
             throw new RuntimeException("Error: attempting to add item without specifying an id");
         }
-        checkId(values);
-        return (int) db.insert(table, null, values);
+
+        updateMaxId(values.getAsInteger(Favorites._ID));
+        return (int) db.insert(Favorites.TABLE_NAME, null, values);
     }
 
-    public void checkId(ContentValues values) {
-        int id = values.getAsInteger(Favorites._ID);
+    /** Updates the max ID counter to include the provided id */
+    public void updateMaxId(int id) {
         mMaxItemId.accumulateAndGet(id, Math::max);
     }
 

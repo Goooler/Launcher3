@@ -18,11 +18,19 @@ package com.android.launcher3.util;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.os.Process.THREAD_PRIORITY_FOREGROUND;
 
+import static com.android.launcher3.Flags.enableTaskbarUiThread;
+
 import android.os.Looper;
 import android.os.Process;
 
+import androidx.annotation.VisibleForTesting;
+
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -76,6 +84,11 @@ public class Executors {
     public static final LooperExecutor MAIN_EXECUTOR =
             new LooperExecutor(Looper.getMainLooper(), THREAD_PRIORITY_FOREGROUND);
 
+    public static final Executor IMMEDIATE_EXECUTOR = Runnable::run;
+
+    private static final LooperExecutor TASKBAR_UI_THREAD =
+            new LooperExecutor("TASKBAR_UI_THREAD", THREAD_PRIORITY_FOREGROUND);
+
     /**
      * A background executor for using time sensitive actions where user is waiting for response.
      *
@@ -111,6 +124,23 @@ public class Executors {
      */
     public static LooperExecutor getPackageExecutor(String packageName) {
         return PACKAGE_EXECUTORS.computeIfAbsent(packageName, LooperExecutor::new);
+    }
+
+    @VisibleForTesting
+    public static List<ExecutorService> getAllExecutorsForTesting() {
+        return Arrays.asList(
+                MODEL_EXECUTOR,
+                MAIN_EXECUTOR,
+                UI_HELPER_EXECUTOR,
+                DATA_HELPER_EXECUTOR,
+                THREAD_POOL_EXECUTOR,
+                ORDERED_BG_EXECUTOR,
+                TASKBAR_UI_THREAD
+        );
+    }
+
+    public static LooperExecutor getTaskbarUiThread() {
+        return enableTaskbarUiThread() ? TASKBAR_UI_THREAD : MAIN_EXECUTOR;
     }
 
     /**

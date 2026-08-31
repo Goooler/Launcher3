@@ -17,7 +17,6 @@ package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 
-import android.content.Context;
 import android.graphics.Color;
 
 import androidx.core.graphics.ColorUtils;
@@ -32,7 +31,8 @@ import com.android.launcher3.views.ScrimColors;
  */
 public class HintState extends LauncherState {
 
-    private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE | FLAG_DISABLE_RESTORE
+    private static final int STATE_FLAGS = FLAG_WORKSPACE_INACCESSIBLE
+            | FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE
             | FLAG_HAS_SYS_UI_SCRIM;
 
     public static final float DEPTH_5_PERCENT = 0.05f;
@@ -51,7 +51,7 @@ public class HintState extends LauncherState {
     }
 
     @Override
-    protected float getDepthUnchecked(Context context) {
+    protected float getDepthUnchecked(ActivityContext context) {
         return DEPTH_5_PERCENT;
     }
 

@@ -21,12 +21,13 @@ import android.platform.test.rule.AllowedDevices
 import android.platform.test.rule.DeviceProduct
 import android.platform.test.rule.IgnoreLimit
 import android.platform.test.rule.LimitDevicesRule
-import android.util.SparseArray
 import com.android.launcher3.DeviceProfile.Builder.createDefaultDisplayOptionSpec
 import com.android.launcher3.DeviceProfile.DEFAULT_DIMENSION_PROVIDER
 import com.android.launcher3.DeviceProfile.DEFAULT_PROVIDER
+import com.android.launcher3.deviceprofile.DeviceConfiguration
+import com.android.launcher3.deviceprofile.DeviceProperties.Factory.createDeviceProperties
+import com.android.launcher3.display.LauncherDisplayInfo
 import com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE
-import com.android.launcher3.util.DisplayController.Info
 import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.WindowBounds
 import java.io.PrintWriter
@@ -51,12 +52,13 @@ abstract class FakeInvariantDeviceProfileTest {
     @get:Rule val context = SandboxApplication()
 
     protected lateinit var inv: InvariantDeviceProfile
-    protected val info = spy(Info(context, context.appComponent.wmProxy))
+    protected val info = spy(LauncherDisplayInfo(context, context.appComponent.wmProxy))
     protected lateinit var windowBounds: WindowBounds
     private var transposeLayoutWithOrientation = false
     private var useTwoPanels = false
     private var isGestureMode = true
     private var isTransientTaskbar = true
+    private var workspaceItemsLabelHidden = true
 
     @Rule @JvmField val limitDevicesRule = LimitDevicesRule()
 
@@ -65,19 +67,26 @@ abstract class FakeInvariantDeviceProfileTest {
         // make sure to reset values
         useTwoPanels = false
         isGestureMode = true
+        workspaceItemsLabelHidden = false
     }
 
     protected fun newDP(): DeviceProfile =
         DeviceProfile(
             inv,
             info,
-            context.appComponent.wmProxy,
-            windowBounds,
-            SparseArray(),
-            /*isExternalDisplay=*/ false,
-            transposeLayoutWithOrientation,
-            useTwoPanels,
-            isGestureMode,
+            createDeviceProperties(
+                info = info,
+                windowBounds = windowBounds,
+                deviceConfiguration =
+                    DeviceConfiguration(
+                        isExternalDisplay = false,
+                        transposeLayoutWithOrientation = transposeLayoutWithOrientation,
+                        isMultiDisplay = useTwoPanels,
+                        isGestureMode = isGestureMode,
+                        isWorkspaceItemsLabelHidden = workspaceItemsLabelHidden,
+                    ),
+                isTaskbarDrawnInProcess = context.appComponent.wmProxy.isTaskbarDrawnInProcess,
+            ),
             DEFAULT_PROVIDER,
             DEFAULT_DIMENSION_PROVIDER,
             createDefaultDisplayOptionSpec(
@@ -91,6 +100,7 @@ abstract class FakeInvariantDeviceProfileTest {
     protected fun initializeVarsForPhone(
         isGestureMode: Boolean = true,
         isVerticalBar: Boolean = false,
+        workspaceItemsLabelHidden: Boolean = false,
     ) {
         val (x, y) = if (isVerticalBar) Pair(2400, 1080) else Pair(1080, 2400)
 
@@ -105,12 +115,13 @@ abstract class FakeInvariantDeviceProfileTest {
                 ),
             )
 
-        doReturn(false).whenever(info).isTablet(any())
-        doReturn(420).whenever(info).getDensityDpi()
+        doReturn(false).whenever(info).isLargeScreen(any())
+        doReturn(420).whenever(info).densityDpi
         doReturn(411f).whenever(info).smallestSizeDp(any())
 
         this.isGestureMode = isGestureMode
         this.isTransientTaskbar = false
+        this.workspaceItemsLabelHidden = workspaceItemsLabelHidden
         transposeLayoutWithOrientation = true
 
         inv =
@@ -190,17 +201,19 @@ abstract class FakeInvariantDeviceProfileTest {
     protected fun initializeVarsForTablet(
         isLandscape: Boolean = false,
         isGestureMode: Boolean = true,
+        workspaceItemsLabelHidden: Boolean = false,
     ) {
         val (x, y) = if (isLandscape) Pair(2560, 1600) else Pair(1600, 2560)
 
         windowBounds = WindowBounds(Rect(0, 0, x, y), Rect(0, 104, 0, 0))
 
-        doReturn(true).whenever(info).isTablet(any())
-        doReturn(320).whenever(info).getDensityDpi()
+        doReturn(true).whenever(info).isLargeScreen(any())
+        doReturn(320).whenever(info).densityDpi
         doReturn(800f).whenever(info).smallestSizeDp(any())
 
         this.isGestureMode = isGestureMode
         this.isTransientTaskbar = true
+        this.workspaceItemsLabelHidden = workspaceItemsLabelHidden
         useTwoPanels = false
 
         inv =
@@ -283,17 +296,19 @@ abstract class FakeInvariantDeviceProfileTest {
         isGestureMode: Boolean = true,
         rows: Int = 4,
         cols: Int = 4,
+        workspaceItemsLabelHidden: Boolean = false,
     ) {
         val (x, y) = if (isLandscape) Pair(2208, 1840) else Pair(1840, 2208)
 
         windowBounds = WindowBounds(Rect(0, 0, x, y), Rect(0, 110, 0, 0))
 
-        doReturn(true).whenever(info).isTablet(any())
-        doReturn(420).whenever(info).getDensityDpi()
+        doReturn(true).whenever(info).isLargeScreen(any())
+        doReturn(420).whenever(info).densityDpi
         doReturn(700f).whenever(info).smallestSizeDp(any())
 
         this.isGestureMode = isGestureMode
         this.isTransientTaskbar = true
+        this.workspaceItemsLabelHidden = workspaceItemsLabelHidden
         useTwoPanels = true
 
         inv =

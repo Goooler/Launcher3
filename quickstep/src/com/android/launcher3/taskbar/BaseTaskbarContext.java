@@ -15,21 +15,35 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.Flags.enableTaskbarUiThread;
+import static com.android.launcher3.util.Executors.getTaskbarUiThread;
+
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ShortcutInfo;
 import android.graphics.Point;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.UserHandle;
 import android.view.LayoutInflater;
+import android.view.View;
+
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
 
 import com.android.launcher3.LifecycleTracker;
 import com.android.launcher3.dagger.LauncherComponentProvider;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.taskbar.bubbles.BubbleActivityStarter;
 import com.android.launcher3.util.BaseContext;
+import com.android.launcher3.util.LifecycleRegistryWrapper;
+import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.Themes;
 import com.android.wm.shell.shared.bubbles.logging.EntryPoint;
+
+import java.util.concurrent.Executor;
 
 // TODO(b/218912746): Share more behavior to avoid all apps context depending directly on taskbar.
 /** Base for common behavior between taskbar window contexts. */
@@ -40,16 +54,54 @@ public abstract class BaseTaskbarContext extends BaseContext
     private final boolean mIsPrimaryDisplay;
     protected final LayoutInflater mLayoutInflater;
 
+    /**
+     * {@link LifecycleRegistry#createUnsafe(LifecycleOwner)} allows created
+     * {@link LifecycleRegistry} obj be executed off main thread.
+     */
+    @SuppressLint("VisibleForTests")
     public BaseTaskbarContext(Context windowContext, int displayId, boolean isPrimaryDisplay) {
-        super(windowContext, Themes.getActivityThemeRes(windowContext));
+        super(
+                windowContext,
+                Themes.getActivityThemeRes(windowContext),
+                /* destroyOnDetach= */ true,
+                /* lifecycleRegistryProvider= */
+                (owner, uiExecutor) ->
+                        enableTaskbarUiThread()
+                                ? new LifecycleRegistryWrapper(owner, uiExecutor)
+                                : new LifecycleRegistryWrapper(owner)
+        );
         mDisplayId = displayId;
         mIsPrimaryDisplay = isPrimaryDisplay;
         mLayoutInflater = LayoutInflater.from(this).cloneInContext(this);
     }
 
+    /**
+     * For taskbar the "main" thread should be taskbar's ui thread obtained from
+     * [ActivityContext.getUiExecutor]
+     */
+    @Override
+    public Handler getMainThreadHandler()  {
+        return getUiExecutor().getHandler();
+    }
+
+    @Override
+    public Looper getMainLooper() {
+        return getUiExecutor().getLooper();
+    }
+
+    @Override
+    public Executor getMainExecutor() {
+        return getUiExecutor();
+    }
+
     @Override
     public int getDisplayId() {
         return mDisplayId;
+    }
+
+    @Override
+    public LooperExecutor getUiExecutor() {
+        return getTaskbarUiThread();
     }
 
     /**
@@ -89,11 +141,6 @@ public abstract class BaseTaskbarContext extends BaseContext
     public abstract boolean isTaskbarShowingDesktopTasks();
 
     /**
-     * Returns whether the taskbar is forced to be pinned when home is visible.
-     */
-    public abstract  boolean showLockedTaskbarOnHome();
-
-    /**
      * Returns whether desktop taskbar (pinned taskbar that shows desktop tasks) is to be used on
      * the display because the display is a freeform display.
      */
@@ -108,12 +155,6 @@ public abstract class BaseTaskbarContext extends BaseContext
      * Returns display height.
      */
     public abstract int getDisplayHeight();
-
-    /**
-     * Notifies the context that the configuration has changed.
-     */
-    public abstract void notifyConfigChanged();
-
 
     @Override
     public final LayoutInflater getLayoutInflater() {
@@ -149,6 +190,9 @@ public abstract class BaseTaskbarContext extends BaseContext
 
     /** Callback invoked when a popup is shown or closed within this context. */
     public abstract void onPopupVisibilityChanged(boolean isVisible);
+
+    /** Displays the shortcut popup menu for the specified icon. */
+    public abstract void showPopupMenuForIcon(View icon);
 
     /**
      * Callback invoked when user attempts to split the screen through a long-press menu in Taskbar

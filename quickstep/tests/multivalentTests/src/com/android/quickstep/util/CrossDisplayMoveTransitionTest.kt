@@ -20,17 +20,19 @@ import android.app.WindowConfiguration
 import android.content.ComponentName
 import android.view.SurfaceControl
 import android.view.WindowManager
+import android.view.WindowManager.TRANSIT_CLOSE
+import android.view.WindowManager.TRANSIT_TO_BACK
 import android.window.IRemoteTransitionFinishedCallback
 import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
+import android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY
+import android.window.WindowContainerToken
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.launcher3.uioverrides.QuickstepLauncher
 import org.junit.Assert.*
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
 import org.mockito.Mockito.atLeastOnce
 import org.mockito.junit.MockitoJUnit
 import org.mockito.junit.MockitoRule
@@ -46,18 +48,15 @@ class CrossDisplayMoveTransitionTest {
     private val LAUNCHING_TRANSITION_DURATION_MS = 500L
     private val UNLAUNCHING_TRANSITION_DURATION_MS = 250L
 
-    @get:Rule
-    val mockitoRule: MockitoRule = MockitoJUnit.rule()
+    @get:Rule val mockitoRule: MockitoRule = MockitoJUnit.rule()
 
     private val mockLauncher = mock<QuickstepLauncher>()
     private val mockTransaction = mock<SurfaceControl.Transaction>()
     private val mockFinishCallback = mock<IRemoteTransitionFinishedCallback>()
 
-    private lateinit var transition: CrossDisplayMoveTransition
-
     private inner class TransitionInfoBuilder(
         type: Int = WindowManager.TRANSIT_NONE,
-        flags: Int = 0
+        flags: Int = 0,
     ) {
         private val info: TransitionInfo = TransitionInfo(type, flags)
         private var srcDisplayId: Int = 0
@@ -65,12 +64,16 @@ class CrossDisplayMoveTransitionTest {
 
         var srcRoot: TransitionInfo.Root? = null
             private set
+
         var dstRoot: TransitionInfo.Root? = null
             private set
+
         var crossDisplayTask: Change? = null
             private set
+
         var crossDisplayTaskHasSnapshot: Boolean = false
             private set
+
         var launcherChange: Change? = null
             private set
 
@@ -80,13 +83,41 @@ class CrossDisplayMoveTransitionTest {
             return this
         }
 
-        private fun addChange(config: (Change) -> Unit): Change {
-            val leash = mock<SurfaceControl>()
-            val change = TransitionInfo.Change(null /* container */, leash)
+        private fun addChange(
+            container: WindowContainerToken? = null,
+            leash: SurfaceControl = mock<SurfaceControl>(),
+            config: (Change) -> Unit,
+        ): Change {
+            val change = TransitionInfo.Change(container, leash)
             config(change)
             info.addChange(change)
             return change
         }
+
+        private fun addCrossDisplayTaskChange(
+            hasSnapshot: Boolean = true,
+            taskContainer: WindowContainerToken? = mock(),
+        ): Change =
+            addChange(taskContainer) { change ->
+                val taskInfo = ActivityManager.RunningTaskInfo()
+                taskInfo.topActivity = ComponentName("app.pkg", "App")
+                change.taskInfo = taskInfo
+                change.setDisplayId(srcDisplayId, dstDisplayId)
+                if (hasSnapshot) {
+                    change.setSnapshot(mock(), /* luma= */ 0f)
+                }
+            }
+
+        private fun addClosingActivityEmbeddingChange(
+            parent: Change,
+            leash: SurfaceControl,
+            mode: Int,
+        ): Change =
+            addChange(leash = leash) { change ->
+                change.mode = mode
+                change.flags = FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY
+                change.parent = parent.getContainer()
+            }
 
         fun addRoot(isSrc: Boolean): TransitionInfoBuilder {
             val displayId = if (isSrc) srcDisplayId else dstDisplayId
@@ -103,15 +134,24 @@ class CrossDisplayMoveTransitionTest {
 
         fun addCrossDisplayTask(hasSnapshot: Boolean = true): TransitionInfoBuilder {
             crossDisplayTaskHasSnapshot = hasSnapshot
-            crossDisplayTask = addChange { change ->
-                val taskInfo = ActivityManager.RunningTaskInfo()
-                taskInfo.topActivity = ComponentName("app.pkg", "App")
-                change.taskInfo = taskInfo
-                change.setDisplayId(srcDisplayId, dstDisplayId)
-                if (hasSnapshot) {
-                    change.setSnapshot(mock(), 0f /* luma */)
-                }
-            }
+            crossDisplayTask = addCrossDisplayTaskChange(hasSnapshot)
+            return this
+        }
+
+        fun addCrossDisplayActivityEmbeddingTask(
+            hasSnapshot: Boolean = true,
+            taskContainer: WindowContainerToken? = mock(),
+            activityEmbeddingLeash: SurfaceControl = mock(),
+            activityEmbeddingTransitMode: Int = TRANSIT_CLOSE,
+        ): TransitionInfoBuilder {
+            crossDisplayTaskHasSnapshot = hasSnapshot
+            val taskChange = addCrossDisplayTaskChange(hasSnapshot, taskContainer)
+            crossDisplayTask = taskChange
+            addClosingActivityEmbeddingChange(
+                parent = taskChange,
+                leash = activityEmbeddingLeash,
+                mode = activityEmbeddingTransitMode,
+            )
             return this
         }
 
@@ -129,8 +169,7 @@ class CrossDisplayMoveTransitionTest {
                 val taskInfo: ActivityManager.RunningTaskInfo = mock()
                 val componentName = mockLauncher.componentName
                 whenever(taskInfo.topActivity).thenReturn(componentName)
-                whenever(taskInfo.activityType)
-                    .thenReturn(WindowConfiguration.ACTIVITY_TYPE_HOME)
+                whenever(taskInfo.activityType).thenReturn(WindowConfiguration.ACTIVITY_TYPE_HOME)
                 change.taskInfo = taskInfo
                 change.mode = mode
             }
@@ -138,12 +177,6 @@ class CrossDisplayMoveTransitionTest {
         }
 
         fun build(): TransitionInfo = info
-    }
-
-    @Before
-    fun setup() {
-        transition = CrossDisplayMoveTransition(mockLauncher,
-            LAUNCHING_TRANSITION_DURATION_MS, UNLAUNCHING_TRANSITION_DURATION_MS)
     }
 
     @Test
@@ -161,17 +194,20 @@ class CrossDisplayMoveTransitionTest {
     @Test
     fun startAnimation_withEmptyInfo_doesNotCrash() {
         val info = TransitionInfoBuilder().build()
-        transition.startCrossDisplayMoveAnimation(
+        CrossDisplayMoveTransition.startCrossDisplayMoveAnimation(
+            mockLauncher,
+            LAUNCHING_TRANSITION_DURATION_MS,
+            UNLAUNCHING_TRANSITION_DURATION_MS,
             info,
             mockTransaction,
-            mockFinishCallback
+            mockFinishCallback,
         )
         // No crash is a pass
     }
 
     private fun assertValidMoveInfo(
         builder: TransitionInfoBuilder,
-        moveInfo: CrossDisplayMoveTransitionInfo?
+        moveInfo: CrossDisplayMoveTransitionInfo?,
     ) {
         assertNotNull(moveInfo)
         moveInfo!!
@@ -195,11 +231,12 @@ class CrossDisplayMoveTransitionTest {
 
     @Test
     fun create_happyPath_returnsValidInfo() {
-        val builder = TransitionInfoBuilder()
-            .addRoot(isSrc = true)
-            .addRoot(isSrc = false)
-            .addCrossDisplayTask()
-            .addLauncherChange()
+        val builder =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = true)
+                .addRoot(isSrc = false)
+                .addCrossDisplayTask()
+                .addLauncherChange()
         val info = builder.build()
         val moveInfo = CrossDisplayMoveTransitionInfo.create(info)
         assertValidMoveInfo(builder, moveInfo)
@@ -207,9 +244,7 @@ class CrossDisplayMoveTransitionTest {
 
     @Test
     fun create_noSrcRoot_returnsValidInfo() {
-        val builder = TransitionInfoBuilder()
-            .addRoot(isSrc = false)
-            .addCrossDisplayTask()
+        val builder = TransitionInfoBuilder().addRoot(isSrc = false).addCrossDisplayTask()
         val info = builder.build()
         val moveInfo = CrossDisplayMoveTransitionInfo.create(info)
         assertValidMoveInfo(builder, moveInfo)
@@ -217,10 +252,11 @@ class CrossDisplayMoveTransitionTest {
 
     @Test
     fun create_noLauncherChange_returnsValidInfo() {
-        val builder = TransitionInfoBuilder()
-            .addRoot(isSrc = true)
-            .addRoot(isSrc = false)
-            .addCrossDisplayTask()
+        val builder =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = true)
+                .addRoot(isSrc = false)
+                .addCrossDisplayTask()
         val info = builder.build()
         val moveInfo = CrossDisplayMoveTransitionInfo.create(info)
         assertValidMoveInfo(builder, moveInfo)
@@ -238,7 +274,7 @@ class CrossDisplayMoveTransitionTest {
                     .addRoot(isSrc = false)
                     .addLauncherChange(),
                 // No destination root
-                TransitionInfoBuilder().addRoot(isSrc = true).addCrossDisplayTask()
+                TransitionInfoBuilder().addRoot(isSrc = true).addCrossDisplayTask(),
             )
 
         invalidBuilders.forEach { builder ->
@@ -255,42 +291,111 @@ class CrossDisplayMoveTransitionTest {
 
     @Test
     fun setupInitialAnimationState_happyPath_reparentsLeashes() {
-        val builder = TransitionInfoBuilder()
-            .addRoot(isSrc = true)
-            .addRoot(isSrc = false)
-            .addCrossDisplayTask()
-            .addLauncherChange()
+        val builder =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = true)
+                .addRoot(isSrc = false)
+                .addCrossDisplayTask()
+                .addLauncherChange()
         val toFrontChange = builder.addGenericTask(mode = WindowManager.TRANSIT_TO_FRONT)
+        val toBackChange = builder.addGenericTask(mode = WindowManager.TRANSIT_TO_BACK)
         val info = builder.build()
         val moveInfo = CrossDisplayMoveTransitionInfo.create(info)!!
 
-        transition.setupInitialAnimationState(info, moveInfo, mockTransaction)
+        CrossDisplayMoveTransition.setupInitialAnimationState(info, moveInfo, mockTransaction)
 
-        // Verify reparenting
+        // Parenting and visibility should follow the following logic:
+        //  - The task moving between displays should have 2 leashes, both visible, and each leash
+        //    should be parented to the corresponding animation root.
+        //  - The launcher should be visible.
+        //
+        // If we're not in one of the above named cases, then we want to ensure:
+        //  - Any TRANSIT_FRONT is visible.
+        //  - Any TRANSIT_BACK is untouched (cross fade means we want to keep it as-is until the
+        //    effect is played out)
+
+        // Verify task state
         verify(mockTransaction).reparent(moveInfo.srcTaskLeash!!, moveInfo.srcRoot!!.leash)
         verify(mockTransaction).reparent(moveInfo.dstTaskLeash, moveInfo.dstRoot.leash)
-
-        // Verify visibility initialization
-        verifyInitializedAsVisible(moveInfo.launcherToFront!!.leash)
         verifyInitializedAsVisible(moveInfo.dstTaskLeash)
         verifyInitializedAsVisible(moveInfo.srcTaskLeash!!)
+
+        // Verify launcher state
+        verifyInitializedAsVisible(moveInfo.launcherToFront!!.leash)
+
+        // Verify default handling of TRANSIT_FRONT
         verifyInitializedAsVisible(toFrontChange.leash)
+
+        // Verify default handling of TRANSIT_BACK
+        verify(mockTransaction, never()).hide(toBackChange.leash)
+        verify(mockTransaction, never()).show(toBackChange.leash)
+        verify(mockTransaction, never()).setAlpha(eq(toBackChange.leash), any())
+        verify(mockTransaction, never()).setPosition(eq(toBackChange.leash), any(), any())
     }
 
     @Test
     fun setupInitialAnimationState_noSrcRoot_srcTaskLeashIsNull() {
-        val builder = TransitionInfoBuilder()
-            .addRoot(isSrc = false)
-            .addCrossDisplayTask(hasSnapshot = true)
+        val builder =
+            TransitionInfoBuilder().addRoot(isSrc = false).addCrossDisplayTask(hasSnapshot = true)
         val info = builder.build()
         val moveInfo = CrossDisplayMoveTransitionInfo.create(info)!!
 
-        transition.setupInitialAnimationState(info, moveInfo, mockTransaction)
+        CrossDisplayMoveTransition.setupInitialAnimationState(info, moveInfo, mockTransaction)
 
         // Verify reparenting
         verify(mockTransaction).reparent(moveInfo.dstTaskLeash, moveInfo.dstRoot.leash)
 
         // Null src leash means the src screenshot should have been set to null
         assertNull(moveInfo.srcTaskLeash)
+    }
+
+    @Test
+    fun setupInitialAnimationState_closingActivityEmbedding_hidesActivity() {
+        val activityEmbeddingLeash = mock<SurfaceControl>()
+        val info =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = false)
+                .addCrossDisplayActivityEmbeddingTask(
+                    activityEmbeddingLeash = activityEmbeddingLeash,
+                    activityEmbeddingTransitMode = TRANSIT_CLOSE,
+                )
+                .build()
+        val moveInfo = CrossDisplayMoveTransitionInfo.create(info)!!
+
+        CrossDisplayMoveTransition.setupInitialAnimationState(info, moveInfo, mockTransaction)
+
+        verify(mockTransaction).hide(activityEmbeddingLeash)
+    }
+
+    @Test
+    fun setupInitialAnimationState_toBackActivityEmbedding_hidesActivity() {
+        val activityEmbeddingLeash = mock<SurfaceControl>()
+        val info =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = false)
+                .addCrossDisplayActivityEmbeddingTask(
+                    activityEmbeddingLeash = activityEmbeddingLeash,
+                    activityEmbeddingTransitMode = TRANSIT_TO_BACK,
+                )
+                .build()
+        val moveInfo = CrossDisplayMoveTransitionInfo.create(info)!!
+
+        CrossDisplayMoveTransition.setupInitialAnimationState(info, moveInfo, mockTransaction)
+
+        verify(mockTransaction).hide(activityEmbeddingLeash)
+    }
+
+    @Test
+    fun startAnimation_closingActivityEmbedding_nullContainer_doesNotCrash() {
+        val info =
+            TransitionInfoBuilder()
+                .addRoot(isSrc = false)
+                .addCrossDisplayActivityEmbeddingTask(taskContainer = null)
+                .build()
+        val moveInfo = CrossDisplayMoveTransitionInfo.create(info)!!
+
+        CrossDisplayMoveTransition.setupInitialAnimationState(info, moveInfo, mockTransaction)
+
+        // No crash is a pass
     }
 }

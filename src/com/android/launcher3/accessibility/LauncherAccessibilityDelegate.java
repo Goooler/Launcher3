@@ -4,18 +4,20 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS;
 import static android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK;
 
+import static com.android.launcher3.AbstractFloatingView.TYPE_WIDGET_RESIZE_FRAME;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.accessibility.WidgetResizePopupDataSource.decreaseHeightAction;
+import static com.android.launcher3.accessibility.WidgetResizePopupDataSource.decreaseWidthAction;
+import static com.android.launcher3.accessibility.WidgetResizePopupDataSource.increaseHeightAction;
+import static com.android.launcher3.accessibility.WidgetResizePopupDataSource.increaseWidthAction;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_NOT_PINNABLE;
 
 import android.animation.AnimatorSet;
-import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
 import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.os.Handler;
 import android.util.Log;
 import android.util.Pair;
@@ -27,7 +29,7 @@ import android.view.accessibility.AccessibilityEvent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
-import com.android.launcher3.AppWidgetResizeFrame;
+import com.android.launcher3.AppWidgetResizeFrameBase;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.ButtonDropTarget;
 import com.android.launcher3.CellLayout;
@@ -37,22 +39,27 @@ import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Workspace;
-import com.android.launcher3.celllayout.CellLayoutLayoutParams;
+import com.android.launcher3.apppairs.AppPairIcon;
+import com.android.launcher3.automation.AutomationRepository;
 import com.android.launcher3.dragndrop.DragOptions;
-import com.android.launcher3.dragndrop.DragOptions.PreDragCondition;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.folder.Folder;
+import com.android.launcher3.folder.FolderIcon;
+import com.android.launcher3.homescreenfiles.HomeScreenFilesUtilsKt;
 import com.android.launcher3.keyboard.KeyboardDragAndDropView;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.popup.ArrowPopup;
+import com.android.launcher3.popup.Popup;
 import com.android.launcher3.popup.PopupContainer;
+import com.android.launcher3.popup.PopupController;
+import com.android.launcher3.popup.PopupData;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.IntArray;
@@ -60,11 +67,9 @@ import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.BubbleTextHolder;
-import com.android.launcher3.views.OptionsPopupView;
-import com.android.launcher3.views.OptionsPopupView.OptionItem;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
+import com.android.launcher3.widget.NavigableAppWidgetHostView;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
-import com.android.launcher3.widget.util.WidgetSizeHandler;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -147,7 +152,7 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
             }
         }
 
-        if (host instanceof AppWidgetResizeFrame) {
+        if (host instanceof AppWidgetResizeFrameBase) {
             out.add(mActions.get(CLOSE));
         }
 
@@ -157,6 +162,9 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
     }
 
     private boolean supportAddToWorkSpace(ItemInfo item) {
+        if (item.container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
+            return false;
+        }
         return ((item instanceof AppInfo)
                     && (((AppInfo) item).runtimeStatusFlags & FLAG_NOT_PINNABLE) == 0)
                 || ((item instanceof WorkspaceItemInfo)
@@ -185,38 +193,43 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
     protected boolean performAction(final View host, final ItemInfo item, int action,
             boolean fromKeyboard) {
         if (action == ACTION_LONG_CLICK) {
-            PreDragCondition dragCondition = null;
+            PopupController<Launcher> popupController = null;
             // Long press should be consumed for workspace items, and it should invoke the
             // Shortcuts / Notifications / Actions pop-up menu, and not start a drag as the
             // standard long press path does.
-            if (host instanceof BubbleTextView) {
-                dragCondition = ((BubbleTextView) host)
-                        .startLongPressAction(mContext.getPopupControllerForAppIcons());
-            } else if (host instanceof BubbleTextHolder) {
-                BubbleTextHolder holder = (BubbleTextHolder) host;
-                dragCondition = holder.getBubbleText() == null ? null
-                        : holder.getBubbleText()
-                                .startLongPressAction(mContext.getPopupControllerForAppIcons());
+            if (host instanceof BubbleTextView || (host instanceof BubbleTextHolder
+                    && ((BubbleTextHolder) host).getBubbleText() != null)) {
+                popupController = ShortcutUtil.supportsShortcuts(item)
+                        ? mContext.getPopupControllerForAppIcons()
+                        : mContext.getPopupControllerForHomeScreenItems();
+            } else if (host instanceof FolderIcon || host instanceof AppPairIcon
+                    || host instanceof NavigableAppWidgetHostView) {
+                popupController = mContext.getPopupControllerForHomeScreenItems();
             }
-            return dragCondition != null;
+
+            if (popupController == null) {
+                return false;
+            }
+
+            Popup popup = popupController.show(host);
+            return popup != null && popup.createPreDragCondition() != null;
         } else if (action == MOVE) {
-            final View itemView = (host instanceof AppWidgetResizeFrame)
-                    ? ((AppWidgetResizeFrame) host).getViewForAccessibility()
-                    : host;
+            final View itemView = (host instanceof AppWidgetResizeFrameBase)
+                    ? ((AppWidgetResizeFrameBase) host).getViewForAccessibility() : host;
             return beginAccessibleDrag(itemView, item, fromKeyboard);
         } else if (action == ADD_TO_WORKSPACE) {
             return addToWorkspace(item, true /*accessibility*/, null /*finishCallback*/);
         } else if (action == MOVE_TO_WORKSPACE) {
             return moveToWorkspace(item);
         } else if (action == RESIZE) {
-            final View itemView = (host instanceof AppWidgetResizeFrame)
-                    ? ((AppWidgetResizeFrame) host).getViewForAccessibility()
-                    : host;
+            final View itemView = (host instanceof AppWidgetResizeFrameBase)
+                    ? ((AppWidgetResizeFrameBase) host).getViewForAccessibility() : host;
             final LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) item;
-            List<OptionItem> actions = getSupportedResizeActions(itemView, info);
-            Rect pos = new Rect();
-            mContext.getDragLayer().getDescendantRectRelativeToSelf(itemView, pos);
-            ArrowPopup popup = OptionsPopupView.show(mContext, new RectF(pos), actions, false);
+            List<PopupData> actions = getSupportedResizeActions(itemView, info);
+            var popup = PopupContainer.Companion.showForMenuItems(mContext, itemView, actions);
+            if (popup == null) {
+                return false;
+            }
             popup.requestFocus();
             popup.addOnCloseCallback(() -> {
                 itemView.requestFocus();
@@ -235,9 +248,9 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                     && mContext.getPopupControllerForAppIcons()
                     .show(btv) != null;
         } else if (action == CLOSE) {
-            if (host instanceof AppWidgetResizeFrame) {
+            if (host instanceof AppWidgetResizeFrameBase) {
                 AbstractFloatingView.closeOpenViews(mContext, /* animate= */ false,
-                        AbstractFloatingView.TYPE_WIDGET_RESIZE_FRAME);
+                        TYPE_WIDGET_RESIZE_FRAME);
             }
         } else {
             for (ButtonDropTarget dropTarget : mContext.getDropTargetBar().getDropTargets()) {
@@ -251,11 +264,11 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
         return false;
     }
 
-    private List<OptionItem> getSupportedResizeActions(View host, LauncherAppWidgetInfo info) {
-        List<OptionItem> actions = new ArrayList<>();
-        if (host instanceof AppWidgetResizeFrame) {
+    private List<PopupData> getSupportedResizeActions(View host, LauncherAppWidgetInfo info) {
+        List<PopupData> actions = new ArrayList<>();
+        if (host instanceof AppWidgetResizeFrameBase) {
             return getSupportedResizeActions(
-                    ((AppWidgetResizeFrame) host).getViewForAccessibility(), info);
+                    ((AppWidgetResizeFrameBase) host).getViewForAccessibility(), info);
         }
         AppWidgetProviderInfo providerInfo = ((LauncherAppWidgetHostView) host).getAppWidgetInfo();
         if (providerInfo == null) {
@@ -275,77 +288,25 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
         if ((providerInfo.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0) {
             if (layout.isRegionVacant(info.cellX + info.spanX, info.cellY, 1, info.spanY) ||
                     layout.isRegionVacant(info.cellX - 1, info.cellY, 1, info.spanY)) {
-                actions.add(new OptionItem(mContext,
-                        R.string.action_increase_width,
-                        R.drawable.ic_widget_width_increase,
-                        IGNORE,
-                        v -> performResizeAction(R.string.action_increase_width, host, info)));
+                actions.add(increaseWidthAction());
             }
 
             if (info.spanX > info.minSpanX && info.spanX > 1) {
-                actions.add(new OptionItem(mContext,
-                        R.string.action_decrease_width,
-                        R.drawable.ic_widget_width_decrease,
-                        IGNORE,
-                        v -> performResizeAction(R.string.action_decrease_width, host, info)));
+                actions.add(decreaseWidthAction());
             }
         }
 
         if ((providerInfo.resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0) {
             if (layout.isRegionVacant(info.cellX, info.cellY + info.spanY, info.spanX, 1) ||
                     layout.isRegionVacant(info.cellX, info.cellY - 1, info.spanX, 1)) {
-                actions.add(new OptionItem(mContext,
-                        R.string.action_increase_height,
-                        R.drawable.ic_widget_height_increase,
-                        IGNORE,
-                        v -> performResizeAction(R.string.action_increase_height, host, info)));
+                actions.add(increaseHeightAction());
             }
 
             if (info.spanY > info.minSpanY && info.spanY > 1) {
-                actions.add(new OptionItem(mContext,
-                        R.string.action_decrease_height,
-                        R.drawable.ic_widget_height_decrease,
-                        IGNORE,
-                        v -> performResizeAction(R.string.action_decrease_height, host, info)));
+                actions.add(decreaseHeightAction());
             }
         }
         return actions;
-    }
-
-    private boolean performResizeAction(int action, View host, LauncherAppWidgetInfo info) {
-        CellLayoutLayoutParams lp = (CellLayoutLayoutParams) host.getLayoutParams();
-        CellLayout layout = (CellLayout) host.getParent().getParent();
-        layout.markCellsAsUnoccupiedForView(host);
-
-        if (action == R.string.action_increase_width) {
-            if (((host.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
-                    && layout.isRegionVacant(info.cellX - 1, info.cellY, 1, info.spanY))
-                    || !layout.isRegionVacant(info.cellX + info.spanX, info.cellY, 1, info.spanY)) {
-                lp.setCellX(lp.getCellX() - 1);
-                info.cellX --;
-            }
-            lp.cellHSpan ++;
-            info.spanX ++;
-        } else if (action == R.string.action_decrease_width) {
-            lp.cellHSpan --;
-            info.spanX --;
-        } else if (action == R.string.action_increase_height) {
-            if (!layout.isRegionVacant(info.cellX, info.cellY + info.spanY, info.spanX, 1)) {
-                lp.setCellY(lp.getCellY() - 1);
-                info.cellY --;
-            }
-            lp.cellVSpan ++;
-            info.spanY ++;
-        } else if (action == R.string.action_decrease_height) {
-            lp.cellVSpan --;
-            info.spanY --;
-        }
-
-        layout.markCellsAsOccupiedForView(host);
-        WidgetSizeHandler.updateSizeRanges((AppWidgetHostView) host, info.spanX, info.spanY);
-        host.requestLayout();
-        mContext.getModelWriter().updateItemInDatabase(info);
-        return true;
     }
 
     @Thunk void announceConfirmation(int resId) {
@@ -368,6 +329,8 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
             mDragInfo.dragType = DragType.APP_PAIR;
         } else if (info instanceof LauncherAppWidgetInfo) {
             mDragInfo.dragType = DragType.WIDGET;
+        } else if (HomeScreenFilesUtilsKt.isFileSystemItem(info)) {
+            mDragInfo.dragType = DragType.FILESYSTEM_ICON;
         }
 
         Rect pos = new Rect();
@@ -451,54 +414,80 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
 
         final int[] coordinates = new int[2];
         final int screenId = findSpaceOnWorkspace(item, coordinates);
-        if (screenId == -1) {
+        final CellLayout layout = mContext.getWorkspace().getScreenWithId(screenId);
+        if (screenId == -1 || layout == null) {
             if (finishCallback != null) {
                 finishCallback.accept(false /*success*/);
             }
             return false;
         }
-        mContext.getStateManager().goToState(NORMAL, true, forSuccessCallback(() -> {
-            if (item instanceof WorkspaceItemFactory) {
-                WorkspaceItemInfo info = ((WorkspaceItemFactory) item).makeWorkspaceItem(mContext);
-                mContext.getModelWriter().addItemToDatabase(info,
-                        LauncherSettings.Favorites.CONTAINER_DESKTOP,
-                        screenId, coordinates[0], coordinates[1]);
-
-                bindItem(info, accessibility, finishCallback);
-            } else if (item instanceof PendingAddItemInfo) {
-                PendingAddItemInfo info = (PendingAddItemInfo) item;
-                if (info instanceof PendingAddWidgetInfo widgetInfo
-                        && widgetInfo.bindOptions == null) {
-                    widgetInfo.bindOptions = widgetInfo.getDefaultSizeOptions(mContext);
-                }
-                Workspace<?> workspace = mContext.getWorkspace();
-                workspace.post(() -> {
-                    workspace.snapToPage(workspace.getPageIndexForScreenId(screenId));
-                    workspace.setOnPageTransitionEndCallback(() -> {
-                        mContext.addPendingItem(info, LauncherSettings.Favorites.CONTAINER_DESKTOP,
-                                screenId, coordinates, info.spanX, info.spanY);
-                        if (finishCallback != null) {
-                            finishCallback.accept(/* success= */ true);
-                        }
-                    });
-                });
-            } else if (item instanceof WorkspaceItemInfo) {
-                WorkspaceItemInfo info = ((WorkspaceItemInfo) item).clone();
-                mContext.getModelWriter().addItemToDatabase(info,
-                        LauncherSettings.Favorites.CONTAINER_DESKTOP,
-                        screenId, coordinates[0], coordinates[1]);
-                bindItem(info, accessibility, finishCallback);
-            } else if (item instanceof CollectionInfo ci) {
-                Workspace<?> workspace = mContext.getWorkspace();
-                workspace.snapToPage(workspace.getPageIndexForScreenId(screenId));
-                mContext.getModelWriter().addItemToDatabase(ci,
-                        LauncherSettings.Favorites.CONTAINER_DESKTOP, screenId, coordinates[0],
-                        coordinates[1]);
-                ci.getContents().forEach(member ->
-                        mContext.getModelWriter()
-                                .addItemToDatabase(member, ci.id, -1, -1, -1));
-                bindItem(ci, accessibility, finishCallback);
+        layout.setDropPending(true);
+        @Nullable Consumer<Boolean> wrappedDropCallback = (success) -> {
+            layout.setDropPending(false);
+            if (finishCallback != null) {
+                finishCallback.accept(success);
             }
+        };
+
+        Runnable itemBindLogic = () -> {
+            switch (item) {
+                case WorkspaceItemFactory workspaceItemFactory -> {
+                    WorkspaceItemInfo info = workspaceItemFactory.makeWorkspaceItem(mContext);
+                    info.checkAndApplyAutomationFlag(AutomationRepository.INSTANCE.get(mContext));
+                    mContext.getModelWriter().addItemToDatabase(info,
+                            LauncherSettings.Favorites.CONTAINER_DESKTOP,
+                            screenId, coordinates[0], coordinates[1]);
+                    bindItem(info, accessibility, wrappedDropCallback);
+                }
+                case PendingAddItemInfo info -> {
+                    if (info instanceof PendingAddWidgetInfo widgetInfo
+                            && widgetInfo.bindOptions == null) {
+                        widgetInfo.bindOptions = widgetInfo.getDefaultSizeOptions(mContext);
+                    }
+                    mContext.addPendingItem(info, LauncherSettings.Favorites.CONTAINER_DESKTOP,
+                            screenId, coordinates, info.spanX, info.spanY);
+                    // For PendingAddItemInfo, the wrappedDropCallback should be called directly
+                    // here as there is no subsequent bindItem call.
+                    wrappedDropCallback.accept(/* success= */ true);
+                }
+                case WorkspaceItemInfo workspaceItemInfo -> {
+                    WorkspaceItemInfo info = workspaceItemInfo.clone();
+                    info.checkAndApplyAutomationFlag(AutomationRepository.INSTANCE.get(mContext));
+                    mContext.getModelWriter().addItemToDatabase(info,
+                            LauncherSettings.Favorites.CONTAINER_DESKTOP,
+                            screenId, coordinates[0], coordinates[1]);
+                    bindItem(info, accessibility, wrappedDropCallback);
+                }
+                case CollectionInfo ci -> {
+                    mContext.getModelWriter().addItemToDatabase(ci,
+                            LauncherSettings.Favorites.CONTAINER_DESKTOP, screenId, coordinates[0],
+                            coordinates[1]);
+                    AutomationRepository automationRepo =
+                            AutomationRepository.INSTANCE.get(mContext);
+                    ci.getContents().forEach(member -> {
+                        if (member instanceof ItemInfoWithIcon iiwi) {
+                            iiwi.checkAndApplyAutomationFlag(automationRepo);
+                        }
+                        mContext.getModelWriter().addItemToDatabase(member, ci.id, -1, -1, -1);
+                    });
+                    bindItem(ci, accessibility, wrappedDropCallback);
+                }
+                default -> {
+                }
+            }
+        };
+
+        mContext.getStateManager().goToState(NORMAL, true, forSuccessCallback(() -> {
+            Workspace<?> workspace = mContext.getWorkspace();
+            int pageIndex = workspace.getPageIndexForScreenId(screenId);
+            workspace.post(() -> {
+                if (workspace.getCurrentPage() == pageIndex) {
+                    itemBindLogic.run();
+                } else {
+                    workspace.snapToPage(pageIndex);
+                    workspace.setOnPageTransitionEndCallback(itemBindLogic);
+                }
+            });
         }));
         return true;
     }

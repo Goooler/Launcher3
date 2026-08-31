@@ -25,6 +25,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Icon
 import android.os.Process
 import android.view.ViewGroup
+import com.android.users.UserType
 import com.android.wm.shell.shared.bubbles.BubbleInfo
 
 object FakeBubbleViewFactory {
@@ -55,8 +56,10 @@ object FakeBubbleViewFactory {
                 "test app",
                 "test app",
                 false,
-                true,
                 null,
+                false,
+                false,
+                UserType.MAIN,
             )
         return BubbleCreator(context)
             .populateBubble(

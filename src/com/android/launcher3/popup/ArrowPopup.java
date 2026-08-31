@@ -37,12 +37,15 @@ import android.util.Pair;
 import android.util.Property;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
 
+import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.AbstractFloatingView;
@@ -61,8 +64,7 @@ import com.android.launcher3.views.BaseDragLayer;
  *
  * @param <T> The activity on with the popup shows
  */
-public abstract class ArrowPopup<T extends Context & ActivityContext>
-        extends AbstractFloatingView {
+public abstract class ArrowPopup<T extends ActivityContext> extends AbstractFloatingView {
 
     // Duration values (ms) for popup open and close animations.
     protected int mOpenDuration = 276;
@@ -84,7 +86,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
     private static final int OPEN_CHILD_FADE_DURATION_U = 83;
     private static final int OPEN_OVERSHOOT_DURATION_U = 200;
 
-    private static final int CLOSE_DURATION_U  = 233;
+    @VisibleForTesting public static final int CLOSE_DURATION_U  = 233;
     private static final int CLOSE_FADE_START_DELAY_U = 150;
     private static final int CLOSE_FADE_DURATION_U = 83;
     private static final int CLOSE_CHILD_FADE_START_DELAY_U = 150;
@@ -123,7 +125,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
     // The rect string of the view that the arrow is attached to, in screen reference frame.
     protected int mArrowColor;
 
-    protected final float mElevation;
+    protected float mElevation;
 
     // Tag for Views that have children that will need to be iterated to add styling.
     private final String mIterateChildrenTag;
@@ -134,7 +136,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         super(context, attrs, defStyleAttr);
         mInflater = LayoutInflater.from(context);
         mOutlineRadius = Themes.getDialogCornerRadius(context);
-        mActivityContext = ActivityContext.lookupContext(context);
+        mActivityContext = (T) ActivityContext.lookupContext(context);
         mIsRtl = Utilities.isRtl(getResources());
         mElevation = getResources().getDimension(R.dimen.deep_shortcuts_elevation);
 
@@ -253,7 +255,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
                 mlp.bottomMargin = 0;
 
                 if (colors != null && isShortcutContainer(view)) {
-                    setChildColor(view, colors[0], colorAnimator);
+                    setChildColor(view.getBackground(), colors[0], colorAnimator);
                     mArrowColor = colors[0];
                 }
 
@@ -277,7 +279,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
                     }
                 }
 
-                setChildColor(view, backgroundColor, colorAnimator);
+                setChildColor(view.getBackground(), backgroundColor, colorAnimator);
             }
         }
 
@@ -302,8 +304,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
     /**
      * Sets the background color of the child.
      */
-    protected void setChildColor(View view, int color, AnimatorSet animatorSetOut) {
-        Drawable bg = view.getBackground();
+    protected void setChildColor(Drawable bg, int color, AnimatorSet animatorSetOut) {
         if (bg instanceof GradientDrawable) {
             GradientDrawable gd = (GradientDrawable) bg.mutate();
             int oldColor = ((GradientDrawable) bg).getColor().getDefaultColor();
@@ -389,6 +390,10 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
      */
     protected abstract void getTargetObjectLocation(Rect outPos);
 
+    protected void orientAboutObject(@Px int maxHeightPx) {
+        orientAboutObject(/* allowAlignLeft */ true, /* allowAlignRight */ true, maxHeightPx);
+    }
+
     /**
      * Orients this container above or below the given icon, aligning with the left or right.
      *
@@ -402,7 +407,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
      * and align above if there is enough vertical space.
      */
     protected void orientAboutObject() {
-        orientAboutObject(true /* allowAlignLeft */, true /* allowAlignRight */);
+        orientAboutObject(/* allowAlignLeft */ true, /* allowAlignRight */ true, /* maxHeight */ 0);
     }
 
     /**
@@ -410,9 +415,12 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
      *
      * @param allowAlignLeft Set to false if we already tried aligning left and didn't have room.
      * @param allowAlignRight Set to false if we already tried aligning right and didn't have room.
+     * @param maxHeightPx is used for expandable popup menu, otherwise it is 0 and we use measured
+     *      height.
      * TODO: Can we test this with all permutations of widths/heights and icon locations + RTL?
      */
-    private void orientAboutObject(boolean allowAlignLeft, boolean allowAlignRight) {
+    private void orientAboutObject(boolean allowAlignLeft, boolean allowAlignRight,
+            @Px int maxHeightPx) {
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
 
         int extraVerticalSpace = mArrowHeight + mArrowOffsetVertical + getExtraVerticalOffset();
@@ -455,7 +463,7 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
             if (!alignmentStillValid) {
                 // Try again, but don't allow this alignment we already know won't work.
                 orientAboutObject(allowAlignLeft && !mIsLeftAligned /* allowAlignLeft */,
-                        allowAlignRight && mIsLeftAligned /* allowAlignRight */);
+                        allowAlignRight && mIsLeftAligned /* allowAlignRight */, maxHeightPx);
                 return;
             }
         }
@@ -463,7 +471,8 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         // Open above icon if there is room.
         int iconHeight = mTempRect.height();
         int y = mTempRect.top - height;
-        mIsAboveIcon = y > dragLayer.getTop() + insets.top;
+        mIsAboveIcon = (maxHeightPx == 0 ? y
+                : (mTempRect.top - maxHeightPx)) > dragLayer.getTop() + insets.top;
         if (!mIsAboveIcon) {
             y = mTempRect.top + iconHeight + extraVerticalSpace;
             height -= extraVerticalSpace;
@@ -570,9 +579,16 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
                 setAlpha(1f);
                 announceAccessibilityChanges();
                 mOpenCloseAnimator = null;
+                if (requestFocusOnOpened()) {
+                    requestFocus();
+                }
             }
         });
         mOpenCloseAnimator.start();
+    }
+
+    protected boolean requestFocusOnOpened() {
+        return false;
     }
 
     private void fadeInChildViews(ViewGroup group, float[] alphaValues, long startDelay,
@@ -705,6 +721,14 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
      * Called when creating the close transition allowing subclass can add additional animations.
      */
     protected void onCreateCloseAnimation(AnimatorSet anim) { }
+
+    @Override
+    public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
+        if (getPointerIcon() == null) {
+            return PointerIcon.getSystemIcon(getContext(), PointerIcon.TYPE_DEFAULT);
+        }
+        return super.onResolvePointerIcon(event, pointerIndex);
+    }
 
     /**
      * Closes the popup without animation.

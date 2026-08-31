@@ -23,6 +23,7 @@ import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
 import static com.android.launcher3.allapps.UserProfileManager.STATE_DISABLED;
 import static com.android.launcher3.allapps.UserProfileManager.STATE_ENABLED;
 import static com.android.launcher3.model.data.AppsListData.FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import static org.junit.Assert.assertEquals;
@@ -53,6 +54,7 @@ import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.util.rule.MockUsersRule;
 import com.android.launcher3.util.rule.MockUsersRule.MockUser;
 import com.android.launcher3.util.rule.TestStabilityRule;
+import com.android.users.UserType;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -65,13 +67,13 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 @RunWith(AndroidJUnit4.class)
-@MockUser(userType = UserIconInfo.TYPE_MAIN)
-@MockUser(userType = UserIconInfo.TYPE_PRIVATE)
+@MockUser(userType = UserType.MAIN)
+@MockUser(userType = UserType.PRIVATE)
 public class PrivateProfileManagerTest {
 
     @Rule public TestRule testStabilityRule = new TestStabilityRule();
     @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
-    @Rule public SandboxApplication app = spy(new SandboxApplication().withModelDependency());
+    @Rule public SandboxApplication app = new SandboxApplication().withModelDependency();
     @Rule public MockUsersRule mockUserRule = new MockUsersRule(app);
     @Rule public TestActivityContext context = new TestActivityContext(app);
 
@@ -100,7 +102,8 @@ public class PrivateProfileManagerTest {
                 .getIntentSender()).when(launcherApps).getAppMarketActivityIntent(any(), any());
 
         mPrivateProfileManager = spy(new PrivateProfileManager(
-                mActivityAllAppsContainerView, mStatsLogManager, UserCache.getInstance(app)));
+                mActivityAllAppsContainerView, MAIN_EXECUTOR, mStatsLogManager,
+                UserCache.getInstance(app)));
         doReturn(mAllAppsRecyclerView).when(mPrivateProfileManager).getMainRecyclerView();
 
         mUserManager = app.spyService(UserManager.class);

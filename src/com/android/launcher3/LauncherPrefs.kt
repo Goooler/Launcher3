@@ -29,12 +29,12 @@ import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.model.DeviceGridState
 import com.android.launcher3.pm.InstallSessionHelper
+import com.android.launcher3.popup.ui.ExpandedSection
 import com.android.launcher3.provider.RestoreDbTask
-import com.android.launcher3.provider.RestoreDbTask.FIRST_LOAD_AFTER_RESTORE_KEY
+import com.android.launcher3.provider.RestoreDbTask.Companion.FIRST_LOAD_AFTER_RESTORE_KEY
 import com.android.launcher3.settings.SettingsActivity
-import com.android.launcher3.states.RotationHelper
 import com.android.launcher3.util.DaggerSingletonObject
-import com.android.launcher3.util.DisplayController
+import com.android.launcher3.util.DefaultsValueProvider
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
@@ -54,7 +54,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
             .getSharedPreferences(BOOT_AWARE_PREFS_KEY, MODE_PRIVATE)
     }
 
-    open protected fun getSharedPrefs(item: Item): SharedPreferences =
+    protected open fun getSharedPrefs(item: Item): SharedPreferences =
         item.run {
             if (encryptionType == EncryptionType.DEVICE_PROTECTED) deviceProtectedSharedPrefs
             else encryptedContext.getSharedPreferences(sharedPrefFile, MODE_PRIVATE)
@@ -95,6 +95,10 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 sp.getLong(item.sharedPrefKey, default as Long)
             Set::class.java.isAssignableFrom(item.type) ->
                 sp.getStringSet(item.sharedPrefKey, default as? Set<String>)
+            item.type.isEnum -> {
+                val name = sp.getString(item.sharedPrefKey, (default as Enum<*>).name)
+                item.type.enumConstants?.find { (it as Enum<*>).name == name } ?: default
+            }
             else ->
                 throw IllegalArgumentException(
                     "item type: ${item.type}" + " is not compatible with sharedPref methods"
@@ -167,6 +171,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 putLong(item.sharedPrefKey, value as Long)
             Set::class.java.isAssignableFrom(item.type) ->
                 putStringSet(item.sharedPrefKey, value as? Set<String>)
+            item.type.isEnum -> putString(item.sharedPrefKey, (value as Enum<*>).name)
             else ->
                 throw IllegalArgumentException(
                     "item type: ${item.type} is not compatible with sharedPref methods"
@@ -239,6 +244,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
     companion object {
         @VisibleForTesting const val BOOT_AWARE_PREFS_KEY = "boot_aware_prefs"
 
+        const val COMPOSITION_TRACING_PREF_KEY = "pref_enableCompositionTracing"
+
         @JvmField val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getLauncherPrefs)
 
         @JvmStatic fun get(context: Context): LauncherPrefs = INSTANCE.get(context)
@@ -246,8 +253,14 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         const val TASKBAR_PINNING_KEY = "TASKBAR_PINNING_KEY"
         const val TASKBAR_PINNING_DESKTOP_MODE_KEY = "TASKBAR_PINNING_DESKTOP_MODE_KEY"
 
+        const val ENABLE_TWO_LINE_TOGGLE_KEY: String = "pref_enable_two_line_toggle"
+
         @JvmField
-        val ENABLE_TWOLINE_ALLAPPS_TOGGLE = backedUpItem("pref_enable_two_line_toggle", false)
+        val ENABLE_TWOLINE_ALLAPPS_TOGGLE =
+            backedUpItem(ENABLE_TWO_LINE_TOGGLE_KEY, Boolean::class.java) { context ->
+                DefaultsValueProvider.get(context).enableTwoLineToggle
+            }
+
         @JvmField
         val PROMISE_ICON_IDS = nonRestorableItem(InstallSessionHelper.PROMISE_ICON_IDS, "")
         @JvmField val WORK_EDU_STEP = backedUpItem("showed_work_profile_edu", 0)
@@ -301,14 +314,18 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 encryptionType = EncryptionType.ENCRYPTED,
                 type = String::class.java,
             )
-        @JvmField
-        val ALLOW_ROTATION =
-            backedUpItem(RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY, Boolean::class.java) {
-                RotationHelper.getAllowRotationDefaultValue(DisplayController.INSTANCE.get(it).info)
-            }
+
+        @JvmField val ENABLE_COMPOSITION_TRACING = backedUpItem(COMPOSITION_TRACING_PREF_KEY, false)
 
         @JvmField
         val FIXED_LANDSCAPE_MODE = backedUpItem(SettingsActivity.FIXED_LANDSCAPE_MODE, false)
+
+        @JvmField
+        val WORKSPACE_ITEMS_LABEL_HIDDEN = backedUpItem("pref_workspace_items_label_hidden", false)
+
+        @JvmField
+        val EXPANDED_POPUP_MENU_SECTION =
+            backedUpItem("pref_expanded_popup_menu", ExpandedSection.SYSTEM)
 
         @JvmField
         val NON_FIXED_LANDSCAPE_GRID_NAME =
@@ -324,6 +341,18 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val RECONFIGURABLE_WIDGET_EDUCATION_TIP_SEEN =
             backedUpItem("launcher.reconfigurable_widget_education_tip_seen", false)
+
+        // Preferences for Launcher statistics
+        /* Format: a string converted from List<Long>. Sorted descendingly (latest to earliest). */
+        @JvmField
+        val ALL_APPS_TIP_SHOWN_TIMESTAMPS =
+            backedUpItem("launcher.all_apps_tip_shown_timestamps", "")
+
+        @JvmField val ALL_APPS_OPEN_UP_COUNT = backedUpItem("launcher.all_apps_open_up_count", 0)
+
+        @JvmField val INITIAL_TIMESTAMP = backedUpItem("launcher.initial_timestamp", 0L)
+
+        @JvmField val SELECT_TIP_SEEN = backedUpItem("launcher.select_tip_seen", false)
 
         @JvmStatic
         fun <T> backedUpItem(

@@ -20,6 +20,7 @@ import static android.view.RemoteAnimationTarget.MODE_CLOSING;
 import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
 
+import static com.android.launcher3.Flags.enableTaskbarUiThread;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.wm.shell.shared.TransitionUtil.TYPE_SPLIT_SCREEN_DIM_LAYER;
 
@@ -30,6 +31,7 @@ import android.util.ArraySet;
 import android.view.RemoteAnimationTarget;
 import android.window.TransitionInfo;
 
+import androidx.annotation.AnyThread;
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.UiThread;
@@ -47,7 +49,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Wrapper around {@link com.android.systemui.shared.system.RecentsAnimationListener} which
@@ -55,8 +59,8 @@ import java.util.Set;
  */
 public class RecentsAnimationCallbacks implements
         com.android.systemui.shared.system.RecentsAnimationListener {
-
-    private final Set<RecentsAnimationListener> mListeners = new ArraySet<>();
+    private final Set<RecentsAnimationListener> mListeners = enableTaskbarUiThread()
+            ? ConcurrentHashMap.newKeySet() : new ArraySet<>();
     private final boolean mIsContainerRecentsWindowManager;
 
     // TODO(141886704): Remove these references when they are no longer needed
@@ -68,15 +72,19 @@ public class RecentsAnimationCallbacks implements
         mIsContainerRecentsWindowManager = container instanceof RecentsWindowManager;
     }
 
-    @UiThread
+    @AnyThread
     public void addListener(RecentsAnimationListener listener) {
-        Preconditions.assertUIThread();
+        if (!enableTaskbarUiThread()) {
+            Preconditions.assertUIThread();
+        }
         mListeners.add(listener);
     }
 
-    @UiThread
+    @AnyThread
     public void removeListener(RecentsAnimationListener listener) {
-        Preconditions.assertUIThread();
+        if (!enableTaskbarUiThread()) {
+            Preconditions.assertUIThread();
+        }
         mListeners.remove(listener);
     }
 
@@ -169,15 +177,20 @@ public class RecentsAnimationCallbacks implements
 
     private void onAnimationFinished(RecentsAnimationController controller) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
-            ActiveGestureProtoLogProxy.logAbsSwipeUpHandlerOnRecentsAnimationFinished();
+            ActiveGestureProtoLogProxy.logRecentsAnimationCallbacksOnRecentsAnimationFinished();
             for (RecentsAnimationListener listener : getListeners()) {
                 listener.onRecentsAnimationFinished(controller);
             }
         });
     }
 
-    private RecentsAnimationListener[] getListeners() {
-        return mListeners.toArray(new RecentsAnimationListener[mListeners.size()]);
+    void onRecentsAnimationStartTimedOut() {
+        Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
+            ActiveGestureProtoLogProxy.logRecentsAnimationCallbacksOnAnimationStartTimedOut();
+            for (RecentsAnimationListener listener : getListeners()) {
+                listener.onRecentsAnimationStartTimedOut();
+            }
+        });
     }
 
     private void classifyTargets(RemoteAnimationTarget[] appTargets,
@@ -197,6 +210,10 @@ public class RecentsAnimationCallbacks implements
         pw.println(prefix + "RecentsAnimationCallbacks:");
 
         pw.println(prefix + "\tmCancelled=" + mCancelled);
+    }
+
+    private Iterable<RecentsAnimationListener> getListeners() {
+        return enableTaskbarUiThread() ? List.copyOf(mListeners) : new ArrayList<>(mListeners);
     }
 
     /**
@@ -223,5 +240,10 @@ public class RecentsAnimationCallbacks implements
          */
         default void onTasksAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTarget,
                 @Nullable TransitionInfo transitionInfo) {}
+
+        /**
+         * Callback made when the recents animation start times out in TaskAnimationManager.
+         */
+        default void onRecentsAnimationStartTimedOut() {}
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.snapshotFlow
 import com.android.launcher3.widgetpicker.WidgetPickerSingleton
 import com.android.launcher3.widgetpicker.domain.interactor.WidgetAppIconsInteractor
 import com.android.launcher3.widgetpicker.domain.interactor.WidgetsInteractor
+import com.android.launcher3.widgetpicker.shared.model.PickableWidget
 import com.android.launcher3.widgetpicker.shared.model.WidgetAppIcon
 import com.android.launcher3.widgetpicker.shared.model.WidgetAppId
 import com.android.launcher3.widgetpicker.shared.model.WidgetId

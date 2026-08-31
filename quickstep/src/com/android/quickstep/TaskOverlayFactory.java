@@ -16,9 +16,6 @@
 
 package com.android.quickstep;
 
-import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
-import static com.android.quickstep.views.OverviewActionsView.DISABLED_NO_THUMBNAIL;
-import static com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED;
 import static com.android.quickstep.views.RecentsViewContainer.containerFromContext;
 
 import android.annotation.SuppressLint;
@@ -62,20 +59,22 @@ import javax.inject.Inject;
  * Factory class to create and add an overlays on the TaskView
  */
 public class TaskOverlayFactory {
-
     @Inject
-    public TaskOverlayFactory() {
+    public TaskOverlayFactory(List<TaskShortcutFactory> perTaskShortcutFactories) {
+        mPerTaskShortcutFactories = perTaskShortcutFactories;
     }
+
+    private final List<TaskShortcutFactory> mPerTaskShortcutFactories;
 
     /**
      * Returns menu options associated with TaskContainer.
      */
-    public static List<SystemShortcut> getEnabledShortcuts(TaskView taskView,
+    public List<SystemShortcut> getEnabledShortcuts(TaskView taskView,
             @Nullable TaskContainer taskContainer) {
         final RecentsViewContainer container = containerFromContext(taskView.getContext());
         final ArrayList<SystemShortcut> shortcuts = new ArrayList<>();
         if (taskContainer != null) {
-            for (TaskShortcutFactory menuOption : PER_TASK_MENU_OPTIONS) {
+            for (TaskShortcutFactory menuOption : mPerTaskShortcutFactories) {
                 if (taskView instanceof GroupedTaskView && !menuOption.showForGroupedTask()) {
                     continue;
                 }
@@ -120,22 +119,6 @@ public class TaskOverlayFactory {
      */
     public void clearAllActiveState() { }
 
-    /** Note that these will be shown in order from top to bottom, if available for the task. */
-    private static final TaskShortcutFactory[] PER_TASK_MENU_OPTIONS = new TaskShortcutFactory[]{
-            TaskShortcutFactory.APP_INFO,
-            TaskShortcutFactory.SPLIT_SELECT,
-            TaskShortcutFactory.PIN,
-            TaskShortcutFactory.INSTALL,
-            TaskShortcutFactory.FREE_FORM,
-            DesktopSystemShortcut.Companion.createFactory(),
-            ExternalDisplaySystemShortcut.Companion.createFactory(),
-            AspectRatioSystemShortcut.Companion.createFactory(),
-            TaskShortcutFactory.WELLBEING,
-            TaskShortcutFactory.SAVE_APP_PAIR,
-            TaskShortcutFactory.SCREENSHOT,
-            TaskShortcutFactory.MODAL,
-    };
-
     /**
      * Overlay on each task handling Overview Action Buttons.
      */
@@ -148,6 +131,8 @@ public class TaskOverlayFactory {
         protected ImageActionsApi mImageApi;
         private ThumbnailData mThumbnailData = null;
 
+        private OverlayUICallbacksImpl mOverlayUICallbacks;
+
         protected TaskOverlay(TaskContainer taskContainer) {
             mApplicationContext = taskContainer.getTaskView().getContext().getApplicationContext();
             mTaskContainer = taskContainer;
@@ -159,37 +144,24 @@ public class TaskOverlayFactory {
         }
 
         protected @Nullable Bitmap getThumbnail() {
-            if (enableRefactorTaskThumbnail()) {
-                return mThumbnailData == null ? null : mThumbnailData.getThumbnail();
-            } else {
-                return mTaskContainer.getThumbnailViewDeprecated().getThumbnail();
-            }
+            return mThumbnailData == null ? null : mThumbnailData.getThumbnail();
         }
         /**
          * Returns whether the snapshot is real. If the device is locked for the user of the task,
          * the snapshot used will be an app-theme generated snapshot instead of a real snapshot.
          */
         protected boolean isRealSnapshot() {
-            if (enableRefactorTaskThumbnail()) {
-                if (mThumbnailData == null) return false;
+            if (mThumbnailData == null) return false;
 
-                return mThumbnailData.isRealSnapshot && !mTaskContainer.getTask().isLocked;
-            } else {
-                return mTaskContainer.getThumbnailViewDeprecated().isRealSnapshot();
-            }
+            return mThumbnailData.isRealSnapshot && !mTaskContainer.getTask().isLocked;
         }
 
         /**
          * Returns whether the snapshot is rotated compared to the current task orientation.
          */
         public boolean isThumbnailRotationDifferentFromTask() {
-            if (enableRefactorTaskThumbnail()) {
-                ThumbnailPosition thumbnailPosition = mTaskContainer.getThumbnailPosition();
-                return thumbnailPosition != null && thumbnailPosition.isRotated();
-            }
-
-            return mTaskContainer.getThumbnailViewDeprecated()
-                    .isThumbnailRotationDifferentFromTask();
+            ThumbnailPosition thumbnailPosition = mTaskContainer.getThumbnailPosition();
+            return thumbnailPosition != null && thumbnailPosition.isRotated();
         }
 
         protected T getActionsView() {
@@ -217,15 +189,9 @@ public class TaskOverlayFactory {
          */
         public void initOverlay(Task task, @Nullable Bitmap thumbnail, Matrix matrix,
                 boolean rotated) {
-            if (!enableRefactorTaskThumbnail()) {
-                getActionsView().updateDisabledFlags(DISABLED_NO_THUMBNAIL, thumbnail == null);
-            }
-
             if (thumbnail != null) {
-                if (!enableRefactorTaskThumbnail()) {
-                    getActionsView().updateDisabledFlags(DISABLED_ROTATED, rotated);
-                }
-                getActionsView().setCallbacks(new OverlayUICallbacksImpl(isRealSnapshot(), task));
+                mOverlayUICallbacks = new OverlayUICallbacksImpl(isRealSnapshot(), task);
+                getActionsView().setCallbacks(mOverlayUICallbacks);
             }
         }
 
@@ -307,6 +273,9 @@ public class TaskOverlayFactory {
          */
         public SystemShortcut getScreenshotShortcut(RecentsViewContainer container,
                 ItemInfo iteminfo, View originalView) {
+            if (mOverlayUICallbacks == null) {
+                return null;
+            }
             return new ScreenshotSystemShortcut(container, iteminfo, originalView);
         }
 
@@ -350,14 +319,10 @@ public class TaskOverlayFactory {
             // the difference between the bitmap bounds and the projected view bounds.
             Matrix boundsToBitmapSpace = new Matrix();
             Matrix thumbnailMatrix;
-            if (enableRefactorTaskThumbnail()) {
-                if (mTaskContainer.getThumbnailPosition() != null) {
-                    thumbnailMatrix = mTaskContainer.getThumbnailPosition().getMatrix();
-                } else {
-                    thumbnailMatrix = Matrix.IDENTITY_MATRIX;
-                }
+            if (mTaskContainer.getThumbnailPosition() != null) {
+                thumbnailMatrix = mTaskContainer.getThumbnailPosition().getMatrix();
             } else {
-                thumbnailMatrix = mTaskContainer.getThumbnailViewDeprecated().getThumbnailMatrix();
+                thumbnailMatrix = Matrix.IDENTITY_MATRIX;
             }
             thumbnailMatrix.invert(boundsToBitmapSpace);
             RectF boundsInBitmapSpace = new RectF();
@@ -365,7 +330,7 @@ public class TaskOverlayFactory {
 
             RecentsViewContainer container = containerFromContext(
                     getTaskView().getContext());
-            int bottomInset = container.getDeviceProfile().getDeviceProperties().isTablet()
+            int bottomInset = container.getDeviceProfile().getDeviceProperties().isLargeScreen()
                     ? Math.round(bitmapRect.bottom - boundsInBitmapSpace.bottom) : 0;
             return Insets.of(0, 0, 0, bottomInset);
         }
@@ -409,7 +374,7 @@ public class TaskOverlayFactory {
 
             @Override
             public void onClick(View view) {
-                saveScreenshot(mTaskContainer.getTask());
+                mOverlayUICallbacks.onScreenshot();
                 dismissTaskMenuView();
             }
         }

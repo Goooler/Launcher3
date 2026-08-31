@@ -17,14 +17,17 @@ package com.android.launcher3.testing;
 
 import static androidx.lifecycle.Lifecycle.State.DESTROYED;
 
-import static com.android.launcher3.Flags.enableFallbackOverviewInWindow;
-import static com.android.launcher3.Flags.enableLauncherOverviewInWindow;
+import static com.android.launcher3.Flags.enableTaskbarUiThread;
+import static com.android.launcher3.InvariantDeviceProfile.TYPE_PHONE;
+import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
 import static com.android.launcher3.allapps.AllAppsStore.DEFER_UPDATES_TEST;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
 import static com.android.launcher3.testing.shared.TestProtocol.TEST_INFO_RESPONSE_FIELD;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
-import static com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview;
+import static com.android.launcher3.util.Executors.getTaskbarUiThread;
+import static com.android.launcher3.util.OverviewReleaseFlags.enableFallbackOverviewInWindow;
+import static com.android.launcher3.util.OverviewReleaseFlags.enableLauncherOverviewInWindow;
 
 import android.app.Activity;
 import android.app.Application;
@@ -52,19 +55,20 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.dagger.LauncherComponentProvider;
+import com.android.launcher3.display.DisplayController;
+import com.android.launcher3.display.LauncherDisplayInfo;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.icons.ClockDrawableWrapper;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.ActivityLifecycleCallbacksAdapter;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.TaskbarModeUtil;
-import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -102,11 +106,12 @@ public class TestInformationHandler {
     private static int sActivitiesCreatedCount = 0;
 
     protected Context mContext;
-    protected DeviceProfile mDeviceProfile;
+    private DeviceProfile mPrimaryDeviceProfile;
 
     public void init(Context context) {
         mContext = context;
-        mDeviceProfile = InvariantDeviceProfile.INSTANCE.get(context).getDeviceProfile(context);
+        mPrimaryDeviceProfile =
+                InvariantDeviceProfile.INSTANCE.get(context).getDeviceProfile(context);
         if (sActivityLifecycleCallbacks == null) {
             sActivityLifecycleCallbacks = new ActivityLifecycleCallbacksAdapter() {
                 @Override
@@ -149,6 +154,9 @@ public class TestInformationHandler {
             }
 
             case TestProtocol.REQUEST_IS_LAUNCHER_INITIALIZED: {
+                if (enableTaskbarUiThread()) {
+                    getFromExecutorSync(getTaskbarUiThread(),  Bundle::new);
+                }
                 return getUIProperty(Bundle::putBoolean, t -> isLauncherInitialized(), () -> true);
             }
 
@@ -177,11 +185,6 @@ public class TestInformationHandler {
                         l -> l.getAppsView().getActiveRecyclerView().computeVerticalScrollOffset());
             }
 
-            case TestProtocol.REQUEST_WIDGETS_SCROLL_Y: {
-                return getLauncherUIProperty(Bundle::putInt,
-                        l -> WidgetsFullSheet.getWidgetsView(l).computeVerticalScrollOffset());
-            }
-
             case TestProtocol.REQUEST_TARGET_INSETS: {
                 return getUIProperty(Bundle::putParcelable, insets -> Insets.max(
                         insets.getSystemGestureInsets(),
@@ -194,8 +197,12 @@ public class TestInformationHandler {
             }
 
             case TestProtocol.REQUEST_CELL_LAYOUT_BOARDER_HEIGHT: {
-                response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        mDeviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().y);
+                response.putInt(
+                        TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        mPrimaryDeviceProfile
+                                .getWorkspaceProfile()
+                                .getCellLayoutBorderSpacePx()
+                                .y);
                 return response;
             }
 
@@ -211,7 +218,7 @@ public class TestInformationHandler {
 
             case TestProtocol.REQUEST_ICON_HEIGHT: {
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        mDeviceProfile.getAllAppsProfile().getCellHeightPx());
+                        mPrimaryDeviceProfile.getAllAppsProfile().getCellHeightPx());
                 return response;
             }
 
@@ -220,18 +227,19 @@ public class TestInformationHandler {
                 return response;
 
             case TestProtocol.REQUEST_IS_TABLET:
-                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, mDeviceProfile.getDeviceProperties().isTablet());
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        mPrimaryDeviceProfile.getDeviceProperties().isLargeScreen());
                 return response;
             case TestProtocol.REQUEST_IS_PREDICTIVE_BACK_SWIPE_ENABLED:
-                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        mDeviceProfile.isPredictiveBackSwipe);
-                return response;
-
+                return getLauncherUIProperty(
+                        Bundle::putBoolean, l -> l.isOnBackInvokedCallbackEnabled()
+                );
             case TestProtocol.REQUEST_TASKBAR_SHOWN_ON_HOME: {
-                DisplayController.Info displayInfo = DisplayController.INSTANCE.get(
+                LauncherDisplayInfo displayInfo = DisplayController.INSTANCE.get(
                         mContext).getInfoForDisplay(Integer.parseInt(arg));
                 response.putBoolean(TEST_INFO_RESPONSE_FIELD,
-                        displayInfo != null && displayInfo.showLockedTaskbarOnHome());
+                        displayInfo != null
+                                && displayInfo.getShowDesktopTaskbarForFreeformDisplay());
                 return response;
             }
 
@@ -244,32 +252,40 @@ public class TestInformationHandler {
             }
 
             case TestProtocol.REQUEST_IS_IN_DESKTOP_FIRST_MODE: {
-                DisplayController.Info displayInfo = DisplayController.INSTANCE.get(
+                LauncherDisplayInfo displayInfo = DisplayController.INSTANCE.get(
                         mContext).getInfoForDisplay(Integer.parseInt(arg));
                 response.putBoolean(TEST_INFO_RESPONSE_FIELD,
-                        displayInfo != null && displayInfo.isInDesktopFirstMode());
+                        displayInfo != null && displayInfo.isInDesktopFirstMode);
                 return response;
             }
 
             case TestProtocol.REQUEST_NUM_ALL_APPS_COLUMNS:
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        mDeviceProfile.numShownAllAppsColumns);
+                        mPrimaryDeviceProfile.getAllAppsProfile().getNumShownAllAppsColumns());
                 return response;
 
             case TestProtocol.REQUEST_IS_TRANSIENT_TASKBAR:
+                LauncherDisplayInfo displayInfo = DisplayController.INSTANCE.get(
+                        mContext).getInfoForDisplay(Integer.parseInt(arg));
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        TaskbarModeUtil.INSTANCE.get(mContext).isTransient());
+                        TaskbarModeUtil.INSTANCE.get(mContext).isTransient(displayInfo));
                 return response;
 
             case TestProtocol.REQUEST_IS_TWO_PANELS:
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        FOLDABLE_SINGLE_PAGE.get() ? false : mDeviceProfile.getDeviceProperties().isTwoPanels());
+                        !FOLDABLE_SINGLE_PAGE.get()
+                                && mPrimaryDeviceProfile.getDeviceProperties().isTwoPanels());
                 return response;
 
             case TestProtocol.REQUEST_GET_HAD_NONTEST_EVENTS:
                 response.putBoolean(
                         TestProtocol.TEST_INFO_RESPONSE_FIELD, TestLogging.sHadEventsNotFromTest);
                 return response;
+
+            case TestProtocol.REQUEST_ENABLE_REGISTER_EVENT_NOT_FROM_TEST: {
+                TestLogging.setEnableRegisterEventNotFromTest(Boolean.parseBoolean(arg));
+                return response;
+            }
 
             case TestProtocol.REQUEST_START_DRAG_THRESHOLD: {
                 final Resources resources = mContext.getResources();
@@ -290,6 +306,13 @@ public class TestInformationHandler {
                                 .forceAllowRotationForTesting(Boolean.parseBoolean(arg)));
                 return response;
 
+            case TestProtocol.REQUEST_ENABLE_FIXED_LANDSCAPE: {
+                boolean enable = Boolean.parseBoolean(arg)
+                        && DisplayController.INSTANCE.get(mContext).getInfo()
+                                .getDeviceType() == TYPE_PHONE;
+                LauncherPrefs.INSTANCE.get(mContext).put(FIXED_LANDSCAPE_MODE, enable);
+                return response;
+            }
             case TestProtocol.REQUEST_WORKSPACE_CELL_LAYOUT_SIZE:
                 return getLauncherUIProperty(Bundle::putIntArray, launcher -> {
                     final Workspace<?> workspace = launcher.getWorkspace();
@@ -356,15 +379,15 @@ public class TestInformationHandler {
                                 + l.getAppsView().getActiveRecyclerView().getPaddingBottom());
             }
 
-            case TestProtocol.REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW: {
+            case TestProtocol.REQUEST_IS_LAUNCHER_RECENTS_WINDOW_ENABLED: {
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        enableGridOnlyOverview());
+                        enableLauncherOverviewInWindow());
                 return response;
             }
 
-            case TestProtocol.REQUEST_IS_RECENTS_WINDOW_ENABLED: {
+            case TestProtocol.REQUEST_IS_FALLBACK_RECENTS_WINDOW_ENABLED: {
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        enableLauncherOverviewInWindow() || enableFallbackOverviewInWindow());
+                        enableFallbackOverviewInWindow());
                 return response;
             }
 
@@ -433,7 +456,7 @@ public class TestInformationHandler {
                     MODEL_EXECUTOR.execute(() -> {
                         LauncherModel model = LauncherAppState.getInstance(mContext).getModel();
                         model.getModelDbController().createEmptyDB();
-                        MAIN_EXECUTOR.execute(model::forceReload);
+                        MAIN_EXECUTOR.execute(() -> model.forceReload("REQUEST_REINITIALIZE_DATA"));
                     });
                     return response;
                 } finally {
@@ -448,7 +471,7 @@ public class TestInformationHandler {
                         LauncherModel model = LauncherAppState.getInstance(mContext).getModel();
                         model.getModelDbController().createEmptyDB();
                         model.getModelDbController().clearEmptyDbFlag();
-                        MAIN_EXECUTOR.execute(model::forceReload);
+                        MAIN_EXECUTOR.execute(() -> model.forceReload("REQUEST_CLEAR_DATA"));
                     });
                     return response;
                 } finally {
@@ -613,5 +636,13 @@ public class TestInformationHandler {
                 }
             }
         };
+    }
+
+    protected DeviceProfile getDeviceProfile(int displayId) {
+        return mPrimaryDeviceProfile;
+    }
+
+    protected DeviceProfile getDeviceProfile() {
+        return mPrimaryDeviceProfile;
     }
 }

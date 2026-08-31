@@ -26,30 +26,30 @@ import android.os.UserManager.USER_TYPE_PROFILE_MANAGED
 import android.os.UserManager.USER_TYPE_PROFILE_PRIVATE
 import android.util.Log
 import androidx.annotation.WorkerThread
-import com.android.launcher3.Utilities.ATLEAST_U
 import com.android.launcher3.Utilities.ATLEAST_V
+import com.android.launcher3.concurrent.annotations.LightweightBackground
+import com.android.launcher3.concurrent.annotations.LightweightBackgroundPriority
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
-import com.android.launcher3.icons.BitmapInfo
-import com.android.launcher3.icons.UserBadgeDrawable
 import com.android.launcher3.util.DaggerSingletonObject
 import com.android.launcher3.util.DaggerSingletonTracker
-import com.android.launcher3.util.Executors.MODEL_EXECUTOR
-import com.android.launcher3.util.FlagOp
-import com.android.launcher3.util.SafeCloseable
+import com.android.launcher3.util.LooperExecutor
+import com.android.launcher3.util.MutableListenableStream
 import com.android.launcher3.util.SimpleBroadcastReceiver
 import com.android.launcher3.util.SimpleBroadcastReceiver.Companion.actionsFilter
 import com.android.launcher3.util.UserIconInfo
-import java.util.function.BiConsumer
+import com.android.users.UserType
 import javax.inject.Inject
 
 /** Class which manages a local cache of user handles to avoid system rpc */
 @LauncherAppSingleton
 class UserCache
 @Inject
-constructor(@ApplicationContext private val context: Context, tracker: DaggerSingletonTracker) {
-    private val userEventListeners = ArrayList<BiConsumer<UserHandle, String>>()
-
+constructor(
+    @ApplicationContext private val context: Context,
+    tracker: DaggerSingletonTracker,
+    @LightweightBackground(LightweightBackgroundPriority.UI) executor: LooperExecutor,
+) {
     private val userManager = context.getSystemService(UserManager::class.java)!!
 
     private var closed = false
@@ -59,22 +59,29 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
     val userManagerState: UserManagerState
         get() = _userInfoMap ?: rebuildUserCache()
 
+    private val _userChanges = MutableListenableStream<UserChangeEvent>()
+
+    /** Stream for listening to user manager changes */
+    val userChanges = _userChanges.asListenable()
+
     init {
         val userChangeReceiver =
-            SimpleBroadcastReceiver(context = context, executor = MODEL_EXECUTOR) {
-                onUsersChanged(it)
-            }
+            SimpleBroadcastReceiver(context = context, executor = executor) { onUsersChanged(it) }
         userChangeReceiver.register(
             actionsFilter(
+                // go/keep-sorted start
+                Intent.ACTION_MANAGED_PROFILE_ADDED,
                 Intent.ACTION_MANAGED_PROFILE_AVAILABLE,
-                Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE,
                 Intent.ACTION_MANAGED_PROFILE_REMOVED,
-                ACTION_PROFILE_ADDED,
-                ACTION_PROFILE_REMOVED,
-                ACTION_PROFILE_UNLOCKED,
-                ACTION_PROFILE_LOCKED,
-                ACTION_PROFILE_AVAILABLE,
-                ACTION_PROFILE_UNAVAILABLE,
+                Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE,
+                Intent.ACTION_MANAGED_PROFILE_UNLOCKED,
+                Intent.ACTION_PROFILE_ACCESSIBLE,
+                Intent.ACTION_PROFILE_ADDED,
+                Intent.ACTION_PROFILE_AVAILABLE,
+                Intent.ACTION_PROFILE_INACCESSIBLE,
+                Intent.ACTION_PROFILE_REMOVED,
+                Intent.ACTION_PROFILE_UNAVAILABLE,
+                // go/keep-sorted end
             )
         ) {
             rebuildUserCache()
@@ -86,10 +93,17 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
     @WorkerThread
     private fun onUsersChanged(intent: Intent) {
         if (closed) return
+        val oldState = userManagerState
         rebuildUserCache()
         val user = intent.getParcelableExtra<UserHandle>(Intent.EXTRA_USER) ?: return
-        val action = intent.action ?: return
-        userEventListeners.forEach { it.accept(user, action) }
+        val change =
+            UserChangeEvent(
+                oldState.getCachedInfoOrNull(user),
+                userManagerState.getCachedInfoOrNull(user),
+            )
+        if (change.oldUser != change.newUser) {
+            _userChanges.dispatchValue(change)
+        }
     }
 
     @WorkerThread
@@ -110,7 +124,7 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
                 CachedUserInfo(
                     UserIconInfo(
                         user = user,
-                        type = if (isWork) UserIconInfo.TYPE_WORK else UserIconInfo.TYPE_MAIN,
+                        type = if (isWork) UserType.WORK else UserType.MAIN,
                         userSerial = getSerialNumberForUser(user),
                     ),
                     isUnlocked = isUserUnlocked(user),
@@ -128,11 +142,11 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
                         user = user,
                         type =
                             when (userType) {
-                                null -> UserIconInfo.TYPE_MAIN
-                                USER_TYPE_PROFILE_MANAGED -> UserIconInfo.TYPE_WORK
-                                USER_TYPE_PROFILE_CLONE -> UserIconInfo.TYPE_CLONED
-                                USER_TYPE_PROFILE_PRIVATE -> UserIconInfo.TYPE_PRIVATE
-                                else -> UserIconInfo.TYPE_MAIN
+                                null -> UserType.MAIN
+                                USER_TYPE_PROFILE_MANAGED -> UserType.WORK
+                                USER_TYPE_PROFILE_CLONE -> UserType.CLONED
+                                USER_TYPE_PROFILE_PRIVATE -> UserType.PRIVATE
+                                else -> UserType.MAIN
                             },
                         userSerial = it.userSerialNumber.toLong(),
                     ),
@@ -150,12 +164,6 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
             Log.e(TAG, "Security exception while fetching user property", e)
             defaultValue
         }
-
-    /** Adds a listener for user additions and removals */
-    fun addUserEventListener(listener: BiConsumer<UserHandle, String>): SafeCloseable {
-        userEventListeners.add(listener)
-        return SafeCloseable { userEventListeners.remove(listener) }
-    }
 
     /** @see UserManager.getSerialNumberForUser */
     fun getSerialNumberForUser(user: UserHandle): Long = getUserInfo(user).userSerial
@@ -196,45 +204,17 @@ constructor(@ApplicationContext private val context: Context, tracker: DaggerSin
         val preInstallApps: Set<String> = emptySet(),
     )
 
+    data class UserChangeEvent(val oldUser: CachedUserInfo?, val newUser: CachedUserInfo?)
+
     companion object {
         private const val TAG = "UserCache"
 
         @JvmField var INSTANCE = DaggerSingletonObject { it.userCache }
 
-        @JvmField
-        val ACTION_PROFILE_ADDED =
-            if (ATLEAST_U) Intent.ACTION_PROFILE_ADDED else Intent.ACTION_MANAGED_PROFILE_ADDED
-
-        @JvmField
-        val ACTION_PROFILE_REMOVED =
-            if (ATLEAST_U) Intent.ACTION_PROFILE_REMOVED else Intent.ACTION_MANAGED_PROFILE_REMOVED
-
-        @JvmField
-        val ACTION_PROFILE_UNLOCKED =
-            if (ATLEAST_U) Intent.ACTION_PROFILE_ACCESSIBLE
-            else Intent.ACTION_MANAGED_PROFILE_UNLOCKED
-
-        @JvmField
-        val ACTION_PROFILE_LOCKED =
-            if (ATLEAST_U) Intent.ACTION_PROFILE_INACCESSIBLE
-            else Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE
-
-        const val ACTION_PROFILE_AVAILABLE = "android.intent.action.PROFILE_AVAILABLE"
-        const val ACTION_PROFILE_UNAVAILABLE = "android.intent.action.PROFILE_UNAVAILABLE"
-
         /** Returns an instance of UserCache bound to the context provided. */
         @JvmStatic
         fun getInstance(context: Context): UserCache {
             return INSTANCE[context]
-        }
-
-        /** Get a non-themed [UserBadgeDrawable] based on the provided [UserHandle]. */
-        @JvmStatic
-        fun getBadgeDrawable(context: Context, userHandle: UserHandle): UserBadgeDrawable? {
-            return BitmapInfo.LOW_RES_INFO.withFlags(
-                    getInstance(context).getUserInfo(userHandle).applyBitmapInfoFlags(FlagOp.NO_OP)
-                )
-                .getBadgeDrawable(context, false /* isThemed */) as UserBadgeDrawable?
         }
     }
 }

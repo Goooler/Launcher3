@@ -16,6 +16,8 @@
 package com.android.launcher3.appiconmenu;
 
 import static com.android.launcher3.util.TestConstants.AppNames.TEST_APP_NAME;
+import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
+import static com.android.launcher3.util.ui.ActivityStartUtils.getAppPackageName;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -23,12 +25,13 @@ import static org.junit.Assert.assertTrue;
 import android.platform.test.annotations.PlatinumTest;
 import android.view.View;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.tapl.AllApps;
 import com.android.launcher3.tapl.AppIconMenu;
 import com.android.launcher3.tapl.AppIconMenuItem;
 import com.android.launcher3.tapl.HomeAllApps;
+import com.android.launcher3.util.rule.TestStabilityRule.DesktopStability;
 import com.android.launcher3.util.ui.AbstractLauncherUiTest;
 import com.android.launcher3.util.ui.PortraitLandscapeRunner.PortraitLandscape;
 
@@ -42,7 +45,7 @@ import org.junit.Test;
 public class TaplAppIconMenuTest extends AbstractLauncherUiTest<Launcher, View> {
 
     private boolean isOptionsPopupVisible(Launcher launcher) {
-        final ArrowPopup<?> popup = launcher.getOptionsPopup();
+        final AbstractFloatingView popup = launcher.getOptionsPopup();
         return popup != null && popup.isShown();
     }
 
@@ -53,6 +56,7 @@ public class TaplAppIconMenuTest extends AbstractLauncherUiTest<Launcher, View> 
     @Test
     @PortraitLandscape
     @PlatinumTest(focusArea = "launcher")
+    @DesktopStability(flavors = LOCAL, bug = 488075943)
     public void testLaunchMenuItem() {
         final AllApps allApps = mLauncher.getWorkspace().switchToAllApps();
         allApps.freeze();
@@ -77,6 +81,7 @@ public class TaplAppIconMenuTest extends AbstractLauncherUiTest<Launcher, View> 
      */
     @PlatinumTest(focusArea = "launcher")
     @Test
+    @DesktopStability(flavors = LOCAL, bug = 488075943)
     public void testLaunchHomeScreenMenuItem() {
         // Drag the test app icon to home screen and open short cut menu from the icon
         final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();

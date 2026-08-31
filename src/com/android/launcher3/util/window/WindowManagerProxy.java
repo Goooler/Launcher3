@@ -50,13 +50,13 @@ import android.view.WindowMetrics;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.dagger.LauncherBaseAppComponent;
+import com.android.launcher3.display.DisplayController;
+import com.android.launcher3.display.LauncherDisplayInfo;
 import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.util.DaggerSingletonObject;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.WindowBounds;
 
@@ -109,23 +109,9 @@ public class WindowManagerProxy {
     }
 
     /**
-     * Returns if we are in desktop mode or not.
-     */
-    public boolean isInDesktopMode(int displayId) {
-        return false;
-    }
-
-    /**
      * Returns if the display is in desktop-first mode.
      */
     public boolean isDisplayDesktopFirst(Context displayInfoContext) {
-        return false;
-    }
-
-    /**
-     * Returns if the pinned taskbar should be shown when home is visible.
-     */
-    public boolean showLockedTaskbarOnHome(Context displayInfoContext) {
         return false;
     }
 
@@ -134,13 +120,6 @@ public class WindowManagerProxy {
      * and showing desktop tasks.
      */
     public boolean showDesktopTaskbarForFreeformDisplay(Context displayInfoContext) {
-        return false;
-    }
-
-    /**
-     * Returns if the home is visible.
-     */
-    public boolean isHomeVisible() {
         return false;
     }
 
@@ -155,8 +134,8 @@ public class WindowManagerProxy {
         // uses DisplayController instance to determine whether taskbar is shown on home, and this
         // method gets called while initializing DisaplayController.
         normalizeWindowInsets(displayInfoContext,
-                showLockedTaskbarOnHome(displayInfoContext) || showDesktopTaskbarForFreeformDisplay(
-                        displayInfoContext), windowMetrics.getWindowInsets(), insets);
+                showDesktopTaskbarForFreeformDisplay(displayInfoContext),
+                windowMetrics.getWindowInsets(), insets);
         return new WindowBounds(windowMetrics.getBounds(), insets, info.rotation);
     }
 
@@ -166,9 +145,8 @@ public class WindowManagerProxy {
     public WindowInsets normalizeWindowInsets(Context context,
             WindowInsets oldInsets,
             Rect outInsets) {
-        return normalizeWindowInsets(context,
-                DisplayController.showLockedTaskbarOnHome(context)
-                        || DisplayController.showDesktopTaskbarForFreeformDisplay(context),
+        LauncherDisplayInfo info = DisplayController.getInfo(context);
+        return normalizeWindowInsets(context, info.getShowDesktopTaskbarForFreeformDisplay(),
                 oldInsets, outInsets);
     }
 
@@ -524,11 +502,6 @@ public class WindowManagerProxy {
         return NavigationMode.NO_BUTTON;
     }
 
-    /** Returns whether overview on connected displays is enabled */
-    public boolean enableOverviewOnConnectedDisplays() {
-        return Flags.enableOverviewOnConnectedDisplays();
-    }
-
     /**
      * @see DisplayCutout#getSafeInsets
      */
@@ -536,52 +509,4 @@ public class WindowManagerProxy {
         return new Rect(cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(),
                 cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
     }
-
-    /** Registers a listener for Taskbar changes in Desktop Mode.  */
-    public void registerDesktopVisibilityListener(DesktopVisibilityListener listener) { }
-
-    /** Removes a previously registered listener for Taskbar changes in Desktop Mode.  */
-    public void unregisterDesktopVisibilityListener(DesktopVisibilityListener listener) { }
-
-    /** A listener for when the user enters/exits Desktop Mode.  */
-    public interface DesktopVisibilityListener {
-        /**
-         * Called whenever the conditions that allow the creation of desks change.
-         *
-         * @param canCreateDesks whether it is possible to create new desks.
-         */
-        default void onCanCreateDesksChanged(boolean canCreateDesks) {
-        }
-
-        /**
-         * Called when a new desk is added.
-         *
-         * @param displayId The ID of the display on which the desk was added.
-         * @param deskId The ID of the newly added desk.
-         */
-        default void onDeskAdded(int displayId, int deskId) {}
-
-        /**
-         * Called when an existing desk is removed.
-         *
-         * @param displayId The ID of the display on which the desk was removed.
-         * @param deskId The ID of the desk that was removed.
-         */
-        default void onDeskRemoved(int displayId, int deskId) {}
-
-        /**
-         * Called when the active desk changes.
-         *
-         * @param displayId The ID of the display on which the desk activation change is happening.
-         * @param newActiveDesk The ID of the new active desk or -1 if no desk is active anymore
-         *                      (i.e. exit desktop mode).
-         * @param oldActiveDesk The ID of the desk that was previously active, or -1 if no desk was
-         *                      active before.
-         */
-        default void onActiveDeskChanged(int displayId, int newActiveDesk, int oldActiveDesk) {}
-
-        /** Called when the listener is initialised from shell. */
-        default void onListenerInitializedFromShell() {}
-    }
-
 }

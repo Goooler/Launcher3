@@ -17,15 +17,18 @@
 package com.android.quickstep.recents.domain.usecase
 
 import android.os.UserHandle
-import com.android.launcher3.Flags.enableLaterIsLockedCheck
 import com.android.launcher3.Flags.enableRefactorDigitalWellbeingToast
+import com.android.launcher3.util.OverviewReleaseFlags.enableLaterIsLockedCheck
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.data.UserLockedStateRepository
 import com.android.quickstep.recents.domain.model.TaskModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class GetTaskUseCase(
+class GetTaskUseCase
+@Inject
+constructor(
     private val tasksRepository: RecentTasksRepository,
     private val getRemainingAppTimerDurationUseCase: GetRemainingAppTimerDurationUseCase,
     private val userLockedStateRepository: UserLockedStateRepository,
@@ -36,8 +39,6 @@ class GetTaskUseCase(
 
             val packageName = task.topComponent.packageName
 
-            // TODO(b/405359794): If getTask for a single task ends up being called multiple
-            //  times by the UI, explore alternatives of loading the timer info only once.
             val remainingDuration =
                 if (enableRefactorDigitalWellbeingToast()) {
                     getRemainingAppTimerDurationUseCase(
@@ -64,6 +65,7 @@ class GetTaskUseCase(
                 isLocked = isLocked,
                 isMinimized = task.isMinimized,
                 remainingAppDuration = remainingDuration,
+                isAppLocked = task.isAppLockEnabled,
             )
         }
 }

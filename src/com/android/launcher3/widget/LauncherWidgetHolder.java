@@ -31,7 +31,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Looper;
-import android.util.Log;
 import android.util.SparseArray;
 import android.widget.Toast;
 
@@ -67,8 +66,6 @@ import java.util.function.IntConsumer;
  * background.
  */
 public class LauncherWidgetHolder {
-
-    private static final String TAG = "LauncherWidgetHolder";
 
     public static final int APPWIDGET_HOST_ID = 1024;
 
@@ -106,8 +103,14 @@ public class LauncherWidgetHolder {
     @Nullable IntConsumer mAppWidgetRemovedCallback;
 
     @AssistedInject
-    protected LauncherWidgetHolder(@Assisted("UI_CONTEXT") @NonNull Context context) {
+    protected LauncherWidgetHolder(
+            @Assisted("UI_CONTEXT") @NonNull Context context,
+            ProvidersUpdateDispatcher updateDispatcher) {
         this(context, APPWIDGET_HOST_ID);
+        // In case of Launcher3, there is no central widget host, but there can only be one active
+        // host at a time. Adding a dispatcher to every created host ensures and the active host
+        // eventually dispatches the update
+        mWidgetHost.registerUpdateDispatcher(updateDispatcher);
     }
 
     public LauncherWidgetHolder(@NonNull Context context, int hostId) {
@@ -200,14 +203,10 @@ public class LauncherWidgetHolder {
      * Called when the launcher is destroyed
      */
     public void destroy() {
-        try {
-            MAIN_EXECUTOR.submit(() -> {
-                clearViews();
-                mWidgetHost.getHolders().remove(this);
-            }).get();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to remove self from holder list", e);
-        }
+        MAIN_EXECUTOR.execute(() -> {
+            clearViews();
+            mWidgetHost.getHolders().remove(this);
+        });
     }
 
     /**
@@ -384,10 +383,7 @@ public class LauncherWidgetHolder {
     public AppWidgetHostView createView(
             int appWidgetId, @NonNull LauncherAppWidgetProviderInfo appWidget) {
         if (appWidget.isCustomWidget()) {
-            LauncherAppWidgetHostView lahv = new LauncherAppWidgetHostView(mContext);
-            lahv.setAppWidget(INVALID_APPWIDGET_ID, appWidget);
-            CustomWidgetManager.INSTANCE.get(mContext).onViewCreated(lahv);
-            return lahv;
+            return CustomWidgetManager.INSTANCE.get(mContext).createView(mContext, appWidget);
         }
 
         LauncherAppWidgetHostView view = createViewInternal(appWidgetId, appWidget);

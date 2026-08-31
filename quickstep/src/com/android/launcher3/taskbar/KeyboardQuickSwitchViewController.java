@@ -19,8 +19,8 @@ import static android.window.DesktopModeFlags.ENABLE_TASKBAR_OVERFLOW;
 
 import static com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType.UNMINIMIZE;
 import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableAltTabKqsFlatenning;
-import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.Executors.getTaskbarUiThread;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -41,9 +41,9 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.FocusState;
 import com.android.quickstep.SystemUiProxy;
@@ -345,7 +345,7 @@ public class KeyboardQuickSwitchViewController {
                         DisplayController.INSTANCE.get(mControllers.taskbarActivityContext),
                         UNMINIMIZE,
                         Cuj.CUJ_DESKTOP_MODE_KEYBOARD_QUICK_SWITCH_APP_LAUNCH,
-                        MAIN_EXECUTOR
+                        getTaskbarUiThread()
                 ),
                 "DesktopKeyboardQuickSwitchUnminimize");
     }
@@ -438,8 +438,10 @@ public class KeyboardQuickSwitchViewController {
             mControllers.taskbarActivityContext.launchKeyboardFocusedTask();
         }
 
-        void updateThumbnailInBackground(Task task, Consumer<ThumbnailData> callback) {
-            mControllerCallbacks.updateThumbnailInBackground(task, callback);
+        void updateThumbnailInBackground(
+                Task task, boolean isTaskRunning, Consumer<ThumbnailData> callback) {
+            mControllerCallbacks.updateThumbnailInBackground(
+                    task, isTaskRunning, callback);
         }
 
         void updateIconInBackground(Task task, Consumer<Task> callback) {
@@ -465,6 +467,10 @@ public class KeyboardQuickSwitchViewController {
             if (mControllers.taskbarActivityContext.getDisplayId() != displayId) {
                 closeQuickSwitchView(/* animate= */ true);
             }
+        }
+
+        boolean isTaskRunning(@Nullable GroupTask task) {
+            return mControllerCallbacks.isTaskRunning(task);
         }
     }
 }

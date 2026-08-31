@@ -27,12 +27,17 @@ import androidx.test.filters.SmallTest
 import com.android.launcher3.DragSource
 import com.android.launcher3.DropTarget
 import com.android.launcher3.DropTarget.DragObject
+import com.android.launcher3.Flags.FLAG_ENABLE_DRAG_START_END_MULTI_DISPATCH
 import com.android.launcher3.Flags.FLAG_ENABLE_SYSTEM_DRAG
+import com.android.launcher3.Flags.enableDragStartEndMultiDispatch
+import com.android.launcher3.Flags.enableSystemDrag
 import com.android.launcher3.dragndrop.DragController.DragListener
+import com.android.launcher3.dragndrop.DragController.DragSessionListener
 import com.android.launcher3.dragndrop.DragController.SystemDragHandler
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.util.LauncherMultivalentJUnit
 import com.android.launcher3.util.TestActivityContext
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -40,13 +45,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
-import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
+import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.inOrder
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 
@@ -69,6 +75,16 @@ class DragControllerTest {
     @Before
     fun setUp() {
         controller = TestDragController(context)
+    }
+
+    @Test
+    fun testConstructor() {
+        // NOTE: The constructor registers the default handler for system-level drag events.
+        assertEquals(
+            if (enableSystemDrag()) listOf(context.activityComponent.systemDragController)
+            else emptyList(),
+            controller.mSystemDragHandlers,
+        )
     }
 
     @Test
@@ -238,6 +254,90 @@ class DragControllerTest {
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_DRAG_START_END_MULTI_DISPATCH)
+    fun testDragListenerEventsWithFlagDisabled() {
+        testDragListenerEvents(useSystemDrag = true)
+        testDragListenerEvents(useSystemDrag = false)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DRAG_START_END_MULTI_DISPATCH)
+    fun testDragListenerEventsWithFlagEnabled() {
+        testDragListenerEvents(useSystemDrag = true)
+        testDragListenerEvents(useSystemDrag = false)
+    }
+
+    private fun testDragListenerEvents(useSystemDrag: Boolean) {
+        with(controller) {
+            mOptions = mock()
+            mOptions.simulatedDndStartPoint = if (useSystemDrag) mock() else null
+            mDragDriver = DragDriver.create(this, mOptions) {}
+            mDragObject = mock<DragObject>().apply { dragView = mock() }
+
+            val mockListener = mock<DragListener>().also(::addDragListener)
+            val mockSessionListener = mock<DragSessionListener>().also(::addDragSessionListener)
+
+            // Step 1: Drag start.
+            callOnDragStart()
+            verify(mockSessionListener).onDragSessionStart(mDragObject, mOptions)
+            if (!enableDragStartEndMultiDispatch() || !useSystemDrag) {
+                verify(mockListener).onDragStart(mDragObject, mOptions)
+            }
+            verifyNoMoreInteractions(mockListener, mockSessionListener)
+            clearInvocations(mockListener, mockSessionListener)
+
+            // Step 2: Drag enter.
+            if (useSystemDrag) {
+                onDriverDragEnterWindow()
+                if (enableDragStartEndMultiDispatch()) {
+                    verify(mockListener).onDragStart(mDragObject, mOptions)
+                }
+                verifyNoMoreInteractions(mockListener, mockSessionListener)
+                clearInvocations(mockListener, mockSessionListener)
+            }
+
+            // Step 3: Drag exit.
+            if (useSystemDrag) {
+                onDriverDragExitWindow()
+                if (enableDragStartEndMultiDispatch()) {
+                    verify(mockListener).onDragEnd()
+                }
+                verifyNoMoreInteractions(mockListener, mockSessionListener)
+                clearInvocations(mockListener, mockSessionListener)
+            }
+
+            // Step 4: Drag re-enter.
+            if (useSystemDrag) {
+                onDriverDragEnterWindow()
+                if (enableDragStartEndMultiDispatch()) {
+                    verify(mockListener).onDragStart(mDragObject, mOptions)
+                }
+                verifyNoMoreInteractions(mockListener, mockSessionListener)
+                clearInvocations(mockListener, mockSessionListener)
+            }
+
+            // Step 5. Drag re-exit.
+            if (useSystemDrag) {
+                onDriverDragExitWindow()
+                if (enableDragStartEndMultiDispatch()) {
+                    verify(mockListener).onDragEnd()
+                }
+                verifyNoMoreInteractions(mockListener, mockSessionListener)
+                clearInvocations(mockListener, mockSessionListener)
+            }
+
+            // Step 6: Drag end.
+            callOnDragEnd()
+            if (!enableDragStartEndMultiDispatch() || !useSystemDrag) {
+                verify(mockListener).onDragEnd()
+            }
+            verify(mockSessionListener).onDragSessionEnd()
+            verifyNoMoreInteractions(mockListener, mockSessionListener)
+            clearInvocations(mockListener, mockSessionListener)
+        }
+    }
+
+    @Test
     @EnableFlags(FLAG_ENABLE_SYSTEM_DRAG)
     fun testRemoveSystemDragHandlerCancelsDrag() {
         controller.addDragListener(mockDragListener)
@@ -274,25 +374,24 @@ class DragControllerTest {
         verifyNoMoreInteractions(mockSystemDragHandler2)
     }
 
-    private class TestDragController(context: TestActivityContext) :
-        DragController<TestActivityContext>(context) {
+    private class TestDragController(context: TestActivityContext) : DragController(context) {
         override fun exitDrag() {}
 
         override fun getDefaultDropTarget(dropCoordinates: IntArray?): DropTarget =
-            mock(DropTarget::class.java)
+            mock<DropTarget>()
 
         fun startDrag() =
             startDrag(
-                mock(Drawable::class.java),
-                mock(DraggableView::class.java),
+                mock<Drawable>(),
+                mock<DraggableView>(),
                 /*dragLayerX=*/ 0,
                 /*dragLayerY=*/ 0,
-                mock(DragSource::class.java),
-                mock(ItemInfo::class.java),
+                mock<DragSource>(),
+                mock<ItemInfo>(),
                 /*dragRegion=*/ Rect(),
                 /*initialDragViewScale=*/ 1.0f,
                 /*dragViewScaleOnDrop=*/ 1.0f,
-                mock(DragOptions::class.java),
+                mock<DragOptions>(),
             )
 
         override fun startDrag(
@@ -307,11 +406,11 @@ class DragControllerTest {
             initialDragViewScale: Float,
             dragViewScaleOnDrop: Float,
             options: DragOptions?,
-        ): DragView<*> =
-            mock(DragView::class.java).also { dv ->
+        ): DragView =
+            mock<DragView>().also { dv ->
                 mDragDriver = DragDriver.create(this, options) {}
                 mDragObject =
-                    mock(DragObject::class.java).apply {
+                    mock<DragObject>().apply {
                         dragSource = source
                         dragView = dv
                     }

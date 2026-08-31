@@ -43,7 +43,15 @@
     <uses-permission android:name="android.permission.READ_REMOTE_TASKS"/>
     <uses-permission android:name="android.permission.REQUEST_TASK_HANDOFF"/>
 
+    <uses-permission android:name="android.permission.REPORT_UI_LATENCY_STATS"
+                     android:featureFlag="com.android.server.ui_latency_stats.ui_latency_stats_service" />
     <uses-permission android:name="android.permission.SYSTEM_APPLICATION_OVERLAY" />
+    <uses-permission android:name="android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"/>
+
+    <uses-permission android:name="android.permission.PERSONAL_CONTEXT_PUBLISH_HINTS"/>
+    <uses-permission android:name="android.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS"/>
+    <uses-permission android:name="android.permission.PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE"/>
+    <uses-permission android:name="android.permission.PERSONAL_CONTEXT_READ_SETTINGS"/>
 
     <!--
     Permission required to access profiles which are otherwise hidden
@@ -58,6 +66,14 @@
     <!-- Permission required to start a WidgetPickerActivity. -->
     <permission android:name="${applicationId}.permission.START_WIDGET_PICKER_ACTIVITY"
         android:protectionLevel="signature|privileged" />
+
+    <!--
+        Permission required to send an intent to the file manager when attempting to click on a zip
+        file on the launcher home screen.
+    -->
+    <uses-permission
+        android:name="com.android.documentsui.LAUNCH_FILE_MANAGER"
+        android:featureFlag="com.android.launcher3.show_files_on_home_screen" />
 
     <application android:backupAgent="com.android.launcher3.LauncherBackupAgent"
          android:enableOnBackInvokedCallback="true"
@@ -77,6 +93,15 @@
              android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.QUICKSTEP_SERVICE"/>
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.android.launcher3.taskbar.CueBarInsightRendererService"
+            android:exported="true"
+            android:permission="android.permission.BIND_CONTEXT_COMPONENT_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.personalcontext.renderer.InsightRendererService" />
             </intent-filter>
         </service>
 
@@ -167,6 +192,16 @@
             </intent-filter>
         </activity>
 
+        <activity android:name="com.android.launcher3.QuickstepAddItemActivity"
+            android:theme="@style/AddItemActivityTheme"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+                <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

@@ -31,8 +31,8 @@ import com.android.launcher3.util.Executors
 import com.android.launcher3.util.IntSet
 import com.android.launcher3.util.LauncherLayoutBuilder
 import com.android.launcher3.util.LauncherModelHelper
-import com.android.launcher3.util.LayoutResource
 import com.android.launcher3.util.ModelTestExtensions.countPersistedModelItems
+import com.android.launcher3.util.ModelTestExtensions.setModelLayout
 import com.android.launcher3.util.PackageUserKey
 import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.TestUtil
@@ -54,7 +54,6 @@ class CacheDataUpdatedTaskTest {
 
     @get:Rule var testStabilityRule: TestRule = TestStabilityRule()
     @get:Rule var context: SandboxApplication = SandboxApplication().withModelDependency()
-    @get:Rule var layout: LayoutResource = LayoutResource(context)
     @get:Rule var installerSessionRule: InstallerSessionRule = InstallerSessionRule()
 
     private val fixedBitmapInfo = fromBitmap(Bitmap.createBitmap(30, 30, ARGB_8888))
@@ -87,7 +86,7 @@ class CacheDataUpdatedTaskTest {
                 .addApp(PENDING_APP_2, LauncherModelHelper.TEST_ACTIVITY2) // 9
                 .addApp(PENDING_APP_2, LauncherModelHelper.TEST_ACTIVITY3) // 10
                 .build()
-        layout.set(builder)
+        context.setModelLayout(builder)
         // Items on homescreen and folders:
         Assert.assertEquals(10, modelState.dataModel.itemsIdMap.countPersistedModelItems())
     }
@@ -130,11 +129,12 @@ class CacheDataUpdatedTaskTest {
     fun testSessionUpdate_updates_pending_apps() {
         // Run on model executor so that no other task runs in the middle.
         val sessionInfo =
-            ApplicationProvider.getApplicationContext<Context>()
-                .packageManager
-                .packageInstaller
-                .getSessionInfo(session1)
-        Assert.assertNotNull(sessionInfo)
+            requireNotNull(
+                ApplicationProvider.getApplicationContext<Context>()
+                    .packageManager
+                    .packageInstaller
+                    .getSessionInfo(session1)
+            )
         TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) {
             getInstance(context)
                 .iconCache

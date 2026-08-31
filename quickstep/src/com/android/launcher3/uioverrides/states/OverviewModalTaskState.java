@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.uioverrides.states;
 
-import static com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 
 import com.android.launcher3.DeviceProfile;
@@ -31,8 +30,9 @@ import com.android.quickstep.fallback.RecentsState;
  */
 public class OverviewModalTaskState extends OverviewState {
 
-    private static final int STATE_FLAGS =
-            FLAG_DISABLE_RESTORE | FLAG_RECENTS_VIEW_VISIBLE | FLAG_WORKSPACE_INACCESSIBLE;
+    private static final int STATE_FLAGS = FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE
+            | FLAG_RECENTS_VIEW_VISIBLE
+            | FLAG_WORKSPACE_INACCESSIBLE;
 
     public OverviewModalTaskState(int id) {
         super(id, LAUNCHER_STATE_OVERVIEW, STATE_FLAGS);
@@ -60,9 +60,6 @@ public class OverviewModalTaskState extends OverviewState {
 
     @Override
     public boolean isTaskbarStashed(DeviceProfile deviceProfile) {
-        if (enableGridOnlyOverview()) {
-            return true;
-        }
-        return super.isTaskbarStashed(deviceProfile);
+        return true;
     }
 }

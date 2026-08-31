@@ -20,15 +20,16 @@ import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarInteractor;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.views.RecentsView;
@@ -46,11 +47,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         ACTIVITY_TYPE extends StatefulActivity<STATE_TYPE> & RecentsViewContainer> extends
         BaseContainerInterface<STATE_TYPE, ACTIVITY_TYPE> {
 
-    private STATE_TYPE mTargetState;
+    @NonNull private STATE_TYPE mTargetState;
 
-    protected BaseActivityInterface(boolean rotationSupportedByActivity,
-            STATE_TYPE overviewState, STATE_TYPE backgroundState) {
-        super(backgroundState);
+    protected BaseActivityInterface(
+            boolean rotationSupportedByActivity,
+            @NonNull STATE_TYPE overviewState,
+            @NonNull STATE_TYPE backgroundState,
+            @NonNull TaskAnimationManager taskAnimationManager) {
+        super(backgroundState, taskAnimationManager);
         this.rotationSupportedByActivity = rotationSupportedByActivity;
         mTargetState = overviewState;
     }
@@ -59,7 +63,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract ACTIVITY_TYPE getCreatedContainer();
 
     @Nullable
-    public DepthController getDepthController() {
+    public DepthController<STATE_TYPE, ACTIVITY_TYPE> getDepthController() {
         return null;
     }
 
@@ -125,7 +129,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         }
 
         @Override
-        public void createContainerInterface(long transitionLength) {
+        public void createContainerInterface(long transitionLength, boolean runningOverHome) {
             PendingAnimation pa = new PendingAnimation(transitionLength * 2);
             createBackgroundToOverviewAnim(mActivity, pa);
             AnimatorPlaybackController controller = pa.createPlaybackController();

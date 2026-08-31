@@ -24,6 +24,8 @@ import static com.android.launcher3.BubbleTextView.RunningAppState.MINIMIZED;
 import static com.android.launcher3.BubbleTextView.RunningAppState.RUNNING;
 import static com.android.launcher3.Flags.enableContrastTiles;
 import static com.android.launcher3.Flags.enableScalabilityForDesktopExperience;
+import static com.android.launcher3.UtilitiesKt.drawWorkspaceItemSelectionHighlight;
+import static com.android.launcher3.graphics.AutomatedIconDelegate.newAutomatedIcon;
 import static com.android.launcher3.graphics.PreloadIconDelegate.extractPreloadDelegate;
 import static com.android.launcher3.graphics.PreloadIconDelegate.hasPendingAnimationCompleted;
 import static com.android.launcher3.graphics.PreloadIconDelegate.newPendingIcon;
@@ -33,6 +35,7 @@ import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_AUTOMATED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INCREMENTAL_DOWNLOAD_ACTIVE;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK;
@@ -78,10 +81,13 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
+import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragOptions.PreDragCondition;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.FolderIcon;
+import com.android.launcher3.graphics.AutomatedIconDelegate;
 import com.android.launcher3.graphics.PreloadIconDelegate;
 import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags;
@@ -95,19 +101,25 @@ import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.popup.IconViewController;
 import com.android.launcher3.popup.Poppable;
 import com.android.launcher3.popup.PoppableType;
 import com.android.launcher3.popup.Popup;
 import com.android.launcher3.popup.PopupController;
 import com.android.launcher3.search.StringMatcherUtility;
+import com.android.launcher3.touch.CustomActionsListener;
+import com.android.launcher3.touch.CustomEventsTouchHandler;
+import com.android.launcher3.touch.CustomTouchDelegate;
 import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingIconViewCompanion;
+import com.android.launcher3.views.OptionsPopupView;
 
 import java.text.NumberFormat;
 import java.util.HashMap;
@@ -119,7 +131,8 @@ import java.util.Locale;
  * too aggressive.
  */
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
-        FloatingIconViewCompanion, DraggableView, Reorderable, Poppable {
+        FloatingIconViewCompanion, DraggableView, Reorderable, Poppable, IconViewController,
+        CustomTouchDelegate {
 
     public static final String TAG = "BubbleTextView";
 
@@ -162,19 +175,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     };
 
-    public static final Property<BubbleTextView, Float> TEXT_ALPHA_PROPERTY
-            = new Property<BubbleTextView, Float>(Float.class, "textAlpha") {
-        @Override
-        public Float get(BubbleTextView bubbleTextView) {
-            return bubbleTextView.mTextAlpha;
-        }
-
-        @Override
-        public void set(BubbleTextView bubbleTextView, Float alpha) {
-            bubbleTextView.setTextAlpha(alpha);
-        }
-    };
-
     private final MultiTranslateDelegate mTranslateDelegate = new MultiTranslateDelegate(this);
     protected final ActivityContext mActivity;
     private FastBitmapDrawable mIcon;
@@ -184,6 +184,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     protected int mDisplay;
 
     private final CheckLongPressHelper mLongPressHelper;
+    // TODO(b/465247812): Remove this and overridden functions in favor of Kotlin interface
+    //  delegation, upon file conversion to Kotlin.
+    private final CustomEventsTouchHandler mCustomEventsTouchHandler;
 
     private boolean mLayoutHorizontal;
     private final boolean mIsRtl;
@@ -199,9 +202,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private int mTextColor;
     @ViewDebug.ExportedProperty(category = "launcher")
     private ColorStateList mTextColorStateList;
-    @ViewDebug.ExportedProperty(category = "launcher")
-    private float mTextAlpha = 1;
-
     @ViewDebug.ExportedProperty(category = "launcher")
     private DotInfo mDotInfo;
     private final DotRenderer mDotRenderer;
@@ -225,11 +225,66 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private final String mMinimizedStateDescription;
     private final String mRunningStateDescription;
+    private static final int TEXT_ALPHA_CHANNEL_COUNT = 2;
+    private static final int TEXT_ALPHA_INDEX_CONTAINER_VISIBILITY = 0;
+    private static final int TEXT_ALPHA_INDEX_TRANSITION = 1;
+
+    private final AnimatedFloat mTextAlpha = new AnimatedFloat(() -> {
+        if (mTextColorStateList != null) {
+            setTextColor(mTextColorStateList);
+        } else {
+            super.setTextColor(getModifiedColor());
+        }
+    }, 1f);
+    private final MultiPropertyFactory<AnimatedFloat> mTextAlphaMultiPropertyFactory =
+            new MultiPropertyFactory<>(
+                    mTextAlpha,
+                    AnimatedFloat.VALUE,
+                    TEXT_ALPHA_CHANNEL_COUNT,
+                    (a, b) -> a * b,
+                    1f);
 
     @NonNull
     @Override
     public PoppableType getPoppableType() {
         return PoppableType.APP;
+    }
+
+    /**
+     * Sets the visibility of the text container for a BubbleTextView
+     *
+     * @param visible defines whether we should make the container visible or invisible.
+     */
+    public void setContainerTextVisibility(boolean visible) {
+        mTextAlphaMultiPropertyFactory.get(TEXT_ALPHA_INDEX_CONTAINER_VISIBILITY).setValue(
+                visible ? 1f : 0f);
+    }
+
+    /**
+     * Gets the alpha for text inside a BubbleTextView.
+     *
+     * @return a MultiProperty that has the alpha for the text.
+     */
+    @NonNull
+    @Override
+    public MultiPropertyFactory<AnimatedFloat>.MultiProperty getFloatingViewTextAlpha() {
+        return mTextAlphaMultiPropertyFactory.get(TEXT_ALPHA_INDEX_TRANSITION);
+    }
+
+    @Override
+    public boolean onDelegateTouchEvent(@NonNull MotionEvent event) {
+        return mCustomEventsTouchHandler.onDelegateTouchEvent(event);
+    }
+
+    @Nullable
+    @Override
+    public CustomActionsListener getCustomActionsListener() {
+        return mCustomEventsTouchHandler.getCustomActionsListener();
+    }
+
+    @Override
+    public void setCustomActionsListener(@Nullable CustomActionsListener listener) {
+        mCustomEventsTouchHandler.setCustomActionsListener(listener);
     }
 
     /**
@@ -279,11 +334,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         final int defaultIconSize;
         if (mDisplay == DISPLAY_WORKSPACE) {
             setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                    mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
+                    mDeviceProfile.getWorkspaceProfile().getIconTextSizePx());
             setCompoundDrawablePadding(
-                    mDeviceProfile.getWorkspaceIconProfile().getIconDrawablePaddingPx());
-            defaultIconSize = mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
-            setCenterVertically(mDeviceProfile.getWorkspaceIconProfile().getIconCenterVertically());
+                    mDeviceProfile.getWorkspaceProfile().getIconDrawablePaddingPx());
+            defaultIconSize = mDeviceProfile.getWorkspaceProfile().getIconSizePx();
+            setCenterVertically(mDeviceProfile.getWorkspaceProfile().getIconCenterVertically());
         } else if (mDisplay == DISPLAY_ALL_APPS || mDisplay == DISPLAY_PREDICTION_ROW
                 || mDisplay == DISPLAY_SEARCH_RESULT_APP_ROW) {
             setTextSize(TypedValue.COMPLEX_UNIT_PX,
@@ -305,10 +360,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             defaultIconSize = getResources().getDimensionPixelSize(
                     R.dimen.search_row_small_icon_size);
         } else if (mDisplay == DISPLAY_TASKBAR) {
-            defaultIconSize = mDeviceProfile.getTaskbarProfile().getIconSize();
+            float iconSize;
+            if (mDeviceProfile.getTaskbarProfile().isTransientTaskbar()) {
+                iconSize = getResources().getDimension(R.dimen.transient_taskbar_icon_size);
+            } else {
+                iconSize = getResources().getDimension(R.dimen.persistent_taskbar_icon_size);
+            }
+            defaultIconSize = (int) iconSize;
         } else {
             // widget_selection or shortcut_popup
-            defaultIconSize = mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
+            defaultIconSize = mDeviceProfile.getWorkspaceProfile().getIconSizePx();
         }
 
 
@@ -325,23 +386,43 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         mLongPressHelper = new CheckLongPressHelper(this);
 
+        // CustomEventsTouchHandler is initialized with a default touch handler to ensure standard
+        // touch behaviors (like long presses and clicks) are preserved when no custom actions
+        // listener is set. Additionally, it utilizes `shouldIgnoreTouchDown` to filter out
+        // touch events in non-interactive padding areas, preventing unintended interactions.
+        mCustomEventsTouchHandler = new CustomEventsTouchHandler(this, (event) -> {
+            if (isLongClickable()) {
+                super.onTouchEvent(event);
+                mLongPressHelper.onTouchEvent(event);
+                // Keep receiving the rest of the events
+                return true;
+            } else {
+                return super.onTouchEvent(event);
+            }
+        }, this::shouldIgnoreTouchDown);
+
         mDotParams = new DotRenderer.DrawParams();
         mDotParams.setDotColor(Themes.getAttrColor(context, R.attr.notificationDotColor));
 
         if (mDisplay == DISPLAY_ALL_APPS) {
-            mDotRenderer = mActivity.getDeviceProfile().mDotRendererAllApps;
+            mDotRenderer = new DotRenderer(
+                    mActivity.getDeviceProfile().getAllAppsProfile().getIconSizePx()
+            );
 
             // Do not use normalized info, as we account for normalization in iconBounds
             mDotParams.shapeInfo = IconShapeInfo.DEFAULT;
         } else {
-            mDotRenderer = mActivity.getDeviceProfile().mDotRendererWorkSpace;
+            mDotRenderer = new DotRenderer(
+                    mActivity.getDeviceProfile().getWorkspaceProfile().getIconSizePx()
+            );
             mDotParams.shapeInfo = ThemeManager.INSTANCE.get(context)
                     .getIconState().getIconShapeInfo();
         }
 
         setEllipsize(TruncateAt.END);
         setAccessibilityDelegate(mActivity.getAccessibilityDelegate());
-        setTextAlpha(1f);
+
+        setContainerTextVisibility(mDisplay != DISPLAY_TASKBAR);
     }
 
     @Override
@@ -422,6 +503,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         applyIconAndLabel(info);
         setItemInfo(info);
 
+        // NOTE: We do not verify high res immediately for workspace items as doing so would result
+        // in eager loading of icons for foldered items which should instead be lazily loaded on
+        // first open.
+
         applyDotState(info, false /* animate */);
         setDownloadStateContentDescription(info, info.getProgressLevel());
     }
@@ -488,9 +573,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         invalidate();
     }
 
-    /**
-     * Returns state description of this icon.
-     */
+    /** Returns the description of the icon based on its running state. */
     public String getIconStateDescription() {
         if (mRunningAppState == MINIMIZED) {
             return mMinimizedStateDescription;
@@ -509,12 +592,24 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @UiThread
     public void applyIconAndLabel(ItemInfoWithIcon info) {
         FastBitmapDrawable oldIcon = mIcon;
-        // Check if we can reuse icon so that any animation is preserved
-        if (hasPendingAnimationCompleted(mIcon) || !mIcon.isSameInfo(info.bitmap)) {
-            setNonPendingIcon(info);
+        boolean isOldIconAutomated = oldIcon != null
+                && oldIcon.getDelegate() instanceof AutomatedIconDelegate;
+        boolean isItemAutomated = Flags.enableAppAutomationIndicator()
+                && (info.runtimeStatusFlags & FLAG_AUTOMATED) != 0;
+
+        if (isItemAutomated)  {
+            // If icon is not already animated or underlying bitmap changed then replace it.
+            if (!isOldIconAutomated || !mIcon.isSameInfo(info.bitmap)) {
+                setIcon(newAutomatedIcon(getContext(), info, getIconCreationFlagsForInfo(info)));
+            }
+        } else if (hasPendingAnimationCompleted(mIcon) || !mIcon.isSameInfo(info.bitmap)
+                || isOldIconAutomated) {
+            // Set new, regular icon if loading completed, no longer automating, or bitmap changed
+            setStandardIcon(info);
         }
-        applyLabel(info);
+        // Always check if we should update loading progress
         maybeApplyProgressLevel(info, oldIcon);
+        applyLabel(info);
     }
 
     /**
@@ -530,16 +625,29 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 ? !wii.hasPromiseIconUi() : !info.isArchived();
         if (isNoLongerPending && info.getProgressLevel() == 100 && pendingIcon != null) {
             pendingIcon.maybePerformFinishedAnimation(oldIcon,
-                    () -> setNonPendingIcon(
+                    () -> setStandardIcon(
                             (getTag() instanceof ItemInfoWithIcon iiwi) ? iiwi : info));
         }
     }
 
-    private void setNonPendingIcon(ItemInfoWithIcon info) {
+    private void setStandardIcon(ItemInfoWithIcon info) {
         FastBitmapDrawable iconDrawable =
                 info.newIcon(getContext(), getIconCreationFlagsForInfo(info));
         if (mIsShowingMinimalPopup) {
             iconDrawable.setAnimationEnabled(false);
+        }
+
+        // views may be recycled (Ex. folder items) and have stale ItemInfo so avoid animating.
+        boolean isRecycled = getTag() != info;
+        if (!isRecycled && getIcon() != null
+                && getIcon().getDelegate() instanceof AutomatedIconDelegate aid) {
+            aid.startExitAnimation(() -> {
+                // Ensure view wasn't recycled for a different item while animation was running.
+                if (getTag() == info) {
+                    setIcon(iconDrawable);
+                }
+            });
+            return;
         }
         setIcon(iconDrawable);
     }
@@ -566,7 +674,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public int getIconCreationFlagsForInfo(ItemInfoWithIcon info) {
         // Set nonPendingIcon acts as a restart which should refresh the flag state when applicable.
         int flags = shouldUseTheme() ? FLAG_THEMED : 0;
-        // Remove badge on icons smaller than 48dp.
+        // Remove badge on icons smaller than 48dp. Except for in 2026 refresh which uses 40dp
+        // for small icon.
         if (mHideBadge || mDisplay == DISPLAY_SEARCH_RESULT_SMALL) {
             flags |= FLAG_NO_BADGE;
         }
@@ -611,7 +720,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 return mDeviceProfile.getAllAppsProfile().getMaxAllAppsTextLineCount();
             }
             case DISPLAY_WORKSPACE -> {
-                return mDeviceProfile.getWorkspaceIconProfile().getMaxIconTextLineCount();
+                return mDeviceProfile.getWorkspaceProfile().getMaxIconTextLineCount();
             }
             case DISPLAY_FOLDER -> {
                 return mDeviceProfile.getFolderProfile().getMaxChildTextLineCount();
@@ -622,8 +731,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     public void applyLabel(ItemInfo info) {
-        applyLabel(info.title, info.contentDescription, Flags.useNewIconForArchivedApps()
-                && info instanceof ItemInfoWithIcon infoWithIcon
+        applyLabel(info.title, info.contentDescription,
+                info instanceof ItemInfoWithIcon infoWithIcon
                 && infoWithIcon.isInactiveArchive(), info.isDisabled());
     }
 
@@ -700,33 +809,21 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        // ignore events if they happen in padding area
-        if (event.getAction() == MotionEvent.ACTION_DOWN
-                && shouldIgnoreTouchDown(event.getX(), event.getY())) {
-            return false;
-        }
-        if (isLongClickable()) {
-            super.onTouchEvent(event);
-            mLongPressHelper.onTouchEvent(event);
-            // Keep receiving the rest of the events
-            return true;
-        } else {
-            return super.onTouchEvent(event);
-        }
+        return onDelegateTouchEvent(event);
     }
 
     /**
      * Returns true if the touch down at the provided position be ignored
      */
-    protected boolean shouldIgnoreTouchDown(float x, float y) {
+    protected boolean shouldIgnoreTouchDown(MotionEvent event) {
         if (mDisplay == DISPLAY_TASKBAR) {
             // Allow touching within padding on taskbar, given icon sizes are smaller.
             return false;
         }
-        return y < getPaddingTop()
-                || x < getPaddingLeft()
-                || y > getHeight() - getPaddingBottom()
-                || x > getWidth() - getPaddingRight();
+        return event.getY() < getPaddingTop()
+                || event.getX() < getPaddingLeft()
+                || event.getY() > getHeight() - getPaddingBottom()
+                || event.getX() > getWidth() - getPaddingRight();
     }
 
     void setStayPressed(boolean stayPressed) {
@@ -832,9 +929,19 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public void onDraw(Canvas canvas) {
+        drawSelectedBackgroundIfNecessary(canvas);
+
         super.onDraw(canvas);
         drawDotIfNecessary(canvas);
         drawRunningAppIndicatorIfNecessary(canvas);
+    }
+
+    protected void drawSelectedBackgroundIfNecessary(Canvas canvas) {
+        // FolderIcons and AppPairIcons draw the workspace highlight themselves.
+        if (isSelected() && !(getParent() instanceof FolderIcon)
+                && !(getParent() instanceof AppPairIcon)) {
+            drawWorkspaceItemSelectionHighlight(canvas, this);
+        }
     }
 
     /**
@@ -1017,8 +1124,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getLineSpacingExtra());
             if (!TextUtils.equals(modifiedString, mLastModifiedText)) {
                 mLastModifiedText = modifiedString;
-                if (Flags.useNewIconForArchivedApps()
-                        && getTag() instanceof ItemInfoWithIcon infoWithIcon
+                if (getTag() instanceof ItemInfoWithIcon infoWithIcon
                         && infoWithIcon.isInactiveArchive()) {
                     setTextWithArchivingIcon(modifiedString);
                 } else {
@@ -1092,59 +1198,46 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mTextColorStateList = colors;
         }
 
-        if (Float.compare(mTextAlpha, 1) == 0) {
+        // mTextAlpha could be null if setTextColor is called before BubbleTextView is initialized.
+        if (mTextAlpha != null && Float.compare(mTextAlpha.value, 1f) == 0) {
             super.setTextColor(colors);
         } else {
             super.setTextColor(getModifiedColor());
         }
     }
 
-    public boolean shouldTextBeVisible() {
-        // Text should be visible everywhere but the hotseat.
-        Object tag = getParent() instanceof FolderIcon ? ((View) getParent()).getTag() : getTag();
-        ItemInfo info = tag instanceof ItemInfo ? (ItemInfo) tag : null;
-        return info == null || (info.container != LauncherSettings.Favorites.CONTAINER_HOTSEAT
-                && info.container != LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION);
+    @Override
+    public int getIconHeight() {
+        if (mIcon == null) {
+            return 0;
+        }
+
+        return mIcon.getBounds().height();
     }
 
     /**
      * Whether or not an App title contrast tile should be drawn for this element.
      **/
     public boolean shouldDrawAppContrastTile() {
-        return mDisplay == DISPLAY_WORKSPACE && shouldTextBeVisible()
+        return mDisplay == DISPLAY_WORKSPACE
+                // mTextAlpha could be null if setTextColor is called before BubbleTextView is
+                // initialized.
+                && (mTextAlpha == null || Float.compare(mTextAlpha.value, 1f) == 0)
                 && PillColorProvider.getInstance(getContext()).isMatchaEnabled()
                 && enableContrastTiles();
     }
 
-    public void setTextVisibility(boolean visible) {
-        setTextAlpha(visible ? 1 : 0);
-    }
-
-    private void setTextAlpha(float alpha) {
-        mTextAlpha = alpha;
-        if (mTextColorStateList != null) {
-            setTextColor(mTextColorStateList);
-        } else {
-            super.setTextColor(getModifiedColor());
-        }
-    }
-
     private int getModifiedColor() {
-        if (mTextAlpha == 0) {
+        if (mTextAlpha != null && mTextAlpha.value == 0f) {
             // Special case to prevent text shadows in high contrast mode
             return Color.TRANSPARENT;
         }
-        return setColorAlphaBound(mTextColor, Math.round(Color.alpha(mTextColor) * mTextAlpha));
+        return setColorAlphaBound(mTextColor, Math.round(Color.alpha(mTextColor)
+                * (mTextAlpha != null ? mTextAlpha.value : 1f)));
     }
 
-    /**
-     * Creates an animator to fade the text in or out.
-     *
-     * @param fadeIn Whether the text should fade in or fade out.
-     */
-    public ObjectAnimator createTextAlphaAnimator(boolean fadeIn) {
-        float toAlpha = shouldTextBeVisible() && fadeIn ? 1 : 0;
-        return ObjectAnimator.ofFloat(this, TEXT_ALPHA_PROPERTY, toAlpha);
+    public float getTextContainerVisibility() {
+        return mTextAlphaMultiPropertyFactory.get(TEXT_ALPHA_INDEX_CONTAINER_VISIBILITY).getValue();
     }
 
     /**
@@ -1413,7 +1506,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 mIconLoadRequest.cancel();
             }
             mIconLoadRequest = LauncherAppState.getInstance(getContext()).getIconCache()
-                    .updateIconInBackground(BubbleTextView.this, info, expectedFlag);
+                    .updateIconInBackground(getContext().getMainExecutor(), BubbleTextView.this,
+                            info, expectedFlag);
         }
     }
 
@@ -1500,6 +1594,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public PreDragCondition startLongPressAction(PopupController<?> popupController) {
         Popup popup = popupController.show(this);
         return popup != null ? popup.createPreDragCondition() : null;
+    }
+
+    /**
+     * Triggers showing the options popup menu for this icon.
+     * Subclasses can override this to provide custom popup menu behavior.
+     * @return the {@link OptionsPopupView} that was shown, or null if no popup was shown.
+     */
+    @Nullable
+    public OptionsPopupView<?> showPopup() {
+        return null;
     }
 
     /**

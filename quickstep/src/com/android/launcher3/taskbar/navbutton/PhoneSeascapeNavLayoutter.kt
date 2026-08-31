@@ -24,25 +24,39 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Space
 import com.android.launcher3.R
+import com.android.launcher3.Utilities
 
 class PhoneSeascapeNavLayoutter(
     resources: Resources,
-    navBarContainer: LinearLayout,
+    navButtonContainer: LinearLayout,
     endContextualContainer: ViewGroup,
     startContextualContainer: ViewGroup,
     imeSwitcher: ImageView?,
     a11yButton: ImageView?,
+    moreOptionsButton: ImageView?,
     space: Space?,
+    backButton: ImageView?,
+    homeButton: ImageView?,
+    recentsButton: ImageView?,
 ) :
     PhoneLandscapeNavLayoutter(
         resources,
-        navBarContainer,
+        navButtonContainer,
         endContextualContainer,
         startContextualContainer,
         imeSwitcher,
         a11yButton,
+        moreOptionsButton,
         space,
+        backButton,
+        homeButton,
+        recentsButton,
     ) {
+
+    override fun shouldFlipButtonOrder(): Boolean {
+        // setting & config both flip the order, so xor operator makes them cancel each other out.
+        return isFlipEnabledBySetting() xor Utilities.isRtl(resources)
+    }
 
     override fun repositionContextualButtons(buttonSize: Int) {
         endContextualContainer.removeAllViews()

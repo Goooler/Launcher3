@@ -45,6 +45,9 @@
     <uses-permission android:name="android.permission.ROTATE_SURFACE_FLINGER" />
     <uses-permission android:name="android.permission.WAKEUP_SURFACE_FLINGER" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.LOCK_APPS"
+                     android:featureFlag="android.security.app_lock_apis" />
+    <uses-permission android:name="com.android.systemui.permission.LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG" />
 
     <permission
         android:name="${applicationId}.permission.GRID_CONTROL"
@@ -136,6 +139,7 @@
         <activity
             android:name="com.android.launcher3.settings.SettingsActivity"
             android:label="@string/settings_button_text"
+            android:icon="@drawable/ic_setting"
             android:theme="@style/HomeSettings.Theme"
             android:exported="true"
             android:autoRemoveFromRecents="true">
@@ -178,5 +182,30 @@
         <property
             android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED"
             android:value="true" />
+
+        <activity
+            android:name="com.android.launcher3.organizer.creation.screen.ui.OrganizerActivity"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/OrganizerTheme">
+            <intent-filter>
+                <action android:name="com.android.launcher3.ORGANIZER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.android.launcher3.organizer.creation.screen.ui.foldercreator.FolderCreatorActivity"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/FolderCreatorTheme">
+            <intent-filter>
+                <action android:name="com.android.launcher3.FOLDER_CREATION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
     </application>
 </manifest>

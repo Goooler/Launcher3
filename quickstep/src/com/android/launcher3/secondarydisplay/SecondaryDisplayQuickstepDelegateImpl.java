@@ -16,8 +16,6 @@
 package com.android.launcher3.secondarydisplay;
 
 import static androidx.lifecycle.Lifecycle.State.RESUMED;
-
-import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableAutoStashConnectedDisplayTaskbar;
 import static com.android.launcher3.util.OnboardingPrefs.ALL_APPS_VISITED_COUNT;
 import static com.android.window.flags.Flags.useInputReportedFocusForAccessibility;
 
@@ -38,12 +36,10 @@ import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.dagger.ActivityContextSingleton;
 import com.android.launcher3.model.data.PredictedContainerInfo;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.OverviewComponentObserver;
-import com.android.quickstep.TouchInteractionService.TISBinder;
-import com.android.quickstep.util.TISBindHelper;
+import com.android.quickstep.sysuiconnection.SysUIConnectionTracker;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.window.RecentsWindowManager;
 
@@ -59,7 +55,7 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
 
     private final ActivityContext mActivityContext;
     private final Context mContext;
-    private final TISBindHelper mTISBindHelper;
+    private final SysUIConnectionTracker mSysUIConnectionTracker;
     private final OverviewComponentObserver mOverviewComponentObserver;
     private final OnBackAnimationCallback mOnBackInvokedCallback = new OnBackAnimationCallback() {
         @Override
@@ -113,12 +109,12 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
             OverviewComponentObserver overviewComponentObserver) {
         mContext = activityContext.asContext();
         mActivityContext = activityContext;
-        mTISBindHelper = new TISBindHelper(mContext, this::onTISConnected);
+        mSysUIConnectionTracker = SysUIConnectionTracker.get(activityContext.asContext());
         mOverviewComponentObserver = overviewComponentObserver;
+        mSysUIConnectionTracker.onConnected(activityContext, c -> onTISConnected());
     }
 
     void onDestroy() {
-        mTISBindHelper.onDestroy();
         if (mActivityContext instanceof Activity activity) {
             activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
                     mOnBackInvokedCallback);
@@ -147,12 +143,10 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
 
     @Override
     void openAllAppsForDisplay(int displayId) {
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager == null) {
-            return;
-        }
+        var conn = mSysUIConnectionTracker.getActiveComponent().getValue();
+        if (conn == null) return;
         TaskbarActivityContext currentDisplayTaskbarContext =
-                taskbarManager.getTaskbarForDisplay(displayId);
+                conn.getTaskbarManager().getTaskbarForDisplay(displayId);
         if (currentDisplayTaskbarContext != null) {
             currentDisplayTaskbarContext.openTaskbarAllApps();
         }
@@ -160,21 +154,13 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
 
     @Override
     void updateStashControllerStateFlags(int displayId, boolean isVisible) {
-        if (displayId == Display.DEFAULT_DISPLAY
-                || !enableAutoStashConnectedDisplayTaskbar.isTrue()) {
+        if (displayId == Display.DEFAULT_DISPLAY) {
             return;
         }
 
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager == null) {
-            return;
-        }
-        TaskbarActivityContext tac =
-                taskbarManager.getTaskbarForDisplay(displayId);
-        if (tac == null) {
-            return;
-        }
-        tac.updateStashControllerLauncherStateFlag(isVisible);
+        var conn = mSysUIConnectionTracker.getActiveComponent().getValue();
+        if (conn == null) return;
+        conn.getTaskbarManager().updateStashControllerLauncherStateFlag(displayId, isVisible);
     }
 
     @Override
@@ -212,7 +198,7 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
         }
     }
 
-    private void onTISConnected(TISBinder binder) {
+    private void onTISConnected() {
         boolean isVisible = mActivityContext.getLifecycle().getCurrentState().isAtLeast(RESUMED);
         int displayId = mActivityContext.asContext().getDisplay().getDisplayId();
         updateStashControllerStateFlags(displayId, isVisible);

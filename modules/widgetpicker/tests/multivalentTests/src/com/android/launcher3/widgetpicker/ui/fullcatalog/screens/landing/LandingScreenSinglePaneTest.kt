@@ -316,4 +316,5 @@ class LandingScreenSinglePaneTest {
                 )
                 .assertIsDisplayed()
         }
+
 }

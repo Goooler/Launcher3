@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.states
 
-import android.content.Context
 import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherState
 import com.android.launcher3.logging.StatsLogManager
@@ -30,14 +29,15 @@ class EditModeState(id: Int) : LauncherState(id, StatsLogManager.LAUNCHER_STATE_
         private val STATE_FLAGS =
             (FLAG_MULTI_PAGE or
                 FLAG_WORKSPACE_INACCESSIBLE or
-                FLAG_DISABLE_RESTORE or
+                FLAG_DISABLE_RESTORE_EXCEPT_UI_MODE_CHANGE or
                 FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED or
-                FLAG_WORKSPACE_HAS_BACKGROUNDS)
+                FLAG_WORKSPACE_HAS_BACKGROUNDS or
+                FLAG_WORKSPACE_ICONS_BEING_DRAGGED)
     }
 
     override fun getTransitionDuration(context: ActivityContext, isToState: Boolean) = 150
 
-    override fun <T> getDepthUnchecked(context: T): Float where T : Context?, T : ActivityContext? {
+    override fun getDepthUnchecked(context: ActivityContext): Float {
         return DEPTH_15_PERCENT
     }
 

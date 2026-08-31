@@ -16,6 +16,8 @@
 
 package com.android.quickstep;
 
+import static com.android.launcher3.util.Executors.IMMEDIATE_EXECUTOR;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +36,8 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 
 import androidx.test.annotation.UiThreadTest;
@@ -42,13 +46,12 @@ import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
-import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.icons.IconChangeTracker;
 import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MutableListenableStream;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.SplitTask;
 import com.android.systemui.shared.recents.model.Task;
@@ -66,11 +69,16 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class RecentsModelTest {
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
     @Mock
     private Context mContext;
 
@@ -86,12 +94,6 @@ public class RecentsModelTest {
 
     @Mock private IconChangeTracker mIconChangeTracker;
 
-    @Mock
-    private LockedUserState mLockedUserState;
-
-    @Mock
-    private ThemeManager mThemeManager;
-
     private RecentsModel mRecentsModel;
 
     private RecentTasksList.TaskLoadResult mTaskResult;
@@ -100,12 +102,8 @@ public class RecentsModelTest {
 
     @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
 
-    @Rule
-    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
-
     @Before
     public void setup() throws NoSuchFieldException {
-        mSetFlagsRule.enableFlags(Flags.FLAG_ENABLE_GRID_ONLY_OVERVIEW);
         mTaskResult = getTaskResult();
         doAnswer(invocation-> {
             Consumer<ArrayList<GroupTask>> callback = invocation.getArgument(1);
@@ -115,11 +113,11 @@ public class RecentsModelTest {
         doAnswer(invocation -> {
             mRegisteredTaskListListener = invocation.getArgument(0);
             return null;
-        }).when(mTasksList).registerRecentTasksChangedListener(any());
+        }).when(mTasksList).setRecentTasksChangedListener(any());
         doAnswer(invocation -> {
             mRegisteredTaskListListener = null;
             return null;
-        }).when(mTasksList).unregisterRecentTasksChangedListener();
+        }).when(mTasksList).clearRecentTasksChangedListener();
         doAnswer(invocation -> {
             if (mRegisteredTaskListListener != null) {
                 mRegisteredTaskListListener.onRecentTasksChanged();
@@ -139,8 +137,6 @@ public class RecentsModelTest {
                 mock(TaskIconCache.class),
                 mThumbnailCache,
                 mock(TaskStackChangeListeners.class),
-                mLockedUserState,
-                () -> mThemeManager,
                 mock(DaggerSingletonTracker.class),
                 Executors.UI_HELPER_EXECUTOR,
                 mIconChangeTracker);
@@ -150,9 +146,10 @@ public class RecentsModelTest {
         when(mContext.getResources()).thenReturn(mResource);
     }
 
+    @DisableFlags(Flags.FLAG_ENABLE_LOW_RES_THUMBNAIL_PRELOADING)
     @Test
     @UiThreadTest
-    public void preloadOnHighResolutionEnabled() {
+    public void preloadOnHighResolutionEnabled_withFlagOff() {
         mRecentsModel.preloadCacheIfNeeded();
 
         ArgumentCaptor<Task> taskArgs = ArgumentCaptor.forClass(Task.class);
@@ -166,6 +163,16 @@ public class RecentsModelTest {
         for (int i = 0; i < expectedTasks.size(); ++i) {
             assertThat(taskArgsValues.get(i)).isEqualTo(expectedTasks.get(i));
         }
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_LOW_RES_THUMBNAIL_PRELOADING)
+    @Test
+    public void noPreloadOnHighResolutionEnabled_withFlagOn() {
+        when(mHighResLoadingState.isEnabled()).thenReturn(true);
+        when(mThumbnailCache.isPreloadingEnabled()).thenReturn(true);
+        mRecentsModel.preloadCacheIfNeeded();
+        verify(mRecentsModel.getThumbnailCache(), never())
+                .updateThumbnailInCache(any(), anyBoolean());
     }
 
     @Test
@@ -186,8 +193,9 @@ public class RecentsModelTest {
 
     }
 
+    @DisableFlags(Flags.FLAG_ENABLE_LOW_RES_THUMBNAIL_PRELOADING)
     @Test
-    public void increaseCacheSizeAndPreload() {
+    public void increaseCacheSizeAndPreload_withFlagOff() {
         // Mock to return preload is needed
         when(mThumbnailCache.updateCacheSizeAndRemoveExcess()).thenReturn(true);
         // Update cache size
@@ -209,18 +217,28 @@ public class RecentsModelTest {
     }
 
     @Test
-    public void themeCallbackAttachedOnUnlock() {
-        verify(mThemeManager, never()).addChangeListener(any());
+    @EnableFlags(Flags.FLAG_ENABLE_TASKBAR_UI_THREAD)
+    public void recentTaskListChangesNotiftListeners_enableFlag_taskbarUiThread() {
+        List<Void> changes = new ArrayList<>();
+        SafeCloseable closeable = mRecentsModel.getTasksChanges().forEach(
+                IMMEDIATE_EXECUTOR,
+                (unused) -> {
+                    changes.add(unused);
+                    return null;
+                });
+        assertThat(changes).hasSize(0);
 
-        ArgumentCaptor<Runnable> callbackCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(mLockedUserState).runOnUserUnlocked(callbackCaptor.capture());
+        mTasksList.onRecentTasksChanged();
+        assertThat(changes).hasSize(1);
 
-        callbackCaptor.getAllValues().forEach(Runnable::run);
-        verify(mThemeManager, times(1)).addChangeListener(any());
+        closeable.close();
+        mTasksList.onRecentTasksChanged();
+        assertThat(changes).hasSize(1);
     }
 
     @Test
-    public void recentTaskListChangesNotiftListeners() {
+    @DisableFlags(Flags.FLAG_ENABLE_TASKBAR_UI_THREAD)
+    public void recentTaskListChangesNotiftListeners_disableFlag_taskbarUiThread() {
         RecentsModel.RecentTasksChangedListener listener1 = mock(
                 RecentsModel.RecentTasksChangedListener.class);
         RecentsModel.RecentTasksChangedListener listener2 = mock(

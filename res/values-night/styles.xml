@@ -24,6 +24,7 @@
         <!-- Add the dim background here, rather than in the activity layout as the window slides
              in from the bottom, and we don't want the scrim to slide. -->
         <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.6</item>
     </style>
 
     <style name="DynamicColorsBaseLauncherTheme" parent="@style/BaseLauncherTheme">
@@ -42,6 +43,7 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:enforceStatusBarContrast">false</item>
         <item name="android:windowTranslucentStatus">false</item>

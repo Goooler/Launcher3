@@ -37,14 +37,13 @@ import android.view.RemoteAnimationTarget;
 import android.window.TransitionInfo;
 
 import com.android.app.animation.Interpolators;
-import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
-import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.InputConsumer;
 import com.android.quickstep.MultiStateCallback;
@@ -137,8 +136,7 @@ public class ProgressDelegateInputConsumer implements InputConsumer,
 
         String SUWTheme = SystemProperties.get(SUW_THEME_SYSTEM_PROPERTY, "");
         mIsNewExpressiveThemeAnimation = (SUWTheme.equals(GLIF_EXPRESSIVE_THEME)
-                || SUWTheme.equals(GLIF_EXPRESSIVE_LIGHT_THEME))
-                && Flags.enableNewAllSetAnimation();
+                || SUWTheme.equals(GLIF_EXPRESSIVE_LIGHT_THEME));
     }
 
     @Override

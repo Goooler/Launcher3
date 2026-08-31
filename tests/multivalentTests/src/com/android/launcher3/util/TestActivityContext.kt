@@ -17,6 +17,7 @@
 package com.android.launcher3.util
 
 import android.R
+import android.app.PendingIntent
 import android.content.Context
 import android.graphics.Point
 import android.view.View
@@ -28,6 +29,8 @@ import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.MultipageCellLayout
 import com.android.launcher3.allapps.ActivityAllAppsContainerView
 import com.android.launcher3.dragndrop.DragController
+import com.android.launcher3.dragndrop.SimpleDragLayer
+import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.views.BaseDragLayer
 import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider
@@ -39,7 +42,7 @@ import org.junit.runners.model.Statement
 private typealias AllAppsView = ActivityAllAppsContainerView<TestActivityContext>
 
 /** [BaseContext] implementation for as a [TestRule] for easily managing cleanup */
-class TestActivityContext
+open class TestActivityContext
 @JvmOverloads
 constructor(
     base: Context = InstrumentationRegistry.getInstrumentation().targetContext,
@@ -52,11 +55,15 @@ constructor(
     private val myDeviceProfile: DeviceProfile by lazy {
         InvariantDeviceProfile.INSTANCE.get(base).getDeviceProfile(base).copy()
     }
-    private val myDragLayer: BaseDragLayer<TestActivityContext> by lazy { MyDragLayer(this) }
+    private val myDragLayer: BaseDragLayer<TestActivityContext> by lazy {
+        SimpleDragLayer(this, null)
+    }
 
     private val myAppsView: AllAppsView by lazy {
         MAIN_EXECUTOR.submit<AllAppsView> { AllAppsView(this) }.get()
     }
+
+    private val myDragController: DragController by lazy { DragController(this) }
 
     private val myWidgetPickerDataProvider = WidgetPickerDataProvider()
 
@@ -74,8 +81,7 @@ constructor(
     /** Override required to allow spying */
     override fun getAccessibilityDelegate() = super.getAccessibilityDelegate()
 
-    /** Override required to allow spying */
-    override fun <T : DragController<*>?> getDragController(): T = super.getDragController()
+    override fun getDragController(): DragController = myDragController
 
     /** Override required to allow spying */
     override fun getModelWriter() = super.getModelWriter()
@@ -98,8 +104,7 @@ constructor(
         // modify the device profile.
         dp.inv.numColumns = if (isMulti) columns / 2 else columns
         dp.inv.numRows = rows
-        dp.workspaceIconProfile =
-            dp.workspaceIconProfile.copy(cellLayoutBorderSpacePx = Point(0, 0))
+        dp.workspaceProfile = dp.workspaceProfile.copy(cellLayoutBorderSpacePx = Point(0, 0))
         val cl =
             if (isMulti) MultipageCellLayout(this)
             else
@@ -135,12 +140,14 @@ constructor(
             .apply(statement, description)
     }
 
-    private class MyDragLayer(context: Context) :
-        BaseDragLayer<TestActivityContext>(context, null, 1) {
-
-        override fun recreateControllers() {
-            super.recreateControllers()
-            mControllers = arrayOfNulls(0)
-        }
+    // Overriding is required since Mockito does not correctly spy default interface methods,
+    // causing the real method to be called instead of the mock. This ensures the method is part of
+    // the class, and can be reliably spied upon.
+    override fun sendPendingIntentWithAnimation(
+        v: View,
+        intent: PendingIntent,
+        item: ItemInfo?,
+    ): RunnableList? {
+        return super.sendPendingIntentWithAnimation(v, intent, item)
     }
 }

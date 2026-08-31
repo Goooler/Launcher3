@@ -19,6 +19,7 @@ import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SY
 
 import android.media.AudioManager;
 import android.media.session.MediaSessionManager;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -48,11 +49,13 @@ public class LauncherInputConsumer<S extends BaseState<S>,
         T extends RecentsViewContainer & StatefulContainer<S>>
         implements InputConsumer {
 
-    private final T mContainer;
-    private final BaseContainerInterface<?, T> mContainerInterface;
-    private final BaseDragLayer mTarget;
-    private final InputMonitorCompat mInputMonitor;
-    private final GestureState mGestureState;
+    private static final String TAG = "LauncherInputConsumer";
+
+    @NonNull private final T mContainer;
+    @NonNull private final BaseContainerInterface<?, T> mContainerInterface;
+    @NonNull private final BaseDragLayer mTarget;
+    @Nullable private final InputMonitorCompat mInputMonitor;
+    @NonNull private final GestureState mGestureState;
 
     private final int[] mLocationOnScreen = new int[2];
 
@@ -62,8 +65,21 @@ public class LauncherInputConsumer<S extends BaseState<S>,
     private boolean mIsWaitingForAttachToWindow;
 
     public LauncherInputConsumer(
-            GestureState gestureState,
-            T container,
+            @NonNull GestureState gestureState,
+            @NonNull T container,
+            @Nullable InputMonitorCompat inputMonitor,
+            boolean startingInActivityBounds) {
+        this(gestureState,
+                container,
+                container.getDragLayer(),
+                inputMonitor,
+                startingInActivityBounds);
+    }
+
+    public LauncherInputConsumer(
+            @NonNull GestureState gestureState,
+            @NonNull T container,
+            @NonNull BaseDragLayer<?> dragLayer,
             @Nullable InputMonitorCompat inputMonitor,
             boolean startingInActivityBounds) {
         mContainer = container;
@@ -72,7 +88,7 @@ public class LauncherInputConsumer<S extends BaseState<S>,
         mContainerInterface = gestureState.getContainerInterface();
         mGestureState = gestureState;
 
-        mTarget = container.getDragLayer();
+        mTarget = dragLayer;
         mTarget.getLocationOnScreen(mLocationOnScreen);
     }
 
@@ -113,6 +129,7 @@ public class LauncherInputConsumer<S extends BaseState<S>,
             }
             if (mInputMonitor != null) {
                 TestLogging.recordEvent(TestProtocol.SEQUENCE_PILFER, "pilferPointers");
+                Log.d(TAG, "onMotionEvent: pilfering pointers for touch controller");
                 mInputMonitor.pilferPointers();
             }
         }

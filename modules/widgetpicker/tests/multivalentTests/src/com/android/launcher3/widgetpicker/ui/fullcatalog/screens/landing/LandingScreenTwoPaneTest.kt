@@ -371,4 +371,5 @@ class LandingScreenTwoPaneTest {
                 .onNode(hasText(WORK_TEST_APPS[0].title!!.toString()))
                 .assertIsNotDisplayed()
         }
+
 }

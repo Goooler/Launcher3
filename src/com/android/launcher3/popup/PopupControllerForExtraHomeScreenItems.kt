@@ -17,69 +17,58 @@
 package com.android.launcher3.popup
 
 import android.content.Context
+import android.os.Trace
 import android.view.View
 import com.android.launcher3.AppWidgetResizeFrame
-import com.android.launcher3.R
 import com.android.launcher3.dragndrop.LauncherDragController
 import com.android.launcher3.model.data.ItemInfo
-import com.android.launcher3.shortcuts.DeepShortcutView
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.widget.LauncherAppWidgetHostView
 
 /**
- * Controller for home screen items: folders, app pairs, and widgets. This controller does not
- * handle apps or app shortcuts. This controller handles actions for the popups such as showing and
- * dismissing them.
+ * Controller for home screen items: folders, app pairs, widgets, and file system based items. This
+ * controller does not handle apps or app shortcuts. This controller handles actions for the popups
+ * such as showing and dismissing them.
  */
 class PopupControllerForExtraHomeScreenItems<T>(
     private val popupDataRepository: PopupDataRepository,
     private val dragController: LauncherDragController,
 ) : PopupController<T> where T : Context, T : ActivityContext {
     override fun show(view: View): Popup {
+        val container: PopupContainer<T>
+        val activityContext: T = ActivityContext.lookupContext(view.context) as T
         val itemInfo = view.tag as ItemInfo
-        val activityContext: ActivityContext = ActivityContext.lookupContext<T>(view.context)
-        val container =
-            PopupContainer.create<T>(
-                context = view.context,
-                originalView = view,
-                itemInfo = itemInfo,
-            )
-        dragController.addDragListener(container)
-        addSystemShortcuts(container, itemInfo, itemView = view, activityContext)
-        container.show()
+        try {
+            Trace.beginSection("showPopupMenu")
+            container =
+                PopupContainer.create(
+                    context = view.context,
+                    originalView = view,
+                    itemInfo = itemInfo,
+                )
+            dragController.addDragListener(container)
+            popupDataRepository.getAllSupportedPopupActions(itemInfo)?.let {
+                container.showForSystemShortcuts(it, activityContext, view)
+            }
+            showResizeFrameIfNeeded(activityContext, itemInfo, view)
+        } finally {
+            logEvent(activityContext.statsLogManager, itemInfo.itemType, PopupEvent.OPEN)
+            Trace.endSection()
+        }
+        return container
+    }
 
+    private fun showResizeFrameIfNeeded(
+        activityContext: ActivityContext,
+        itemInfo: ItemInfo,
+        view: View,
+    ) {
         val cellLayout = activityContext.getCellLayout(itemInfo.container, itemInfo.screenId)
         val resizeStrategy = DefaultPopupResizeStrategy()
         if (resizeStrategy.shouldShowResizeFrame(itemInfo, view, cellLayout)) {
             AppWidgetResizeFrame.showForWidget(view as LauncherAppWidgetHostView?, cellLayout)
         }
-        return container
     }
 
-    private fun addSystemShortcuts(
-        popup: PopupContainer<T>,
-        itemInfo: ItemInfo,
-        itemView: View,
-        activityContext: ActivityContext,
-    ) {
-        popup.systemShortcutContainer =
-            popup.inflateAndAdd(R.layout.system_shortcut_rows_container, popup)
-        val popupData = popupDataRepository.getPopupDataByItemInfo(itemInfo)?.toList()
-        popupData?.forEach { systemShortcut ->
-            val view: DeepShortcutView =
-                popup.inflateAndAdd(R.layout.system_shortcut, popup.systemShortcutContainer)
-
-            view.iconView.setBackgroundResource(systemShortcut.iconResId)
-            view.bubbleText.setText(systemShortcut.labelResId)
-
-            view.tag = systemShortcut
-            view.setOnClickListener {
-                systemShortcut.popupAction.invoke(activityContext, itemInfo, itemView)
-            }
-        }
-    }
-
-    override fun dismiss() {
-        TODO("Not yet implemented")
-    }
+    override fun dismiss() {}
 }

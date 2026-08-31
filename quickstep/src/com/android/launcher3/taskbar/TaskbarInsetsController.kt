@@ -49,17 +49,23 @@ import com.android.app.tracing.traceSection
 import com.android.internal.policy.GestureNavigationSettingsObserver
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.anim.AlphaUpdateListener
+import com.android.launcher3.folder.Folder
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
+import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.CUEBAR_IN_WINDOW
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.DEFAULT_TOUCH_REGION
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.DRAG_LAYER_INVISIBLE
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.FULLSCREEN_TASKBAR_WINDOW
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.ICONS_INVISIBLE
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.PHONE_MODE
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.SYSTEM_DRAG_IN_PROGRESS
+import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.SYSTEM_DRAG_TO_TASKBAR_IN_PROGRESS
+import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.SYSTEM_DRAG_TO_TASKBAR_WITH_FOLDER_IN_PROGRESS
+import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.SYSTEM_DRAG_TO_TASKBAR_WITH_OVERFLOW_IN_PROGRESS
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.TRANSIENT_IN_OVERVIEW
 import com.android.launcher3.taskbar.TaskbarInsetsController.DebugTouchableRegion.Companion.UI_CONTROLLER_UNTOUCHABLE
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.Executors
+import com.android.wm.shell.Flags
 import java.io.PrintWriter
 import kotlin.jvm.optionals.getOrNull
 
@@ -140,14 +146,20 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
 
             val bubbleControllers = controllers.bubbleControllers.getOrNull()
             val taskbarTouchableHeight = taskbarStashController.touchableHeight
-            val bubblesTouchableHeight =
-                bubbleControllers?.bubbleStashController?.getTouchableHeight() ?: 0
             // reset touch bounds
             defaultTouchableRegion.setEmpty()
-            if (bubbleControllers != null) {
+            // when the shade is expanded, it takes the touches
+            val validShadeState =
+                !context.isNotificationShadeExpanded ||
+                    context.isTaskbarTouchableBehindNotificationShade()
+            if (bubbleControllers != null && validShadeState) {
                 val bubbleBarViewController = bubbleControllers.bubbleBarViewController
                 val isBubbleBarVisible =
-                    bubbleControllers.bubbleStashController.isBubbleBarVisible()
+                    if (Flags.fixBubbleInsetsWhenInvisible()) {
+                        bubbleBarViewController.isBubbleBarAndContainerVisible
+                    } else {
+                        bubbleControllers.bubbleStashController.isBubbleBarVisible()
+                    }
                 val isAnimatingNewBubble = bubbleBarViewController.isAnimatingNewBubble
                 // if bubble bar is visible or animating new bubble, add bar bounds to the touch
                 // region
@@ -159,11 +171,13 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 }
             }
             if (
-                taskbarStashController.isInApp ||
-                    controllers.uiController.isInOverviewUi ||
-                    context.showLockedTaskbarOnHome()
+                validShadeState &&
+                    (taskbarStashController.isInApp ||
+                        controllers.uiController.isInOverviewUi ||
+                        context.showDesktopTaskbarForFreeformDisplay())
             ) {
-                // only add the taskbar touch region if not on home
+                // only add the taskbar touch region if not on home, and when taskbar is not shown
+                // on home
                 val bottom = windowLayoutParams.height
                 val top = bottom - taskbarTouchableHeight
                 val right = context.deviceProfile.deviceProperties.widthPx
@@ -249,7 +263,8 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                         context.resources,
                     )
                 val isPinnedTaskbar =
-                    context.deviceProfile.isTaskbarPresent && !context.isTransientTaskbar
+                    context.deviceProfile.deviceProperties.taskbarConfiguration.isTaskbarPresent &&
+                        !context.isTransientTaskbar
                 val mandatoryGestureHeight = if (isPinnedTaskbar) contentHeight else gestureHeight
                 provider.insetsSize =
                     getInsetsForGravityWithCutout(mandatoryGestureHeight, gravity, endRotation)
@@ -336,8 +351,14 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         fun includeBubbleBarBounds(): Boolean {
             if (isImeVisible) return false
             val bubbleControllers = controllers.bubbleControllers.getOrNull() ?: return false
-            if (bubbleControllers.bubbleBarViewController.isAnimatingNewBubble) return true
-            val bubbleBarVisible = bubbleControllers.bubbleStashController.isBubbleBarVisible()
+            val bubbleBarViewController = bubbleControllers.bubbleBarViewController
+            if (bubbleBarViewController.isAnimatingNewBubble) return true
+            val bubbleBarVisible =
+                if (Flags.fixBubbleInsetsWhenInvisible()) {
+                    bubbleBarViewController.isBubbleBarAndContainerVisible
+                } else {
+                    bubbleControllers.bubbleStashController.isBubbleBarVisible()
+                }
             val dragging = bubbleControllers.dragToBubbleController.isDragInProgress
             return bubbleBarVisible && !dragging
         }
@@ -351,8 +372,14 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 context.isUserSetupComplete &&
                 (!isImeVisible || !controllers.navbarButtonsViewController.isImeRenderingNavButtons)
         ) {
-            touchableInsets = TOUCHABLE_INSETS_FRAME
-            debugTouchableRegion.lastSetTouchableReason = PHONE_MODE
+            if (controllers.cueBarController.isVisible) {
+                // Let touches pass through us.
+                touchableInsets = TOUCHABLE_INSETS_REGION
+                debugTouchableRegion.lastSetTouchableReason = CUEBAR_IN_WINDOW
+            } else {
+                touchableInsets = TOUCHABLE_INSETS_FRAME
+                debugTouchableRegion.lastSetTouchableReason = PHONE_MODE
+            }
         } else if (context.dragLayer.alpha < AlphaUpdateListener.ALPHA_CUTOFF_THRESHOLD) {
             // Let touches pass through us.
             touchableInsets = TOUCHABLE_INSETS_REGION
@@ -362,9 +389,39 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             touchableInsets = TOUCHABLE_INSETS_REGION
             debugTouchableRegion.lastSetTouchableReason = UI_CONTROLLER_UNTOUCHABLE
         } else if (controllers.taskbarOverlayController.isAnySystemDragInProgress) {
-            // Let touches pass through us.
-            touchableInsets = TOUCHABLE_INSETS_REGION
-            debugTouchableRegion.lastSetTouchableReason = SYSTEM_DRAG_IN_PROGRESS
+            if (!controllers.taskbarOverlayController.taskbarIsViableTargetForSystemDrag()) {
+                // Let touches pass through us.
+                touchableInsets = TOUCHABLE_INSETS_REGION
+                debugTouchableRegion.lastSetTouchableReason = SYSTEM_DRAG_IN_PROGRESS
+            } else if (
+                controllers.taskbarViewController.overflownAppsContainerController.isOpen()
+            ) {
+                // If overflow is shown, let taskbar (expected to be fullscreen) handle all touches
+                // until overflow bubble gets closed.
+                touchableInsets = TOUCHABLE_INSETS_FRAME
+                context.dragLayer.getBoundsInWindow(
+                    debugTouchableRegion.lastSetTouchableBounds,
+                    false,
+                )
+                debugTouchableRegion.lastSetTouchableReason =
+                    SYSTEM_DRAG_TO_TASKBAR_WITH_OVERFLOW_IN_PROGRESS
+            } else if (Folder.getOpen(context) != null) {
+                // If a folder is open, let taskbar (expected to be fullscreen) handle all touches
+                // until overflow bubble gets closed.
+                touchableInsets = TOUCHABLE_INSETS_FRAME
+                context.dragLayer.getBoundsInWindow(
+                    debugTouchableRegion.lastSetTouchableBounds,
+                    false,
+                )
+                debugTouchableRegion.lastSetTouchableReason =
+                    SYSTEM_DRAG_TO_TASKBAR_WITH_FOLDER_IN_PROGRESS
+            } else {
+                // Allow drag to enter taskbar.
+                touchableInsets = TOUCHABLE_INSETS_REGION
+                insetsInfo.touchableRegion.set(defaultTouchableRegion)
+                debugTouchableRegion.lastSetTouchableBounds.set(defaultTouchableRegion.bounds)
+                debugTouchableRegion.lastSetTouchableReason = SYSTEM_DRAG_TO_TASKBAR_IN_PROGRESS
+            }
         } else if (context.isTaskbarWindowFullscreen) {
             // Intercept entire fullscreen window.
             touchableInsets = TOUCHABLE_INSETS_FRAME
@@ -457,9 +514,16 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             const val DRAG_LAYER_INVISIBLE = "Taskbar is invisible"
             const val UI_CONTROLLER_UNTOUCHABLE = "Taskbar is not touchable"
             const val SYSTEM_DRAG_IN_PROGRESS = "System drag is in progress"
+            const val SYSTEM_DRAG_TO_TASKBAR_IN_PROGRESS =
+                "System drag handleble by taskbar in progress"
+            const val SYSTEM_DRAG_TO_TASKBAR_WITH_FOLDER_IN_PROGRESS =
+                "System drag handleble by taskbar in progress, folder open"
+            const val SYSTEM_DRAG_TO_TASKBAR_WITH_OVERFLOW_IN_PROGRESS =
+                "System drag handleble by taskbar in progress, overflow open"
             const val FULLSCREEN_TASKBAR_WINDOW = "Taskbar is fullscreen"
             const val TRANSIENT_IN_OVERVIEW = "Transient Taskbar is in Overview"
             const val DEFAULT_TOUCH_REGION = "Using default touchable region"
+            const val CUEBAR_IN_WINDOW = "CueBar in window"
             const val ICONS_INVISIBLE =
                 "Icons are not visible, but other components such as 3 buttons might be"
         }

@@ -28,6 +28,7 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
 
 import androidx.annotation.ColorInt;
@@ -35,8 +36,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.util.Preconditions;
+import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.util.BorderAnimator;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -99,6 +102,16 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
                 attrs, R.styleable.TaskView, defStyleAttr, defStyleRes);
 
         setWillNotDraw(false);
+        setAccessibilityDelegate(new AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(@NonNull View host,
+                    @NonNull AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK);
+                info.setClickable(false);
+                info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SELECT);
+            }
+        });
 
         mFocusBorderColor = ta.getColor(
                 R.styleable.TaskView_focusBorderColor, DEFAULT_BORDER_COLOR);
@@ -201,7 +214,7 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
         // be updated once the task metadata has been loaded - the delay should be very short, and
         // the content description when task titles are not available still gives some useful
         // information to the user (the task's position in the list).
-        updateContentDesctiptionForTasks(task1, task2);
+        updateContentDescriptionForTasks(task1, task2);
 
         if (iconUpdateFunction == null) {
             applyIcon(mIcon1, task1);
@@ -214,7 +227,7 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             if (task2 != null) {
                 return;
             }
-            updateContentDesctiptionForTasks(task1, null);
+            updateContentDescriptionForTasks(task1, null);
         });
 
         if (task2 == null) {
@@ -222,7 +235,7 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
         }
         iconUpdateFunction.updateIconInBackground(task2, t -> {
             applyIcon(mIcon2, task2);
-            updateContentDesctiptionForTasks(task1, task2);
+            updateContentDescriptionForTasks(task1, task2);
         });
     }
 
@@ -251,8 +264,9 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             return;
         }
 
+        DeviceProfile dp = ActivityContext.lookupContext(getContext()).getDeviceProfile();
+        final boolean isLeftRightSplit = dp.getSysuiProfile().isLeftRightSplit();
 
-        final boolean isLeftRightSplit = !splitBounds.appsStackedVertically;
         final float leftOrTopTaskPercent = splitBounds.getLeftTopTaskPercent();
 
         ConstraintLayout.LayoutParams leftTopParams = (ConstraintLayout.LayoutParams)
@@ -267,6 +281,8 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             leftTopParams.matchConstraintPercentWidth = leftOrTopTaskPercent;
             leftTopParams.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
             leftTopParams.rightToLeft = R.id.thumbnail_2;
+            leftTopParams.topToTop = ConstraintLayout.LayoutParams.UNSET;
+            leftTopParams.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
             mThumbnailView1.setLayoutParams(leftTopParams);
 
             rightBottomParams.width = 0;
@@ -274,6 +290,8 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             rightBottomParams.matchConstraintPercentWidth = 1 - leftOrTopTaskPercent;
             rightBottomParams.leftToRight = R.id.thumbnail_1;
             rightBottomParams.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
+            rightBottomParams.topToBottom = ConstraintLayout.LayoutParams.UNSET;
+            rightBottomParams.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
             mThumbnailView2.setLayoutParams(rightBottomParams);
         } else {
             // Set thumbnail view ratio in top bottom split mode.
@@ -282,6 +300,8 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             leftTopParams.matchConstraintPercentHeight = leftOrTopTaskPercent;
             leftTopParams.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
             leftTopParams.bottomToTop = R.id.thumbnail_2;
+            leftTopParams.leftToLeft = ConstraintLayout.LayoutParams.UNSET;
+            leftTopParams.rightToLeft = ConstraintLayout.LayoutParams.UNSET;
             mThumbnailView1.setLayoutParams(leftTopParams);
 
             rightBottomParams.height = 0;
@@ -289,6 +309,8 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
             rightBottomParams.matchConstraintPercentHeight = 1 - leftOrTopTaskPercent;
             rightBottomParams.topToBottom = R.id.thumbnail_1;
             rightBottomParams.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+            rightBottomParams.leftToRight = ConstraintLayout.LayoutParams.UNSET;
+            rightBottomParams.rightToRight = ConstraintLayout.LayoutParams.UNSET;
             mThumbnailView2.setLayoutParams(rightBottomParams);
         }
     }
@@ -340,7 +362,7 @@ public class KeyboardQuickSwitchTaskView extends ConstraintLayout {
     /**
      * Updates the task view's content description to reflect tasks represented by the view.
      */
-    private void updateContentDesctiptionForTasks(@NonNull Task task1, @Nullable Task task2) {
+    private void updateContentDescriptionForTasks(@NonNull Task task1, @Nullable Task task2) {
         String tasksDescription = task1.titleDescription == null || task2 == null
                 ? task1.titleDescription
                 : getContext().getString(

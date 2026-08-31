@@ -124,9 +124,9 @@ public class LauncherSettings {
         public static final int ITEM_TYPE_DEEP_SHORTCUT = 6;
 
         /**
-         * The favorite is an app pair for launching split screen
+         * The favorite is an app group for launching split screen
          */
-        public static final int ITEM_TYPE_APP_PAIR = 10;
+        public static final int ITEM_TYPE_APP_GROUP = 10;
 
         // *** Below enum values are used for metrics purpose but not used in Favorites DB ***
 
@@ -181,11 +181,6 @@ public class LauncherSettings {
         public static final String TABLE_NAME = "favorites";
 
         /**
-         * Backup table created when user hotseat is moved to workspace for hybrid hotseat
-         */
-        public static final String HYBRID_HOTSEAT_BACKUP_TABLE = "hotseat_restore_backup";
-
-        /**
          * Temporary table used specifically for multi-db grid migrations
          */
         public static final String TMP_TABLE = "favorites_tmp";
@@ -224,9 +219,19 @@ public class LauncherSettings {
                 case CONTAINER_DESKTOP: return "desktop";
                 case CONTAINER_HOTSEAT: return "hotseat";
                 case CONTAINER_ALL_APPS_PREDICTION: return "prediction";
+                case CONTAINER_WIDGETS_PREDICTION: return "widgets_prediction";
+                case CONTAINER_HOTSEAT_PREDICTION: return "hotseat_prediction";
                 case CONTAINER_ALL_APPS: return "all_apps";
                 case CONTAINER_WIDGETS_TRAY: return "widgets_tray";
+                case CONTAINER_BOTTOM_WIDGETS_TRAY: return "bottom_widgets_tray";
+                case CONTAINER_PIN_WIDGETS: return "pin_widgets";
+                case CONTAINER_WALLPAPERS: return "wallpapers";
                 case CONTAINER_SHORTCUTS: return "shortcuts";
+                case CONTAINER_SETTINGS: return "settings";
+                case CONTAINER_TASKSWITCHER: return "taskswitcher";
+                case CONTAINER_PRIVATESPACE: return "privatespace";
+                case EXTENDED_CONTAINERS: return "extended_containers";
+                case CONTAINER_UNKNOWN: return "unknown";
                 default: return String.valueOf(container);
             }
         }
@@ -240,7 +245,7 @@ public class LauncherSettings {
                 case ITEM_TYPE_DEEP_SHORTCUT: return "DEEPSHORTCUT";
                 case ITEM_TYPE_TASK: return "TASK";
                 case ITEM_TYPE_QSB: return "QSB";
-                case ITEM_TYPE_APP_PAIR: return "APP_PAIR";
+                case ITEM_TYPE_APP_GROUP: return "APP_PAIR";
                 case ITEM_TYPE_PRIVATE_SPACE_INSTALL_APP_BUTTON:
                     return "PRIVATE_SPACE_INSTALL_APP_BUTTON";
                 case ITEM_TYPE_SYSTEM_DRAG: return "SYSTEM_DRAG";
@@ -338,7 +343,7 @@ public class LauncherSettings {
 
         // LinkedHashMap maintains Order of Insertion
         @NonNull
-        private static LinkedHashMap<String, String> getColumnsToTypes(long profileId) {
+        public static LinkedHashMap<String, String> getColumnsToTypes(long profileId) {
             final LinkedHashMap<String, String> columnsToTypes = new LinkedHashMap<>();
             columnsToTypes.put(_ID, "INTEGER PRIMARY KEY");
             columnsToTypes.put(TITLE, "TEXT");

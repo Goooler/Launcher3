@@ -32,6 +32,7 @@ import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.icons.IconCache
 import com.android.launcher3.model.AllAppsList
+import com.android.launcher3.model.BgDataModel.ModificationSource.ModelTask
 import com.android.launcher3.model.ModelTaskController
 import com.android.launcher3.model.TestableModelState
 import com.android.launcher3.model.data.AppInfo
@@ -133,7 +134,7 @@ class PackageUpdatedTaskTest {
     @Test
     @EnableFlags(Flags.FLAG_MODEL_REPOSITORY)
     fun `OP_ADD triggers model callbacks and adds new items to AllAppsList`() {
-        modelState.dataModel.addItem(context, expectedWorkspaceItem)
+        modelState.dataModel.addItems(context, listOf(expectedWorkspaceItem), ModelTask)
         val appUpdates = modelState.appsRepo.appsListStateRef.trackUpdate()
         val widgetsUpdates = modelState.homeRepo.allWidgets.trackUpdate()
         val workspaceUpdates = modelState.homeRepo.workspaceState.trackUpdateAndChanges()
@@ -145,7 +146,7 @@ class PackageUpdatedTaskTest {
         assertThat(widgetsUpdates).hasSize(2)
         workspaceUpdates.verifyItemUpdated()
 
-        verify(modelState.appsList).updatePackage(any(), eq(expectedPackage), eq(mUser), any())
+        verify(modelState.appsList).updatePackage(any(), eq(expectedPackage), eq(mUser))
         verify(mockTaskController).bindUpdatedWorkspaceItems(listOf(expectedWorkspaceItem))
         verify(mockTaskController).bindUpdatedWidgets(modelState.dataModel)
 
@@ -158,7 +159,7 @@ class PackageUpdatedTaskTest {
     @Test
     @EnableFlags(Flags.FLAG_MODEL_REPOSITORY)
     fun `OP_UPDATE triggers model callbacks and updates items in AllAppsList`() {
-        modelState.dataModel.addItem(context, expectedWorkspaceItem)
+        modelState.dataModel.addItems(context, listOf(expectedWorkspaceItem), ModelTask)
         val appUpdates = modelState.appsRepo.appsListStateRef.trackUpdate()
         val workspaceUpdates = modelState.homeRepo.workspaceState.trackUpdateAndChanges()
 
@@ -168,7 +169,7 @@ class PackageUpdatedTaskTest {
         assertThat(appUpdates).hasSize(2)
         workspaceUpdates.verifyItemUpdated()
 
-        verify(modelState.appsList).updatePackage(any(), eq(expectedPackage), eq(mUser), any())
+        verify(modelState.appsList).updatePackage(any(), eq(expectedPackage), eq(mUser))
         verify(mockTaskController).bindUpdatedWorkspaceItems(listOf(expectedWorkspaceItem))
 
         assertThat(modelState.appsList.data.firstOrNull()?.componentName)

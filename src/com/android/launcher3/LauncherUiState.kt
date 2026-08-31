@@ -22,70 +22,42 @@ import com.android.launcher3.util.MutableListenableRef
 /** Expose Launcher Ui State to Taskbar. */
 class LauncherUiState {
 
-    private val _launcherStateRef = MutableListenableRef(LauncherState.NORMAL)
     private val _deviceProfileRef = MutableListenableRef(DEFAULT_DEVICE_PROFILE)
-    private val _activityFlagsRef = MutableListenableRef(0)
-    private val _isSplitSelectActiveRef = MutableListenableRef(false)
-    private val _isOverlayShown = MutableListenableRef(false)
-    private val _taskbarAlignmentChannelAlphaRef = MutableListenableRef(0f)
     private val _isTopResumedActivityRef = MutableListenableRef(false)
+    private val _isResumedActivityRef = MutableListenableRef(false)
 
+    @Volatile private var _activityFlags = 0
+
+    @Volatile var launcherState: LauncherState = LauncherState.NORMAL
+    @Volatile var isOverlayShown = false
+    @Volatile var taskbarAlignmentChannelAlpha = 0f
+
+    val splitScreenUiState = SplitScreenUiState()
     val deviceProfileRef = _deviceProfileRef.asListenable()
-    val isSplitSelectActiveRef = _isSplitSelectActiveRef.asListenable()
-    val launcherStateRef = _launcherStateRef.asListenable()
-    val taskbarAlignmentChannelAlpha = _taskbarAlignmentChannelAlphaRef.asListenable()
     val isTopResumedActivityRef = _isTopResumedActivityRef.asListenable()
 
+    val isResumedActivityRef = _isResumedActivityRef.asListenable()
+
     val isResumed: Boolean
-        get() = (_activityFlagsRef.value and BaseActivity.ACTIVITY_STATE_RESUMED) != 0
+        get() = (_activityFlags and BaseActivity.ACTIVITY_STATE_RESUMED) != 0
 
     val isDeviceProfileInitialized: Boolean
         get() = _deviceProfileRef.value !== DEFAULT_DEVICE_PROFILE
-
-    val isOverlayShownRef = _isOverlayShown.asListenable()
-
-    // Split select state
-    private var _initialTask = SplitSelectTask()
-    private var _secondTask = SplitSelectTask()
-
-    fun setLauncherState(launcherState: LauncherState) {
-        _launcherStateRef.diffAndDispatch(launcherState)
-    }
 
     fun setDeviceProfile(deviceProfile: DeviceProfile) {
         _deviceProfileRef.diffAndDispatch(deviceProfile)
     }
 
     fun setActivityFlag(flags: Int) {
-        _activityFlagsRef.diffAndDispatch(flags)
-    }
-
-    fun setSplitSelectInitialTask(initialTask: SplitSelectTask) {
-        _initialTask = initialTask
-        updateIsSplitSelectActiveRef()
-    }
-
-    fun setSplitSelectSecondTask(secondTask: SplitSelectTask) {
-        _secondTask = secondTask
-        updateIsSplitSelectActiveRef()
-    }
-
-    fun setIsOverlayShown(isOverlayShown: Boolean) {
-        _isOverlayShown.diffAndDispatch(isOverlayShown)
-    }
-
-    fun setTaskbarAlignmentChannelAlpha(alpha: Float) {
-        _taskbarAlignmentChannelAlphaRef.diffAndDispatch(alpha)
+        _activityFlags = flags
     }
 
     fun setIsTopResumedActivity(isTopResumedActivity: Boolean) {
         _isTopResumedActivityRef.diffAndDispatch(isTopResumedActivity)
     }
 
-    private fun updateIsSplitSelectActiveRef() {
-        _isSplitSelectActiveRef.diffAndDispatch(
-            _initialTask.isIntentSet && !_secondTask.isIntentSet
-        )
+    fun setIsResumedActivity(isResumedActivity: Boolean) {
+        _isResumedActivityRef.diffAndDispatch(isResumedActivity)
     }
 
     private fun <T> MutableListenableRef<T>.diffAndDispatch(newValue: T) {

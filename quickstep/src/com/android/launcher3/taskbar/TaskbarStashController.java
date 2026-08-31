@@ -22,21 +22,20 @@ import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.internal.jank.InteractionJankMonitor.Configuration;
-import static com.android.launcher3.Flags.refactorTaskbarUiState;
-import static com.android.launcher3.Flags.syncAppLaunchWithTaskbarStash;
 import static com.android.launcher3.QuickstepTransitionManager.PINNED_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_HIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_SHOW;
 import static com.android.launcher3.statehandlers.DesktopVisibilityController.INACTIVE_DESK_ID;
 import static com.android.launcher3.taskbar.TaskbarActivityContext.ENABLE_TASKBAR_BEHIND_SHADE;
-import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableAutoStashConnectedDisplayTaskbar;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 import static com.android.quickstep.util.SystemActionConstants.SYSTEM_ACTION_ID_TASKBAR;
 import static com.android.quickstep.util.SystemUiFlagUtils.isTaskbarHidden;
+import static com.android.systemui.shared.Flags.cueBarAceMigration;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DUAL_SHADE_ENABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
@@ -55,6 +54,7 @@ import android.view.ViewConfiguration;
 import android.view.accessibility.AccessibilityManager;
 import android.view.animation.Interpolator;
 
+import androidx.annotation.AnyThread;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -113,11 +113,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     // taskbar should always be stashed for bubble bar on phone
     public static final int FLAG_STASHED_BUBBLE_BAR_ON_PHONE = 1 << 15;
     public static final int FLAG_IGNORE_IN_APP = 1 << 16; // used to sync with app launch animation
-    public static final int FLAG_AUTO_STASHED_ON_HOME = 1 << 17; // auto stash taskbar for AL
     // Used on CD to not stash when in desktop mode.
-    public static final int FLAG_IN_DESKTOP_MODE_ON_CD = 1 << 18;
+    public static final int FLAG_IN_DESKTOP_MODE_ON_CD = 1 << 17;
     // Used on CD to not stash when in launcher. FLAG_IN_APP is always set on CD.
-    public static final int FLAG_IN_SECONDARY_LAUNCHER_ON_CD = 1 << 19;
+    public static final int FLAG_IN_SECONDARY_LAUNCHER_ON_CD = 1 << 18;
+    public static final int FLAG_STASHED_IN_OVERVIEW_FOR_TRANSLUCENT_APP = 1 << 19;
 
     // If any of these flags are enabled, isInApp should return true.
     private static final int FLAGS_IN_APP = FLAG_IN_APP | FLAG_IN_SETUP;
@@ -128,7 +128,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             | FLAG_STASHED_SMALL_SCREEN | FLAG_STASHED_IN_APP_AUTO | FLAG_STASHED_IME;
 
     // If we're in overview and any of these flags are enabled, taskbar should be stashed.
-    private static final int FLAGS_STASHED_IN_OVERVIEW = FLAG_STASHED_IME;
+    private static final int FLAGS_STASHED_IN_OVERVIEW = FLAG_STASHED_IME
+            | FLAG_STASHED_IN_OVERVIEW_FOR_TRANSLUCENT_APP;
 
     // If any of these flags are enabled, inset apps by our stashed height instead of our unstashed
     // height. This way the reported insets are consistent even during transitions out of the app.
@@ -174,6 +175,22 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     private static final long TASKBAR_HINT_STASH_DURATION =
             ViewConfiguration.DEFAULT_LONG_PRESS_TIMEOUT;
+
+
+    /**
+     * How long to delay the icon/stash handle alpha.
+     */
+    public static final int TASKBAR_STASH_DURATION_WITHOUT_ICON_ALIGNMENT = 400;
+
+    /**
+     * How long take to icon alpha to change during stash animation.
+     */
+    public static final int TASKBAR_STASH_WITHOUT_ICON_ALIGNMENT_ICON_ALPHA_DURATION = 83;
+
+    /**
+     * How long take to icon alpha to change during unstash animation.
+     */
+    public static final int TASKBAR_UNSTASH_WITHOUT_ICON_ALIGNMENT_ICON_ALPHA_DURATION = 150;
 
     /**
      * How long to delay the icon/stash handle alpha.
@@ -271,13 +288,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private boolean mIsImeVisible;
 
     private final Alarm mTimeoutAlarm = new Alarm();
-    private boolean mEnableBlockingTimeoutDuringTests = false;
+    private volatile boolean mEnableBlockingTimeoutDuringTests = false;
 
     private Animator mTaskbarBackgroundAlphaAnimator;
     private final long mTaskbarBackgroundDuration;
     private boolean mUserIsNotGoingHome = false;
-
-    private final boolean mInAppStateAffectsDesktopTasksVisibilityInTaskbar;
 
     // Evaluate whether the handle should be stashed
     private final StatePropertyHolder mStatePropertyHolder;
@@ -296,7 +311,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         mAccessibilityManager = mActivity.getSystemService(AccessibilityManager.class);
         mStatePropertyHolder = new StatePropertyHolder(flags -> {
             if (!mActivity.isPrimaryDisplay()
-                    && enableAutoStashConnectedDisplayTaskbar.isTrue()
                     && (hasAnyFlag(FLAG_IN_DESKTOP_MODE_ON_CD) || hasAnyFlag(
                     FLAG_IN_SECONDARY_LAUNCHER_ON_CD))) {
                 return false;
@@ -308,23 +322,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             boolean inOverview = hasAnyFlag(flags, FLAG_IN_OVERVIEW);
             boolean stashedInOverview = hasAnyFlag(flags, FLAGS_STASHED_IN_OVERVIEW);
             boolean forceStashed = hasAnyFlag(flags, FLAGS_FORCE_STASHED);
-            boolean stashedInAlDevice = hasAnyFlag(flags, FLAG_AUTO_STASHED_ON_HOME);
             return (inApp && stashedInApp)
                     || (!inApp && stashedLauncherState)
                     || (inOverview && stashedInOverview)
-                    || forceStashed
-                    || stashedInAlDevice;
+                    || forceStashed;
         });
-
-        // Taskbar, via `TaskbarDesktopModeController`, depends on `TaskbarStashController` state to
-        // determine whether desktop tasks should be shown because taskbar is pinned on the home
-        // screen for freeform windowing displays. In this case, list of items shown in the taskbar
-        // needs to be updated when in-app state changes.
-        // TODO(b/390665752): Feature to "lock" pinned taskbar to home screen will be superseded by
-        //     pinning, in other launcher states, at which point this variable can be removed.
-        mInAppStateAffectsDesktopTasksVisibilityInTaskbar =
-                !mActivity.showDesktopTaskbarForFreeformDisplay()
-                        && mActivity.showLockedTaskbarOnHome();
 
         mTaskbarBackgroundDuration = activity.getResources().getInteger(
                 R.integer.taskbar_background_duration);
@@ -377,7 +379,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 && !mTaskbarSharedState.getTaskbarWasPinned()
                 && mTaskbarSharedState.taskbarWasStashedAuto;
 
-        if (!mActivity.isPrimaryDisplay() && enableAutoStashConnectedDisplayTaskbar.isTrue()) {
+        if (!mActivity.isPrimaryDisplay()) {
             updateFlagForDesktopModeOnCD(/* fromInit= */ true);
 
             // Check if secondary launcher is currently visible (vs fullscreen app); required when
@@ -400,12 +402,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         updateStateForFlag(FLAG_IN_OVERVIEW, mTaskbarSharedState.isTaskbarOnOverview);
         updateStateForFlag(FLAG_STASHED_BUBBLE_BAR_ON_PHONE, mActivity.isBubbleBarOnPhone());
 
-        boolean desktopModeTaskbarPinned = LauncherPrefs.get(mActivity).get(
-                LauncherPrefs.TASKBAR_PINNING_IN_DESKTOP_MODE);
-
-        updateStateForFlag(FLAG_AUTO_STASHED_ON_HOME,
-                mActivity.shouldShowHomeBehindDesktop() && !desktopModeTaskbarPinned);
-
+        updateStateForFlag(FLAG_STASHED_IN_OVERVIEW_FOR_TRANSLUCENT_APP, false);
         applyState(/* duration = */ 0);
 
         // Hide the background while stashed so it doesn't show on fast swipes home
@@ -417,15 +414,14 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         notifyStashChange(/* visible */ false, /* stashed */ isStashedInApp());
 
         mControllers.runAfterInit(() -> {
-            // if taskbar should auto stash attempt to start timeout.
-            if (shouldAllowTaskbarToAutoStash()) {
+            if  (shouldAllowTaskbarToAutoStash()) {
                 tryStartTaskbarTimeout();
             }
         });
     }
 
     void updateFlagForDesktopModeOnCD(boolean fromInit) {
-        if (mActivity.isPrimaryDisplay() || !enableAutoStashConnectedDisplayTaskbar.isTrue()) {
+        if (mActivity.isPrimaryDisplay()) {
             return;
         }
 
@@ -460,7 +456,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             return false;
         }
         if (!mActivity.isPrimaryDisplay()) {
-            return enableAutoStashConnectedDisplayTaskbar.isTrue();
+            return true;
         }
         return !mActivity.isThreeButtonNav();
     }
@@ -469,6 +465,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * Enables the auto timeout for taskbar stashing. This method should only be used for taskbar
      * testing.
      */
+    @AnyThread
     @VisibleForTesting
     public void enableBlockingTimeoutDuringTests(boolean enableBlockingTimeout) {
         mEnableBlockingTimeoutDuringTests = enableBlockingTimeout;
@@ -491,6 +488,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         if (mActivity.getTaskbarFeatureEvaluator().isPersistent()) {
             return PINNED_TASKBAR_TRANSITION_DURATION;
         }
+        if (mActivity.isTransientTaskbar()
+                && mControllers.taskbarRecentAppsController.getCanShowRecentApps()) {
+            return TASKBAR_STASH_DURATION_WITHOUT_ICON_ALIGNMENT;
+        }
+
         return mActivity.isTransientTaskbar() ? TRANSIENT_TASKBAR_STASH_DURATION
                 : TASKBAR_STASH_DURATION;
     }
@@ -603,7 +605,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             // If the navigation bar is hidden in SUW, we can draw the SUW content lower so we avoid
             // reporting a higher inset
             if (hasAnyFlag(FLAG_STASHED_IN_APP_SETUP)
-                    && (dp.isTaskbarPresent || mActivity.isPhoneGestureNavMode())
+                    && (dp.getDeviceProperties().getTaskbarConfiguration().isTaskbarPresent()
+                    || mActivity.isPhoneGestureNavMode())
                     && !isNavbarHiddeninSUW()) {
                 // When we show the back button in SUW, the SUW layout may not be wide enough to
                 // support overlapping the nav bar with its content in portrait. So we send
@@ -736,26 +739,27 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 /* shouldBubblesFollow= */ !bubbleBarExpanded);
     }
 
-    /**
-     * @return if we should allow taskbar to auto stash
-     */
+    /** @return if we should allow taskbar to auto stash. */
+    @AnyThread
     public boolean shouldAllowTaskbarToAutoStash() {
-        if (mActivity.isThreeButtonNav() && mActivity.isPrimaryDisplay()) {
+        final boolean isPrimaryDisplay = mTaskbarUiState.isPrimaryDisplay();
+        if (mTaskbarUiState.isThreeButtonNav() && isPrimaryDisplay) {
             return false;
         }
 
-        if (mActivity.isTransientTaskbar()) {
+        if (mTaskbarUiState.isTransientTaskbar()) {
             return true;
         }
-        if (!mActivity.isPrimaryDisplay()) {
-            // On connected display, only allow to auto stash if the feature flag is ON.
-            return enableAutoStashConnectedDisplayTaskbar.isTrue();
+        if (!isPrimaryDisplay) {
+            return true;
         }
 
-        // In desktop mode on primary displays, allow taskbar to stash based on user pref.
-        boolean isTaskbarPinningOnInDesktopMode = LauncherPrefs.TASKBAR_PINNING_IN_DESKTOP_MODE.get(
-                mActivity);
-        return !isTaskbarPinningOnInDesktopMode && mActivity.isTaskbarShowingDesktopTasks();
+        final boolean isTaskbarPinningOnInDesktopMode =
+                LauncherPrefs.TASKBAR_PINNING_IN_DESKTOP_MODE.get(mActivity);
+        final boolean isTaskbarShowingDesktopTasks = DesktopVisibilityController.INSTANCE
+                .get(mActivity).isInDesktopMode(mActivity.getDisplayId())
+                || mTaskbarUiState.getShowDesktopTaskbarForFreeformDisplay();
+        return !isTaskbarPinningOnInDesktopMode && isTaskbarShowingDesktopTasks;
     }
 
     /**
@@ -770,9 +774,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void updateAndAnimatePinnedTaskbar(boolean isStashed) {
         boolean shouldApplyState = false;
-        int stashFlag = mActivity.shouldShowHomeBehindDesktop()
-                ? FLAG_AUTO_STASHED_ON_HOME
-                : FLAG_STASHED_IN_APP_AUTO;
+        int stashFlag = FLAG_STASHED_IN_APP_AUTO;
 
         if (hasAnyFlag(stashFlag) != isStashed) {
             mControllers.bubbleControllers
@@ -784,8 +786,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         if (shouldApplyState) {
             applyState();
         }
-        if (enableAutoStashConnectedDisplayTaskbar.isTrue()
-                && !mControllers.taskbarActivityContext.isPrimaryDisplay()) {
+        if (!mControllers.taskbarActivityContext.isPrimaryDisplay()) {
             mControllers.navbarButtonsViewController.setTaskbarStashedIfConnectedDisplay(
                     mIsStashed);
         }
@@ -793,14 +794,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /** Toggles the Taskbar's stash state. */
     public void toggleTaskbarStash() {
-        if (!shouldAllowTaskbarToAutoStash() || (!hasAnyFlag(FLAGS_IN_APP)
-                && !mActivity.shouldShowHomeBehindDesktop())) {
+        if (!shouldAllowTaskbarToAutoStash() || !hasAnyFlag(FLAGS_IN_APP)) {
             return;
         }
         if (mActivity.isTransientTaskbar()) {
             updateAndAnimateTransientTaskbar(!hasAnyFlag(FLAG_STASHED_IN_APP_AUTO));
-        } else if (mActivity.shouldShowHomeBehindDesktop()) {
-            updateAndAnimatePinnedTaskbar(!hasAnyFlag(FLAG_AUTO_STASHED_ON_HOME));
         } else if (mActivity.isTaskbarShowingDesktopTasks()) {
             updateAndAnimatePinnedTaskbar(!hasAnyFlag(FLAG_STASHED_IN_APP_AUTO));
         }
@@ -877,11 +875,15 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             return;
         }
 
-        if (mActivity.isTransientTaskbar()) {
+        if (mActivity.isTransientTaskbar()
+                && mControllers.taskbarRecentAppsController.getCanShowRecentApps()) {
+            createNewTransientAnimToIsStashed(mAnimator, isStashed,
+                    duration, animationType);
+        } else if (mActivity.isTransientTaskbar()) {
             createTransientAnimToIsStashed(mAnimator, isStashed, duration,
                     shouldDelayBackground, animationType);
         } else if (shouldAllowTaskbarToAutoStash()) {
-            if (enableAutoStashConnectedDisplayTaskbar.isTrue() && !mActivity.isPrimaryDisplay()) {
+            if (!mActivity.isPrimaryDisplay()) {
                 // Use stash to handle animation on connected displays.
                 createAnimToIsStashed(mAnimator, isStashed, duration, stashTranslation,
                         animationType);
@@ -910,6 +912,106 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 }
             }
         });
+    }
+
+    private void createNewTransientAnimToIsStashed(AnimatorSet animator, boolean isStashed,
+            long duration, int animationType) {
+
+        // Target values of the properties this is going to set
+        final float backgroundOffsetTarget = isStashed ? 1 : 0;
+        final float iconAlphaTarget = isStashed ? 0 : 1;
+        final float stashedHandleAlphaTarget = isStashed ? 1 : 0;
+        final float backgroundAlphaTarget = isStashed ? 0 : 1;
+
+
+        int stashYTranslation = !isStashed ? 0 : mUnstashedHeight - mStashedHeight;
+
+        int navHandleWidth = mControllers.stashedHandleViewController.getNavHandleWidth(
+                mControllers.taskbarActivityContext);
+        float taskbarWidth =
+                mControllers.taskbarActivityContext.getTransientTaskbarBounds().width();
+
+
+        float ratio = taskbarWidth == 0 ? 0 : (navHandleWidth / taskbarWidth);
+
+        // Timing for the alpha values depend on the animation played
+        long iconAlphaStartDelay = 0, iconAlphaDuration = 0, backgroundAndHandleAlphaStartDelay = 0,
+                backgroundAndHandleAlphaDuration = 0;
+        if (duration > 0) {
+            if (animationType == TRANSITION_HANDLE_FADE) {
+                // When fading, the handle fades in/out at the beginning of the transition with
+                // TASKBAR_STASH_ALPHA_DURATION.
+                backgroundAndHandleAlphaDuration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION;
+                iconAlphaDuration = TASKBAR_STASH_WITHOUT_ICON_ALIGNMENT_ICON_ALPHA_DURATION;
+            } else {
+                iconAlphaStartDelay = TASKBAR_STASH_ALPHA_START_DELAY;
+                iconAlphaDuration = TASKBAR_UNSTASH_WITHOUT_ICON_ALIGNMENT_ICON_ALPHA_DURATION;
+                backgroundAndHandleAlphaDuration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION;
+
+                if (isStashed) {
+                    iconAlphaDuration = TASKBAR_STASH_WITHOUT_ICON_ALIGNMENT_ICON_ALPHA_DURATION;
+                    backgroundAndHandleAlphaStartDelay = iconAlphaStartDelay;
+                    backgroundAndHandleAlphaDuration = Math.max(0, duration - iconAlphaStartDelay);
+                }
+
+            }
+        }
+
+        play(animator, mTaskbarStashedHandleAlpha.animateToValue(stashedHandleAlphaTarget),
+                backgroundAndHandleAlphaStartDelay,
+                backgroundAndHandleAlphaDuration, EMPHASIZED);
+
+
+        play(animator, mTaskbarBackgroundAlphaForStash.animateToValue(backgroundAlphaTarget),
+                backgroundAndHandleAlphaStartDelay,
+                backgroundAndHandleAlphaDuration, EMPHASIZED);
+
+        // The rest of the animations might be "skipped" in TRANSITION_HANDLE_FADE transitions.
+        AnimatorSet skippable = animator;
+        if (animationType == TRANSITION_HANDLE_FADE) {
+            skippable = new AnimatorSet();
+            animator.play(skippable);
+            skippable.setInterpolator(isStashed ? INSTANT : FINAL_FRAME);
+        }
+
+
+        final boolean animateBg = animationType != TRANSITION_UNSTASH_SUW_MANUAL;
+        if (animateBg) {
+            play(skippable, mTaskbarBackgroundOffset.animateToValue(backgroundOffsetTarget), 0,
+                    duration, EMPHASIZED);
+        } else {
+            skippable.addListener(AnimatorListeners.forEndCallback(
+                    () -> mTaskbarBackgroundOffset.updateValue(backgroundOffsetTarget)));
+        }
+        if (isStashed) {
+            play(animator, mControllers.taskbarSpringOnStashController.createSpringToStash(),
+                    0, duration, LINEAR);
+            play(animator, mIconAlphaForStash.animateToValue(iconAlphaTarget),
+                    iconAlphaStartDelay,
+                    iconAlphaDuration,
+                    LINEAR);
+        } else {
+            play(animator, mControllers.taskbarSpringOnStashController.createResetAnimForUnstash(),
+                    0, duration, LINEAR);
+            play(animator, mIconAlphaForStash.animateToValue(iconAlphaTarget),
+                    iconAlphaStartDelay,
+                    iconAlphaDuration,
+                    LINEAR);
+        }
+
+        play(animator, mIconScaleForStash.animateToValue(isStashed ? ratio : 1), 0, duration,
+                EMPHASIZED);
+        play(animator, mIconTranslationYForStash.animateToValue(stashYTranslation), 0, duration,
+                EMPHASIZED);
+
+        play(animator, mControllers.stashedHandleViewController
+                        .createRevealAnimToIsStashed(isStashed && !isDeviceLocked()), 0, duration,
+                EMPHASIZED);
+
+        // Return the stashed handle to its default scale in case it was changed as part of the
+        // feedforward hint. Note that the reveal animation above also visually scales it.
+        animator.play(mTaskbarStashedHandleHintScale.animateToValue(1f)
+                .setDuration(isStashed ? duration / 2 : duration));
     }
 
     private void createAnimToIsStashedPinnedTaskbar(AnimatorSet as, boolean isStashed,
@@ -948,8 +1050,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             );
 
             float newStashedTaskbarStashedHandleAlpha = 1;
-            if (enableAutoStashConnectedDisplayTaskbar.isTrue() && !mActivity.isPrimaryDisplay()
-                    && hasAnyFlag(FLAG_STASHED_DEVICE_LOCKED)) {
+            if (!mActivity.isPrimaryDisplay() && hasAnyFlag(FLAG_STASHED_DEVICE_LOCKED)) {
                 // On connected display, the Taskbar stashed handle remains hidden on lock screen.
                 newStashedTaskbarStashedHandleAlpha = 0;
             }
@@ -1222,9 +1323,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     private void updateIsTaskbarStashed(boolean isStashed) {
-        if (refactorTaskbarUiState()) {
-            mActivity.getTaskbarUiState().setIsTaskbarStashed(isStashed);
-        }
+        mActivity.getTaskbarUiState().setTaskbarStashed(isStashed);
     }
 
     public void applyState() {
@@ -1233,7 +1332,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /** Applies state and performs action after state is applied. */
     public void applyState(@Nullable Runnable postApplyAction) {
-        applyState(hasAnyFlag(FLAG_IN_SETUP) ? 0 : TASKBAR_STASH_DURATION, postApplyAction);
+        applyState(hasAnyFlag(FLAG_IN_SETUP) ? 0 : getStashDuration(), postApplyAction);
     }
 
     public void applyState(long duration) {
@@ -1289,6 +1388,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void onImeInsetChanged() {
         setStashedImeState();
+        mControllers.bubbleControllers.ifPresent(c -> c.bubbleBarController.onImeInsetChanged());
     }
 
     /**
@@ -1311,11 +1411,19 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         long animDuration = TASKBAR_STASH_DURATION;
         long startDelay = 0;
 
-        updateStateForFlag(FLAG_STASHED_IN_APP_SYSUI, hasAnyFlag(systemUiStateFlags,
-                SYSUI_STATE_DIALOG_SHOWING | (ENABLE_TASKBAR_BEHIND_SHADE.isTrue()
-                        ? 0
-                        : SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE)
-        ));
+        final boolean isDualShadeDesktop =
+                ((systemUiStateFlags & SYSUI_STATE_DUAL_SHADE_ENABLED) != 0)
+                        && mActivity.isDesktopFormFactor();
+
+        long stashMask = SYSUI_STATE_DIALOG_SHOWING;
+        if (!ENABLE_TASKBAR_BEHIND_SHADE.isTrue() && !isDualShadeDesktop) {
+            // Stash when the notification panel is visible, UNLESS:
+            // 1. The "Taskbar behind shade" flag is enabled.
+            // 2. It is a dual-shade desktop environment.
+            stashMask |= SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
+        }
+
+        updateStateForFlag(FLAG_STASHED_IN_APP_SYSUI, hasAnyFlag(systemUiStateFlags, stashMask));
 
         boolean stashForBubbles = hasAnyFlag(FLAG_IN_OVERVIEW)
                 && hasAnyFlag(systemUiStateFlags, SYSUI_STATE_BUBBLES_EXPANDED)
@@ -1380,7 +1488,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         } else {
             mState &= ~flag;
         }
-        mTaskbarUiState.setStashStateRef(mState);
+        mTaskbarUiState.setTaskbarStashState(mState);
         return mState != oldState;
     }
 
@@ -1402,8 +1510,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
         // The primary display's transient Taskbar flag isn't applicable for connected displays.
         if (hasAnyFlag(changedFlags, FLAG_STASHED_IN_APP_AUTO)
-                && (!enableAutoStashConnectedDisplayTaskbar.isTrue()
-                || mActivity.isPrimaryDisplay())) {
+                && mActivity.isPrimaryDisplay()) {
             mActivity.getStatsLogManager().logger().log(hasAnyFlag(FLAG_STASHED_IN_APP_AUTO)
                     ? LAUNCHER_TRANSIENT_TASKBAR_HIDE
                     : LAUNCHER_TRANSIENT_TASKBAR_SHOW);
@@ -1414,18 +1521,17 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         if (hasAnyFlag(changedFlags, FLAG_IN_OVERVIEW | FLAG_IN_APP)) {
             mControllers.runAfterInit(() -> mControllers.taskbarInsetsController
                     .onTaskbarOrBubblebarWindowHeightOrInsetsChanged());
-            if (mInAppStateAffectsDesktopTasksVisibilityInTaskbar) {
-                mControllers.runAfterInit(
-                        () -> mControllers.taskbarViewController.commitRunningAppsToUI());
-            }
         }
         updateTaskbarWindowForciblyShownFlag();
     }
 
     private void notifyStashChange(boolean visible, boolean stashed) {
         mSystemUiProxy.notifyTaskbarStatus(visible, stashed);
-        setUpTaskbarSystemAction(visible);
+        setUpTaskbarSystemAction(visible, stashed);
         mControllers.rotationButtonController.onTaskbarStateChange(visible, stashed);
+        if (cueBarAceMigration()) {
+            mControllers.cueBarController.onTaskbarStatusUpdated(visible, stashed);
+        }
     }
 
     private void updateTaskbarWindowForciblyShownFlag() {
@@ -1437,9 +1543,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Setup system action for showing Taskbar depending on its visibility.
      */
-    public void setUpTaskbarSystemAction(boolean visible) {
+    public void setUpTaskbarSystemAction(boolean visible, boolean stashed) {
         UI_HELPER_EXECUTOR.execute(() -> {
-            if (!visible || !mActivity.isTransientTaskbar()
+            if (mActivity.isInDesktopMode()) {
+                if (!shouldAllowTaskbarToAutoStash()
+                        || (shouldAllowTaskbarToAutoStash() && !stashed)) {
+                    mAccessibilityManager.unregisterSystemAction(SYSTEM_ACTION_ID_TASKBAR);
+                    mIsTaskbarSystemActionRegistered = false;
+                    return;
+                }
+            } else if (!visible || !mActivity.isTransientTaskbar()
                     || mActivity.isPhoneMode()) {
                 mAccessibilityManager.unregisterSystemAction(SYSTEM_ACTION_ID_TASKBAR);
                 mIsTaskbarSystemActionRegistered = false;
@@ -1448,7 +1561,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
             if (!mIsTaskbarSystemActionRegistered) {
                 RemoteAction taskbarRemoteAction = new RemoteAction(
-                        Icon.createWithResource(mActivity, R.drawable.ic_info_no_shadow),
+                        Icon.createWithResource(mActivity, R.drawable.ic_unstash_no_shadow),
                         mActivity.getString(R.string.taskbar_a11y_title),
                         mActivity.getString(R.string.taskbar_a11y_title),
                         mTaskbarSharedState.taskbarSystemActionPendingIntent);
@@ -1565,9 +1678,12 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         appendFlag(sj, flags, FLAG_STASHED_IN_APP_SETUP, "FLAG_STASHED_IN_APP_SETUP");
         appendFlag(sj, flags, FLAG_STASHED_IME, "FLAG_STASHED_IN_APP_IME");
         appendFlag(sj, flags, FLAG_IN_STASHED_LAUNCHER_STATE, "FLAG_IN_STASHED_LAUNCHER_STATE");
-        appendFlag(sj, flags, FLAG_STASHED_IN_TASKBAR_ALL_APPS, "FLAG_STASHED_IN_TASKBAR_ALL_APPS");
+        appendFlag(sj, flags, FLAG_STASHED_IN_TASKBAR_ALL_APPS,
+                "FLAG_STASHED_IN_TASKBAR_ALL_APPS");
         appendFlag(sj, flags, FLAG_IN_SETUP, "FLAG_IN_SETUP");
         appendFlag(sj, flags, FLAG_STASHED_IN_APP_AUTO, "FLAG_STASHED_IN_APP_AUTO");
+        appendFlag(sj, flags, FLAG_STASHED_IN_OVERVIEW_FOR_TRANSLUCENT_APP,
+                "FLAG_STASHED_IN_OVERVIEW_FOR_TRANSLUCENT_APP");
         appendFlag(sj, flags, FLAG_STASHED_SYSUI, "FLAG_STASHED_SYSUI");
         appendFlag(sj, flags, FLAG_STASHED_DEVICE_LOCKED, "FLAG_STASHED_DEVICE_LOCKED");
         appendFlag(sj, flags, FLAG_IN_OVERVIEW, "FLAG_IN_OVERVIEW");
@@ -1605,9 +1721,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         @Nullable
         public Animator createSetStateAnimator(long flags, long duration) {
             // We do this when we want to synchronize the app launch and taskbar stash animations.
-            if (syncAppLaunchWithTaskbarStash()
-                    && hasAnyFlag(FLAG_IGNORE_IN_APP)
-                    && hasAnyFlag(flags, FLAG_IN_APP)) {
+            if (hasAnyFlag(FLAG_IGNORE_IN_APP) && hasAnyFlag(flags, FLAG_IN_APP)) {
                 flags = flags & ~FLAG_IN_APP;
             }
 

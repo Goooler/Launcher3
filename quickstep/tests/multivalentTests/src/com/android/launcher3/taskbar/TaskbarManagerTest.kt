@@ -16,33 +16,34 @@
 
 package com.android.launcher3.taskbar
 
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.SetFlagsRule
-import com.android.launcher3.Flags.FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT
-import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnTaskbarUiThreadSync
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
-import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.UserLocked
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
-import com.android.launcher3.util.LauncherMultivalentJUnit
-import com.android.launcher3.util.LauncherMultivalentJUnit.EmulatedDevices
+import com.android.launcher3.testutil.rule.LazyInitRule.Companion.lazyRule
+import com.android.launcher3.util.Executors.getTaskbarUiThread
 import com.android.launcher3.util.SandboxApplication
+import com.android.launcher3.util.TestUtil
+import com.android.launcher3.util.rule.MockUsersRule
+import com.android.launcher3.util.rule.MockUsersRule.MockUser
 import com.android.quickstep.SystemUiProxy
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAVIGATION_BAR_DISABLED
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
+import com.android.users.UserType
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@RunWith(LauncherMultivalentJUnit::class)
-@EmulatedDevices(["pixelTablet2023"])
+@RunWith(AndroidJUnit4::class)
 class TaskbarManagerTest {
 
-    @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
-    @get:Rule(order = 1) val context = TaskbarWindowSandboxContext.create()
-    @get:Rule(order = 2) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 0) val context = TaskbarWindowSandboxContext.create()
+    @get:Rule(order = 1) val mockUsers = lazyRule { MockUsersRule(context.base) }
+    @get:Rule(order = 2) val taskbarUnitTestRule = TaskbarUnitTestRule(context)
+
+    private val mockerUserRule: MockUsersRule by mockUsers
 
     private val taskbarManager by taskbarUnitTestRule::taskbarManager
     private val activityContext by taskbarUnitTestRule::activityContext
@@ -54,7 +55,9 @@ class TaskbarManagerTest {
 
         assertThat(activityContext.displayId).isEqualTo(displayId)
         // Allow drag layer to attach before checking.
-        runOnMainSync { assertThat(activityContext.dragLayer.isAttachedToWindow).isTrue() }
+        runOnTaskbarUiThreadSync {
+            assertThat(activityContext.dragLayer.isAttachedToWindow).isTrue()
+        }
     }
 
     @Test
@@ -69,65 +72,44 @@ class TaskbarManagerTest {
     }
 
     @Test
-    @UserLocked
-    @DisableFlags(FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT)
-    fun onUserUnlocked_noDirectBootSupport_taskbarCreatedAfterUnlock() {
-        assertThat(taskbarManager.currentActivityContext).isNull()
-        taskbarUnitTestRule.unlockUser()
-        assertThat(taskbarManager.currentActivityContext).isNotNull()
-    }
-
-    @Test
-    @UserLocked
-    @DisableFlags(FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT)
-    fun onUserUnlocked_noDirectBootSupport_connectedDisplay_taskbarCreatedAfterUnlock() {
-        val displayId = context.virtualDisplayRule.add()
-        assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNull()
-        taskbarUnitTestRule.unlockUser()
-        assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNotNull()
-    }
-
-    @Test
-    @UserLocked
-    @EnableFlags(FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT)
-    fun onUserUnlocked_directBootSupport_taskbarRecreatedOutsideBootAppContext() {
+    @MockUser(userType = UserType.MAIN, isUserUnlocked = false)
+    fun userLocked_primaryDisplay_hasTaskbarInDirectBootSandbox() {
         assertThat(activityContext.applicationContext)
             .isInstanceOf(TaskbarBootAppContext::class.java)
-        taskbarUnitTestRule.unlockUser()
+    }
+
+    @Test
+    @MockUser(userType = UserType.MAIN, isUserUnlocked = false)
+    fun userLocked_externalDisplay_missingTaskbarInDirectBootStage() {
+        val displayId = context.virtualDisplayRule.add()
+        assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNull()
+    }
+
+    @Test
+    @MockUser(userType = UserType.MAIN, isUserUnlocked = false)
+    fun onUserUnlocked_directBootStage_taskbarRecreatedOutsideBootAppContext() {
+        mockerUserRule.unlockMainUser()
+        TestUtil.runOnExecutorSync(getTaskbarUiThread()) {}
+
         assertThat(activityContext.applicationContext).isInstanceOf(SandboxApplication::class.java)
     }
 
     @Test
-    @UserLocked
-    @EnableFlags(FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT)
-    fun onUserUnlocked_directBootSupport_connectedDisplay_taskbarRecreatedOutsideBootAppContext() {
+    @MockUser(userType = UserType.MAIN, isUserUnlocked = false)
+    fun onUserUnlocked_directBootStage_connectedDisplay_taskbarRecreatedOutsideBootAppContext() {
         val displayId = context.virtualDisplayRule.add()
-        var application =
-            checkNotNull(taskbarManager.getTaskbarForDisplay(displayId)).applicationContext
-        assertThat(application).isInstanceOf(TaskbarBootAppContext::class.java)
+        mockerUserRule.unlockMainUser()
+        TestUtil.runOnExecutorSync(getTaskbarUiThread()) {}
 
-        taskbarUnitTestRule.unlockUser()
-        application =
+        val application =
             checkNotNull(taskbarManager.getTaskbarForDisplay(displayId)).applicationContext
         assertThat(application).isInstanceOf(SandboxApplication::class.java)
     }
 
     @Test
-    @UserLocked
-    @EnableFlags(FLAG_ENABLE_TASKBAR_FOR_DIRECT_BOOT)
-    fun onUserUnlocked_directBootSupport_connectedDisplay_deviceProfileCacheCleared() {
-        val displayId = context.virtualDisplayRule.add()
-        val dp1 = checkNotNull(taskbarManager.getTaskbarForDisplay(displayId)).deviceProfile
-
-        taskbarUnitTestRule.unlockUser()
-        val dp2 = checkNotNull(taskbarManager.getTaskbarForDisplay(displayId)).deviceProfile
-        assertThat(dp1).isNotSameInstanceAs(dp2)
-    }
-
-    @Test
     fun toggleAllAppsSearch_deviceLocked_allAppsNotOpened() {
         SystemUiProxy.INSTANCE[context].focusState.focusedDisplayId = context.displayId
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             taskbarManager.onSystemUiFlagsChanged(
                 SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING,
                 context.displayId,
@@ -140,7 +122,7 @@ class TaskbarManagerTest {
     @Test
     fun toggleAllAppsSearch_deviceUnlocked_allAppsOpened() {
         SystemUiProxy.INSTANCE[context].focusState.focusedDisplayId = context.displayId
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             taskbarManager.onSystemUiFlagsChanged(
                 SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY,
                 context.displayId,
@@ -154,10 +136,10 @@ class TaskbarManagerTest {
     fun onSystemUiFlagsChanged_navBarDisabled_taskbarDestroyed() {
         assertThat(taskbarManager.currentActivityContext).isNotNull()
 
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             taskbarManager.onSystemUiFlagsChanged(
                 SYSUI_STATE_NAVIGATION_BAR_DISABLED,
-                context.displayId
+                context.displayId,
             )
         }
 
@@ -166,16 +148,16 @@ class TaskbarManagerTest {
 
     @Test
     fun onSystemUiFlagsChanged_navBarEnabled_taskbarCreated() {
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             // Start with taskbar disabled
             taskbarManager.onSystemUiFlagsChanged(
                 SYSUI_STATE_NAVIGATION_BAR_DISABLED,
-                context.displayId
+                context.displayId,
             )
         }
         assertThat(taskbarManager.currentActivityContext).isNull()
 
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             // Then enable it
             taskbarManager.onSystemUiFlagsChanged(0, context.displayId)
         }
@@ -188,11 +170,8 @@ class TaskbarManagerTest {
         val displayId = context.virtualDisplayRule.add()
         assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNotNull()
 
-        runOnMainSync {
-            taskbarManager.onSystemUiFlagsChanged(
-                SYSUI_STATE_NAVIGATION_BAR_DISABLED,
-                displayId
-            )
+        runOnTaskbarUiThreadSync {
+            taskbarManager.onSystemUiFlagsChanged(SYSUI_STATE_NAVIGATION_BAR_DISABLED, displayId)
         }
 
         assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNull()
@@ -201,20 +180,46 @@ class TaskbarManagerTest {
     @Test
     fun onSystemUiFlagsChanged_connectedDisplay_navBarEnabled_taskbarCreated() {
         val displayId = context.virtualDisplayRule.add()
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             // Start with taskbar disabled
-            taskbarManager.onSystemUiFlagsChanged(
-                SYSUI_STATE_NAVIGATION_BAR_DISABLED,
-                displayId
-            )
+            taskbarManager.onSystemUiFlagsChanged(SYSUI_STATE_NAVIGATION_BAR_DISABLED, displayId)
         }
         assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNull()
 
-        runOnMainSync {
+        runOnTaskbarUiThreadSync {
             // Then enable it
             taskbarManager.onSystemUiFlagsChanged(0, displayId)
         }
 
         assertThat(taskbarManager.getTaskbarForDisplay(displayId)).isNotNull()
+    }
+
+    @Test
+    fun recreateTaskbar_forExternalDisplay_recreatesDeviceProfile() {
+        // Create an external display, which creates an initial DeviceProfile.
+        val displayId = context.virtualDisplayRule.add()
+        val initialActivityContext = checkNotNull(taskbarManager.getTaskbarForDisplay(displayId))
+        val initialDeviceProfile = initialActivityContext.deviceProfile
+
+        // Get the PerDisplayTaskbarResource for the external display.
+        val perDisplayResource =
+            checkNotNull(taskbarManager.getPerDisplayResourceForTest(displayId)) {
+                "PerDisplayTaskbarResource not found for displayId: $displayId"
+            }
+
+        // Recreate the taskbar for the external display.
+        runOnTaskbarUiThreadSync {
+            taskbarManager.recreateTaskbarForDisplay(
+                perDisplayResource,
+                0 /* duration */,
+                "recreateTaskbar_forExternalDisplay_recreatesDeviceProfile",
+            )
+        }
+
+        // Verify that the DeviceProfile was recreated.
+        val newActivityContext = checkNotNull(taskbarManager.getTaskbarForDisplay(displayId))
+        val newDeviceProfile = newActivityContext.deviceProfile
+        assertThat(newActivityContext).isNotSameInstanceAs(initialActivityContext)
+        assertThat(newDeviceProfile).isNotSameInstanceAs(initialDeviceProfile)
     }
 }

@@ -30,6 +30,8 @@ public final class TestProtocol {
     public static final String FOLDER_OPENED_MESSAGE = "TAPL_FOLDER_OPENED";
     public static final String SEARCH_RESULT_COMPLETE = "SEARCH_RESULT_COMPLETE";
     public static final String LAUNCHER_ACTIVITY_STOPPED_MESSAGE = "TAPL_LAUNCHER_ACTIVITY_STOPPED";
+    public static final String LAUNCHER_ACTIVITY_LOST_WINDOW_FOCUS_MESSAGE =
+            "TAPL_LAUNCHER_ACTIVITY_LOST_WINDOW_FOCUS";
     public static final String WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE =
             "TAPL_WALLPAPER_OPEN_ANIMATION_FINISHED";
     public static final int NORMAL_STATE_ORDINAL = 0;
@@ -43,6 +45,7 @@ public final class TestProtocol {
     public static final int HINT_STATE_TWO_BUTTON_ORDINAL = 8;
     public static final int OVERVIEW_SPLIT_SELECT_ORDINAL = 9;
     public static final int EDIT_MODE_STATE_ORDINAL = 10;
+    public static final int DESKTOP_DRAG_MODE_ORDINAL = 11;
     public static final String SEQUENCE_MAIN = "Main";
     public static final String SEQUENCE_TIS = "TIS";
     public static final String SEQUENCE_PILFER = "Pilfer";
@@ -71,6 +74,8 @@ public final class TestProtocol {
                 return "OverviewSplitSelect";
             case EDIT_MODE_STATE_ORDINAL:
                 return "EditMode";
+            case DESKTOP_DRAG_MODE_ORDINAL:
+                return "DesktopDragMode";
             default:
                 return "Unknown";
         }
@@ -80,10 +85,8 @@ public final class TestProtocol {
     public static final String TEST_INFO_PARAM_INDEX = "index";
     public static final String TEST_INFO_PARAM_CELL_SPAN = "cell-span";
 
-    public static final String REQUEST_HOME_TO_OVERVIEW_SWIPE_HEIGHT =
-            "home-to-overview-swipe-height";
-    public static final String REQUEST_BACKGROUND_TO_OVERVIEW_SWIPE_HEIGHT =
-            "background-to-overview-swipe-height";
+    public static final String REQUEST_SWIPE_TO_OVERVIEW_HEIGHT =
+            "swipe-to-overview-height";
     public static final String REQUEST_HOME_TO_ALL_APPS_SWIPE_HEIGHT =
             "home-to-all-apps-swipe-height";
     public static final String REQUEST_ICON_HEIGHT =
@@ -121,13 +124,12 @@ public final class TestProtocol {
     public static final String REQUEST_REINITIALIZE_DATA = "reinitialize-data";
     public static final String REQUEST_CLEAR_DATA = "clear-data";
     public static final String REQUEST_HOTSEAT_ICON_NAMES = "get-hotseat-icon-names";
+    public static final String INJECT_TEST_INSIGHTS = "inject-test-insights";
     public static final String REQUEST_SHOULD_SHOW_HOME_BEHIND_DESKTOP =
             "should-show-home-behind-desktop";
     public static final String REQUEST_IS_TABLET = "is-tablet";
     public static final String REQUEST_IS_PREDICTIVE_BACK_SWIPE_ENABLED =
             "is-predictive-back-swipe-enabled";
-    public static final String REQUEST_ENABLE_TASKBAR_NAVBAR_UNIFICATION =
-            "enable-taskbar-navbar-unification";
     public static final String REQUEST_TASKBAR_SHOWN_ON_HOME =
             "taskbar-shown-on-home";
     public static final String REQUEST_NUM_ALL_APPS_COLUMNS = "num-all-apps-columns";
@@ -168,6 +170,7 @@ public final class TestProtocol {
             "get-overview-first-taskview-index";
     public static final String REQUEST_GET_SPLIT_SELECTION_ACTIVE = "get-split-selection-active";
     public static final String REQUEST_ENABLE_ROTATION = "enable_rotation";
+    public static final String REQUEST_ENABLE_FIXED_LANDSCAPE = "enable_fixed_landscape";
     public static final String REQUEST_MODEL_QUEUE_CLEARED = "model-queue-cleared";
 
     public static boolean sDebugTracing = false;
@@ -179,15 +182,19 @@ public final class TestProtocol {
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
-    public static final String REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW = "enable-grid-only-overview";
 
-    public static final String REQUEST_FLAG_ENABLE_MULTIPLE_DESKTOPS = "enable-multiple-desks";
+    public static final String REQUEST_FLAG_IS_DESKTOP_MODE_SUPPORTED = "is-desktop-mode-supported";
 
     public static final String REQUEST_GET_ACTIVE_DESK_ID = "get-active-desk-id";
 
     public static final String REQUEST_GET_DESK_ID = "get-desk-id";
 
-    public static final String REQUEST_IS_RECENTS_WINDOW_ENABLED = "recents-window-enabled";
+    public static final String REQUEST_GET_DESK_COUNT = "get-desk-count";
+
+    public static final String REQUEST_IS_LAUNCHER_RECENTS_WINDOW_ENABLED =
+            "launcher-recents-window-enabled";
+    public static final String REQUEST_IS_FALLBACK_RECENTS_WINDOW_ENABLED =
+            "fallback-recents-window-enabled";
 
     public static final String REQUEST_UNSTASH_BUBBLE_BAR_IF_STASHED =
             "unstash-bubble-bar-if-stashed";
@@ -209,6 +216,18 @@ public final class TestProtocol {
 
     public static final String REQUEST_IS_IN_DESKTOP_FIRST_MODE =
             "display_is_in_desktop_first_mode";
+
+    public static final String REQUEST_ENABLE_REGISTER_EVENT_NOT_FROM_TEST =
+            "enable_register_event_not_from_test";
+
+    public static final String REQUEST_DISPLAY_BOUNDS = "display_bounds";
+    public static final String REQUEST_INFO_DISPLAY_ID = "display_id";
+
+    public static final String REQUEST_MARK_OVERVIEW_SELECT_TIP_SEEN =
+            "mark_overview_select_tip_seen";
+
+    public static final String SYSTEM_SHORTCUTS_CONTAINER = "system_shortcuts_container";
+    public static final String DEEP_SHORTCUTS_CONTAINER = "deep_shortcuts_container";
 
     /** Logs {@link Log#d(String, String)} if {@link #sDebugTracing} is true. */
     public static void testLogD(String tag, String message) {

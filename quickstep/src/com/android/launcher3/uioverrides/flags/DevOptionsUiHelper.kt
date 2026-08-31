@@ -41,8 +41,10 @@ import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceViewHolder
 import androidx.preference.SwitchPreference
 import com.android.launcher3.ExtendedEditText
+import com.android.launcher3.Flags
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherPrefs
+import com.android.launcher3.LauncherPrefs.Companion.COMPOSITION_TRACING_PREF_KEY
 import com.android.launcher3.R
 import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
 import com.android.launcher3.proxy.ProxyActivityStarter
@@ -53,10 +55,10 @@ import com.android.launcher3.util.Executors.ORDERED_BG_EXECUTOR
 import com.android.launcher3.util.OnboardingPrefs.ALL_APPS_VISITED_COUNT
 import com.android.launcher3.util.OnboardingPrefs.HOME_BOUNCE_COUNT
 import com.android.launcher3.util.OnboardingPrefs.HOME_BOUNCE_SEEN
-import com.android.launcher3.util.OnboardingPrefs.HOTSEAT_DISCOVERY_TIP_COUNT
 import com.android.launcher3.util.OnboardingPrefs.HOTSEAT_LONGPRESS_TIP_SEEN
 import com.android.launcher3.util.OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP
 import com.android.launcher3.util.OnboardingPrefs.TASKBAR_SEARCH_EDU_SEEN
+import com.android.launcher3.util.OnboardingPrefs.TASKBAR_SEEN_EDU_FLAGS
 import com.android.launcher3.util.PluginManagerWrapper
 import com.android.launcher3.util.StartActivityParams
 import com.android.quickstep.util.DeviceConfigHelper
@@ -117,6 +119,23 @@ class DevOptionsUiHelper(c: Context, attr: AttributeSet?) : PreferenceGroup(c, a
         addIntentTargets()
         addOnboardingPrefsCategory()
         addLayoutSharePref()
+        addComposePref()
+    }
+
+    private fun addComposePref() {
+        newCategory(titleText = context.getString(R.string.compose_developer_options_section))
+            .apply {
+                addPreference(
+                    SwitchPreference(context).apply {
+                        title = context.getString(R.string.enable_composition_tracing_title)
+                        summary = context.getString(R.string.enable_composition_tracing_desc)
+                        isPersistent = true
+                        key = COMPOSITION_TRACING_PREF_KEY
+                        setDefaultValue(false)
+                        isEnabled = true
+                    }
+                )
+            }
     }
 
     private fun newCategory(titleText: String, subTitleText: String? = null) =
@@ -370,13 +389,15 @@ class DevOptionsUiHelper(c: Context, attr: AttributeSet?) : PreferenceGroup(c, a
                 HOME_BOUNCE_SEEN.sharedPrefKey,
                 HOME_BOUNCE_COUNT.sharedPrefKey,
             )
-            addOnboardPref(
-                "Hybrid Hotseat Education",
-                HOTSEAT_DISCOVERY_TIP_COUNT.sharedPrefKey,
-                HOTSEAT_LONGPRESS_TIP_SEEN.sharedPrefKey,
-            )
-            addOnboardPref("Taskbar Education", TASKBAR_EDU_TOOLTIP_STEP.sharedPrefKey)
-            addOnboardPref("Taskbar Search Education", TASKBAR_SEARCH_EDU_SEEN.sharedPrefKey)
+            addOnboardPref("Hybrid Hotseat Education", HOTSEAT_LONGPRESS_TIP_SEEN.sharedPrefKey)
+            val taskbarEduKeys = mutableListOf(TASKBAR_EDU_TOOLTIP_STEP.sharedPrefKey)
+            if (Flags.tooltipEduCombinator()) {
+                taskbarEduKeys.add(TASKBAR_SEEN_EDU_FLAGS.sharedPrefKey)
+            }
+            addOnboardPref("Taskbar Education", *taskbarEduKeys.toTypedArray())
+            if (!Flags.tooltipEduCombinator()) {
+                addOnboardPref("Taskbar Search Education", TASKBAR_SEARCH_EDU_SEEN.sharedPrefKey)
+            }
             addOnboardPref("All Apps Visited Count", ALL_APPS_VISITED_COUNT.sharedPrefKey)
         }
     }

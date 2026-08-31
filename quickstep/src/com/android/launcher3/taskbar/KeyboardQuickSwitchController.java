@@ -17,8 +17,11 @@ package com.android.launcher3.taskbar;
 
 import static android.window.DesktopModeFlags.ENABLE_TASKBAR_OVERFLOW;
 
+import static com.android.launcher3.Flags.enableKqsForceTakeRunningTaskThumbnail;
+import static com.android.launcher3.desktop.DesktopStateProvider.getDesktopState;
 import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableAltTabKqsFlatenning;
-import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableAltTabKqsOnConnectedDisplays;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.getTaskbarUiThread;
 
 import android.app.ActivityManager;
 import android.content.ComponentName;
@@ -32,6 +35,7 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.R;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.TouchController;
 import com.android.quickstep.RecentsFilterState;
 import com.android.quickstep.RecentsModel;
@@ -42,7 +46,6 @@ import com.android.quickstep.util.SingleTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
-import com.android.wm.shell.shared.desktopmode.DesktopState;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -63,7 +66,8 @@ public final class KeyboardQuickSwitchController implements
     @VisibleForTesting
     public static final int MAX_TASKS = 6;
 
-    @NonNull private final ControllerCallbacks mControllerCallbacks = new ControllerCallbacks();
+    @VisibleForTesting
+    @NonNull final ControllerCallbacks mControllerCallbacks = new ControllerCallbacks();
     // Callback used to notify when the KQS view is closed.
     @Nullable private Runnable mOnClosed;
 
@@ -95,8 +99,7 @@ public final class KeyboardQuickSwitchController implements
     public void init(@NonNull TaskbarControllers controllers) {
         mControllers = controllers;
         mModel = RecentsModel.INSTANCE.get(controllers.taskbarActivityContext);
-        mIsProjectedMode = DesktopState.getInstance(
-                mControllers.taskbarActivityContext).isProjectedMode();
+        mIsProjectedMode = getDesktopState(mControllers.taskbarActivityContext).isProjectedMode();
     }
 
     void onConfigurationChanged(@ActivityInfo.Config int configChanges) {
@@ -168,23 +171,23 @@ public final class KeyboardQuickSwitchController implements
                 if (!mModel.isTaskListValid(mTaskListChangeId) || !taskIdsToExclude.equals(
                         mExcludedTaskIds)) {
                     mExcludedTaskIds = taskIdsToExclude;
-                    mTaskListChangeId = mModel.getTasks(
-                            shouldShowDesktopTasks ? RecentsFilterState.EMPTY_FILTER
-                                    : RecentsFilterState.getDesktopTaskFilter(),
-                            (tasks) -> {
+                    final KeyboardQuickSwitchViewController viewController =
+                            mQuickSwitchViewController;
+                    mTaskListChangeId = mModel.getTasks(RecentsFilterState.EMPTY_FILTER,
+                            (tasks) -> getTaskbarUiThread().execute(() -> {
                                 processLoadedTasks(
                                         wasOpenedFromTaskbar,
                                         shouldShowDesktopTasks,
                                         tasks,
                                         taskIdsToExclude);
-                                mQuickSwitchViewController.updateQuickSwitchView(
+                                viewController.updateQuickSwitchView(
                                         mTasks,
                                         wasOpenedFromTaskbar ? 0 : mNumHiddenTasks,
                                         currentFocusIndexOverride,
                                         mHasDesktopTask,
                                         mWasDesktopTaskFilteredOut,
                                         /* useAnimationStartDelay= */ !wasOpenedFromTaskbar);
-                            });
+                            }));
                 }
 
                 mQuickSwitchViewController.updateLayoutForSurface(
@@ -227,26 +230,26 @@ public final class KeyboardQuickSwitchController implements
             return;
         }
 
+        final KeyboardQuickSwitchViewController viewController = mQuickSwitchViewController;
         mExcludedTaskIds = taskIdsToExclude;
-        mTaskListChangeId = mModel.getTasks(
-                shouldShowDesktopTasks ? RecentsFilterState.EMPTY_FILTER
-                        : RecentsFilterState.getDesktopTaskFilter(),
-                (tasks) -> {
+        mTaskListChangeId = mModel.getTasks(RecentsFilterState.EMPTY_FILTER,
+                (tasks) -> getTaskbarUiThread().execute(() -> {
                     processLoadedTasks(
                             wasOpenedFromTaskbar, shouldShowDesktopTasks, tasks, taskIdsToExclude);
                     // Check if the first task is running after the recents model has updated so
                     // that we use the correct index.
-                    mQuickSwitchViewController.openQuickSwitchView(
+                    viewController.openQuickSwitchView(
                             mTasks,
                             wasOpenedFromTaskbar ? 0 : mNumHiddenTasks,
                             /* updateTasks= */ true,
-                            currentFocusedIndex == -1 && !mControllerCallbacks.isFirstTaskRunning()
+                            currentFocusedIndex == -1
+                                    && !mControllerCallbacks.isFirstTaskRunning()
                                     ? 0 : currentFocusedIndex,
                             shouldShowDesktopTasks,
                             mHasDesktopTask,
                             mWasDesktopTaskFilteredOut,
                             wasOpenedFromTaskbar);
-                });
+                }));
     }
 
     private boolean shouldIncludeTask(GroupTask task, Set<Integer> taskIdsToExclude) {
@@ -378,24 +381,18 @@ public final class KeyboardQuickSwitchController implements
         // multiple desktops flag disabled. So, until multiple desktops is implemented the following
         // should help with team-fooding Alt+tab on connected displays. Post multiple desktop,
         // further changes maybe required to support launching selected desktops.
-        if (enableAltTabKqsOnConnectedDisplays.isTrue()) {
-            mTasks = desktopTasks.stream()
-                    .flatMap(t -> t.getTasks().stream())
-                    .map(SingleTask::new)
-                    .filter(task -> shouldIncludeTask(task, taskIdsToExclude))
-                    .collect(Collectors.toList());
-        } else if (!desktopTasks.isEmpty()) {
-            mTasks = desktopTasks.get(0).getTasks().stream()
-                    .map(SingleTask::new)
-                    .filter(task -> shouldIncludeTask(task, taskIdsToExclude))
-                    .collect(Collectors.toList());
-        } else {
-            // Desktop tasks were visible, but the recents entry is missing. Fall back to empty list
-            mTasks = Collections.emptyList();
-        }
+        mTasks = desktopTasks.stream()
+                .flatMap(t -> t.getTasks().stream())
+                .map(SingleTask::new)
+                .filter(task -> shouldIncludeTask(task, taskIdsToExclude))
+                .collect(Collectors.toList());
     }
 
-    void closeQuickSwitchView() {
+    /**
+     * Closes the Keyboard Quick Switch view, usually in response to a specific action like tapping
+     * outside the view or pressing the Escape key.
+     */
+    public void closeQuickSwitchView() {
         closeQuickSwitchView(true);
     }
 
@@ -449,8 +446,7 @@ public final class KeyboardQuickSwitchController implements
         return isShown() && mQuickSwitchViewController.wasOpenedFromTaskbar();
     }
 
-    @VisibleForTesting
-    boolean isShown() {
+    public boolean isShown() {
         return mQuickSwitchViewController != null
                 && !mQuickSwitchViewController.isCloseAnimationRunning();
     }
@@ -497,21 +493,36 @@ public final class KeyboardQuickSwitchController implements
             return index < 0 || index >= mTasks.size() ? null : mTasks.get(index);
         }
 
-        void updateThumbnailInBackground(Task task, Consumer<ThumbnailData> callback) {
-            mModel.getThumbnailCache().getThumbnailInBackground(task,
-                    thumbnailData -> {
+        void updateThumbnailInBackground(
+                Task task, boolean isTaskRunning, Consumer<ThumbnailData> callback) {
+            Consumer<ThumbnailData> wrappedCallback = thumbnailData ->
+                    getTaskbarUiThread().execute(() -> {
                         task.thumbnail = thumbnailData;
                         callback.accept(thumbnailData);
                     });
+            MAIN_EXECUTOR.execute(() -> {
+                if (!enableKqsForceTakeRunningTaskThumbnail() || !isTaskRunning) {
+                    mModel.getThumbnailCache().getThumbnailInBackground(task, wrappedCallback);
+                    return;
+                }
+                ThumbnailData thumbnailData =
+                        ActivityManagerWrapper.getInstance().takeTaskThumbnail(task.key.id);
+
+                mModel.getThumbnailCache().updateTaskSnapShot(task.key.id, thumbnailData);
+
+                wrappedCallback.accept(thumbnailData);
+            });
         }
 
         void updateIconInBackground(Task task, Consumer<Task> callback) {
-            mModel.getIconCache().getIconInBackground(task, (icon, contentDescription, title) -> {
-                task.icon = icon;
-                task.titleDescription = contentDescription;
-                task.title = title;
-                callback.accept(task);
-            });
+            Preconditions.assertTaskbarUiThread();
+            mModel.getIconCache().getIconInBackground(
+                    task, getTaskbarUiThread(), (icon, contentDescription, title) -> {
+                        task.icon = icon;
+                        task.titleDescription = contentDescription;
+                        task.title = title;
+                        callback.accept(task);
+                    });
         }
 
         void onCloseStarted() {

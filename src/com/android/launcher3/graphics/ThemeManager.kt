@@ -18,13 +18,16 @@ package com.android.launcher3.graphics
 
 import android.content.Context
 import android.content.res.Resources
+import androidx.annotation.AnyThread
 import com.android.launcher3.LauncherPrefChangeListener
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherPrefs.Companion.backedUpItem
+import com.android.launcher3.R
 import com.android.launcher3.concurrent.annotations.Ui
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.display.OverlayChangeHandler
 import com.android.launcher3.graphics.ShapeDelegate.Companion.DEFAULT_PATH_SIZE_INT
 import com.android.launcher3.graphics.ShapeDelegate.Companion.pickBestShape
 import com.android.launcher3.graphics.theme.IconThemeFactory
@@ -42,8 +45,6 @@ import com.android.launcher3.util.ListenableRef
 import com.android.launcher3.util.LooperExecutor
 import com.android.launcher3.util.MutableListenableRef
 import com.android.launcher3.util.SafeCloseable
-import com.android.launcher3.util.SimpleBroadcastReceiver
-import com.android.launcher3.util.SimpleBroadcastReceiver.Companion.packageFilter
 import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Named
@@ -54,12 +55,12 @@ class ThemeManager
 @Inject
 constructor(
     @ApplicationContext private val context: Context,
-    @Ui private val uiExecutor: LooperExecutor,
     private val prefs: LauncherPrefs,
     private val themePreference: ThemePreference,
     @Named(ICON_FACTORY_DAGGER_KEY)
     private val iconThemeFactories: Map<String, @JvmSuppressWildcards IconThemeFactory>,
     @Ui mainExecutor: LooperExecutor,
+    overlayChangeHandler: OverlayChangeHandler,
     lifecycle: DaggerSingletonTracker,
 ) {
 
@@ -88,12 +89,16 @@ constructor(
     val folderShape
         get() = iconState.folderShape
 
+    val fileShape
+        get() = iconState.fileShape
+
+    var fileShapeData = fileShape.createIconShape(DEFAULT_PATH_SIZE_INT)
+        private set
+
     private val listeners = CopyOnWriteArrayList<ThemeChangeListener>()
 
     init {
-        val receiver = SimpleBroadcastReceiver(context, uiExecutor) { verifyIconState() }
-        receiver.register(packageFilter("android", ACTION_OVERLAY_CHANGED))
-        lifecycle.addCloseable(receiver)
+        lifecycle.addCloseable(overlayChangeHandler.addCallback { verifyIconState() })
 
         val prefListener = LauncherPrefChangeListener {
             if (it == PREF_ICON_SHAPE.sharedPrefKey) verifyIconState()
@@ -108,27 +113,35 @@ constructor(
 
     private fun verifyIconState() {
         val newState = parseIconState(iconState)
-        if (newState == iconState) return
-        val hasThemedChanged = newState.toUniqueId() != iconState.toUniqueId()
+        val oldState = iconState
+        if (newState == oldState) return
+        val hasThemedChanged =
+            newState.themeCode != oldState.themeCode || newState.isCircle != oldState.isCircle
         iconState = newState
         if (hasThemedChanged) {
             // trigger listeners only for theme change, not shape change
             listeners.forEach { it.onThemeChanged() }
         }
-        _iconShapeData.dispatchValue(iconShape.createIconShape(iconShapeData.value.pathSize))
+        if (newState.iconShape != oldState.iconShape) {
+            _iconShapeData.dispatchValue(iconShape.createIconShape(iconShapeData.value.pathSize))
+        }
     }
 
-    fun addChangeListener(listener: ThemeChangeListener) = listeners.add(listener)
+    @AnyThread fun addChangeListener(listener: ThemeChangeListener) = listeners.add(listener)
 
-    fun removeChangeListener(listener: ThemeChangeListener) = listeners.remove(listener)
+    @AnyThread fun removeChangeListener(listener: ThemeChangeListener) = listeners.remove(listener)
 
     /**
      * Generates new IconShape based given [iconSize] and current [iconShape] Allocates new Bitmap
      * via [createIconShape]
      */
     fun generateIconShape(iconSize: Int) {
-        if (iconShapeData.value.pathSize == iconSize) return
-        _iconShapeData.dispatchValue(iconShape.createIconShape(iconSize))
+        if (iconShapeData.value.pathSize != iconSize) {
+            _iconShapeData.dispatchValue(iconShape.createIconShape(iconSize))
+        }
+        if (fileShapeData.pathSize != iconSize) {
+            fileShapeData = fileShape.createIconShape(iconSize)
+        }
     }
 
     private fun parseIconState(oldState: IconState?): IconState {
@@ -160,6 +173,14 @@ constructor(
                 ShapeDelegate.RoundedSquare(folderRadius)
             }
 
+        val fileShape =
+            oldState?.fileShape
+                ?: run {
+                    val res = context.resources
+                    val path = res.getString(R.string.home_screen_files_file_icon_path_data)
+                    ShapeDelegate.GenericPathShape(path)
+                }
+
         val themeKey = themePreference.value
         val themeCode = themeKey?.toString() ?: "no-theme"
 
@@ -179,6 +200,7 @@ constructor(
             folderShape = folderShape,
             shapeRadius = shapeModel?.shapeRadius ?: DEFAULT_ICON_RADIUS,
             themeCode = themeCode,
+            fileShape = fileShape,
         )
     }
 
@@ -192,11 +214,9 @@ constructor(
         val isCircle: Boolean = iconShape is ShapeDelegate.Circle,
         val folderShape: ShapeDelegate,
         val shapeRadius: Float,
+        val fileShape: ShapeDelegate,
     ) {
-        fun toUniqueId() = "$themeCode,$isCircle"
-
         val iconShapeInfo = IconShapeInfo.fromPath(iconShape.getPath(), DEFAULT_PATH_SIZE_INT)
-        val folderShapeInfo = IconShapeInfo.fromPath(folderShape.getPath(), DEFAULT_PATH_SIZE_INT)
     }
 
     private fun IconState.closeController() {
@@ -217,7 +237,6 @@ constructor(
 
         @JvmField val DEFAULT_SHAPE_DELEGATE = pickBestShape(shapeStr = "")
 
-        private const val ACTION_OVERLAY_CHANGED = "android.intent.action.OVERLAY_CHANGED"
         private val CONFIG_ICON_MASK_RES_ID: Int =
             Resources.getSystem().getIdentifier("config_icon_mask", "string", "android")
 

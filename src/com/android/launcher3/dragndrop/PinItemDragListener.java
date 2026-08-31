@@ -31,7 +31,12 @@ import android.view.DragEvent;
 import android.view.View;
 import android.widget.RemoteViews;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.DragSource;
+import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
@@ -44,23 +49,56 @@ import com.android.launcher3.widget.WidgetAddFlowHandler;
  * in the source window and is passed on to the Launcher activity as an Intent extra.
  */
 @TargetApi(Build.VERSION_CODES.O)
-public class PinItemDragListener extends BaseItemDragListener {
+public class PinItemDragListener extends BaseItemDragListener<Launcher> {
 
     private final PinItemRequest mRequest;
     private final CancellationSignal mCancelSignal;
     private final float mPreviewScale;
+    @Nullable
+    private String mMimeType = null;
 
+    /**
+     * {@link DragSource} for handling drop from a different window with the scale = 1 and a
+     * default {@code mimeType}.
+     */
     public PinItemDragListener(PinItemRequest request, Rect previewRect,
             int previewBitmapWidth, int previewViewWidth) {
         this(request, previewRect, previewBitmapWidth, previewViewWidth, /* previewScale= */ 1f);
     }
 
+    /**
+     * {@link DragSource} for handling drop from a different window with the specified
+     * {@code mimeType}
+     */
+    public PinItemDragListener(PinItemRequest request, Rect previewRect,
+            int previewBitmapWidth, int previewViewWidth,
+            @NonNull String mimeType) {
+        this(request, previewRect, previewBitmapWidth, previewViewWidth, /* previewScale= */ 1f);
+        mMimeType = mimeType;
+    }
+
+    /**
+     * {@link DragSource} for handling drop from a different window with the specified
+     * {@code previewScale} and a default {@code mimeType}.
+     */
     public PinItemDragListener(PinItemRequest request, Rect previewRect,
             int previewBitmapWidth, int previewViewWidth, float previewScale) {
         super(previewRect, previewBitmapWidth, previewViewWidth);
         mRequest = request;
         mCancelSignal = new CancellationSignal();
         mPreviewScale = previewScale;
+    }
+
+    @Override
+    public String getMimeType() {
+        return mMimeType != null ? mMimeType : super.getMimeType();
+    }
+
+    @Override
+    public boolean init(Launcher context, boolean isHomeStarted) {
+        final boolean result = super.init(context, isHomeStarted);
+        context.getStateManager().goToState(LauncherState.NORMAL, /* animated= */ isHomeStarted);
+        return result;
     }
 
     @Override
@@ -77,12 +115,12 @@ public class PinItemDragListener extends BaseItemDragListener {
         final PendingAddItemInfo item;
         if (mRequest.getRequestType() == PinItemRequest.REQUEST_TYPE_SHORTCUT) {
             item = new PendingAddShortcutInfo(
-                    new PinShortcutRequestActivityInfo(mRequest, mLauncher));
+                    new PinShortcutRequestActivityInfo(mRequest, mContext));
         } else {
             // mRequest.getRequestType() == PinItemRequestCompat.REQUEST_TYPE_APPWIDGET
             LauncherAppWidgetProviderInfo providerInfo =
                     LauncherAppWidgetProviderInfo.fromProviderInfo(
-                            mLauncher, mRequest.getAppWidgetProviderInfo(mLauncher));
+                            mContext, mRequest.getAppWidgetProviderInfo(mContext));
             final PinWidgetFlowHandler flowHandler =
                     new PinWidgetFlowHandler(providerInfo, mRequest);
             item = new PendingAddWidgetInfo(providerInfo, CONTAINER_PIN_WIDGETS) {
@@ -92,7 +130,7 @@ public class PinItemDragListener extends BaseItemDragListener {
                 }
             };
         }
-        View view = new View(mLauncher);
+        View view = new View(mContext);
         view.setTag(item);
 
         PendingItemDragHelper dragHelper = new PendingItemDragHelper(view);

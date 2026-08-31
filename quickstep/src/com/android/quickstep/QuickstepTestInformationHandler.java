@@ -2,38 +2,52 @@ package com.android.quickstep;
 
 import static android.view.Display.DEFAULT_DISPLAY;
 
+import static com.android.launcher3.LauncherPrefs.SELECT_TIP_SEEN;
+import static com.android.launcher3.desktop.DesktopStateProvider.getDesktopState;
 import static com.android.launcher3.taskbar.TaskbarThresholdUtils.getFromNavThreshold;
+import static com.android.launcher3.testing.shared.TestProtocol.REQUEST_INFO_DISPLAY_ID;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.getTaskbarUiThread;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 
 import androidx.annotation.Nullable;
 
+import com.android.app.displaylib.PerDisplayRepository;
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.InvariantDeviceProfile;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.dagger.ApplicationContext;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
+import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.testing.TestInformationHandler;
 import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.quickstep.dagger.SysUIConnectionComponent;
+import com.android.quickstep.sysuiconnection.SysUIConnectionTracker;
+import com.android.quickstep.util.ActiveTrackpadList;
 import com.android.quickstep.util.GroupTask;
-import com.android.quickstep.util.LayoutUtils;
-import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.shared.bubbles.DeviceConfig;
-import com.android.wm.shell.shared.desktopmode.DesktopState;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -42,29 +56,41 @@ import javax.inject.Inject;
 
 public class QuickstepTestInformationHandler extends TestInformationHandler {
 
-    protected final Context mContext;
+    private final Context mContext;
     private final RecentsModel mRecentsModel;
     private final SystemUiProxy mSystemUiProxy;
-    private final  OverviewComponentObserver mOverviewComponentObserver;
+    private final OverviewComponentObserver mOverviewComponentObserver;
     private final DesktopVisibilityController mDesktopVisibilityController;
-
+    private final ActiveTrackpadList mActiveTrackpadList;
+    private final SysUIConnectionTracker mSysUIConnectionTracker;
+    private final PerDisplayRepository<Context> mDisplayContextRepository;
+    private final Map<Integer, DeviceProfile> mDisplayDeviceProfile = new HashMap();
 
     @Inject
     public QuickstepTestInformationHandler(@ApplicationContext Context context,
             RecentsModel recentsModel,
             SystemUiProxy systemUiProxy,
             OverviewComponentObserver overviewComponentObserver,
-            DesktopVisibilityController desktopVisibilityController) {
+            DesktopVisibilityController desktopVisibilityController,
+            ActiveTrackpadList activeTrackpadList,
+            SysUIConnectionTracker sysUIConnectionTracker,
+            PerDisplayRepository<Context> displayContextRepository) {
         mContext = context;
         mRecentsModel = recentsModel;
         mSystemUiProxy = systemUiProxy;
         mOverviewComponentObserver = overviewComponentObserver;
         mDesktopVisibilityController = desktopVisibilityController;
+        mActiveTrackpadList = activeTrackpadList;
+        mSysUIConnectionTracker = sysUIConnectionTracker;
+        mDisplayContextRepository = displayContextRepository;
     }
 
+    @SuppressLint("VisibleForTests")
     @Override
     public Bundle call(String method, String arg, @Nullable Bundle extras) {
         final Bundle response = new Bundle();
+        final int displayId = getDisplayIdForRequest(extras);
+
         switch (method) {
             case TestProtocol.REQUEST_RECENT_TASKS_LIST: {
                 ArrayList<String> taskBaseIntentComponents = new ArrayList<>();
@@ -88,15 +114,9 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
                 return response;
             }
 
-            case TestProtocol.REQUEST_HOME_TO_OVERVIEW_SWIPE_HEIGHT: {
+            case TestProtocol.REQUEST_SWIPE_TO_OVERVIEW_HEIGHT: {
                 final float swipeHeight =
-                        LayoutUtils.getDefaultSwipeHeight(mContext, mDeviceProfile);
-                response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD, (int) swipeHeight);
-                return response;
-            }
-
-            case TestProtocol.REQUEST_BACKGROUND_TO_OVERVIEW_SWIPE_HEIGHT: {
-                final float swipeHeight = mDeviceProfile.getDeviceProperties().getHeightPx() / 2f;
+                        getDeviceProfile(displayId).getDeviceProperties().getHeightPx() / 2f;
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD, (int) swipeHeight);
                 return response;
             }
@@ -119,7 +139,7 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
 
             case TestProtocol.REQUEST_GET_OVERVIEW_PAGE_SPACING: {
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        mDeviceProfile.getOverviewProfile().getPageSpacing());
+                        getDeviceProfile(displayId).getOverviewProfile().getPageSpacing());
                 return response;
             }
 
@@ -149,69 +169,46 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
             }
 
             case TestProtocol.REQUEST_UNSTASH_TASKBAR_IF_STASHED:
-                runOnTISBinder(tisBinder -> {
-                    // Allow null-pointer to catch illegal states.
-                    tisBinder.getTaskbarManager().getCurrentActivityContext()
-                            .unstashTaskbarIfStashed();
-                });
-                return response;
+                return getTaskbarProperty(
+                        Bundle::putBoolean, TaskbarManager::unstashTaskbarIfStashed);
 
             case TestProtocol.REQUEST_COLLAPSE_BUBBLE_BAR:
-                runOnTISBinder(tisBinder -> {
-                    // Allow null-pointer to catch illegal states.
-                    tisBinder.getTaskbarManager().getCurrentActivityContext().removeAllBubbles();
-                });
+                runOnTaskbar(TaskbarManager::removeAllBubbles);
                 return response;
 
             case TestProtocol.REQUEST_TASKBAR_FROM_NAV_THRESHOLD: {
                 final Resources resources = mContext.getResources();
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        getFromNavThreshold(resources, mDeviceProfile));
+                        getFromNavThreshold(resources, getDeviceProfile(displayId)));
                 return response;
             }
 
             case TestProtocol.REQUEST_STASHED_TASKBAR_SCALE: {
-                runOnTISBinder(tisBinder -> {
-                    response.putFloat(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                            tisBinder.getTaskbarManager()
-                                    .getCurrentActivityContext()
-                                    .getStashedTaskbarScale());
-                });
-                return response;
+                return getTaskbarProperty(Bundle::putFloat, TaskbarManager::getStashedTaskbarScale);
             }
 
             case TestProtocol.REQUEST_TASKBAR_ALL_APPS_TOP_PADDING: {
-                return getTISBinderUIProperty(Bundle::putInt, tisBinder ->
-                        tisBinder.getTaskbarManager()
-                                .getCurrentActivityContext()
-                                .getTaskbarAllAppsTopPadding());
+                return getCurrentTaskbarActivityContextProperty(Bundle::putInt,
+                        TaskbarActivityContext::getTaskbarAllAppsTopPadding);
             }
 
             case TestProtocol.REQUEST_TASKBAR_APPS_LIST_SCROLL_Y: {
-                return getTISBinderUIProperty(Bundle::putInt, tisBinder ->
-                        tisBinder.getTaskbarManager()
-                                .getCurrentActivityContext()
-                                .getTaskbarAllAppsScroll());
+                return getCurrentTaskbarActivityContextProperty(
+                        Bundle::putInt,
+                        TaskbarActivityContext::getTaskbarAllAppsScroll);
             }
 
             case TestProtocol.REQUEST_LIMIT_MAX_TASKBAR_ICON_NUMBER: {
-                runOnTISBinder(tisBinder ->
-                        tisBinder.getTaskbarManager()
-                                .getCurrentActivityContext()
-                                .limitMaxTaskbarIconsNum(Integer.parseInt(arg)));
+                runOnTaskbar(t -> t.limitMaxTaskbarIconsNum(Integer.parseInt(arg)));
                 return response;
             }
 
             case TestProtocol.REQUEST_ENABLE_BLOCK_TIMEOUT:
-                runOnTISBinder(tisBinder -> {
-                    enableBlockingTimeout(tisBinder, true);
-                });
+                runOnTaskbar(t -> t.enableBlockingTimeoutDuringTests(true));
                 return response;
 
             case TestProtocol.REQUEST_DISABLE_BLOCK_TIMEOUT:
-                runOnTISBinder(tisBinder -> {
-                    enableBlockingTimeout(tisBinder, false);
-                });
+                runOnTaskbar(t -> t.enableBlockingTimeoutDuringTests(false));
                 return response;
 
             case TestProtocol.REQUEST_ENABLE_TRANSIENT_TASKBAR:
@@ -228,38 +225,42 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
                 return response;
 
             case TestProtocol.REQUEST_REFRESH_OVERVIEW_TARGET:
-                runOnTISBinder(TouchInteractionService.TISBinder::refreshOverviewTargetForTest);
-                return response;
+                runOnSysUIConnection(MAIN_EXECUTOR, c -> {
+                    c.getAllAppsActionManager().onDestroy();
+                    mOverviewComponentObserver.dispatchOverviewState();
 
+                    var launcher = Launcher.ACTIVITY_TRACKER.getCreatedContext();
+                    if (launcher != null) c.getTaskbarManager().setActivity(launcher);
+                    waitForTaskbarUiThreadSync();
+                });
+                return response;
+            case TestProtocol.INJECT_TEST_INSIGHTS:
+                runOnTaskbar(TaskbarManager::injectTestInsights);
+                return response;
             case TestProtocol.REQUEST_RECREATE_TASKBAR:
-                // Allow null-pointer to catch illegal states.
-                runOnTISBinder(tisBinder -> tisBinder.getTaskbarManager().recreateTaskbars());
+                runOnTaskbar(TaskbarManager::recreateTaskbars);
                 return response;
             case TestProtocol.REQUEST_TASKBAR_IME_DOCKED:
-                return getTISBinderUIProperty(Bundle::putBoolean, tisBinder ->
-                        tisBinder.getTaskbarManager()
-                                .getCurrentActivityContext().isImeDocked());
+                return getCurrentTaskbarActivityContextProperty(
+                        Bundle::putBoolean, TaskbarActivityContext::isImeDocked);
             case TestProtocol.REQUEST_UNSTASH_BUBBLE_BAR_IF_STASHED:
-                runOnTISBinder(tisBinder -> {
-                    // Allow null-pointer to catch illegal states.
-                    tisBinder.getTaskbarManager().getCurrentActivityContext()
-                            .unstashBubbleBarIfStashed();
-                });
+                runOnTaskbar(TaskbarManager::unstashBubbleBarIfStashed);
                 return response;
             case TestProtocol.REQUEST_REMOVE_ALL_BUBBLES:
-                runOnTISBinder(tisBinder -> {
-                    // Allow null-pointer to catch illegal states.
-                    Context context = tisBinder.getTaskbarManager().getCurrentActivityContext();
-                    SystemUiProxy.INSTANCE.get(context).removeAllBubbles();
-                });
+                runOnTaskbar(TaskbarManager::removeAllSystemUiBubbles);
                 return response;
             case TestProtocol.REQUEST_INJECT_FAKE_TRACKPAD:
-                runOnTISBinder(tisBinder -> tisBinder.injectFakeTrackpadForTesting());
+                runOnSysUIConnection(MAIN_EXECUTOR, c -> {
+                    mActiveTrackpadList.addInputDeviceUnchecked(1000);
+                    c.getTouchInteractionHandler().initInputMonitor("tapl testing");
+                });
                 return response;
             case TestProtocol.REQUEST_EJECT_FAKE_TRACKPAD:
-                runOnTISBinder(tisBinder -> tisBinder.ejectFakeTrackpadForTesting());
+                runOnSysUIConnection(MAIN_EXECUTOR, c -> {
+                    mActiveTrackpadList.onInputDeviceRemoved(1000);
+                    c.getTouchInteractionHandler().initInputMonitor("tapl testing");
+                });
                 return response;
-
             case TestProtocol.REQUEST_DISMISS_MAGNETIC_DETACH_THRESHOLD: {
                 final Resources resources = mContext.getResources();
                 response.putInt(TestProtocol.TEST_INFO_RESPONSE_FIELD,
@@ -282,15 +283,11 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
                 return response;
             }
             case TestProtocol.REQUEST_IS_TRANSIENT_TASKBAR:
-                return getTISBinderUIProperty(Bundle::putBoolean, tisBinder ->
-                        tisBinder.getTaskbarManager()
-                                .getCurrentActivityContext()
-                                .getTaskbarFeatureEvaluator().isTransient());
-            case TestProtocol.REQUEST_FLAG_ENABLE_MULTIPLE_DESKTOPS: {
+                return getTaskbarProperty(Bundle::putBoolean, t -> t.isTransient(displayId));
+            case TestProtocol.REQUEST_FLAG_IS_DESKTOP_MODE_SUPPORTED: {
                 response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                        DesktopState.fromContext(mContext)
-                                .isMultipleDesktopFrontendEnabledOnDisplay(
-                                        Integer.parseInt(arg)));
+                        getDesktopState(mContext).isDesktopModeSupportedOnDisplay(
+                                Integer.parseInt(arg)));
                 return response;
             }
             case TestProtocol.REQUEST_GET_ACTIVE_DESK_ID: {
@@ -314,6 +311,26 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
                             return -1;
                         },
                         this::getRecentsViewContainer);
+            }
+            case TestProtocol.REQUEST_GET_DESK_COUNT: {
+                return getUIProperty(Bundle::putInt,
+                        recentsViewContainer -> {
+                            final RecentsView recentsView = recentsViewContainer.getOverviewPanel();
+                            return recentsView.getDesktopTaskViewCount();
+                        },
+                        this::getRecentsViewContainer);
+            }
+            case TestProtocol.REQUEST_MARK_OVERVIEW_SELECT_TIP_SEEN: {
+                LauncherPrefs.get(mContext).put(SELECT_TIP_SEEN, true);
+                return response;
+            }
+            case TestProtocol.REQUEST_DISPLAY_BOUNDS: {
+                Rect bounds = mDisplayContextRepository.get(getDisplayIdForRequest(extras))
+                        .getSystemService(WindowManager.class)
+                        .getMaximumWindowMetrics().getBounds();
+                response.putParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        new Point(bounds.width(), bounds.height()));
+                return response;
             }
         }
 
@@ -345,47 +362,81 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
         return super.isLauncherInitialized() && mSystemUiProxy.isActive();
     }
 
-    private void enableBlockingTimeout(
-            TouchInteractionService.TISBinder tisBinder, boolean enable) {
-        TaskbarActivityContext context = tisBinder.getTaskbarManager().getCurrentActivityContext();
-        if (context == null) {
-            return;
-        }
-        context.enableBlockingTimeoutDuringTests(enable);
-    }
-
     private void enableTransientTaskbar(boolean enable) {
         LauncherPrefs.get(mContext).put(LauncherPrefs.TASKBAR_PINNING, !enable);
     }
 
     /**
-     * Runs the given command on the UI thread, after ensuring we are connected to
-     * TouchInteractionService.
+     * Runs the given command on the provided executor, after ensuring that the sysui connection
+     * is set up
      */
-    protected void runOnTISBinder(Consumer<TouchInteractionService.TISBinder> connectionCallback) {
-        try {
-            CountDownLatch countDownLatch = new CountDownLatch(1);
-            TISBindHelper helper = MAIN_EXECUTOR.submit(() ->
-                    new TISBindHelper(mContext, tisBinder -> {
-                        connectionCallback.accept(tisBinder);
+    private void runOnSysUIConnection(
+            Executor executor, Consumer<SysUIConnectionComponent> callback) {
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        try (var ignored = mSysUIConnectionTracker.getActiveComponent()
+                .forEach(executor, component -> {
+                    if (component != null && countDownLatch.getCount() > 0) {
+                        callback.accept(component);
                         countDownLatch.countDown();
-                    })).get();
+                    }
+                    return null;
+                })) {
             countDownLatch.await();
-            MAIN_EXECUTOR.execute(helper::onDestroy);
-        } catch (ExecutionException | InterruptedException e) {
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private <T> Bundle getTISBinderUIProperty(
-            BundleSetter<T> bundleSetter, Function<TouchInteractionService.TISBinder, T> provider) {
-        Bundle response = new Bundle();
+    /**
+     * Runs the given command on Taskbar UI thread, after ensuring TaskbarManager is created
+     */
+    private void runOnTaskbar(Consumer<TaskbarManager> callback) {
+        runOnSysUIConnection(
+                getTaskbarUiThread(), c -> callback.accept(c.getTaskbarManager()));
+    }
 
-        runOnTISBinder(tisBinder -> bundleSetter.set(
+    private <T> Bundle getCurrentTaskbarActivityContextProperty(
+            BundleSetter<T> bundleSetter, Function<TaskbarActivityContext, T> provider) {
+        return getTaskbarProperty(bundleSetter,
+                t -> t.getFromImplSync(impl -> provider.apply(impl.getCurrentActivityContext())));
+    }
+
+    private <T> Bundle getTaskbarProperty(
+            BundleSetter<T> bundleSetter, Function<TaskbarManager, T> provider) {
+        Bundle response = new Bundle();
+        runOnTaskbar(taskbarManager -> bundleSetter.set(
                 response,
                 TestProtocol.TEST_INFO_RESPONSE_FIELD,
-                provider.apply(tisBinder)));
-
+                provider.apply(taskbarManager)));
         return response;
+    }
+
+    private void waitForTaskbarUiThreadSync() {
+        try {
+            getTaskbarUiThread().submit(() -> null).get();
+        } catch (Exception ignored) { }
+    }
+
+    @Override
+    protected DeviceProfile getDeviceProfile(int displayId) {
+        if (displayId == DEFAULT_DISPLAY) {
+            return getDeviceProfile();
+        } else {
+            return mDisplayDeviceProfile.computeIfAbsent(displayId,
+                    id -> InvariantDeviceProfile
+                            .INSTANCE
+                            .get(mContext)
+                            .createDeviceProfileForSecondaryDisplay(
+                                    mDisplayContextRepository.get(id)
+                            ));
+        }
+    }
+
+    private int getDisplayIdForRequest(@Nullable Bundle extras) {
+        if (extras == null || !extras.containsKey(REQUEST_INFO_DISPLAY_ID)) {
+            return DEFAULT_DISPLAY;
+        } else {
+            return extras.getInt(REQUEST_INFO_DISPLAY_ID);
+        }
     }
 }

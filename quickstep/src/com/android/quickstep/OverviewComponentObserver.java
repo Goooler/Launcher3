@@ -21,13 +21,13 @@ import static android.content.Intent.ACTION_PACKAGE_CHANGED;
 import static android.content.Intent.ACTION_PACKAGE_REMOVED;
 import static android.view.Display.DEFAULT_DISPLAY;
 
+import static com.android.launcher3.GestureNavContract.EXTRA_GESTURE_CONTRACT;
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.SimpleBroadcastReceiver.actionsFilter;
 import static com.android.launcher3.util.SimpleBroadcastReceiver.packageFilter;
 import static com.android.quickstep.window.RecentsWindowFlags.enableFallbackOverviewInWindow;
 import static com.android.quickstep.window.RecentsWindowFlags.enableLauncherOverviewInWindow;
-import static com.android.quickstep.window.RecentsWindowFlags.enableOverviewOnConnectedDisplays;
 import static com.android.systemui.shared.system.PackageManagerWrapper.ACTION_PREFERRED_ACTIVITY_CHANGED;
 
 import android.content.ActivityNotFoundException;
@@ -46,6 +46,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
 import com.android.app.displaylib.PerDisplayRepository;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.dagger.ApplicationContext;
 import com.android.launcher3.dagger.LauncherAppComponent;
@@ -53,7 +54,9 @@ import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.util.DaggerSingletonObject;
 import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
+import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.util.ActiveGestureProtoLogProxy;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.window.RecentsWindowManager;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 
@@ -81,6 +84,8 @@ public final class OverviewComponentObserver {
     private final SimpleBroadcastReceiver mOtherHomeAppUpdateReceiver;
 
     private final PerDisplayRepository<RecentsWindowManager> mRecentsWindowManagerRepository;
+    private final LauncherActivityInterface mLauncherActivityInterface;
+    private final FallbackActivityInterface mFallbackActivityInterface;
 
     private final Intent mCurrentPrimaryHomeIntent;
     private final Intent mMyPrimaryHomeIntent;
@@ -104,6 +109,8 @@ public final class OverviewComponentObserver {
     public OverviewComponentObserver(
             @ApplicationContext Context context,
             PerDisplayRepository<RecentsWindowManager> recentsWindowManagerRepository,
+            LauncherActivityInterface launcherActivityInterface,
+            FallbackActivityInterface fallbackActivityInterface,
             DaggerSingletonTracker lifecycleTracker) {
         mContext = context;
         mUserPreferenceChangeReceiver =
@@ -111,6 +118,8 @@ public final class OverviewComponentObserver {
         mOtherHomeAppUpdateReceiver =
                 new SimpleBroadcastReceiver(context, MAIN_EXECUTOR, this::updateOverviewTargets);
         mRecentsWindowManagerRepository = recentsWindowManagerRepository;
+        mLauncherActivityInterface = launcherActivityInterface;
+        mFallbackActivityInterface = fallbackActivityInterface;
         // Set up primary intents
         mCurrentPrimaryHomeIntent = createHomeIntent();
         mMyPrimaryHomeIntent = new Intent(mCurrentPrimaryHomeIntent).setPackage(
@@ -232,7 +241,7 @@ public final class OverviewComponentObserver {
                         recentsWindowManager != null ? recentsWindowManager.getContainerInterface()
                                 : null;
             } else {
-                mDefaultDisplayContainerInterface = LauncherActivityInterface.INSTANCE;
+                mDefaultDisplayContainerInterface = mLauncherActivityInterface;
             }
             mIsHomeAndOverviewSame = true;
             mOverviewIntent = mMyPrimaryHomeIntent;
@@ -249,7 +258,7 @@ public final class OverviewComponentObserver {
                         recentsWindowManager != null ? recentsWindowManager.getContainerInterface()
                                 : null;
             } else {
-                mDefaultDisplayContainerInterface = FallbackActivityInterface.INSTANCE;
+                mDefaultDisplayContainerInterface = mFallbackActivityInterface;
             }
             mIsHomeAndOverviewSame = false;
             mOverviewIntent = mFallbackIntent;
@@ -269,6 +278,14 @@ public final class OverviewComponentObserver {
                         ACTION_PACKAGE_ADDED, ACTION_PACKAGE_CHANGED, ACTION_PACKAGE_REMOVED));
             }
         }
+        dispatchOverviewState();
+    }
+
+    /**
+     * Updates all change listeners with the current overview state
+     */
+    @UiThread
+    public void dispatchOverviewState() {
         mOverviewChangeListeners.forEach(l -> l.onOverviewTargetChange(mIsHomeAndOverviewSame));
     }
 
@@ -349,7 +366,7 @@ public final class OverviewComponentObserver {
      */
     @Nullable
     public BaseContainerInterface<?, ?> getContainerInterface(int displayId) {
-        if (enableOverviewOnConnectedDisplays() && displayId != DEFAULT_DISPLAY) {
+        if (displayId != DEFAULT_DISPLAY) {
             RecentsWindowManager recentsWindowManager = mRecentsWindowManagerRepository.get(
                     displayId);
             return recentsWindowManager != null ? recentsWindowManager.getContainerInterface()
@@ -357,6 +374,34 @@ public final class OverviewComponentObserver {
         } else {
             return mDefaultDisplayContainerInterface;
         }
+    }
+
+    /**
+     * Get the current {@link BaseDragLayer} to support drag-and-drop and popup on the given
+     * displayId
+     *
+     * @param displayId the display id
+     * @return the root view that should handle drag-and-drop and popup for the given display
+     */
+    @Nullable
+    public BaseDragLayer<?> getDragLayer(int displayId) {
+        if (displayId == DEFAULT_DISPLAY && mIsHomeAndOverviewSame) {
+            Launcher launcher = mLauncherActivityInterface.getCreatedContainer();
+            if (launcher != null) {
+                return launcher.getDragLayer();
+            }
+        }
+        BaseContainerInterface<?, ?> containerInterface = getContainerInterface(displayId);
+
+        if (containerInterface == null) {
+            return null;
+        }
+        RecentsViewContainer container = containerInterface.getCreatedContainer();
+
+        if (container == null) {
+            return null;
+        }
+        return container.getDragLayer();
     }
 
     public void dump(PrintWriter pw) {
@@ -375,6 +420,10 @@ public final class OverviewComponentObserver {
     public static void startHomeIntentSafely(@NonNull Context context, @Nullable Bundle options,
             @NonNull String reason, int displayId) {
         Intent intent = OverviewComponentObserver.INSTANCE.get(context).getHomeIntent(displayId);
+
+        // Include a GestureNavContract to signal that the workspace reveal animation should play
+        intent.putExtra(EXTRA_GESTURE_CONTRACT, new Bundle());
+
         startHomeIntentSafely(context, intent, options, reason);
     }
 

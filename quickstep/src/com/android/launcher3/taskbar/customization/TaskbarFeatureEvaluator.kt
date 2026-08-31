@@ -17,63 +17,65 @@
 package com.android.launcher3.taskbar.customization
 
 import android.content.Context
-import com.android.launcher3.Flags.enableRecentsInTaskbar
+import androidx.annotation.AnyThread
+import com.android.app.displaylib.PerDisplayRepository
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherPrefs.Companion.TASKBAR_PINNING
-import com.android.launcher3.LauncherPrefs.Companion.TASKBAR_PINNING_IN_DESKTOP_MODE
-import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
 import com.android.launcher3.dagger.ApplicationContext
+import com.android.launcher3.dagger.DisplayId
 import com.android.launcher3.dagger.LauncherAppComponent
-import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.dagger.PerDisplaySingleton
+import com.android.launcher3.display.DisplayController
+import com.android.launcher3.display.LauncherDisplayInfo
 import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.util.DaggerSingletonObject
-import com.android.launcher3.util.DisplayController
-import com.android.launcher3.util.NavigationMode.*
+import com.android.launcher3.util.NavigationMode.NO_BUTTON
+import com.android.launcher3.util.NavigationMode.THREE_BUTTONS
+import com.android.systemui.shared.Flags.enableRecentsInTaskbar
 import javax.inject.Inject
 
 /** Evaluates all the features taskbar can have. */
-@LauncherAppSingleton
+@PerDisplaySingleton
 class TaskbarFeatureEvaluator
 @Inject
 constructor(
-    @ApplicationContext private val context: Context,
+    @DisplayId val displayId: Int,
+    @ApplicationContext val context: Context,
     private val displayController: DisplayController,
     private val desktopVisibilityController: DesktopVisibilityController,
     private val launcherPrefs: LauncherPrefs,
 ) {
-    val primaryDisplayId = context.displayId
+    private val displayInfo: LauncherDisplayInfo?
+        get() = displayController.getInfoForDisplay(displayId)
+
+    val isPrimaryDisplay = displayId == context.displayId
     val hasBubbles = false
     val hasNavButtons: Boolean
-        get() = displayController.info.navigationMode == THREE_BUTTONS
+        get() = displayInfo?.navigationMode == THREE_BUTTONS
 
     val isRecentsEnabled: Boolean
         get() = enableRecentsInTaskbar()
 
+    @get:AnyThread
     val isTransient: Boolean
         get() =
             if (
-                displayController.info.navigationMode != NO_BUTTON ||
-                    desktopVisibilityController.isInDesktopMode(primaryDisplayId) ||
-                    displayController.info.showDesktopTaskbarForFreeformDisplay() ||
-                    (displayController.info.showLockedTaskbarOnHome() &&
-                        displayController.info.isHomeVisible)
+                displayInfo?.navigationMode != NO_BUTTON ||
+                    desktopVisibilityController.isInDesktopMode(displayId) ||
+                    displayInfo?.showDesktopTaskbarForFreeformDisplay == true
             ) {
                 false
-            } else if (enableTaskbarPinning()) {
-                !isPinned
             } else {
-                true
+                !isPinned
             }
 
     val isPinned: Boolean
         get() =
             if (
-                desktopVisibilityController.isInDesktopModeAndNotInOverview(primaryDisplayId) ||
-                    displayController.info.showDesktopTaskbarForFreeformDisplay()
+                desktopVisibilityController.isInDesktopMode(displayId) ||
+                    displayInfo?.showDesktopTaskbarForFreeformDisplay == true
             ) {
                 true
-            } else if (desktopVisibilityController.isInDesktopMode(primaryDisplayId)) {
-                launcherPrefs.get(TASKBAR_PINNING_IN_DESKTOP_MODE)
             } else {
                 launcherPrefs.get(TASKBAR_PINNING)
             }
@@ -85,10 +87,16 @@ constructor(
         get() = isPinned || hasNavButtons
 
     val supportsTransitionToTransientTaskbar: Boolean
-        get() = !hasNavButtons && !DisplayController.showDesktopTaskbarForFreeformDisplay(context)
+        get() =
+            !hasNavButtons &&
+                !DisplayController.getInfo(context).showDesktopTaskbarForFreeformDisplay &&
+                !desktopVisibilityController.isInDesktopMode(displayId)
 
     companion object {
         @JvmField
-        val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getTaskbarFeatureEvaluator)
+        val INSTANCE =
+            DaggerSingletonObject<PerDisplayRepository<TaskbarFeatureEvaluator>>(
+                LauncherAppComponent::getTaskbarFeatureEvaluatorRepository
+            )
     }
 }

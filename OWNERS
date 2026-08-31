@@ -23,32 +23,31 @@ abegovic@google.com
 # Multitasking eng team
 tracyzhou@google.com
 peanutbutter@google.com
-jeremysim@google.com
 atsjenk@google.com
 hwwang@google.com
+mpodolian@google.com
 
 # Overview eng team
 alexchau@google.com
-samcackett@google.com
 uwaisashraf@google.com
-vinayjoglekar@google.com
-willosborn@google.com
 jmokut@google.com
+magdi@google.com
+yyalan@google.com
 
-# Physical Keyboard & Trackpad eng team
-patmanning@google.com
-helencheuk@google.com
+# Context Engine team
+edmundw@google.com
+samcackett@google.com
+vigneshsuresh@google.com
+vinayjoglekar@google.com
+yulecat@google.com
 
 # Widget Picker team
 shamalip@google.com
-zakcohen@google.com
 
 # System Navigation team
 brianji@google.com
 jonmiranda@google.com
 jagrutdesai@google.com
-randypfohl@google.com
-saumyaprakash@google.com
 twickham@google.com
 victortulias@google.com
 
@@ -68,6 +67,7 @@ jiuyu@google.com
 
 # Desktop Experiences team
 gsennton@google.com
+patmanning@google.com
 
 per-file FeatureFlags.java, globs = set noparent
 per-file FeatureFlags.java = sunnygoyal@google.com, winsonc@google.com, adamcohen@google.com, hyunyoungs@google.com, abegovic@google.com
@@ -77,3 +77,7 @@ per-file DeviceConfigWrapper.java = sunnygoyal@google.com, winsonc@google.com, a
 
 # Predictive Back
 per-file LauncherBackAnimationController.java = shanh@google.com, gallmann@google.com
+
+# Bubbles
+per-file res/** = file:/quickstep/src/com/android/launcher3/taskbar/bubbles/OWNERS
+per-file quickstep/res/** = file:/quickstep/src/com/android/launcher3/taskbar/bubbles/OWNERS

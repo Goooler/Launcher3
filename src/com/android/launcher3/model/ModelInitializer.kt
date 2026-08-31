@@ -28,21 +28,28 @@ import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.InvariantDeviceProfile.OnIDPChangeListener
 import com.android.launcher3.LauncherModel
+import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.Utilities
+import com.android.launcher3.automation.AutomationRepository
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.graphics.ThemeManager.ThemeChangeListener
-import com.android.launcher3.homescreenfiles.HomeScreenFilesChangedTask
 import com.android.launcher3.homescreenfiles.HomeScreenFilesProvider
+import com.android.launcher3.homescreenfiles.HomeScreenFilesUpdateTask
 import com.android.launcher3.icons.IconCache
 import com.android.launcher3.icons.IconChangeTracker
 import com.android.launcher3.icons.LauncherIcons.IconPool
 import com.android.launcher3.logging.FileLog
+import com.android.launcher3.model.tasks.AutomationChangedTask
 import com.android.launcher3.model.tasks.PackageUpdatedTask
 import com.android.launcher3.model.tasks.ShortcutsChangedTask
+import com.android.launcher3.model.tasks.UserAvailabilityChangedTask
+import com.android.launcher3.model.tasks.UserLockStateChangedTask
+import com.android.launcher3.model.tasks.WidgetFeaturesUpdateTask
 import com.android.launcher3.notification.NotificationListener
 import com.android.launcher3.pm.InstallSessionHelper
 import com.android.launcher3.pm.UserCache
+import com.android.launcher3.pm.UserCache.UserChangeEvent
 import com.android.launcher3.shortcuts.ShortcutRequest
 import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
@@ -54,8 +61,10 @@ import com.android.launcher3.util.SettingsCache.NOTIFICATION_BADGING_URI
 import com.android.launcher3.util.SettingsCache.PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI
 import com.android.launcher3.util.SimpleBroadcastReceiver
 import com.android.launcher3.util.SimpleBroadcastReceiver.Companion.actionsFilter
+import com.android.launcher3.widget.ProvidersUpdateDispatcher
 import com.android.launcher3.widget.custom.CustomWidgetManager
 import javax.inject.Inject
+import javax.inject.Provider
 
 /** Utility class for initializing all model callbacks */
 class ModelInitializer
@@ -72,9 +81,15 @@ constructor(
     private val installSessionHelper: InstallSessionHelper,
     private val homeScreenFilesProvider: HomeScreenFilesProvider,
     private val lifeCycle: DaggerSingletonTracker,
-    private val homeScreenFilesChangedTask: HomeScreenFilesChangedTask.Factory,
+    private val homeScreenFilesUpdateTask: HomeScreenFilesUpdateTask.Factory,
     private val iconChangeTracker: IconChangeTracker,
+    private val prefs: LauncherPrefs,
+    private val automationRepo: AutomationRepository,
+    private val updateDispatcher: Provider<ProvidersUpdateDispatcher>,
 ) {
+
+    // only allow this once per reboot to reload work apps
+    private var mShouldReloadWorkProfile = true
 
     fun initialize(model: LauncherModel) {
         initializeDisplayEvents(model)
@@ -95,7 +110,7 @@ constructor(
             launcherApps.setArchiveCompatibility(
                 ArchiveCompatibilityParams().apply {
                     setEnableUnarchivalConfirmation(false)
-                    setEnableIconOverlay(!Flags.useNewIconForArchivedApps())
+                    setEnableIconOverlay(false)
                 }
             )
         }
@@ -115,70 +130,96 @@ constructor(
         // Development helper
         if (BuildConfig.IS_STUDIO_BUILD) {
             val reloadReceiver =
-                SimpleBroadcastReceiver(context, UI_HELPER_EXECUTOR) { model.forceReload() }
+                SimpleBroadcastReceiver(context, UI_HELPER_EXECUTOR) {
+                    model.reloadIfActive("force-reload-broadcast")
+                }
             reloadReceiver.register(actionsFilter(ACTION_FORCE_RELOAD), Context.RECEIVER_EXPORTED)
             lifeCycle.addCloseable(reloadReceiver)
         }
 
         // User changes
-        lifeCycle.addCloseable(userCache.addUserEventListener(model::onUserEvent))
+        lifeCycle.addCloseable(
+            userCache.userChanges.forEach(MODEL_EXECUTOR) { handleUserEvent(model, it) }
+        )
 
         // Private space settings changes
-        val psSettingsListener = SettingsCache.OnChangeListener { model.forceReload() }
-        settingsCache.register(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, psSettingsListener)
-        lifeCycle.addCloseable {
-            settingsCache.unregister(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, psSettingsListener)
-        }
+        lifeCycle.addCloseable(
+            settingsCache.getListenableRef(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI).forEach(
+                MAIN_EXECUTOR
+            ) {
+                model.rebindCallbacks("private-space-state-changed")
+            }
+        )
 
         // Notification dots changes
-        val notificationChanges =
-            SettingsCache.OnChangeListener { dotsEnabled ->
+        lifeCycle.addCloseable(
+            settingsCache.getListenableRef(NOTIFICATION_BADGING_URI).forEach(MAIN_EXECUTOR) {
+                dotsEnabled ->
                 if (dotsEnabled)
                     NotificationListener.requestRebind(
                         ComponentName(context, NotificationListener::class.java)
                     )
             }
-        settingsCache.register(NOTIFICATION_BADGING_URI, notificationChanges)
-        notificationChanges.onSettingsChanged(settingsCache.getValue(NOTIFICATION_BADGING_URI))
-        lifeCycle.addCloseable {
-            settingsCache.unregister(NOTIFICATION_BADGING_URI, notificationChanges)
-        }
+        )
 
         // Custom widgets
-        lifeCycle.addCloseable(customWidgetManager.addWidgetRefreshCallback(model::rebindCallbacks))
+        lifeCycle.addCloseable(
+            customWidgetManager.addWidgetRefreshCallback {
+                model.reloadIfActive("custom-widgets-refresh")
+            }
+        )
 
         // Install session changes
         lifeCycle.addCloseable(installSessionHelper.registerInstallTracker(modelCallbacks))
 
-        // Monitor changes to files shown on homescreen.
+        // Monitor changes to files shown on home screen.
         lifeCycle.addCloseable(
-            homeScreenFilesProvider.fileChanges.forEach(MODEL_EXECUTOR) {
-                model.enqueueModelUpdateTask(homeScreenFilesChangedTask.create(it))
+            homeScreenFilesProvider.updates.forEach(MODEL_EXECUTOR) {
+                model.enqueueModelUpdateTask(homeScreenFilesUpdateTask.create(it))
+            }
+        )
+
+        // Monitor widget features
+        lifeCycle.addCloseable(
+            updateDispatcher.get().updates.forEach(MODEL_EXECUTOR) { update ->
+                model.enqueueModelUpdateTask(
+                    WidgetFeaturesUpdateTask(update.appWidgetId, update.info)
+                )
             }
         )
     }
 
     fun initializeDisplayEvents(model: LauncherModel) {
-        fun refreshAndReloadLauncher() {
+        fun refreshAndReloadLauncher(eventName: String) {
             iconPool.clear()
             iconCache.updateIconParams(idp.fillResIconDpi, idp.iconBitmapSize)
-            model.forceReload()
+            model.reloadIfActive(eventName)
         }
 
         // IDP changes
         val idpChangeListener = OnIDPChangeListener { modelChanged ->
-            if (modelChanged) refreshAndReloadLauncher()
+            if (modelChanged) refreshAndReloadLauncher("idb-changed")
         }
         idp.addOnChangeListener(idpChangeListener)
         lifeCycle.addCloseable { idp.removeOnChangeListener(idpChangeListener) }
 
         // Shape changes
         lifeCycle.addCloseable(
-            themeManager.iconShapeData.forEach(MAIN_EXECUTOR) { model.rebindCallbacks() }
+            themeManager.iconShapeData.forEach(MAIN_EXECUTOR) {
+                model.rebindCallbacks("icon-shape-changed")
+            }
         )
 
+        if (Flags.enableAppAutomationIndicator()) {
+            lifeCycle.addCloseable(
+                automationRepo.automatedPackages.changes.forEach(MODEL_EXECUTOR) { change ->
+                    model.enqueueModelUpdateTask(AutomationChangedTask(change))
+                }
+            )
+        }
+
         // Theme changes
-        val themeChangeListener = ThemeChangeListener { refreshAndReloadLauncher() }
+        val themeChangeListener = ThemeChangeListener { refreshAndReloadLauncher("theme-changed") }
         themeManager.addChangeListener(themeChangeListener)
         lifeCycle.addCloseable { themeManager.removeChangeListener(themeChangeListener) }
 
@@ -206,6 +247,49 @@ constructor(
                     )
                 }
             }
+    }
+
+    private fun handleUserEvent(model: LauncherModel, event: UserChangeEvent) {
+        val oldUser = event.oldUser
+        val newUser = event.newUser
+
+        when {
+            // User removed
+            oldUser != null && newUser == null -> {
+                if (oldUser.iconInfo.isWork) prefs.put(LauncherPrefs.WORK_EDU_STEP, 0)
+                model.reloadIfActive("user-removed")
+            }
+
+            // User added
+            oldUser == null && newUser != null -> model.reloadIfActive("user-added")
+
+            // User changed
+            oldUser != null && newUser != null -> {
+                var handled = false
+                if (newUser.isQuietModeEnabled != oldUser.isQuietModeEnabled) {
+                    val isWork = newUser.iconInfo.isWork
+                    if (isWork && mShouldReloadWorkProfile && !newUser.isQuietModeEnabled) {
+                        // Force reload the first time work profile's quiet mode is disabled
+                        model.reloadIfActive("first-time-work-profile")
+                    } else {
+                        if (isWork) mShouldReloadWorkProfile = false
+                        model.enqueueModelUpdateTask(
+                            UserAvailabilityChangedTask(newUser.iconInfo.user)
+                        )
+                    }
+                    handled = true
+                }
+                if (newUser.isUnlocked != oldUser.isUnlocked) {
+                    model.enqueueModelUpdateTask(
+                        UserLockStateChangedTask(newUser.iconInfo.user, newUser.isUnlocked)
+                    )
+                    handled = true
+                }
+
+                // We don't know what changed, just reload to be safe
+                if (!handled) model.reloadIfActive("unknown-user-event")
+            }
+        }
     }
 
     companion object {

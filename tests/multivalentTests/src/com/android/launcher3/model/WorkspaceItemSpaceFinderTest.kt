@@ -15,7 +15,9 @@
  */
 package com.android.launcher3.model
 
+import android.graphics.Point
 import android.graphics.Rect
+import android.util.Size
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
@@ -25,6 +27,8 @@ import com.android.launcher3.model.data.WorkspaceItemCoordinates
 import com.android.launcher3.util.IntSet
 import com.android.launcher3.util.ModelTestExtensions.bgDataModel
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,13 +43,18 @@ class WorkspaceItemSpaceFinderTest : AbstractWorkspaceModelTest() {
         super.setup()
     }
 
-    private fun findSpace(spanX: Int, spanY: Int): WorkspaceItemCoordinates =
+    private fun findSpace(
+        spanX: Int,
+        spanY: Int,
+        excludedScreens: IntSet = IntSet.wrap(FIRST_SCREEN_ID),
+        startingFrom: WorkspaceItemCoordinates = WorkspaceItemCoordinates(FIRST_SCREEN_ID, 0, 0),
+    ): WorkspaceItemCoordinates =
         WorkspaceItemSpaceFinder(
                 mTargetContext.bgDataModel,
                 mAppState.invariantDeviceProfile,
                 model,
             )
-            .findSpaceForItem(mAddedWorkspaceItems, spanX, spanY, IntSet.wrap(FIRST_SCREEN_ID))
+            .findSpaceForItem(mAddedWorkspaceItems, spanX, spanY, excludedScreens, startingFrom)
 
     private fun assertRegionVacant(newItemSpace: WorkspaceItemCoordinates, spanX: Int, spanY: Int) {
         assertThat(
@@ -206,4 +215,125 @@ class WorkspaceItemSpaceFinderTest : AbstractWorkspaceModelTest() {
         assertThat(mExistingScreens.contains(spaceFound.screenId)).isTrue()
         assertRegionVacant(spaceFound, 3, 1)
     }
+
+    @Test
+    fun testFindSpaceStartingFromWhenCoordsAreOutOfBounds() {
+        // Case: Starting from cellX is above bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, Int.MAX_VALUE, 1),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+
+        // Case: Starting from cellX is below bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, Int.MIN_VALUE, 1),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+
+        // Case: Starting from cellY is above bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, 1, Int.MAX_VALUE),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+
+        // Case: Starting from cellY is below bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, 1, Int.MIN_VALUE),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+
+        // Case: Starting from screen is above bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(Int.MAX_VALUE, 1, 1),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+
+        // Case: Starting from screen is below bounds.
+        testFindSpaceStartingFrom(
+            screen0 = listOf(emptySpaceAt(1, 1)),
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(Int.MIN_VALUE, 1, 1),
+            expected = WorkspaceItemCoordinates(0, 1, 1),
+        )
+    }
+
+    @Test
+    fun testFindSpaceStartingFromWhenSpaceIsAvailable() {
+        // Case: Starting from coords are after empty space.
+        testFindSpaceStartingFrom(
+            screen0 = emptyScreenSpaces,
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, 2, 2),
+            expected = WorkspaceItemCoordinates(2, 0, 0),
+        )
+
+        // Case: Starting from coords are before empty space.
+        testFindSpaceStartingFrom(
+            screen0 = emptyScreenSpaces,
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, 0, 0),
+            expected = WorkspaceItemCoordinates(1, 1, 1),
+        )
+
+        // Case: Starting from coords are equal to empty space.
+        testFindSpaceStartingFrom(
+            screen0 = emptyScreenSpaces,
+            screen1 = listOf(emptySpaceAt(1, 1)),
+            startingFrom = WorkspaceItemCoordinates(1, 1, 1),
+            expected = WorkspaceItemCoordinates(1, 1, 1),
+        )
+    }
+
+    @Test
+    fun testFindSpaceStartingFromWhenSpaceIsUnavailable() {
+        // Case: Starting from screen is full.
+        testFindSpaceStartingFrom(
+            screen0 = emptyScreenSpaces,
+            screen1 = fullScreenSpaces,
+            startingFrom = WorkspaceItemCoordinates(1, 0, 0),
+            expected = WorkspaceItemCoordinates(2, 0, 0),
+        )
+    }
+
+    private fun testFindSpaceStartingFrom(
+        screen0: List<Rect>,
+        screen1: List<Rect>,
+        startingFrom: WorkspaceItemCoordinates,
+        expected: WorkspaceItemCoordinates,
+    ) {
+        setup()
+        setupWorkspacesWithSpaces(screen0 = screen0, screen1 = screen1)
+
+        assertThat(
+                findSpace(
+                    spanX = 1,
+                    spanY = 1,
+                    excludedScreens = IntSet(),
+                    startingFrom = startingFrom,
+                )
+            )
+            .isEqualTo(expected)
+
+        if (expected.screenId <= 1) {
+            assertTrue(mExistingScreens.contains(expected.screenId))
+            assertRegionVacant(expected, spanX = 1, spanY = 1)
+        } else {
+            assertFalse(mExistingScreens.contains(expected.screenId))
+        }
+    }
+
+    private fun emptySpaceAt(cellX: Int, cellY: Int) = emptySpaceAt(Point(cellX, cellY))
+
+    private fun emptySpaceAt(cell: Point, span: Size = Size(1, 1)) =
+        Rect(cell.x, cell.y, cell.x + span.width, cell.y + span.height)
 }

@@ -18,10 +18,10 @@ package com.android.launcher3.folder;
 
 import static android.view.View.ALPHA;
 
-import static com.android.launcher3.BubbleTextView.TEXT_ALPHA_PROPERTY;
-import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
+import static com.android.launcher3.LauncherAnimUtils.getScaleProperty;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
 import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
+import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -206,14 +206,16 @@ public class FolderAnimationManager implements FolderAnimationCreator {
         AnimatorSet a = new AnimatorSet();
 
         // Initialize the Folder items' text.
-        PropertyResetListener colorResetListener =
-                new PropertyResetListener<>(TEXT_ALPHA_PROPERTY, 1f);
+        PropertyResetListener colorResetListener = new PropertyResetListener<>(
+                MULTI_PROPERTY_VALUE, 1f);
         for (View icon : mFolder.getItemsOnPage(mFolder.mContent.getCurrentPage())) {
             BubbleTextView titleText = getBubbleTextView(icon);
             if (mIsOpening) {
-                titleText.setTextVisibility(false);
+                titleText.getFloatingViewTextAlpha().setValue(0f);
             }
-            ObjectAnimator anim = titleText.createTextAlphaAnimator(mIsOpening);
+            Animator anim = titleText.getFloatingViewTextAlpha().animateToValue(mIsOpening
+                    ? 1f
+                    : 0f);
             anim.addListener(colorResetListener);
             play(a, anim);
         }
@@ -222,8 +224,8 @@ public class FolderAnimationManager implements FolderAnimationCreator {
         play(a, mBgColorAnimator);
         play(a, getAnimator(mFolder, View.TRANSLATION_X, xDistance, 0f));
         play(a, getAnimator(mFolder, View.TRANSLATION_Y, yDistance, 0f));
-        play(a, getAnimator(mFolder.mContent, SCALE_PROPERTY, initialScale, finalScale));
-        play(a, getAnimator(mFolder.mFooter, SCALE_PROPERTY, initialScale, finalScale));
+        play(a, getAnimator(mFolder.mContent, getScaleProperty(), initialScale, finalScale));
+        play(a, getAnimator(mFolder.mFooter, getScaleProperty(), initialScale, finalScale));
 
         final int footerAlphaDuration;
         final int footerStartDelay;
@@ -253,8 +255,10 @@ public class FolderAnimationManager implements FolderAnimationCreator {
         }
         int left = page * lp.width;
 
-        int extraRadius = (int) ((mDeviceProfile.folderIconSizePx / initialScale)
-                * EXTRA_FOLDER_REVEAL_RADIUS_PERCENTAGE);
+        int extraRadius = (int) (
+                (mDeviceProfile.getFolderProfile().getFolderIconSizePx() / initialScale)
+                        * EXTRA_FOLDER_REVEAL_RADIUS_PERCENTAGE
+        );
         Rect contentStart = new Rect(
                 (int) (left + (startRect.left / initialScale)) - extraRadius,
                 (int) (startRect.top / initialScale) - extraRadius,
@@ -424,7 +428,7 @@ public class FolderAnimationManager implements FolderAnimationCreator {
             translationY.setInterpolator(previewItemInterpolator);
             play(animatorSet, translationY);
 
-            Animator scaleAnimator = getAnimator(v, SCALE_PROPERTY, initialScale, finalScale);
+            Animator scaleAnimator = getAnimator(v, getScaleProperty(), initialScale, finalScale);
             scaleAnimator.setInterpolator(previewItemInterpolator);
             play(animatorSet, scaleAnimator);
 

@@ -46,7 +46,6 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -133,7 +132,6 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
         mWorkFAB = findViewById(R.id.work_mode_toggle);
         mSchedulerButton = findViewById(R.id.work_scheduler);
         mWorkUtilityView = findViewById(R.id.work_utility_view);
-        setSelected(true);
         KeyboardInsetAnimationCallback keyboardInsetAnimationCallback =
                 new KeyboardInsetAnimationCallback(this);
         setWindowInsetsAnimationCallback(keyboardInsetAnimationCallback);
@@ -161,11 +159,13 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
         if (lp != null) {
             int bottomMargin = getResources().getDimensionPixelSize(R.dimen.work_fab_margin_bottom);
             DeviceProfile dp = ActivityContext.lookupContext(getContext()).getDeviceProfile();
-            if (mActivityContext.getAppsView().isSearchBarFloating()) {
+            if (mActivityContext.getAppsView() != null
+                    && mActivityContext.getAppsView().isSearchBarFloating()) {
                 bottomMargin += dp.getHotseatProfile().getQsbHeight();
             }
 
-            if (!dp.getDeviceProperties().isGestureMode() && dp.isTaskbarPresent) {
+            if (!dp.getDeviceProperties().getDeviceConfiguration().isGestureMode()
+                    && dp.getDeviceProperties().getTaskbarConfiguration().isTaskbarPresent()) {
                 bottomMargin += dp.getTaskbarProfile().getHeight();
             }
 
@@ -439,7 +439,7 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
 
     @VisibleForTesting
     boolean shouldUseScheduler() {
-        return Flags.workSchedulerInWorkProfile() && !mWorkSchedulerIntentAction.isEmpty();
+        return !mWorkSchedulerIntentAction.isEmpty();
     }
 
     @VisibleForTesting

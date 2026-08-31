@@ -16,7 +16,6 @@
 
 package com.android.launcher3.model;
 
-import static com.android.launcher3.Flags.enableLauncherBrMetricsFixed;
 import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
 import static com.android.launcher3.icons.CacheableShortcutInfo.convertShortcutsToCacheableShortcuts;
 import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
@@ -29,7 +28,9 @@ import static com.android.launcher3.model.data.AppsListData.FLAG_QUIET_MODE_CHAN
 import static com.android.launcher3.model.data.AppsListData.FLAG_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.data.AppsListData.FLAG_WORK_PROFILE_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
+import static com.android.launcher3.model.tasks.BrowserIconMigrator.PREF_MIGRATION_PENDING;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
+import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.LooperExecutor.CALLER_LOADER_TASK;
 import static com.android.launcher3.util.PackageManagerHelper.hasShortcutsPermission;
 
@@ -44,6 +45,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Process;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.util.Log;
@@ -59,12 +61,15 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.automation.AutomationRepository;
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger;
 import com.android.launcher3.dagger.ApplicationContext;
 import com.android.launcher3.folder.FolderNameInfos;
 import com.android.launcher3.folder.FolderNameProvider;
 import com.android.launcher3.homescreenfiles.HomeScreenFile;
 import com.android.launcher3.homescreenfiles.HomeScreenFilesProvider;
+import com.android.launcher3.homescreenfiles.HomeScreenFilesUpdate;
+import com.android.launcher3.homescreenfiles.HomeScreenFilesUpdateTask;
 import com.android.launcher3.icons.CacheableShortcutCachingLogic;
 import com.android.launcher3.icons.CacheableShortcutInfo;
 import com.android.launcher3.icons.IconCache;
@@ -81,12 +86,12 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.LoaderParams;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.model.tasks.BrowserIconMigratorFactory;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.pm.UserCache.CachedUserInfo;
 import com.android.launcher3.pm.UserManagerState;
-import com.android.launcher3.provider.LauncherDbUtils;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.shortcuts.ShortcutRequest.QueryResult;
@@ -94,7 +99,6 @@ import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.IOUtils;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
-import com.android.launcher3.util.LooperIdleLock;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.SettingsCache;
@@ -109,6 +113,7 @@ import dagger.assisted.AssistedInject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -117,6 +122,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -134,6 +140,7 @@ public class LoaderTask implements Runnable {
 
     private static final boolean DEBUG = true;
 
+    public final String name;
     private final Context mContext;
     private final LauncherModel mModel;
     private final InvariantDeviceProfile mIDP;
@@ -146,7 +153,7 @@ public class LoaderTask implements Runnable {
     private final WidgetSizeHandler mWidgetSizeHandler;
 
     private final ModelDelegate mModelDelegate;
-    private boolean mIsRestoreFromBackup;
+    private final boolean mIsRestoreFromBackup;
 
     @NonNull
     private final BaseLauncherBinder mLauncherBinder;
@@ -171,9 +178,14 @@ public class LoaderTask implements Runnable {
     private final Provider<FolderNameProvider> mFolderNameProviderFactory;
     private final Provider<LauncherRestoreEventLogger> mRestoreEventLoggerProvider;
     private final WorkspaceItemSpaceFinder mWorkspaceItemSpaceFinder;
-    private final kotlin.Lazy<Map<Uri, HomeScreenFile>> mHomeScreenFilesQueryResult;
+    private final CompletableFuture<Map<Uri, HomeScreenFile>> mHomeScreenFilesQueryResult;
+    private final HomeScreenFilesUpdateTask.Factory mHomeScreenFilesUpdateTask;
     private final FirstScreenBroadcastHelper mFirstScreenBroadcastHelper;
     private final SettingsCache mSettingsCache;
+    private final ModelTaskController mModelTaskController;
+    private final BrowserIconMigratorFactory mBrowserIconMigratorFactory;
+    private final LauncherPrefs mPrefs;
+    private final AutomationRepository mAutomationRepo;
 
     @AssistedInject
     protected LoaderTask(
@@ -189,6 +201,7 @@ public class LoaderTask implements Runnable {
             LoaderCursorFactory loaderCursorFactory,
             Provider<FolderNameProvider> folderNameProviderFactory,
             @Named("SAFE_MODE") boolean isSafeModeEnabled,
+            @Assisted @NonNull String callerName,
             @Assisted @NonNull BaseLauncherBinder launcherBinder,
             Provider<LauncherRestoreEventLogger> restoreEventLoggerFactory,
             @Named("MODEL_ITEMS") Provider<Set<ItemInfo>> extraItemsProvider,
@@ -196,8 +209,14 @@ public class LoaderTask implements Runnable {
             LoaderParams params,
             WorkspaceItemSpaceFinder workspaceItemSpaceFinder,
             HomeScreenFilesProvider homeScreenFilesProvider,
+            HomeScreenFilesUpdateTask.Factory homeScreenFilesUpdateTask,
             FirstScreenBroadcastHelper firstScreenBroadcastHelper,
-            SettingsCache settingsCache) {
+            SettingsCache settingsCache,
+            BrowserIconMigratorFactory browserIconMigratorFactory,
+            ModelTaskController modelTaskController,
+            LauncherPrefs prefs,
+            AutomationRepository automationRepo) {
+        name = callerName;
         mContext = context;
         mIDP = idp;
         mModel = model;
@@ -219,20 +238,22 @@ public class LoaderTask implements Runnable {
         mWidgetSizeHandler = widgetSizeHandler;
         mParams = params;
         mWorkspaceItemSpaceFinder = workspaceItemSpaceFinder;
-        mHomeScreenFilesQueryResult = homeScreenFilesProvider.query();
+        mHomeScreenFilesUpdateTask = homeScreenFilesUpdateTask;
         mFirstScreenBroadcastHelper = firstScreenBroadcastHelper;
         mSettingsCache = settingsCache;
         mUserManagerState = mUserCache.getUserManagerState();
-    }
+        mBrowserIconMigratorFactory = browserIconMigratorFactory;
+        mModelTaskController = modelTaskController;
+        mPrefs = prefs;
+        mAutomationRepo = automationRepo;
 
-    protected synchronized void waitForIdle() {
-        // Wait until the either we're stopped or the other threads are done.
-        // This way we don't start loading all apps until the workspace has settled
-        // down.
-        LooperIdleLock idleLock = mLauncherBinder.newIdleLock(this);
-        // Just in case mFlushingWorkerThread changes but we aren't woken up,
-        // wait no longer than 1sec at a time
-        while (!mStopped && idleLock.awaitLocked(1000));
+        mIsRestoreFromBackup = mPrefs.get(IS_FIRST_LOAD_AFTER_RESTORE);
+        // NOTE: Wait for the provider to become ready before querying for file system items.
+        mHomeScreenFilesQueryResult =
+                homeScreenFilesProvider.onReady()
+                    .thenCompose((unused) -> mStopped
+                            ? CompletableFuture.completedFuture(Collections.emptyMap())
+                            : homeScreenFilesProvider.query());
     }
 
     private synchronized void verifyNotStopped() throws CancellationException {
@@ -268,6 +289,7 @@ public class LoaderTask implements Runnable {
     private void loadAllSurfacesOrdered(
             LoaderMemoryLogger memoryLogger, LauncherRestoreEventLogger restoreEventLogger) {
 
+        IconCacheUpdateHandler updateHandler = mIconCache.getUpdateHandler();
         List<CacheableShortcutInfo> allShortcuts = new ArrayList<>();
         Trace.beginSection("LoadWorkspace");
         try {
@@ -295,6 +317,21 @@ public class LoaderTask implements Runnable {
         mLauncherBinder.bindWorkspace(true /* incrementBindId */, /* isBindSync= */ false);
         logASplit("bindWorkspace finished");
 
+        // NOTE: Model task must be enqueued after the loader has finished. Since MODEL_EXECUTOR
+        // runs the task immediately if the caller is on the same thread, using a different executor
+        // (THREAD_POOL_EXECUTOR) ensures the task runs after the current code-block is complete.
+        final CompletableFuture<Void> unused =
+                mHomeScreenFilesQueryResult.thenRunAsync(() ->
+                    mModel.enqueueModelUpdateTask(
+                            mHomeScreenFilesUpdateTask.create(
+                                    new HomeScreenFilesUpdate(
+                                            mHomeScreenFilesQueryResult,
+                                            Process.myUserHandle(),
+                                            HomeScreenFilesUpdate.Extras.builder()
+                                                    .isDelayedInit(true)
+                                                    .build()))),
+                    THREAD_POOL_EXECUTOR);
+
         if (!mParams.getLoadNonWorkspaceItems()) {
             logASplit("Skipping remaining items");
             return;
@@ -304,8 +341,6 @@ public class LoaderTask implements Runnable {
         // Notify the installer packages of packages with active installs on the first screen.
         sendFirstScreenActiveInstallsBroadcast();
 
-        // Take a break
-        waitForIdle();
         logASplit("step 1 loading workspace complete");
         verifyNotStopped();
 
@@ -324,7 +359,6 @@ public class LoaderTask implements Runnable {
         logASplit("bindAllApps finished");
 
         verifyNotStopped();
-        IconCacheUpdateHandler updateHandler = mIconCache.getUpdateHandler();
         setIgnorePackages(updateHandler);
         updateHandler.updateIcons(allActivityList,
                 LauncherActivityCachingLogic.INSTANCE,
@@ -336,8 +370,6 @@ public class LoaderTask implements Runnable {
         updateHandler.updateIcons(allShortcuts, CacheableShortcutCachingLogic.INSTANCE,
                 mModel::onPackageIconsUpdated);
 
-        // Take a break
-        waitForIdle();
         logASplit("step 2 loading AllApps complete");
         verifyNotStopped();
 
@@ -352,8 +384,6 @@ public class LoaderTask implements Runnable {
                 CacheableShortcutCachingLogic.INSTANCE,
                 (pkgs, user) -> { });
 
-        // Take a break
-        waitForIdle();
         logASplit("step 3 loading all shortcuts complete");
         verifyNotStopped();
 
@@ -393,20 +423,15 @@ public class LoaderTask implements Runnable {
         TraceHelper.INSTANCE.beginSection(TAG);
         MODEL_EXECUTOR.elevatePriority(CALLER_LOADER_TASK);
         LoaderMemoryLogger memoryLogger = new LoaderMemoryLogger();
-        mIsRestoreFromBackup =
-                LauncherPrefs.get(mContext).get(IS_FIRST_LOAD_AFTER_RESTORE);
-        LauncherRestoreEventLogger restoreEventLogger = null;
-        if (enableLauncherBrMetricsFixed()) {
-            restoreEventLogger = mRestoreEventLoggerProvider.get();
-        }
+        LauncherRestoreEventLogger restoreEventLogger = mRestoreEventLoggerProvider.get();
+
         try (LauncherModel.LoaderTransaction transaction = mModel.beginLoader(this)) {
             loadAllSurfacesOrdered(memoryLogger, restoreEventLogger);
 
             transaction.commit();
             memoryLogger.clearLogs();
             if (mIsRestoreFromBackup) {
-                mIsRestoreFromBackup = false;
-                LauncherPrefs.get(mContext).putSync(IS_FIRST_LOAD_AFTER_RESTORE.to(false));
+                mPrefs.putSync(IS_FIRST_LOAD_AFTER_RESTORE.to(false));
                 if (restoreEventLogger != null) {
                     restoreEventLogger.reportLauncherRestoreResults();
                 }
@@ -422,9 +447,9 @@ public class LoaderTask implements Runnable {
         TraceHelper.INSTANCE.endSection();
     }
 
-    public synchronized void stopLocked() {
-        FileLog.w(TAG, "stopLocked: Loader stopping");
+    public synchronized void stopLocked(String callerName) {
         mStopped = true;
+        FileLog.w(TAG, "stopLocked: Loader [" + name + "] stopping be caller: " + callerName);
         this.notify();
     }
 
@@ -445,7 +470,9 @@ public class LoaderTask implements Runnable {
         }
 
         Log.d(TAG, "loadWorkspace: loading default favorites if necessary");
-        dbController.loadDefaultFavoritesIfNecessary();
+        if (dbController.loadDefaultFavoritesIfNecessary()) {
+            mPrefs.put(PREF_MIGRATION_PENDING, true);
+        }
 
         synchronized (mBgDataModel) {
             mBgDataModel.clear();
@@ -462,8 +489,7 @@ public class LoaderTask implements Runnable {
 
             mShortcutKeyToPinnedShortcuts = new HashMap<>();
             final LoaderCursor c = mLoaderCursorFactory.createLoaderCursor(
-                    dbController.query(null, selection, null,
-                            LauncherDbUtils.getLoaderCursorQuerySortOrder()),
+                    dbController.query(null, selection, null, null),
                     mUserManagerState,
                     mIsRestoreFromBackup ? restoreEventLogger : null);
             final Bundle extras = c.getExtras();
@@ -479,14 +505,13 @@ public class LoaderTask implements Runnable {
                         mShortcutKeyToPinnedShortcuts, mContext, mIDP, mIconCache,
                         mIsSafeModeEnabled, installingPkgs, isSdCardReady, widgetInflater,
                         mPmHelper, mWorkspaceIconRequestInfos, unlockedUsers, allDeepShortcuts,
-                        mWidgetSizeHandler, mWorkspaceItemSpaceFinder, mHomeScreenFilesQueryResult);
+                        mWidgetSizeHandler, mWorkspaceItemSpaceFinder, mHomeScreenFilesQueryResult,
+                        mAutomationRepo);
 
                 if (mStopped) {
                     Log.w(TAG, "loadWorkspaceImpl: Loader stopped, skipping item processing");
                 } else {
-                    if (Flags.injectableModelItems()) {
-                        itemProcessor.processPreloadedItems(mExtraItemsProvider.get());
-                    }
+                    itemProcessor.processPreloadedItems(mExtraItemsProvider.get());
                     while (!mStopped && c.moveToNext()) {
                         itemProcessor.processItem();
                     }
@@ -503,8 +528,16 @@ public class LoaderTask implements Runnable {
             }
 
             mBgDataModel.updateStringCache(mContext);
-            mBgDataModel.dataLoadComplete(
-                    itemProcessor.finalizeData(mModelDelegate, mModel.getModelDbController()));
+
+            var loadedItems =
+                    itemProcessor.finalizeData(mModelDelegate, mModel.getModelDbController());
+            if (mIsRestoreFromBackup || mPrefs.get(PREF_MIGRATION_PENDING)) {
+                mBrowserIconMigratorFactory
+                        .createBrowserIconMigrator(loadedItems,
+                                mModelTaskController.getModelWriter()).performMigration();
+            }
+
+            mBgDataModel.dataLoadComplete(loadedItems, name /* reason */);
         }
     }
 
@@ -635,7 +668,7 @@ public class LoaderTask implements Runnable {
             for (int i = 0; i < apps.size(); i++) {
                 LauncherActivityInfo app = apps.get(i);
                 AppInfo appInfo = new AppInfo(app, cachedUserInfo,
-                        ApiWrapper.INSTANCE.get(mContext), mPmHelper);
+                        ApiWrapper.INSTANCE.get(mContext), mPmHelper, mAutomationRepo);
                 if (Flags.enableSupportForArchiving() && app.getApplicationInfo().isArchived) {
                     // For archived apps, include progress info in case there is a pending
                     // install session post restart of device.
@@ -795,6 +828,6 @@ public class LoaderTask implements Runnable {
     public interface LoaderTaskFactory {
 
         /** Creates a new LoaderTask */
-        LoaderTask newLoaderTask(BaseLauncherBinder binder);
+        LoaderTask newLoaderTask(String callerName, BaseLauncherBinder binder);
     }
 }

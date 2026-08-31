@@ -18,8 +18,6 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
-import static com.android.launcher3.Flags.refactorTaskbarUiState;
-
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -108,7 +106,7 @@ public class BubbleStashedHandleViewController {
         // Use the max translation for bubble bar whether it is on the home screen or in app.
         // Use values directly from device profile to avoid referencing other bubble controllers
         // during init flow.
-        int maxTy = Math.max(deviceProfile.hotseatBarBottomSpacePx,
+        int maxTy = Math.max(deviceProfile.getHotseatProfile().getBarBottomSpacePx(),
                 deviceProfile.getTaskbarProfile().getBottomMargin());
         // Adjust handle view size to accommodate the handle morphing into the bubble bar
         mStashedHandleView.getLayoutParams().height = barSize + maxTy;
@@ -117,11 +115,9 @@ public class BubbleStashedHandleViewController {
 
         mStashedBubbleBarHeight = resources.getDimensionPixelSize(
                 R.dimen.bubblebar_stashed_size);
-        if (refactorTaskbarUiState()) {
-            mTaskbarUiState.setIsStashedHandlerViewVisible(
-                    mStashedHandleView.getVisibility() == VISIBLE);
-            mTaskbarUiState.setStashedBubbleBarHeightPx(mStashedBubbleBarHeight);
-        }
+        mTaskbarUiState.setIsBubbleBarStashedHandlerViewVisible(
+                mStashedHandleView.getVisibility() == VISIBLE);
+        mTaskbarUiState.setStashedBubbleBarHeightPx(mStashedBubbleBarHeight);
 
         mStashedHandleView.setOutlineProvider(new ViewOutlineProvider() {
             @Override
@@ -142,20 +138,23 @@ public class BubbleStashedHandleViewController {
                     public Rect getSampledRegion(View sampledView) {
                         return mStashedHandleView.getSampledRegion();
                     }
-                }, Executors.MAIN_EXECUTOR, Executors.UI_HELPER_EXECUTOR);
+                }, Executors.getTaskbarUiThread(), Executors.UI_HELPER_EXECUTOR);
 
         mStashedHandleView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) -> {
-                    updateBounds(mBarViewController.getBubbleBarLocation());
-                    if (refactorTaskbarUiState()) {
-                        mTaskbarUiState.setIsStashedHandlerViewVisible(
-                                view.getVisibility() == VISIBLE);
-                    }
-                });
+            updateBounds(mBarViewController.getBubbleBarLocation());
+            mTaskbarUiState.setIsBubbleBarStashedHandlerViewVisible(
+                    view.getVisibility() == VISIBLE);
+        });
     }
 
     /** Returns the [PhysicsAnimator] for the stashed handle view. */
     public PhysicsAnimator<View> getPhysicsAnimator() {
         return PhysicsAnimator.getInstance(mStashedHandleView);
+    }
+
+    /** Updates the handle bounds. */
+    public void updateBounds() {
+        updateBounds(mBarViewController.getBubbleBarLocation());
     }
 
     private void updateBounds(BubbleBarLocation bubbleBarLocation) {
@@ -177,8 +176,8 @@ public class BubbleStashedHandleViewController {
                 stashedCenterX + mStashedHandleWidth / 2,
                 stashedCenterY + mStashedHandleHeight / 2
         );
-        if (refactorTaskbarUiState() && mTaskbarUiState != null) {
-            mTaskbarUiState.setStashedHandlerViewRect(mStashedHandleBounds);
+        if (mTaskbarUiState != null) {
+            mTaskbarUiState.setBubbleBarStashedHandleViewRect(mStashedHandleBounds);
         }
         mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
         mStashedHandleView.setPivotX(stashedCenterX);

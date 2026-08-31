@@ -51,6 +51,7 @@ abstract class AbstractNavButtonLayoutter(
     protected val startContextualContainer: ViewGroup,
     protected val imeSwitcher: ImageView?,
     protected val a11yButton: ImageView?,
+    protected val moreOptionsButton: ImageView?,
     protected val space: Space?,
     protected val backButton: ImageView? = navButtonContainer.findViewById(R.id.back),
     protected val homeButton: ImageView? = navButtonContainer.findViewById(R.id.home),
@@ -119,14 +120,15 @@ abstract class AbstractNavButtonLayoutter(
         contextualContainer.layoutParams = contextualContainerParams
     }
 
+    fun isFlipEnabledBySetting(): Boolean {
+        return SettingsCache.INSTANCE.get(navButtonContainer.context).getValue(NAVBAR_KEY_ORDER_URI)
+    }
+
     /** For ordered layouts, this determines if the order of buttons should be flipped. */
     open fun shouldFlipButtonOrder(): Boolean {
-        val isFlipEnabledBySetting =
-            android.view.accessibility.Flags.navbarFlipOrderOption() &&
-                SettingsCache.INSTANCE.get(navButtonContainer.context)
-                    .getValue(NAVBAR_KEY_ORDER_URI)
-
-        return Utilities.isRtl(resources) xor isFlipEnabledBySetting
+        // Default behavior for layoutters is to only flip via a change to settings.
+        // RTL locales already flip the layout, so no need to flip the button order an extra time.
+        return isFlipEnabledBySetting()
     }
 
     /**

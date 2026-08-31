@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.model.data.ItemInfo;
@@ -45,9 +46,17 @@ public class LauncherPopupLiveUpdateHandler extends PopupLiveUpdateHandler<Launc
 
     @Override
     public void onWidgetsBound() {
-        BubbleTextView originalIcon = mPopupContainerWithArrow.getOriginalIcon();
-        SystemShortcut widgetInfo = SystemShortcut.WIDGETS.getShortcut(mContext,
-                (ItemInfo) originalIcon.getTag(), originalIcon);
+        if (Flags.expandableLongPressMenu()) {
+            return;
+        }
+
+        View originalIcon = mPopupContainerWithArrow.getOriginalIcon();
+        if (!(originalIcon instanceof BubbleTextView
+                && originalIcon.getTag() instanceof ItemInfo info)) {
+            return;
+        }
+        SystemShortcut widgetInfo = SystemShortcut.WIDGETS.getShortcut(mContext, info,
+                originalIcon);
         View widgetsView = getWidgetsView(mPopupContainerWithArrow);
         if (widgetsView == null && mPopupContainerWithArrow.getWidgetContainer() != null) {
             widgetsView = getWidgetsView(mPopupContainerWithArrow.getWidgetContainer());

@@ -24,16 +24,18 @@ import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
 import android.util.SparseArray
 import android.view.View
+import androidx.core.util.containsValue
 import androidx.core.util.size
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
-import com.android.launcher3.taskbar.customization.TASKBAR_OVERFLOW_PIN_LIMIT
+import com.android.launcher3.popup.PinToTaskbarShortcut
+import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnTaskbarUiThreadSync
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
-import com.android.launcher3.util.LauncherMultivalentJUnit
-import com.android.launcher3.util.TestUtil.getOnUiThread
+import com.android.launcher3.util.TestUtil.getOnTaskbarUiThread
 import com.android.window.flags.Flags.FLAG_ENABLE_OVERFLOW_BUTTON_FOR_TASKBAR_PINNED_ITEMS
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
@@ -49,23 +51,26 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 /** Tests for [PinToTaskbarShortcut]. */
-@RunWith(LauncherMultivalentJUnit::class)
+@RunWith(AndroidJUnit4::class)
 class PinToTaskbarShortcutTest {
     @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
 
     @get:Rule(order = 1) val context = TaskbarWindowSandboxContext.create()
 
-    @get:Rule(order = 2) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 2) val taskbarUnitTestRule = TaskbarUnitTestRule(context)
 
     private val taskbarActivityContext: TaskbarActivityContext
         get() = taskbarUnitTestRule.activityContext
+
+    private val maxPinnableCount
+        get() = taskbarActivityContext.taskbarSpecsEvaluator.maxPinnableCount
 
     private val pinnedInfoList = SparseArray<ItemInfo?>()
     private lateinit var view: View
 
     @Before
     fun setUp() {
-        runOnMainSync { view = View(taskbarActivityContext) }
+        runOnTaskbarUiThreadSync { view = View(taskbarActivityContext) }
     }
 
     @Test
@@ -75,9 +80,28 @@ class PinToTaskbarShortcutTest {
         val shortcut = createShortcut(false, pinnedInfoList[0] ?: ItemInfo())
         mockUnpinItem(shortcut)
 
-        runOnMainSync { shortcut.onClick(null) }
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
 
         verify(shortcut).unpinItem(anyOrNull(), anyOrNull())
+        assertThat(pinnedInfoList.size).isEqualTo(0)
+    }
+
+    @Test
+    fun testUnpin_triggeredFromTaskbar_directlyRemovesTaskbarItem() {
+        populatePinnedInfoList(0)
+        assertThat(pinnedInfoList.size).isEqualTo(1)
+
+        // Simulate item clicked directly on the taskbar
+        val taskbarItem = pinnedInfoList[0]!!
+        taskbarItem.container = Favorites.CONTAINER_HOTSEAT
+
+        val shortcut = createShortcut(false, taskbarItem)
+        mockUnpinItem(shortcut)
+
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
+
+        // Verify it unpins the clicked taskbar item directly
+        verify(shortcut).unpinItem(anyOrNull(), eq(taskbarItem))
         assertThat(pinnedInfoList.size).isEqualTo(0)
     }
 
@@ -89,7 +113,7 @@ class PinToTaskbarShortcutTest {
         val shortcut = createShortcut(true, newItemInfo)
         mockPinItem(shortcut)
 
-        runOnMainSync { shortcut.onClick(null) }
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
 
         verify(shortcut).pinItem(anyOrNull(), anyOrNull(), any(), eq(3), any())
         assertThat(pinnedInfoList.size).isEqualTo(4)
@@ -109,7 +133,7 @@ class PinToTaskbarShortcutTest {
         val shortcut = createShortcut(true, newItemInfo)
         mockPinItem(shortcut)
 
-        runOnMainSync { shortcut.onClick(null) }
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
 
         // The pinned items are compacted and the new item is pinned to the end
         verify(shortcut).pinItem(anyOrNull(), anyOrNull(), any(), eq(3), any())
@@ -125,7 +149,7 @@ class PinToTaskbarShortcutTest {
         val shortcut = createShortcut(true, newItemInfo)
         mockPinItem(shortcut)
 
-        runOnMainSync { shortcut.onClick(null) }
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
 
         verify(shortcut).pinItem(anyOrNull(), anyOrNull(), any(), eq(0), any())
         assertThat(pinnedInfoList.size).isEqualTo(1)
@@ -135,17 +159,41 @@ class PinToTaskbarShortcutTest {
     @Test
     @EnableFlags(FLAG_ENABLE_OVERFLOW_BUTTON_FOR_TASKBAR_PINNED_ITEMS)
     fun testPin_withOverflow_pinsToNextAvailableIndex() {
-        populatePinnedInfoList(2, TASKBAR_OVERFLOW_PIN_LIMIT - 1)
+        populatePinnedInfoList(
+            2,
+            taskbarActivityContext.deviceProfile.inv.numDatabaseHotseatIcons - 1,
+        )
         val newItemInfo = createItemInfoToPin()
         val shortcut = createShortcut(true, newItemInfo)
         mockPinItem(shortcut)
 
-        runOnMainSync { shortcut.onClick(null) }
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
 
         // The new item should be pinned to index 2, as it's the first available slot.
         verify(shortcut).pinItem(anyOrNull(), anyOrNull(), any(), eq(2), any())
         assertThat(pinnedInfoList.size).isEqualTo(3)
         assertThat(pinnedInfoList[2]?.targetComponent).isEqualTo(newItemInfo.componentName)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_OVERFLOW_BUTTON_FOR_TASKBAR_PINNED_ITEMS)
+    fun testPin_overflowLimit_showsToast() {
+        // Fill the pinned list to the maximum capacity
+        val positions = IntArray(maxPinnableCount) { it }
+        populatePinnedInfoList(*positions)
+        assertThat(pinnedInfoList.size).isEqualTo(maxPinnableCount)
+
+        // Attempt to pin one more item
+        val newItemInfo = createItemInfoToPin()
+        val shortcut = createShortcut(true, newItemInfo)
+        mockPinItem(shortcut)
+
+        runOnTaskbarUiThreadSync { shortcut.onClick(null) }
+
+        // Verify that the error message is shown and no new item is pinned
+        verify(shortcut).showNoSpaceMessage(any())
+        assertThat(pinnedInfoList.size).isEqualTo(maxPinnableCount)
+        assertThat(pinnedInfoList.containsValue(newItemInfo.makeWorkspaceItem(context))).isFalse()
     }
 
     private fun createItemInfoToPin(): AppInfo {
@@ -160,8 +208,17 @@ class PinToTaskbarShortcutTest {
         isPin: Boolean,
         itemInfo: ItemInfo,
     ): PinToTaskbarShortcut<TaskbarActivityContext> {
-        return getOnUiThread {
-            spy(PinToTaskbarShortcut(taskbarActivityContext, itemInfo, view, isPin, pinnedInfoList))
+        return getOnTaskbarUiThread {
+            spy(
+                PinToTaskbarShortcut(
+                    taskbarActivityContext,
+                    itemInfo,
+                    view,
+                    isPin,
+                    maxPinnableCount,
+                    pinnedInfoList,
+                )
+            )
         }
     }
 
@@ -181,7 +238,7 @@ class PinToTaskbarShortcutTest {
 
     private fun mockPinItem(shortcut: PinToTaskbarShortcut<TaskbarActivityContext>) {
         doAnswer {
-                runOnMainSync {
+                runOnTaskbarUiThreadSync {
                     val newInfo = it.getArgument<WorkspaceItemInfo>(1)
                     val cellX = it.getArgument<Int>(3)
                     pinnedInfoList.put(cellX, newInfo)
@@ -194,7 +251,7 @@ class PinToTaskbarShortcutTest {
 
     private fun mockUnpinItem(shortcut: PinToTaskbarShortcut<TaskbarActivityContext>) {
         doAnswer {
-                runOnMainSync {
+                runOnTaskbarUiThreadSync {
                     val infoToUnpin = it.getArgument<ItemInfo>(1)
                     for (i in 0 until pinnedInfoList.size) {
                         if (

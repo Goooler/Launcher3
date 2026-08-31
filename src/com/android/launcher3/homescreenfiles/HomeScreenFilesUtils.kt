@@ -20,30 +20,74 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
+import com.android.launcher3.Flags.enableHomeScreenFilesTrashing
 import com.android.launcher3.Flags.showFilesOnHomeScreen
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FILE
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FOLDER
+import com.android.launcher3.model.data.ItemInfo
+import com.android.providers.media.flags.Flags.enableTrashAndRestoreByFilePathApi
 
 /** Other utility methods related to managing files on the home screen. */
 class HomeScreenFilesUtils {
     companion object {
+        const val LAUNCH_INTENT_DEFAULT_FLAGS =
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+
         /** Returns `true` if the feature to show files on the home screen is enabled. */
+        @JvmStatic
         val isFeatureEnabled: Boolean by lazy {
             showFilesOnHomeScreen() && Environment.isExternalStorageManager()
         }
 
+        /** Returns `true` if the "Move to trash" feature is enabled. */
+        fun isTrashingEnabled() =
+            enableHomeScreenFilesTrashing() && enableTrashAndRestoreByFilePathApi()
+
+        /** Returns the appropriate item type for the given [homeScreenFile]. */
+        fun buildItemType(homeScreenFile: HomeScreenFile) =
+            if (homeScreenFile.isDirectory) {
+                ITEM_TYPE_FILE_SYSTEM_FOLDER
+            } else {
+                ITEM_TYPE_FILE_SYSTEM_FILE
+            }
+
         /**
          * Creates an [Intent] to open [homeScreenFile] in the app associated with its MIME type.
          */
-        fun buildLaunchIntent(uri: Uri, homeScreenFile: HomeScreenFile) =
+        @JvmOverloads
+        fun buildLaunchIntent(uri: Uri, homeScreenFile: HomeScreenFile? = null) =
             Intent(Intent.ACTION_VIEW).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+                addFlags(LAUNCH_INTENT_DEFAULT_FLAGS)
                 setDataAndType(
                     uri,
-                    if (homeScreenFile.isDirectory) MIME_TYPE_DIR else homeScreenFile.mimeType,
+                    if (homeScreenFile?.isDirectory == true) MIME_TYPE_DIR
+                    else homeScreenFile?.mimeType,
                 )
             }
     }
 }
+
+/** Creates a [HomeScreenFile] from [ItemInfo]. */
+val ItemInfo.homeScreenFile: HomeScreenFile?
+    get() {
+        return if (isFileSystemItem()) {
+            HomeScreenFile(
+                uri = requireNotNull(requireNotNull(intent).data),
+                displayName = title?.toString() ?: "",
+                mimeType = requireNotNull(intent).type,
+                isDirectory = itemType == ITEM_TYPE_FILE_SYSTEM_FOLDER,
+                user = user,
+            )
+        } else null
+    }
+
+/** Returns whether an [ItemInfo] represents a file system item. */
+fun ItemInfo.isFileSystemItem(): Boolean = isFileSystemFileItem() || isFileSystemFolderItem()
+
+/** Returns whether an [ItemInfo] represents a file system file. */
+fun ItemInfo.isFileSystemFileItem(): Boolean = itemType == ITEM_TYPE_FILE_SYSTEM_FILE
+
+/** Returns whether an [ItemInfo] represents a file system folder. */
+fun ItemInfo.isFileSystemFolderItem(): Boolean = itemType == ITEM_TYPE_FILE_SYSTEM_FOLDER

@@ -25,7 +25,7 @@ import android.util.ArrayMap;
 import android.view.DisplayInfo;
 import android.view.WindowInsets;
 
-import com.android.launcher3.util.DisplayController.Info;
+import com.android.launcher3.display.LauncherDisplayInfo;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.SandboxApplication;
 import com.android.launcher3.util.WindowBounds;
@@ -43,9 +43,9 @@ public class TestWindowManagerProxy extends WindowManagerProxy {
 
     private DeviceEmulationData mDevice;
 
-    private boolean mIsInDesktopMode;
-
     private NavigationMode mNavigationMode;
+
+    private boolean mShowDesktopTaskbarForFreeformDisplay;
 
 
     /**
@@ -55,8 +55,8 @@ public class TestWindowManagerProxy extends WindowManagerProxy {
      * DisplayController
      */
     public TestWindowManagerProxy(Context context) {
-        this(DeviceEmulationData.Companion.getCurrentDeviceData(context, new Info(context,
-                new WindowManagerProxy())));
+        this(DeviceEmulationData.Companion.getCurrentDeviceData(context,
+                new LauncherDisplayInfo(context, new WindowManagerProxy())));
     }
 
     public TestWindowManagerProxy(DeviceEmulationData device) {
@@ -157,16 +157,17 @@ public class TestWindowManagerProxy extends WindowManagerProxy {
         return result;
     }
 
-    @Override
-    public boolean isInDesktopMode(int displayId) {
-        return mIsInDesktopMode;
-    }
-
-    public void setInDesktopMode(boolean isInDesktopMode) {
-        mIsInDesktopMode = isInDesktopMode;
-    }
-
     public void setDevice(DeviceEmulationData device) {
         mDevice = device;
+    }
+
+    @Override
+    public boolean showDesktopTaskbarForFreeformDisplay(Context displayInfoContext) {
+        return mShowDesktopTaskbarForFreeformDisplay;
+    }
+
+    public void setShowDesktopTaskbarForFreeformDisplay(
+            boolean showDesktopTaskbarForFreeformDisplay) {
+        mShowDesktopTaskbarForFreeformDisplay = showDesktopTaskbarForFreeformDisplay;
     }
 }

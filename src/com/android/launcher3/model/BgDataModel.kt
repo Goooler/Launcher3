@@ -25,18 +25,20 @@ import android.util.SparseArray
 import androidx.annotation.AnyThread
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.Flags
-import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_GROUP
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.logging.DumpManager
 import com.android.launcher3.logging.DumpManager.LauncherDumpable
 import com.android.launcher3.logging.FileLog
+import com.android.launcher3.model.BgDataModel.ModificationSource.ModelTask
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.model.data.PredictedContainerInfo
 import com.android.launcher3.model.data.WorkspaceChangeEvent.AddEvent
+import com.android.launcher3.model.data.WorkspaceChangeEvent.FullRefresh
 import com.android.launcher3.model.data.WorkspaceChangeEvent.RemoveEvent
 import com.android.launcher3.model.data.WorkspaceChangeEvent.UpdateEvent
 import com.android.launcher3.model.data.WorkspaceData
@@ -52,6 +54,7 @@ import com.android.launcher3.util.Executors
 import com.android.launcher3.util.IntSparseArrayMap
 import com.android.launcher3.util.ItemInfoMatcher
 import com.android.launcher3.util.PackageUserKey
+import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.widget.model.WidgetsListBaseEntry
 import java.io.PrintWriter
 import java.util.Collections
@@ -112,6 +115,7 @@ constructor(
     fun clear() {
         deepShortcutMap = emptyMap()
         extraItems.clear()
+        mutableWorkspaceData.replaceDataMap(SparseArray())
     }
 
     @Synchronized
@@ -126,17 +130,11 @@ constructor(
     }
 
     @Synchronized
-    fun removeItem(context: Context, vararg items: ItemInfo) {
-        removeItem(context, listOf(*items))
-    }
-
-    @Synchronized
-    @JvmOverloads
-    fun removeItem(context: Context, items: Collection<ItemInfo>, owner: Any? = null) {
+    fun removeItems(context: Context, items: List<ItemInfo>, owner: ModificationSource) {
         if (BuildConfig.IS_STUDIO_BUILD) {
             items
                 .asSequence()
-                .filter { it.itemType == ITEM_TYPE_FOLDER || it.itemType == ITEM_TYPE_APP_PAIR }
+                .filter { it.itemType == ITEM_TYPE_FOLDER || it.itemType == ITEM_TYPE_APP_GROUP }
                 .forEach { item: ItemInfo ->
 
                     // We are deleting a collection which still contains items that think they are
@@ -170,14 +168,8 @@ constructor(
             .forEach { updateShortcutPinnedState(context, it) }
     }
 
-    @JvmOverloads
-    fun addItem(context: Context, item: ItemInfo, owner: Any? = null) {
-        addItems(context, listOf(item), owner)
-    }
-
     @Synchronized
-    @JvmOverloads
-    fun addItems(context: Context, items: List<ItemInfo>, owner: Any? = null) {
+    fun addItems(context: Context, items: List<ItemInfo>, owner: ModificationSource) {
         mutableWorkspaceData.modifyItems { items.forEach { put(it.id, it) } }
 
         if (Flags.modelRepository()) {
@@ -193,33 +185,41 @@ constructor(
     }
 
     @Synchronized
-    fun updateAndDispatchItem(item: ItemInfo, owner: Any?) {
+    fun updateAndDispatchItem(item: ItemInfo, owner: ModificationSource) {
         mutableWorkspaceData.modifyItems { put(item.id, item) }
         if (Flags.modelRepository()) {
             repo
                 .get()
                 .dispatchWorkspaceDataChange(
                     mutableWorkspaceData.copy(),
-                    UpdateEvent(listOf(item), owner),
+                    UpdateEvent(setOf(item), owner),
                 )
         }
     }
 
     @Synchronized
-    fun updateItems(items: List<ItemInfo>, owner: Any?) {
+    fun updateItems(items: List<ItemInfo>, owner: ModificationSource) {
         mutableWorkspaceData.modifyItems {}
         if (Flags.modelRepository()) {
             repo
                 .get()
-                .dispatchWorkspaceDataChange(mutableWorkspaceData.copy(), UpdateEvent(items, owner))
+                .dispatchWorkspaceDataChange(
+                    mutableWorkspaceData.copy(),
+                    UpdateEvent(items.toSet(), owner),
+                )
         }
     }
 
     @Synchronized
-    fun dataLoadComplete(allItems: SparseArray<ItemInfo>) {
+    fun dataLoadComplete(allItems: SparseArray<ItemInfo>, reason: String) {
         mutableWorkspaceData.replaceDataMap(allItems)
+        dispatchRebind(reason)
+    }
+
+    @Synchronized
+    fun dispatchRebind(reason: String) {
         if (Flags.modelRepository()) {
-            repo.get().dispatchWorkspaceDataChange(mutableWorkspaceData.copy(), null)
+            repo.get().dispatchWorkspaceDataChange(mutableWorkspaceData.copy(), FullRefresh(reason))
         }
     }
 
@@ -236,7 +236,6 @@ constructor(
     /** Reloads the [stringCache] */
     fun updateStringCache(context: Context) {
         stringCache = StringCache.fromContext(context)
-        if (Flags.modelRepository()) repo.get().dispatchStringCacheChange(stringCache)
     }
 
     fun notifyWidgetsUpdate(allWidgets: List<WidgetsListBaseEntry>) {
@@ -400,7 +399,7 @@ constructor(
             }
             .apply {
                 // Dispatch an update
-                if (isNotEmpty()) updateItems(this, null)
+                if (isNotEmpty()) updateItems(this, ModelTask)
             }
 
     /** An object containing items corresponding to a fixed container */
@@ -417,37 +416,54 @@ constructor(
          * Does a complete model rebind. The callback can be called on any thread and it is up to
          * the client to move the executor to appropriate thread
          */
+        // Migrated to repository
         @AnyThread
         fun bindCompleteModelAsync(itemIdMap: WorkspaceData, isBindingSync: Boolean) {
             Executors.MAIN_EXECUTOR.execute { bindCompleteModel(itemIdMap, isBindingSync) }
         }
 
+        // Migrated to repository
         fun bindCompleteModel(itemIdMap: WorkspaceData, isBindingSync: Boolean) {}
 
+        // Migrated to repository
         fun bindItemsAdded(items: List<@JvmSuppressWildcards ItemInfo>) {}
 
+        // Migrated to repository
         /** Called when a runtime property of the ItemInfo is updated due to some system event */
         fun bindItemsUpdated(updates: Set<@JvmSuppressWildcards ItemInfo>) {}
 
+        // Migrated to repository
         fun bindWorkspaceComponentsRemoved(matcher: Predicate<ItemInfo?>) {}
 
+        // Migrated to repository
         /** Binds updated incremental download progress */
         fun bindIncrementalDownloadProgressUpdated(app: AppInfo) {}
 
+        // Migrated to repository
         /** Binds the app widgets to the providers that share widgets with the UI. */
         fun bindAllWidgets(widgets: List<@JvmSuppressWildcards WidgetsListBaseEntry>) {}
 
         /** Binds extra item provided any external source */
+        // Migrated to repository
         fun bindExtraContainerItems(item: FixedContainerItems) {}
 
+        // Migrated to repository
         fun bindAllApplications(
             apps: Array<AppInfo>,
             flags: Int,
             packageUserKeytoUidMap: Map<PackageUserKey, Int>,
         ) {}
 
+        // Migrated to repository
         /** Binds the cache of string resources */
         fun bindStringCache(cache: StringCache) {}
+    }
+
+    sealed class ModificationSource {
+
+        data class UISurface(val surface: ActivityContext) : ModificationSource()
+
+        data object ModelTask : ModificationSource()
     }
 
     companion object {

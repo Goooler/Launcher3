@@ -20,14 +20,15 @@ import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.taskbar.TaskbarInteractor;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.fallback.RecentsState;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
@@ -48,11 +49,14 @@ public abstract class BaseWindowInterface extends
         BaseContainerInterface<RecentsState, RecentsWindowManager> {
 
     final String TAG = "BaseWindowInterface";
-    private RecentsState mTargetState;
+    @NonNull private RecentsState mTargetState;
 
 
-    protected BaseWindowInterface(RecentsState overviewState, RecentsState backgroundState) {
-        super(backgroundState);
+    protected BaseWindowInterface(
+            @NonNull RecentsState overviewState,
+            @NonNull RecentsState backgroundState,
+            @NonNull TaskAnimationManager taskAnimationManager) {
+        super(backgroundState, taskAnimationManager);
         mTargetState = overviewState;
     }
 
@@ -60,8 +64,12 @@ public abstract class BaseWindowInterface extends
     public abstract RecentsWindowManager getCreatedContainer();
 
     @Nullable
-    public DepthController getDepthController() {
-        return null;
+    public DepthController<RecentsState, RecentsWindowManager> getDepthController() {
+        RecentsWindowManager recentsWindowManager = getCreatedContainer();
+        if (recentsWindowManager == null) {
+            return null;
+        }
+        return recentsWindowManager.getDepthController();
     }
 
     public final boolean isResumed() {
@@ -107,6 +115,23 @@ public abstract class BaseWindowInterface extends
         return launcher != null && launcher.getWorkspace().isOverlayShown();
     }
 
+    @Override
+    public void updateDisallowBack() {
+        super.updateDisallowBack();
+        Launcher launcher = Launcher.ACTIVITY_TRACKER.getCreatedContext();
+        if (launcher == null) {
+            return;
+        }
+        launcher.updateDisallowBack();
+    }
+
+    @Override
+    public boolean shouldHandleBackGesture() {
+        RecentsWindowManager windowManager = getCreatedContainer();
+
+        return windowManager != null && windowManager.isStarted();
+    }
+
     /**
      * todo: Create an abstract animation factory to handle both activity and window implementations
      * todo: move new factory into BaseContainerInterface and cleanup.
@@ -140,7 +165,7 @@ public abstract class BaseWindowInterface extends
         }
 
         @Override
-        public void createContainerInterface(long transitionLength) {
+        public void createContainerInterface(long transitionLength, boolean runningOverHome) {
             PendingAnimation pa = new PendingAnimation(transitionLength * 2);
             createBackgroundToOverviewAnim(mRecentsWindowManager, pa);
             AnimatorPlaybackController controller = pa.createPlaybackController();
@@ -156,10 +181,16 @@ public abstract class BaseWindowInterface extends
 
             RecentsView recentsView = mRecentsWindowManager.getOverviewPanel();
             AnimatorControllerWithResistance controllerWithResistance =
-                    AnimatorControllerWithResistance.createForRecents(controller,
-                            mRecentsWindowManager, recentsView.getPagedViewOrientedState(),
-                            mRecentsWindowManager.getDeviceProfile(), recentsView,
-                            RECENTS_SCALE_PROPERTY, recentsView, TASK_SECONDARY_TRANSLATION);
+                    AnimatorControllerWithResistance.createForRecents(
+                            controller,
+                            mRecentsWindowManager,
+                            recentsView.getPagedViewOrientedState(),
+                            mRecentsWindowManager.getDeviceProfile(),
+                            recentsView,
+                            RECENTS_SCALE_PROPERTY,
+                            recentsView,
+                            TASK_SECONDARY_TRANSLATION,
+                            runningOverHome);
             mCallback.accept(controllerWithResistance);
 
             // Creating the activity controller animation sometimes reapplies the launcher state

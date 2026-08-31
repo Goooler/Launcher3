@@ -37,7 +37,7 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ContentWriter;
-import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
+import com.android.wm.shell.shared.bubbles.BubbleFlagHelper;
 
 import java.util.Arrays;
 
@@ -134,11 +134,9 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
     public WorkspaceItemInfo(ShortcutInfo shortcutInfo, Context context) {
         user = shortcutInfo.getUserHandle();
         itemType = Favorites.ITEM_TYPE_DEEP_SHORTCUT;
-        if (Flags.privateSpaceRestrictAccessibilityDrag()) {
-            if (UserCache.INSTANCE.get(context).getUserInfo(user).isPrivate()) {
-                runtimeStatusFlags |= FLAG_NOT_PINNABLE;
-            }
-        }
+        if (UserCache.INSTANCE.get(context).getUserInfo(user).isPrivate()) {
+            runtimeStatusFlags |= FLAG_NOT_PINNABLE;
+         }
         updateFromDeepShortcutInfo(shortcutInfo, context);
     }
 
@@ -192,7 +190,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
 
     public void updateFromDeepShortcutInfo(@NonNull final ShortcutInfo shortcutInfo,
             @NonNull final Context context) {
-        if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
+        if (BubbleFlagHelper.enableCreateAnyBubble()) {
             mShortcutInfo = shortcutInfo;
         }
         // {@link ShortcutInfo#getActivity} can change during an update. Recreate the intent

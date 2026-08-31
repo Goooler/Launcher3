@@ -44,7 +44,6 @@
     <attr name="workspaceKeyShadowColor" format="color" />
     <attr name="widgetsTheme" format="reference" />
     <attr name="iconOnlyShortcutColor" format="color" />
-    <attr name="eduHalfSheetBGColor" format="color" />
     <attr name="overviewScrimColor" format="color" />
     <attr name="overviewScrimColorFallback" format="color" />
     <attr name="overviewScrimColorBlur" format="color" />
@@ -81,26 +80,9 @@
     <attr name="dropTargetHoverButtonColor" format="color" />
     <attr name="preloadIconAccentColor" format="color" />
     <attr name="preloadIconBackgroundColor" format="color" />
-    <attr name="widgetPickerTitleColor" format="color"/>
-    <attr name="widgetPickerDescriptionColor" format="color"/>
-    <attr name="widgetPickerWidgetOptionsMenuColor" format="color"/>
-    <attr name="widgetPickerPrimarySurfaceColor" format="color"/>
-    <attr name="widgetPickerSecondarySurfaceColor" format="color"/>
     <attr name="widgetPickerHeaderAppTitleColor" format="color"/>
     <attr name="widgetPickerHeaderAppSubtitleColor" format="color"/>
-    <attr name="widgetPickerHeaderBackgroundColor" format="color"/>
-    <attr name="widgetPickerSuggestionsIconBackgroundColor" format="color"/>
-    <attr name="widgetPickerSuggestionsIconColor" format="color"/>
-    <attr name="widgetPickerTabBackgroundSelected" format="color"/>
-    <attr name="widgetPickerTabBackgroundUnselected" format="color"/>
     <attr name="widgetPickerSearchTextColor" format="color"/>
-    <attr name="widgetPickerSelectedTabTextColor" format="color"/>
-    <attr name="widgetPickerUnselectedTabTextColor" format="color"/>
-    <attr name="widgetPickerCollapseHandleColor" format="color"/>
-    <attr name="widgetPickerAddButtonBackgroundColor" format="color"/>
-    <attr name="widgetPickerAddButtonTextColor" format="color"/>
-    <attr name="widgetPickerExpandButtonBackgroundColor" format="color"/>
-    <attr name="widgetPickerExpandButtonTextColor" format="color"/>
     <attr name="widgetCellTitleColor" format="color" />
     <attr name="widgetCellSubtitleColor" format="color" />
 
@@ -298,10 +280,9 @@
         <attr name="isFixedLandscape" format="boolean" />
         <!-- By default all grid types are enabled -->
         <attr name="gridType" format="integer">
-            <!-- Enable on phone only -->
-            <flag name="one_grid" value="1" />
-            <!-- Enable on tablets only -->
-            <flag name="non_one_grid" value="2" />
+            <flag name="standard" value="1" />
+            <flag name="desktop_landscape_optimized_grid" value="4" />
+            <flag name="desktop_dual_optimized_grid" value="8" />
         </attr>
 
         <!-- By default all categories are enabled -->

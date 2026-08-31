@@ -33,8 +33,8 @@ import com.android.launcher3.util.LauncherModelHelper.SETTINGS_PACKAGE
 import com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY
 import com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY2
 import com.android.launcher3.util.LauncherModelHelper.TEST_PACKAGE
-import com.android.launcher3.util.LayoutResource
 import com.android.launcher3.util.ModelTestExtensions.countPersistedModelItems
+import com.android.launcher3.util.ModelTestExtensions.setModelLayout
 import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.TestUtil
 import com.google.common.truth.Truth.assertThat
@@ -51,7 +51,6 @@ class PackageIncrementalDownloadUpdatedTaskTest {
 
     @get:Rule val setFlagsRule = SetFlagsRule()
     @get:Rule val context = SandboxApplication().withModelDependency()
-    @get:Rule val layout = LayoutResource(context)
 
     private val modelState: TestableModelState
         get() = context.appComponent.testableModelState
@@ -59,7 +58,7 @@ class PackageIncrementalDownloadUpdatedTaskTest {
     @Before
     @Throws(Exception::class)
     fun setup() {
-        layout.set(
+        context.setModelLayout(
             LauncherLayoutBuilder()
                 .atWorkspace(0, 0, 1)
                 .putApp(TEST_PACKAGE, TEST_ACTIVITY) // 1
@@ -89,7 +88,7 @@ class PackageIncrementalDownloadUpdatedTaskTest {
                 incrementalUpdates.add(it)
             }
 
-            val workspaceUpdates = mutableListOf<WorkspaceChangeEvent?>()
+            val workspaceUpdates = mutableListOf<WorkspaceChangeEvent>()
             modelState.homeRepo.workspaceState.changes.forEach(MODEL_EXECUTOR) {
                 workspaceUpdates.add(it)
             }
@@ -108,8 +107,9 @@ class PackageIncrementalDownloadUpdatedTaskTest {
             // Only 2 items corresponding to test package got updated
             val update = workspaceUpdates[0] as UpdateEvent
             assertThat(update.items).hasSize(2)
-            assertThat(update.items[0].targetPackage).isEqualTo(TEST_PACKAGE)
-            assertThat(update.items[1].targetPackage).isEqualTo(TEST_PACKAGE)
+            val updatedItems = update.items.toList()
+            assertThat(updatedItems[0].targetPackage).isEqualTo(TEST_PACKAGE)
+            assertThat(updatedItems[1].targetPackage).isEqualTo(TEST_PACKAGE)
         }
     }
 }

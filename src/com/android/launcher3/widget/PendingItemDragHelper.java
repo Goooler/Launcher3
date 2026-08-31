@@ -47,6 +47,7 @@ import com.android.launcher3.icons.BaseIconFactory;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.RoundDrawableWrapper;
+import com.android.launcher3.icons.cache.CachedObjectCachingLogic;
 import com.android.launcher3.widget.DatabaseWidgetPreviewLoader.WidgetPreviewInfo;
 
 import java.util.Objects;
@@ -101,11 +102,10 @@ public class PendingItemDragHelper extends DragPreviewProvider {
     /**
      * Starts the drag for the pending item associated with the view.
      *
-     * @param previewBounds The bounds where the image was displayed,
-     *                      {@link WidgetImageView#getBitmapBounds()}
+     * @param previewBounds The bounds where the image was displayed
      * @param previewBitmapWidth The actual width of the bitmap displayed in the view.
-     * @param previewViewWidth The width of {@link WidgetImageView} displaying the preview
-     * @param screenPos Position of {@link WidgetImageView} on the screen
+     * @param previewViewWidth The width of the view displaying the preview
+     * @param screenPos Position of the view on the screen
      */
     public void startDrag(Rect previewBounds, int previewBitmapWidth, int previewViewWidth,
             Point screenPos, DragSource source, DragOptions options) {
@@ -202,27 +202,28 @@ public class PendingItemDragHelper extends DragPreviewProvider {
                 previewHeight = preview.getIntrinsicHeight();
             }
             scale = previewBounds.width() / (float) previewWidth;
-            launcher.getDragController().addDragListener(new WidgetHostViewLoader(launcher, mView));
+            launcher.getDragController().addDragSessionListener(
+                    new WidgetHostViewLoader(launcher, mView));
 
             dragRegion = null;
             draggableView = DraggableView.ofType(DraggableView.DRAGGABLE_WIDGET);
         } else {
             PendingAddShortcutInfo createShortcutInfo = (PendingAddShortcutInfo) mAddInfo;
-            Drawable icon = createShortcutInfo.getActivityInfo(launcher)
-                    .getFullResIcon(app.getIconCache());
+            Drawable icon = CachedObjectCachingLogic.loadFullResIcon(
+                    app.getIconCache(), createShortcutInfo.getActivityInfo(launcher));
             LauncherIcons li = LauncherIcons.obtain(launcher);
             preview = new FastBitmapDrawable(
                     li.createScaledBitmap(icon, BaseIconFactory.MODE_DEFAULT));
             previewWidth = preview.getIntrinsicWidth();
             previewHeight = preview.getIntrinsicHeight();
             li.recycle();
-            scale = ((float) launcher.getDeviceProfile().getWorkspaceIconProfile().getIconSizePx())
+            scale = ((float) launcher.getDeviceProfile().getWorkspaceProfile().getIconSizePx())
                     / previewWidth;
 
             // Create a preview same as the workspace cell size and draw the icon at the
             // appropriate position.
             DeviceProfile dp = launcher.getDeviceProfile();
-            int iconSize = dp.getWorkspaceIconProfile().getIconSizePx();
+            int iconSize = dp.getWorkspaceProfile().getIconSizePx();
 
             int padding = launcher.getResources()
                     .getDimensionPixelSize(R.dimen.widget_preview_shortcut_padding);
@@ -233,8 +234,8 @@ public class PendingItemDragHelper extends DragPreviewProvider {
             dragRegion.left = (mEstimatedCellSize[0] - iconSize) / 2;
             dragRegion.right = dragRegion.left + iconSize;
             dragRegion.top = (mEstimatedCellSize[1]
-                    - iconSize - dp.getWorkspaceIconProfile().getIconTextSizePx()
-                    - dp.getWorkspaceIconProfile().getIconDrawablePaddingPx()) / 2;
+                    - iconSize - dp.getWorkspaceProfile().getIconTextSizePx()
+                    - dp.getWorkspaceProfile().getIconDrawablePaddingPx()) / 2;
             dragRegion.bottom = dragRegion.top + iconSize;
             draggableView = DraggableView.ofType(DraggableView.DRAGGABLE_ICON);
         }

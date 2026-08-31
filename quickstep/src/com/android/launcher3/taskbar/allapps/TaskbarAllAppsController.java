@@ -19,6 +19,7 @@ import static com.android.launcher3.model.data.AppInfo.EMPTY_ARRAY;
 import static com.android.launcher3.taskbar.TaskbarDesktopExperienceFlags.enableCustomHeightForAllAppsOnCd;
 
 import android.content.res.Resources;
+import android.graphics.Rect;
 import android.view.Gravity;
 import android.view.View;
 
@@ -27,6 +28,8 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
+import com.android.launcher3.LauncherModel;
 import com.android.launcher3.R;
 import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.dragndrop.DragOptions.PreDragCondition;
@@ -41,6 +44,7 @@ import com.android.launcher3.views.BaseDragLayer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
 /**
  * Handles the all apps overlay window initialization, updates, and its data.
  * <p>
@@ -100,6 +104,7 @@ public final class TaskbarAllAppsController {
 
     /** Updates the current {@link AppInfo} instances. */
     public void setApps(@Nullable AppInfo[] apps, int flags, Map<PackageUserKey, Integer> map) {
+        if (LauncherModel.useModelRepositoryBinding()) return;
         mApps = apps == null ? EMPTY_ARRAY : apps;
         mAppsModelFlags = flags;
         mPackageUserKeytoUidMap = map;
@@ -154,6 +159,17 @@ public final class TaskbarAllAppsController {
         }
     }
 
+    /**
+     * Sets the slide-in progress of the all apps view.
+     *
+     * @param progress 1 is open, 0 is closed.
+     */
+    public void setSlideInProgress(float progress) {
+        if (mSlideInView != null) {
+            mSlideInView.setAnimationPlayFraction(progress);
+        }
+    }
+
     /** Returns {@code true} if All Apps is open. */
     public boolean isOpen() {
         return mSlideInView != null && mSlideInView.isOpen();
@@ -163,10 +179,19 @@ public final class TaskbarAllAppsController {
         show(animate, false);
     }
 
-    private void show(boolean animate, boolean showKeyboard) {
+    /**
+     * Shows the all apps view. If the all apps view is already open, this method does nothing.
+     *
+     * @param animate whether to animate the show ({@code false} if user-controlled or recreating)
+     * @param showKeyboard whether to show the keyboard when all apps is open
+     */
+    public void show(boolean animate, boolean showKeyboard) {
         if (mAppsView != null) {
             return;
         }
+        // Explicitly close the keyboard quick switch view to prevent it showing below the All
+        // apps view.
+        mControllers.keyboardQuickSwitchController.closeQuickSwitchView();
         mOverlayContext = mControllers.taskbarOverlayController.requestWindow();
 
         // Initialize search session for All Apps.
@@ -190,14 +215,15 @@ public final class TaskbarAllAppsController {
                     * dp.getDeviceProperties().getAvailableHeightPx());
             int allAppsHeight = (int) Math.ceil(dp.getAllAppsProfile().getCellHeightPx()
                     * mTaskbarAllAppsConnectedDisplayCustomHeightMultiple
-                    * dp.numShownAllAppsColumns);
+                    * dp.getAllAppsProfile().getNumShownAllAppsColumns());
 
             // If the desired height of all apps is greater than the limit then continue with
             // fullscreen all apps.
             if (allAppsHeight <= maxAllAppsHeight) {
                 BaseDragLayer.LayoutParams lp =
                         (BaseDragLayer.LayoutParams) mSlideInView.getLayoutParams();
-                lp.height = allAppsHeight;
+                Rect padding = dp.getAllAppsProfile().getPadding();
+                lp.height = allAppsHeight + padding.top + padding.bottom;
                 lp.gravity = Gravity.BOTTOM;
             }
         }
@@ -208,6 +234,7 @@ public final class TaskbarAllAppsController {
         mSlideInView.addOnCloseListener(this::cleanUpOverlay);
         TaskbarAllAppsViewController viewController = new TaskbarAllAppsViewController(
                 mOverlayContext,
+                mTaskbarUiState,
                 mSlideInView,
                 mControllers,
                 mSearchSessionController,
@@ -215,7 +242,9 @@ public final class TaskbarAllAppsController {
 
         viewController.show(animate);
         mAppsView = mOverlayContext.getAppsView();
-        mAppsView.getAppsStore().setApps(mApps, mAppsModelFlags, mPackageUserKeytoUidMap);
+        if (!LauncherModel.useModelRepositoryBinding()) {
+            mAppsView.getAppsStore().setApps(mApps, mAppsModelFlags, mPackageUserKeytoUidMap);
+        }
         mAppsView.getFloatingHeaderView()
                 .findFixedRowByType(PredictionRowView.class)
                 .setPredictedApps(mPredictedApps);
@@ -225,10 +254,12 @@ public final class TaskbarAllAppsController {
         // doesn't also close
         mOverlayContext.getDragController().setDisallowGlobalDrag(mDisallowGlobalDrag);
         mOverlayContext.getDragController().setDisallowLongClick(mDisallowLongClick);
-        mTaskbarUiState.setIsTaskbarAllAppsOpen(true);
     }
 
     private void cleanUpOverlay() {
+        if (Flags.allAppsSurface() && mControllers != null) {
+            mControllers.uiController.onTaskbarAllAppsClosed();
+        }
         // Floating search bar is added to the drag layer in ActivityAllAppsContainerView onAttach;
         // removed here as this is a special case that we remove the all apps panel.
         if (mAppsView != null && mOverlayContext != null
@@ -247,7 +278,7 @@ public final class TaskbarAllAppsController {
         }
         mSlideInView = null;
         mAppsView = null;
-        mTaskbarUiState.setIsTaskbarAllAppsOpen(false);
+        mTaskbarUiState.setTaskbarAllAppsOpen(false);
     }
 
     @Nullable

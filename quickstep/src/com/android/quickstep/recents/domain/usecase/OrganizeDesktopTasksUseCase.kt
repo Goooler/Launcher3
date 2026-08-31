@@ -19,98 +19,81 @@ package com.android.quickstep.recents.domain.usecase
 import android.graphics.Rect
 import android.graphics.RectF
 import androidx.core.graphics.toRect
-import com.android.quickstep.recents.domain.model.DesktopLayoutConfig
-import com.android.quickstep.recents.domain.model.DesktopTaskBoundsData
-import com.android.quickstep.recents.domain.model.DesktopTaskBoundsData.HiddenDesktopTaskBoundsData
-import com.android.quickstep.recents.domain.model.DesktopTaskBoundsData.RenderedDesktopTaskBoundsData
+import com.android.quickstep.recents.domain.model.TaskLayoutConfig.DesktopLayoutConfig
+import com.android.quickstep.recents.domain.model.TaskPosition
+import com.android.quickstep.recents.domain.model.TaskPosition.Hidden
+import com.android.quickstep.recents.domain.model.TaskPosition.Rendered
+import javax.inject.Inject
 
 /**
  * This usecase is responsible for organizing desktop windows in a non-overlapping way, and can also
  * reflow a layout when a task is dismissed.
  */
-class OrganizeDesktopTasksUseCase {
+class OrganizeDesktopTasksUseCase @Inject constructor() {
 
     /**
      * Arranges desktop tasks or rebalances layout after a task dismissal.
      *
      * @param allCurrentOriginalTaskBounds List of all tasks currently considered for layout, with
-     *   their original, unorganized bounds. If a task is being dismissed, it should be included in
-     *   this list.
+     *   their original, unorganized bounds.
      * @param layoutConfig Configuration for layout (margins, padding, etc.).
      * @param taskPositionsHint A hint of the previous task positions, used to decide whether to
      *   reflow.
      * @param dismissedTaskId Optional ID of a task to be dismissed. If provided, the logic may
      *   choose to reflow the existing layout or perform a full reorganization.
-     * @return A list of [DesktopTaskBoundsData] representing the new layout. Tasks that are laid
-     *   out are [RenderedDesktopTaskBoundsData]; tasks that are hidden (due to empty original
-     *   bounds or inability to fit) are [HiddenDesktopTaskBoundsData].
+     * @return A list of [TaskPosition] representing the new layout. Tasks that are laid out are
+     *   [Rendered]; tasks that are hidden (due to empty original bounds or inability to fit) are
+     *   [Hidden].
      */
     operator fun invoke(
-        allCurrentOriginalTaskBounds: List<RenderedDesktopTaskBoundsData>,
+        allCurrentOriginalTaskBounds: List<Rendered>,
         layoutConfig: DesktopLayoutConfig,
-        taskPositionsHint: List<DesktopTaskBoundsData>? = null,
+        taskPositionsHint: List<TaskPosition>? = null,
         dismissedTaskId: Int? = null,
-    ): List<DesktopTaskBoundsData> {
+    ): List<TaskPosition> {
         if (dismissedTaskId == null) {
             // No task dismissed, perform full organization on all current tasks.
             return performFullOrganization(allCurrentOriginalTaskBounds, layoutConfig)
         }
 
-        // A task is being dismissed.
-        val remainingOriginalTaskBounds =
-            allCurrentOriginalTaskBounds.filterNot { it.taskId == dismissedTaskId }
-
-        if (remainingOriginalTaskBounds.isEmpty() || taskPositionsHint == null) {
+        if (allCurrentOriginalTaskBounds.isEmpty() || taskPositionsHint == null) {
             // Last task was dismissed or we don't have any previous layout position data,
             // performFullOrganization will be performed.
-            return performFullOrganization(remainingOriginalTaskBounds, layoutConfig)
+            return performFullOrganization(allCurrentOriginalTaskBounds, layoutConfig)
         }
 
-        val remainingPreviousOrganizedTaskPosition =
-            taskPositionsHint.filterNot { it.taskId == dismissedTaskId }
         val dismissedTaskData = taskPositionsHint.find { it.taskId == dismissedTaskId }
         // If the dismissed task window was a hidden task window, we can still use the previous
         // layout.
-        if (dismissedTaskData is HiddenDesktopTaskBoundsData) {
-            return remainingPreviousOrganizedTaskPosition
+        if (dismissedTaskData is Hidden) {
+            return taskPositionsHint.filterNot { it.taskId == dismissedTaskId }
         }
 
-        val hadHiddenTasksInPreviousLayout =
-            remainingPreviousOrganizedTaskPosition.any { it is HiddenDesktopTaskBoundsData }
+        val hadHiddenTasksInPreviousLayout = taskPositionsHint.any { it is Hidden }
         if (hadHiddenTasksInPreviousLayout) {
             // Now, check whether the new full layout can show/hide different set of task
             // windows, if so, use the full layout, otherwise, use the reflow layout.
             val tentativeLayoutForRemaining =
-                performFullOrganization(remainingOriginalTaskBounds, layoutConfig)
+                performFullOrganization(allCurrentOriginalTaskBounds, layoutConfig)
 
             val taskIds1 =
-                tentativeLayoutForRemaining
-                    .filterIsInstance<RenderedDesktopTaskBoundsData>()
-                    .map { it.taskId }
-                    .toSet()
-            val taskIds2 =
-                remainingPreviousOrganizedTaskPosition
-                    .filterIsInstance<RenderedDesktopTaskBoundsData>()
-                    .map { it.taskId }
-                    .toSet()
+                tentativeLayoutForRemaining.filterIsInstance<Rendered>().map { it.taskId }.toSet()
+            val taskIds2 = taskPositionsHint.filterIsInstance<Rendered>().map { it.taskId }.toSet()
             if (taskIds1 != taskIds2) {
                 return tentativeLayoutForRemaining
             }
         }
 
+        // Pass only rendered tasks for reflow logic
         val reflowedRenderedTasks =
             performReflowRebalance(
-                currentLayout =
-                    taskPositionsHint.filterIsInstance<
-                        RenderedDesktopTaskBoundsData
-                    >(), // Pass only rendered tasks for reflow logic
+                currentLayout = taskPositionsHint.filterIsInstance<Rendered>(),
                 taskIdToRemove = dismissedTaskId,
                 layoutConfig = layoutConfig,
             )
 
         // Preserve hidden tasks from the previous layout (that were not the dismissed task).
-        val hiddenTasksToPreserve =
-            remainingPreviousOrganizedTaskPosition.filterIsInstance<HiddenDesktopTaskBoundsData>()
+        val hiddenTasksToPreserve = taskPositionsHint.filterIsInstance<Hidden>()
 
         return reflowedRenderedTasks + hiddenTasksToPreserve
     }
@@ -128,9 +111,9 @@ class OrganizeDesktopTasksUseCase {
      * 3. Centering: The successfully arranged tasks are then centered collectively within the
      *    effective layout area.
      *
-     * Input tasks ([taskBounds]) are provided as [RenderedDesktopTaskBoundsData]. Tasks from this
-     * list that have empty `bounds` are immediately converted to [HiddenDesktopTaskBoundsData]. For
-     * the remaining tasks with valid bounds, the algorithm attempts to lay them out.
+     * Input tasks ([taskBounds]) are provided as [Rendered]. Tasks from this list that have empty
+     * `bounds` are immediately converted to [Hidden]. For the remaining tasks with valid bounds,
+     * the algorithm attempts to lay them out.
      *
      * Constraints such as minimum task width (`layoutConfig.minTaskWidth`) and a maximum number of
      * rows (`layoutConfig.maxRows`, which influences minimum task height) are respected for tasks
@@ -138,24 +121,23 @@ class OrganizeDesktopTasksUseCase {
      *
      * Tasks that cannot be successfully placed by the layout algorithm (e.g., due to insufficient
      * space or exceeding the maximum number of displayable items based on constraints) are also
-     * returned as [HiddenDesktopTaskBoundsData]. The visual representation of these hidden tasks
-     * (e.g., as placeholders) is handled by the caller.
+     * returned as [Hidden]. The visual representation of these hidden tasks (e.g., as placeholders)
+     * is handled by the caller.
      *
      * For more details on the original layout strategy and goals, see b/421417134.
      *
-     * @param taskBounds A list of [RenderedDesktopTaskBoundsData] representing the tasks to be
-     *   arranged. Each item includes the task's ID and its original bounds.
+     * @param taskBounds A list of [Rendered] representing the tasks to be arranged. Each item
+     *   includes the task's ID and its original bounds.
      * @param layoutConfig Configuration parameters for the layout, including margins, padding,
      *   minimum task dimensions, and maximum row count.
-     * @return A list of [DesktopTaskBoundsData], with each element corresponding to an input task.
-     *   Elements will be [RenderedDesktopTaskBoundsData] with new, calculated bounds if the task is
-     *   laid out, or [HiddenDesktopTaskBoundsData] if the task was initially empty-bounded or could
-     *   not fit into the layout.
+     * @return A list of [TaskPosition], with each element corresponding to an input task. Elements
+     *   will be [Rendered] with new, calculated bounds if the task is laid out, or [Hidden] if the
+     *   task was initially empty-bounded or could not fit into the layout.
      */
     private fun performFullOrganization(
-        taskBounds: List<RenderedDesktopTaskBoundsData>,
+        taskBounds: List<Rendered>,
         layoutConfig: DesktopLayoutConfig,
-    ): List<DesktopTaskBoundsData> {
+    ): List<TaskPosition> {
         if (taskBounds.isEmpty()) {
             return emptyList()
         }
@@ -163,10 +145,10 @@ class OrganizeDesktopTasksUseCase {
         val validTaskBounds =
             taskBounds
                 .filterNot { it.bounds.isEmpty }
-                .map { RenderedDesktopTaskBoundsData(taskId = it.taskId, bounds = it.bounds) }
+                .map { Rendered(taskId = it.taskId, bounds = it.bounds) }
 
         if (layoutConfig.desktopBounds.isEmpty || validTaskBounds.isEmpty()) {
-            return taskBounds.map { HiddenDesktopTaskBoundsData(it.taskId) }
+            return taskBounds.map { Hidden(it.taskId) }
         }
 
         // Assuming we can place all windows in one row, do one pass first to check whether all
@@ -249,25 +231,23 @@ class OrganizeDesktopTasksUseCase {
             val taskId = originalInputTask.taskId
             val laidOutRectF = laidOutBoundsMap[taskId]
             if (laidOutRectF != null) { // Successfully laid out
-                RenderedDesktopTaskBoundsData(taskId = taskId, bounds = laidOutRectF.toRect())
+                Rendered(taskId = taskId, bounds = laidOutRectF.toRect())
             } else {
-                HiddenDesktopTaskBoundsData(taskId)
+                Hidden(taskId)
             }
         }
     }
 
     /**
-     * @param currentLayout The list of [RenderedDesktopTaskBoundsData] representing the current
-     *   layout.
+     * @param currentLayout The list of [Rendered] representing the current layout.
      * @param taskIdToRemove The ID of the task to remove.
-     * @return A new list of [RenderedDesktopTaskBoundsData] with the task removed and layout
-     *   rebalanced.
+     * @return A new list of [Rendered] with the task removed and layout rebalanced.
      */
     private fun performReflowRebalance(
-        currentLayout: List<RenderedDesktopTaskBoundsData>,
+        currentLayout: List<Rendered>,
         taskIdToRemove: Int,
         layoutConfig: DesktopLayoutConfig,
-    ): List<RenderedDesktopTaskBoundsData> {
+    ): List<Rendered> {
         val taskToRemoveData =
             currentLayout.find { it.taskId == taskIdToRemove }
                 ?: return currentLayout // Task not found, return original layout
@@ -283,7 +263,7 @@ class OrganizeDesktopTasksUseCase {
 
         val remainingRows = remainingTasks.groupBy { it.bounds.top }.toSortedMap()
 
-        val newLayout = mutableListOf<RenderedDesktopTaskBoundsData>()
+        val newLayout = mutableListOf<Rendered>()
         // Check if the removed task was on its own row.
         if (currentLayout.count { it.bounds.top == taskToRemoveData.bounds.top } == 1) {
             val layoutCenterY = overallBounds.centerY().toFloat()
@@ -296,7 +276,7 @@ class OrganizeDesktopTasksUseCase {
                 for (taskData in tasks) {
                     val newBounds = Rect(taskData.bounds)
                     newBounds.offsetTo(newBounds.left, currentY.toInt())
-                    newLayout.add(RenderedDesktopTaskBoundsData(taskData.taskId, newBounds))
+                    newLayout.add(Rendered(taskData.taskId, newBounds))
                 }
                 currentY +=
                     tasks.maxOf { it.bounds.height() } + layoutConfig.verticalPaddingBetweenTasks
@@ -320,7 +300,7 @@ class OrganizeDesktopTasksUseCase {
                 for (taskData in tasks) {
                     val newBounds = Rect(taskData.bounds)
                     newBounds.offsetTo(currentX.toInt(), rowY)
-                    newLayout.add(RenderedDesktopTaskBoundsData(taskData.taskId, newBounds))
+                    newLayout.add(Rendered(taskData.taskId, newBounds))
                     currentX +=
                         taskData.bounds.width() +
                             layoutConfig.horizontalPaddingBetweenTasks.toFloat()
@@ -337,7 +317,7 @@ class OrganizeDesktopTasksUseCase {
      */
     private fun findOptimalHeightAndBalancedWidth(
         availableLayoutBounds: Rect,
-        validTaskBounds: List<RenderedDesktopTaskBoundsData>,
+        validTaskBounds: List<Rendered>,
         layoutConfig: DesktopLayoutConfig,
     ): List<RectF> {
         // Right bound of the narrowest row.
@@ -362,7 +342,10 @@ class OrganizeDesktopTasksUseCase {
                     availableLayoutBounds,
                     layoutConfig,
                 ),
-                DesktopLayoutUtils.getRequiredHeightForMinWidth(validTaskBounds, layoutConfig),
+                DesktopLayoutUtils.getRequiredHeightForMinWidth(
+                    validTaskBounds.map { it.bounds },
+                    layoutConfig,
+                ),
             )
         var highHeight = maxOf(lowHeight, availableLayoutBounds.height() + 1)
         var optimalHeight = 0.5f * (lowHeight + highHeight)
@@ -476,7 +459,7 @@ class OrganizeDesktopTasksUseCase {
      */
     private fun fitWindowRectsInBounds(
         layoutBounds: Rect,
-        taskBounds: List<RenderedDesktopTaskBoundsData>,
+        taskBounds: List<Rendered>,
         optimalWindowHeight: Int,
         layoutConfig: DesktopLayoutConfig,
     ): FitWindowResult {

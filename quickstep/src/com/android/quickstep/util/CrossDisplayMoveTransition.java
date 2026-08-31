@@ -16,9 +16,10 @@
 package com.android.quickstep.util;
 
 
-import static android.view.WindowManager.TRANSIT_OPEN;
-import static android.view.WindowManager.TRANSIT_TO_FRONT;
-import static android.view.WindowManager.TRANSIT_TO_BACK;
+import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
+
+import static com.android.wm.shell.shared.TransitionUtil.isClosingMode;
+import static com.android.wm.shell.shared.TransitionUtil.isOpeningMode;
 
 import android.animation.AnimatorSet;
 import android.graphics.Rect;
@@ -32,8 +33,6 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
-import com.android.quickstep.util.CrossDisplayMoveTransitionInfo;
-import com.android.quickstep.util.CrossDisplayMoveAnimator;
 
 /**
  * Handles the transition for a task moving between displays.
@@ -42,23 +41,10 @@ import com.android.quickstep.util.CrossDisplayMoveAnimator;
  * - "src" refers to the display the task is moving FROM.
  * - "dst" refers to the display the task is moving TO.
  */
-public class CrossDisplayMoveTransition {
+public final class CrossDisplayMoveTransition {
     private static final String TAG = "CrossDisplayMoveTransition";
-    private final QuickstepLauncher mLauncher;
-    private final long mLaunchingTransitionDurationMs;
-    private final long mUnlaunchingTransitionDurationMs;
 
-    /**
-     * @param launcher The launcher instance.
-     * @param launchingTransitionDurationMs The duration of the launching animation.
-     * @param unlaunchingTransitionDurationMs The duration of the unlaunching animation.
-     */
-    public CrossDisplayMoveTransition(QuickstepLauncher launcher,
-            long launchingTransitionDurationMs, long unlaunchingTransitionDurationMs) {
-        mLauncher = launcher;
-        mLaunchingTransitionDurationMs = launchingTransitionDurationMs;
-        mUnlaunchingTransitionDurationMs = unlaunchingTransitionDurationMs;
-    }
+    private CrossDisplayMoveTransition() {}
 
     /**
      * Returns true if the transition involves a task moving between displays.
@@ -76,11 +62,18 @@ public class CrossDisplayMoveTransition {
      *
      * <p>The actual animation is defined by {@link CrossDisplayMoveAnimator}.
      *
+     * @param launcher The launcher instance.
+     * @param launchingTransitionDurationMs The duration of the launching animation.
+     * @param unlaunchingTransitionDurationMs The duration of the unlaunching animation.
      * @param info The transition info.
      * @param t The surface control transaction.
      * @param finishCallback The callback to invoke when the transition is finished.
      */
-    public void startCrossDisplayMoveAnimation(TransitionInfo info,
+    public static void startCrossDisplayMoveAnimation(
+            QuickstepLauncher launcher,
+            long launchingTransitionDurationMs,
+            long unlaunchingTransitionDurationMs,
+            TransitionInfo info,
             SurfaceControl.Transaction t,
             IRemoteTransitionFinishedCallback finishCallback) {
         // 1. Parse the transition info and setup our initial transaction.
@@ -96,6 +89,8 @@ public class CrossDisplayMoveTransition {
             }
             return;
         }
+        Log.v(TAG, "starting cross-display move animation for "
+                + moveInfo.taskMovingBetweenDisplays);
         setupInitialAnimationState(info, moveInfo, t);
 
         // 2. Setup the launcher reveal, if needed.
@@ -111,7 +106,7 @@ public class CrossDisplayMoveTransition {
                 && moveInfo.launcherToFront.getEndDisplayId() == moveInfo.srcDisplayId;
         AnimatorSet launcherRevealAnimators = null;
         if (playLauncherReveal) {
-            launcherRevealAnimators = new ScalingWorkspaceRevealAnim(mLauncher,
+            launcherRevealAnimators = new ScalingWorkspaceRevealAnim(launcher,
                     /* siblingAnimation= */ null, /* windowTargetRect= */ null,
                     /* playAlphaReveal= */ true, /* playBlur= */ true).getAnimators();
         }
@@ -120,12 +115,12 @@ public class CrossDisplayMoveTransition {
         t.apply();
         new CrossDisplayMoveAnimator(moveInfo.srcTaskLeash, moveInfo.dstTaskLeash,
                 moveInfo.srcBounds,
-                moveInfo.dstBounds, mLaunchingTransitionDurationMs,
-                mUnlaunchingTransitionDurationMs, launcherRevealAnimators, finishCallback)
+                moveInfo.dstBounds, launchingTransitionDurationMs,
+                unlaunchingTransitionDurationMs, launcherRevealAnimators, finishCallback)
                 .start();
     }
 
-    private void initializeLeashAsVisible(SurfaceControl.Transaction t, Rect bounds,
+    private static void initializeLeashAsVisible(SurfaceControl.Transaction t, Rect bounds,
             SurfaceControl leash) {
         t.setAlpha(leash, 1f);
         t.setPosition(leash, bounds.left, bounds.top);
@@ -136,8 +131,8 @@ public class CrossDisplayMoveTransition {
      * Sets up the initial animation state. (Including re-rooting leashes to the correct display.)
      */
     @VisibleForTesting
-    public void setupInitialAnimationState(TransitionInfo info, CrossDisplayMoveTransitionInfo move,
-            SurfaceControl.Transaction t) {
+    public static void setupInitialAnimationState(TransitionInfo info,
+            CrossDisplayMoveTransitionInfo move, SurfaceControl.Transaction t) {
         // Our strategy for animation setup is as follows:
         //  1. Set up the state of the animation to match the final state of the transition.
         //    - This setup is independent of the knowledge of the actual animation implementation
@@ -156,9 +151,13 @@ public class CrossDisplayMoveTransition {
         // 1. Set up the state of the animation to match the final state of the transition.
         for (TransitionInfo.Change change : info.getChanges()) {
             final int mode = change.getMode();
-            if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT) {
+            if (isOpeningMode(mode)) {
                 initializeLeashAsVisible(t, change.getEndAbsBounds(), change.getLeash());
-            } else if (mode == TRANSIT_TO_BACK) {
+            } else if (isClosingMode(mode) && isEmbeddedActivityInMovingTask(change, move)) {
+                // If the change is a closing Activity embedded under the moving task, the Activity
+                // doesn't have a dedicated space to be shown on the destination display and should
+                // not be shown.
+                Log.v(TAG, "Hiding closing ActivityEmbedding: " + change);
                 t.hide(change.getLeash());
             }
         }
@@ -193,5 +192,21 @@ public class CrossDisplayMoveTransition {
         CrossDisplayMoveAnimator.applyLaunchState(t, move.dstTaskLeash,
                 move.dstBounds,
                 /* progress= */ 0f);
+    }
+
+    private static boolean isEmbeddedActivityInMovingTask(
+            TransitionInfo.Change change, CrossDisplayMoveTransitionInfo move) {
+        if (!change.hasFlags(FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY)) {
+            return false;
+        }
+        if (change.getParent() == null) {
+            return false;
+        }
+        Log.v(TAG, "isEmbeddedActivityInMovingTask, parent=" + change.getParent()
+                + ", moving task=" + move.taskMovingBetweenDisplays.getContainer());
+        if (change.getParent().equals(move.taskMovingBetweenDisplays.getContainer())) {
+            return true;
+        }
+        return false;
     }
 }

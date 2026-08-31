@@ -277,7 +277,7 @@ public class CellLayout extends ViewGroup {
         mGridVisualizationRoundingRadius =
                 res.getDimensionPixelSize(R.dimen.grid_visualization_rounding_radius);
         mReorderPreviewAnimationMagnitude = (REORDER_PREVIEW_MAGNITUDE
-                * deviceProfile.getWorkspaceIconProfile().getIconSizePx());
+                * deviceProfile.getWorkspaceProfile().getIconSizePx());
 
         // Initialize the data structures used for the drag visualization.
         mEaseOutInterpolator = Interpolators.DECELERATE_QUINT; // Quint ease out
@@ -400,13 +400,13 @@ public class CellLayout extends ViewGroup {
                         deviceProfile.getFolderProfile().getCellLayoutBorderSpacePx());
                 break;
             case HOTSEAT:
-                mBorderSpace = new Point(deviceProfile.hotseatBorderSpace,
-                        deviceProfile.hotseatBorderSpace);
+                mBorderSpace = new Point(deviceProfile.getHotseatProfile().getBorderSpace(),
+                        deviceProfile.getHotseatProfile().getBorderSpace());
                 break;
             case WORKSPACE:
             default:
                 mBorderSpace = new Point(
-                        deviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx());
+                        deviceProfile.getWorkspaceProfile().getCellLayoutBorderSpacePx());
                 break;
         }
 
@@ -445,7 +445,8 @@ public class CellLayout extends ViewGroup {
         return mDropPending;
     }
 
-    void setIsDragOverlapping(boolean isDragOverlapping) {
+    /** Set if the drag is overlapping the sibling cell layout. */
+    public void setIsDragOverlapping(boolean isDragOverlapping) {
         if (mIsDragOverlapping != isDragOverlapping) {
             mIsDragOverlapping = isDragOverlapping;
             mBackground.setState(mIsDragOverlapping
@@ -613,10 +614,10 @@ public class CellLayout extends ViewGroup {
 
     protected void visualizeGrid(Canvas canvas) {
         DeviceProfile dp = mActivity.getDeviceProfile();
-        int paddingX = Math.min((mCellWidth - dp.getWorkspaceIconProfile().getIconSizePx()) / 2,
-                dp.mWorkspaceProfile.getGridVisualizationPaddingX());
-        int paddingY = Math.min((mCellHeight - dp.getWorkspaceIconProfile().getIconSizePx()) / 2,
-                dp.mWorkspaceProfile.getGridVisualizationPaddingY());
+        int paddingX = Math.min((mCellWidth - dp.getWorkspaceProfile().getIconSizePx()) / 2,
+                dp.getWorkspaceProfile().getGridVisualizationPaddingX());
+        int paddingY = Math.min((mCellHeight - dp.getWorkspaceProfile().getIconSizePx()) / 2,
+                dp.getWorkspaceProfile().getGridVisualizationPaddingY());
 
         mVisualizeGridPaint.setStrokeWidth(8);
 
@@ -772,7 +773,7 @@ public class CellLayout extends ViewGroup {
         // Hotseat icons - remove text
         if (child instanceof BubbleTextView) {
             BubbleTextView bubbleChild = (BubbleTextView) child;
-            bubbleChild.setTextVisibility(mContainerType != HOTSEAT);
+            bubbleChild.setContainerTextVisibility(mContainerType != HOTSEAT);
         }
 
         child.setScaleX(DEFAULT_SCALE);
@@ -946,7 +947,7 @@ public class CellLayout extends ViewGroup {
     public float getFolderCreationRadius(int[] targetCell) {
         DeviceProfile grid = mActivity.getDeviceProfile();
         float iconVisibleRadius = ICON_VISIBLE_AREA_FACTOR
-                * grid.getWorkspaceIconProfile().getIconSizePx() / 2;
+                * grid.getWorkspaceProfile().getIconSizePx() / 2;
         // Halfway between reorder radius and icon.
         return (getReorderRadius(targetCell, 1, 1) + iconVisibleRadius) / 2;
     }
@@ -1231,6 +1232,11 @@ public class CellLayout extends ViewGroup {
             return getContext().getString(R.string.move_to_empty_cell_description, row, col,
                     mCellLayoutContainer.getPageDescription(pageIndex));
         }
+    }
+
+    public String getContainerPageDescription() {
+        int pageIndex = mCellLayoutContainer.getCellLayoutIndex(this);
+        return mCellLayoutContainer.getPageDescription(pageIndex);
     }
 
     public void clearDragOutlines() {
@@ -1541,7 +1547,10 @@ public class CellLayout extends ViewGroup {
         ) != null;
     }
 
-    void revertTempState() {
+    /**
+     * Clear state variables to be ready for a new reorder.
+     */
+    protected void revertTempState() {
         completeAndClearReorderPreviewAnimations();
         if (isItemPlacementDirty() && !DESTRUCTIVE_REORDER) {
             final int count = mShortcutsAndWidgets.getChildCount();
@@ -1560,17 +1569,33 @@ public class CellLayout extends ViewGroup {
         }
     }
 
-    boolean createAreaForResize(int cellX, int cellY, int spanX, int spanY,
-            View dragView, int[] direction, boolean commit) {
+    /** Returns true if there exists an arrangement to support the given resizing needs. */
+    public boolean hasAreaForResize(int cellX, int cellY, int spanX, int spanY,
+            View dragView, int[] direction) {
+        ItemConfiguration swapSolution = checkAreaForResize(cellX, cellY, spanX, spanY, dragView,
+                direction);
+        return swapSolution != null && swapSolution.isSolution;
+    }
+
+    @Nullable
+    private ItemConfiguration checkAreaForResize(int cellX, int cellY, int spanX, int spanY,
+            View dragView, int[] direction) {
         int[] pixelXY = new int[2];
         regionToCenterPoint(cellX, cellY, spanX, spanY, pixelXY);
 
         // First we determine if things have moved enough to cause a different layout
-        ItemConfiguration swapSolution = findReorderSolution(pixelXY[0], pixelXY[1], spanX, spanY,
+        return findReorderSolution(pixelXY[0], pixelXY[1], spanX, spanY,
                 spanX,  spanY, direction, dragView,  true);
+    }
 
-        setUseTempCoords(true);
+    /** Create area for resizing the widget in given the direction. */
+    public boolean createAreaForResize(int cellX, int cellY, int spanX, int spanY,
+            View dragView, int[] direction, boolean commit) {
+        final ItemConfiguration swapSolution = checkAreaForResize(cellX, cellY, spanX, spanY,
+                dragView, direction);
+
         if (swapSolution != null && swapSolution.isSolution) {
+            setUseTempCoords(true);
             // If we're just testing for a possible location (MODE_ACCEPT_DROP), we don't bother
             // committing anything or animating anything as we just want to determine if a solution
             // exists

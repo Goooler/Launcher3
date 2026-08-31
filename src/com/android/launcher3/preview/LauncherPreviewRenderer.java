@@ -20,9 +20,10 @@ import static android.view.View.MeasureSpec.makeMeasureSpec;
 import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_PREVIEW_RENDERER;
+import static com.android.launcher3.LauncherModel.useModelRepositoryBinding;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
-import static com.android.launcher3.Utilities.qsbOnFirstScreen;
 import static com.android.launcher3.model.ModelUtils.currentScreenContentFilter;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import static java.util.Comparator.comparingDouble;
 
@@ -34,7 +35,6 @@ import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
-import android.util.SparseIntArray;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.LayoutInflater;
@@ -55,25 +55,27 @@ import com.android.launcher3.Hotseat;
 import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherModel;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.WorkspaceLayoutManager;
-import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.celllayout.CellPosMapper;
 import com.android.launcher3.dagger.LauncherComponentProvider;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.dragndrop.SimpleDragLayer;
 import com.android.launcher3.graphics.FragmentWithPreview;
 import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.WorkspaceChangeEvent.UpdateEvent;
 import com.android.launcher3.model.data.WorkspaceData;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.BaseContext;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInflater;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.ColorsOverride;
 import com.android.launcher3.widget.LauncherWidgetHolder;
 
 import java.util.ArrayList;
@@ -109,22 +111,30 @@ public class LauncherPreviewRenderer extends BaseContext
 
     public LauncherPreviewRenderer(Context context,
             int workspaceScreenId,
-            @Nullable SparseIntArray wallpaperColorResources,
+            ColorsOverride colorsOverride,
             LauncherModel model,
             int themeRes) {
 
         super(context, themeRes);
         mUiHandler = new Handler(Looper.getMainLooper());
         mIdp = InvariantDeviceProfile.INSTANCE.get(context);
-        mDp = getDeviceProfileForPreview(context).toBuilder()
-                .setViewScaleProvider(new PreviewScaleProvider(this)).build();
+
+        DeviceProfile.Builder dpBuilder = getDeviceProfileForPreview(context)
+                .toBuilder();
+        if (com.android.systemui.shared.Flags.workspaceItemsLabelHidden()) {
+            dpBuilder.setIsWorkspaceItemsLabelHidden(
+                    LauncherPrefs.WORKSPACE_ITEMS_LABEL_HIDDEN.get(context)
+            );
+        }
+        mDp = dpBuilder
+                .setViewScaleProvider(new PreviewScaleProvider(this))
+                .build();
         Rect insets = getInsets(context);
         mDp.updateInsets(insets);
         mWidgetHolder =
                 LauncherComponentProvider.get(this).getWidgetHolderFactory().newInstance(this);
-        if (wallpaperColorResources != null) {
-            mWidgetHolder.setOnViewCreationCallback(
-                    v -> v.setColorResources(wallpaperColorResources));
+        if (colorsOverride != null) {
+            mWidgetHolder.setOnViewCreationCallback(colorsOverride::applyTo);
         }
 
         mHomeElementInflater = LayoutInflater.from(
@@ -144,28 +154,28 @@ public class LauncherPreviewRenderer extends BaseContext
 
         CellLayout firstScreen = mRootView.findViewById(R.id.workspace);
         firstScreen.setPadding(
-                mDp.getWorkspaceIconProfile().getWorkspacePadding().left
-                        + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().left,
-                mDp.getWorkspaceIconProfile().getWorkspacePadding().top
-                        + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().top,
+                mDp.getWorkspaceProfile().getWorkspacePadding().left
+                        + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().left,
+                mDp.getWorkspaceProfile().getWorkspacePadding().top
+                        + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().top,
                 mDp.getDeviceProperties().isTwoPanels() ? (
-                        mDp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().x / 2)
-                        : (mDp.getWorkspaceIconProfile().getWorkspacePadding().right
-                                + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().right),
-                mDp.getWorkspaceIconProfile().getWorkspacePadding().bottom
-                        + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().bottom
+                        mDp.getWorkspaceProfile().getCellLayoutBorderSpacePx().x / 2)
+                        : (mDp.getWorkspaceProfile().getWorkspacePadding().right
+                                + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().right),
+                mDp.getWorkspaceProfile().getWorkspacePadding().bottom
+                        + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().bottom
         );
 
         if (mDp.getDeviceProperties().isTwoPanels()) {
             CellLayout rightPanel = mRootView.findViewById(R.id.workspace_right);
             rightPanel.setPadding(
-                    mDp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().x / 2,
-                    mDp.getWorkspaceIconProfile().getWorkspacePadding().top
-                            + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().top,
-                    mDp.getWorkspaceIconProfile().getWorkspacePadding().right
-                            + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().right,
-                    mDp.getWorkspaceIconProfile().getWorkspacePadding().bottom
-                            + mDp.getWorkspaceIconProfile().getCellLayoutPaddingPx().bottom
+                    mDp.getWorkspaceProfile().getCellLayoutBorderSpacePx().x / 2,
+                    mDp.getWorkspaceProfile().getWorkspacePadding().top
+                            + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().top,
+                    mDp.getWorkspaceProfile().getWorkspacePadding().right
+                            + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().right,
+                    mDp.getWorkspaceProfile().getWorkspacePadding().bottom
+                            + mDp.getWorkspaceProfile().getCellLayoutPaddingPx().bottom
             );
 
             int closestEvenPageId = workspaceScreenId - (workspaceScreenId % 2);
@@ -184,7 +194,11 @@ public class LauncherPreviewRenderer extends BaseContext
                 mHotseat
         );
         onViewCreated();
-        model.addCallbacksAndLoad(this);
+        if (useModelRepositoryBinding()) {
+            model.activate();
+        } else {
+            model.addCallbacksAndLoad(this);
+        }
         getLifecycle().addObserver(new DefaultLifecycleObserver() {
             @Override
             public void onDestroy(@NonNull LifecycleOwner owner) {
@@ -192,6 +206,26 @@ public class LauncherPreviewRenderer extends BaseContext
                 mWidgetHolder.destroy();
             }
         });
+
+        if (LauncherModel.useModelRepositoryBinding()) {
+            var repo = LauncherComponentProvider.get(this).getHomeScreenRepository();
+            var state = repo.getWorkspaceState();
+
+            closeOnDestroy(state.getChanges().forEach(MAIN_EXECUTOR, ev -> {
+                // Add and remove events are rare on preview screen. We handle update event to apply
+                // only diff, and for everything else just redraw everything.
+                if (ev instanceof UpdateEvent ue) {
+                    updateContainerItems(ue.getItems(), this);
+                } else {
+                    bindCompleteUI(state.getValue());
+                }
+                return null;
+            }));
+
+            if (state.getValue().getVersion() > 0) {
+                bindCompleteUI(state.getValue());
+            }
+        }
     }
 
     @Nullable
@@ -280,10 +314,10 @@ public class LauncherPreviewRenderer extends BaseContext
      */
     @UiThread
     public void hideBottomRow(boolean hide) {
-        if (mDp.isTaskbarPresent) {
+        if (mDp.getDeviceProperties().getTaskbarConfiguration().isTaskbarPresent()) {
             // hotseat icons on bottom
             mHotseat.setIconsAlpha(hide ? 0 : 1, ALPHA_CHANNEL_PREVIEW_RENDERER);
-            if (mDp.isQsbInline) {
+            if (mDp.getHotseatProfile().isQsbInline()) {
                 mHotseat.setQsbAlpha(hide ? 0 : 1, ALPHA_CHANNEL_PREVIEW_RENDERER);
             }
         } else {
@@ -330,8 +364,7 @@ public class LauncherPreviewRenderer extends BaseContext
         }
     }
 
-    @Override
-    public void bindCompleteModel(@NonNull WorkspaceData itemIdMap, boolean isBindingSync) {
+    private void bindCompleteUI(@NonNull WorkspaceData itemIdMap) {
         getAllLayouts().forEach(CellLayout::removeAllViews);
 
         // Separate the items that are on the current screen, and the other remaining items.
@@ -340,19 +373,6 @@ public class LauncherPreviewRenderer extends BaseContext
                 .forEach(this::inflateAndAdd);
         populateHotseatPredictions(itemIdMap);
 
-        // Add first page QSB
-        if (qsbOnFirstScreen()) {
-            CellLayout firstScreen = mWorkspaceScreens.get(FIRST_SCREEN_ID);
-            if (firstScreen != null) {
-                View qsb = mHomeElementInflater.inflate(R.layout.qsb_preview, firstScreen, false);
-                // TODO: set bgHandler on qsb when it is BaseTemplateCard, which requires API
-                //  changes.
-                CellLayoutLayoutParams lp = new CellLayoutLayoutParams(
-                        0, 0, firstScreen.getCountX(), 1);
-                lp.canReorder = false;
-                firstScreen.addViewToCellLayout(qsb, 0, R.id.search_container_workspace, lp, true);
-            }
-        }
         measureAndLayoutRootView();
         dispatchVisibilityAggregated(mRootView, true);
         measureAndLayoutRootView();
@@ -361,15 +381,23 @@ public class LauncherPreviewRenderer extends BaseContext
         initialRender.complete(mRootView);
     }
 
+
+    @Override
+    public void bindCompleteModel(@NonNull WorkspaceData itemIdMap, boolean isBindingSync) {
+        if (LauncherModel.useModelRepositoryBinding()) return;
+        bindCompleteUI(itemIdMap);
+    }
+
     @Override
     public void bindItemsUpdated(@NonNull Set<ItemInfo> updates) {
+        if (LauncherModel.useModelRepositoryBinding()) return;
         updateContainerItems(updates, this);
     }
 
     private void populateHotseatPredictions(WorkspaceData itemIdMap) {
         List<ItemInfo> predictions = itemIdMap.getPredictedContents(CONTAINER_HOTSEAT_PREDICTION);
         int predictionIndex = 0;
-        for (int rank = 0; rank < mDp.numShownHotseatIcons; rank++) {
+        for (int rank = 0; rank < mDp.getHotseatProfile().getNumShownIcons(); rank++) {
             if (predictions.size() <= predictionIndex) continue;
 
             int cellX = mHotseat.getCellXFromOrder(rank);

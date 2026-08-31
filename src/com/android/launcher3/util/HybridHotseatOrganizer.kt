@@ -25,7 +25,7 @@ import android.view.View
 import android.view.ViewGroup.OnHierarchyChangeListener
 import com.android.launcher3.DragSource
 import com.android.launcher3.DropTarget.DragObject
-import com.android.launcher3.LauncherAnimUtils
+import com.android.launcher3.LauncherAnimUtils.getScaleProperty
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.WorkspaceLayoutManager
 import com.android.launcher3.anim.AnimationSuccessListener
@@ -100,7 +100,7 @@ class HybridHotseatOrganizer(
      *
      * @param matcher filter matching items that have been removed
      */
-    fun onModelItemsRemoved(matcher: Predicate<ItemInfo>) {
+    fun onModelItemsRemoved(matcher: Predicate<ItemInfo?>) {
         val oldItems = predictedItems.toMutableList()
         if (oldItems.removeIf(matcher)) {
             predictedItems = oldItems
@@ -126,7 +126,7 @@ class HybridHotseatOrganizer(
             return
         }
 
-        val hotseatCount = activity.getDeviceProfile().numShownHotseatIcons
+        val hotseatCount = activity.getDeviceProfile().getHotseatProfile().numShownIcons
 
         pauseFlags = pauseFlags or FLAG_FILL_IN_PROGRESS
         for (rank in 0..<hotseatCount) {
@@ -165,9 +165,7 @@ class HybridHotseatOrganizer(
             workspace.addInScreenFromBind(icon, item)
             finishBinding(icon)
             if (animate) {
-                animationSet.play(
-                    ObjectAnimator.ofFloat(icon, LauncherAnimUtils.SCALE_PROPERTY, 0.2f, 1f)
-                )
+                animationSet.play(ObjectAnimator.ofFloat(icon, getScaleProperty(), 0.2f, 1f))
             }
         }
         if (animate) {
@@ -236,7 +234,7 @@ class HybridHotseatOrganizer(
                 )
             )
             icon.isEnabled = false
-            val animator = ObjectAnimator.ofFloat(icon, LauncherAnimUtils.SCALE_PROPERTY, 0f)
+            val animator = ObjectAnimator.ofFloat(icon, getScaleProperty(), 0f)
             animator.addListener(
                 object : AnimationSuccessListener() {
                     override fun onAnimationSuccess(animator: Animator) {
@@ -263,6 +261,9 @@ class HybridHotseatOrganizer(
     }
 
     override fun onDragStart(dragObject: DragObject, options: DragOptions?) {
+        if (hotseat?.isValidDropTarget(dragObject) != true) {
+            return
+        }
         removePredictedApps(outlineDrawings, dragObject)
         if (outlineDrawings.isEmpty()) return
         for (outlineDrawing in outlineDrawings) {
@@ -273,6 +274,9 @@ class HybridHotseatOrganizer(
     }
 
     override fun onDragEnd() {
+        if ((pauseFlags and FLAG_DRAG_IN_PROGRESS) == 0) {
+            return
+        }
         pauseFlags = pauseFlags and FLAG_DRAG_IN_PROGRESS.inv()
         fillGapsWithPrediction(true)
     }
@@ -301,12 +305,13 @@ class HybridHotseatOrganizer(
                 ((view.getTag() as? WorkspaceItemInfo)?.container ==
                     Favorites.CONTAINER_HOTSEAT_PREDICTION)
 
-        private fun getStateString(flags: Int): String {
-            val str = StringJoiner("|")
-            appendFlag(str, flags, FLAG_DRAG_IN_PROGRESS, "FLAG_DRAG_IN_PROGRESS")
-            appendFlag(str, flags, FLAG_FILL_IN_PROGRESS, "FLAG_FILL_IN_PROGRESS")
-            appendFlag(str, flags, FLAG_REMOVING_PREDICTED_ICON, "FLAG_REMOVING_PREDICTED_ICON")
-            return str.toString()
-        }
+        private fun getStateString(flags: Int): String =
+            StringJoiner("|")
+                .apply {
+                    appendFlag(flags, FLAG_DRAG_IN_PROGRESS, "FLAG_DRAG_IN_PROGRESS")
+                    appendFlag(flags, FLAG_FILL_IN_PROGRESS, "FLAG_FILL_IN_PROGRESS")
+                    appendFlag(flags, FLAG_REMOVING_PREDICTED_ICON, "FLAG_REMOVING_PREDICTED_ICON")
+                }
+                .toString()
     }
 }

@@ -22,7 +22,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiObject2;
+
+import com.android.launcher3.Flags;
 
 import java.util.List;
 
@@ -32,7 +35,6 @@ import java.util.List;
 public abstract class AppIconMenu {
 
     private static final String BUBBLE = "Bubble";
-
     private static final String SPLIT_SCREEN = "Split screen";
 
     protected final LauncherInstrumentation mLauncher;
@@ -48,9 +50,17 @@ public abstract class AppIconMenu {
      * Returns a menu item with a given number. Fails if it doesn't exist.
      */
     public AppIconMenuItem getMenuItem(int itemNumber) {
-        final List<UiObject2> menuItems = mLauncher.getObjectsInContainer(mDeepShortcutsContainer,
-                "bubble_text");
-        assertTrue(menuItems.size() > itemNumber);
+        final List<UiObject2> menuItems;
+        if (Flags.expandableLongPressMenu()) {
+            menuItems = mDeepShortcutsContainer.getChildren();
+            assertTrue("Menu item number " + itemNumber + " is out of bounds. There are "
+                            + menuItems.size() + " menu items.",
+                    menuItems.size() > itemNumber);
+        } else {
+            menuItems = mLauncher.getObjectsInContainer(mDeepShortcutsContainer,
+                    "bubble_text");
+            assertTrue(menuItems.size() > itemNumber);
+        }
         return createMenuItem(menuItems.get(itemNumber));
     }
 

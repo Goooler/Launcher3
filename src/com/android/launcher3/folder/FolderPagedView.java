@@ -18,13 +18,12 @@ package com.android.launcher3.folder;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
 import static com.android.launcher3.AbstractFloatingView.TYPE_FOLDER;
-import static com.android.launcher3.Flags.enableLauncherVisualRefresh;
+import static com.android.launcher3.Flags.enableCursorDrivenWorkflows;
 import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Path;
 import android.graphics.Point;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
@@ -45,11 +44,14 @@ import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
+import com.android.launcher3.graphics.PathWrapper;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicatorDots;
+import com.android.launcher3.touch.CustomTouchDelegate;
+import com.android.launcher3.touch.WorkspaceItemCustomActionsListener;
 import com.android.launcher3.util.LauncherBindableItemsContainer.ItemOperator;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.ViewCache;
@@ -96,7 +98,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
     private Folder mFolder;
 
-    private Path mClipPath;
+    private PathWrapper mClipPath;
 
     // If the views are attached to the folder or not. A folder should be bound when its
     // animating or is open.
@@ -126,6 +128,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
         mFocusIndicatorHelper = new ViewGroupFocusHelper(this);
         mViewCache = activityContext.getViewCache();
+        setClipChildren(false);
     }
 
     public void setFolder(Folder folder) {
@@ -153,7 +156,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     protected void dispatchDraw(Canvas canvas) {
         if (mClipPath != null) {
             int count = canvas.save();
-            canvas.clipPath(mClipPath);
+            canvas.clipPath(mClipPath.getPath());
             mFocusIndicatorHelper.draw(canvas);
             super.dispatchDraw(canvas);
             canvas.restoreToCount(count);
@@ -172,10 +175,6 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
         }
         arrangeChildren(items.stream().map(this::createNewView).collect(Collectors.toList()));
         mViewsBound = true;
-    }
-
-    void setCanAnnouncePageDescriptionForFolder(boolean canAnnounce) {
-        mCanAnnouncePageDescription = canAnnounce;
     }
 
     private boolean canAnnouncePageDescriptionForFolder() {
@@ -260,6 +259,10 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
         icon.setOnClickListener(mFolder.mActivityContext.getItemOnClickListener());
         icon.setOnLongClickListener(mFolder);
+        if (enableCursorDrivenWorkflows()) {
+            ((CustomTouchDelegate) icon).setCustomActionsListener(
+                    WorkspaceItemCustomActionsListener.INSTANCE);
+        }
         icon.setOnFocusChangeListener(mFocusIndicatorHelper);
 
         CellLayoutLayoutParams lp = (CellLayoutLayoutParams) icon.getLayoutParams();
@@ -312,8 +315,19 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     }
 
     public void removeItem(View v) {
-        for (int i = getChildCount() - 1; i >= 0; i --) {
-            getPageAt(i).removeView(v);
+        if (v == null) {
+            return;
+        }
+        if (mFolder.getIsDragInProgress()) {
+            // A drag is in progress, so we shouldn't immediately reshuffle the folder.
+            for (int i = getChildCount() - 1; i >= 0; i--) {
+                getPageAt(i).removeView(v);
+            }
+        } else {
+            // This is a permanent removal, so rearrange the items immediately.
+            ArrayList<View> views = new ArrayList<>(mFolder.getIconsInReadingOrder());
+            views.remove(v);
+            arrangeChildren(views);
         }
     }
 
@@ -387,15 +401,32 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
         setEnableOverscroll(getPageCount() > 1);
 
+        // Update the focus chain for all icons to ensure proper keyboard navigation.
+        arrangeChildrenFocus(list);
+
         // Update footer
         mPageIndicator.setVisibility(getPageCount() > 1 ? View.VISIBLE : View.GONE);
-        if (enableLauncherVisualRefresh()) {
-            mFolder.onIndicatorVisibilityChanged();
-        }
+        mFolder.onIndicatorVisibilityChanged();
         // Set the gravity as LEFT or RIGHT instead of START, as START depends on the actual text.
         int horizontalGravity = getPageCount() > 1
                 ? (mIsRtl ? Gravity.RIGHT : Gravity.LEFT) : Gravity.CENTER_HORIZONTAL;
         mFolder.getFolderName().setGravity(horizontalGravity | Gravity.CENTER_VERTICAL);
+    }
+
+    /**
+     * Updates the next focus forward ID for each child in the folder, skipping any null views.
+     */
+    private void arrangeChildrenFocus(List<View> list) {
+        View lastFocusView = null;
+        for (View view : list) {
+            if (view == null) {
+                continue;
+            }
+            if (lastFocusView != null) {
+                lastFocusView.setNextFocusForwardId(view.getId());
+            }
+            lastFocusView = view;
+        }
     }
 
     public int getDesiredWidth() {
@@ -707,7 +738,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     }
 
     @Override
-    public void setClipPath(Path clipPath) {
+    public void setClipPath(PathWrapper clipPath) {
         mClipPath = clipPath;
         invalidate();
     }

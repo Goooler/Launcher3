@@ -16,6 +16,8 @@
 
 package com.android.launcher3.popup
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Process
 import android.util.Log
@@ -23,16 +25,26 @@ import android.view.View
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.AbstractFloatingViewHelper
 import com.android.launcher3.DropTargetHandler
-import com.android.launcher3.Flags
+import com.android.launcher3.Flags.enableHomeScreenFilesCopyPaste
+import com.android.launcher3.Flags.enableHomeScreenFilesRenaming
 import com.android.launcher3.LauncherConstants
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_GROUP
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_CUSTOM_APPWIDGET
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FILE
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FILE_SYSTEM_FOLDER
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER
 import com.android.launcher3.R
 import com.android.launcher3.SecondaryDropTarget
 import com.android.launcher3.Utilities
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate
 import com.android.launcher3.allapps.PrivateProfileManager
-import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.homescreenfiles.HomeScreenFilesRenameDialogFactory
+import com.android.launcher3.homescreenfiles.HomeScreenFilesUtils
+import com.android.launcher3.homescreenfiles.homeScreenFile
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent
 import com.android.launcher3.model.data.ItemInfo
+import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.popup.SystemShortcut.BubbleActivityStarter
 import com.android.launcher3.popup.SystemShortcut.TaskbarBubbleActivityStarter
@@ -43,28 +55,159 @@ import com.android.launcher3.util.PendingRequestArgs
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.Snackbar
 import com.android.launcher3.widget.LauncherAppWidgetHostView
-import com.android.launcher3.widget.WidgetsBottomSheet
 import com.android.wm.shell.shared.bubbles.logging.EntryPoint
 import javax.inject.Inject
 
-@LauncherAppSingleton
-class PopupDataSource @Inject constructor() {
-    // Handles action from tapping remove shortcut.
-    private val handleRemove = { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
-        AbstractFloatingView.closeAllOpenViews(activityContext)
-        val dropTargetHandler: DropTargetHandler = activityContext.dropTargetHandler
-        dropTargetHandler.prepareToUndoDelete()
-        dropTargetHandler.onDeleteComplete(itemInfo, view)
-    }
+object PopupDataSource {
 
     // Popup data for remove shortcut.
     val removePopupData =
         PopupData(
             iconResId = R.drawable.ic_remove_no_shadow,
-            labelResId = R.string.remove_drop_target_label,
-            popupAction = handleRemove,
+            labelResId = R.string.remove_system_shortcut_label,
             category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+        ) { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
+            AbstractFloatingView.closeAllOpenViews(activityContext)
+            val dropTargetHandler: DropTargetHandler = activityContext.dropTargetHandler
+            dropTargetHandler.prepareToUndoDelete(itemInfo)
+            dropTargetHandler.onDeleteComplete(itemInfo, view)
+        }
+}
+
+object FolderSystemShortcuts : PopupDataMapper {
+
+    override fun getPopupDataByItemInfo(itemInfo: ItemInfo): List<PopupData>? =
+        if (itemInfo.itemType == ITEM_TYPE_FOLDER) listOf(PopupDataSource.removePopupData) else null
+}
+
+object AppPairSystemShortcuts : PopupDataMapper {
+
+    override fun getPopupDataByItemInfo(itemInfo: ItemInfo): List<PopupData>? =
+        if (itemInfo.itemType == ITEM_TYPE_APP_GROUP) listOf(PopupDataSource.removePopupData)
+        else null
+}
+
+object AppWidgetSystemShortcuts : PopupDataMapper {
+    private const val TAG = "AppWidgetSystemShortcuts"
+
+    // Popup data for widget settings shortcut.
+    private val widgetSettingsPopupData =
+        PopupData(
+            iconResId = R.drawable.ic_setting,
+            labelResId = R.string.widget_settings,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+        ) { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
+            if (view is LauncherAppWidgetHostView) {
+                activityContext.setWaitingForResult(
+                    PendingRequestArgs.forWidgetInfo(
+                        view.appWidgetId,
+                        // Widget add handler is null since we're reconfiguring an existing widget.
+                        /* widgetHandler= */ null,
+                        itemInfo,
+                    )
+                )
+
+                activityContext.appWidgetHolder?.also {
+                    it.startConfigActivity(
+                        ActivityContext.lookupContext(view.context),
+                        view.appWidgetId,
+                        LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET,
+                    )
+                } ?: Log.e(TAG, "appWidgetHolder is null, cannot start config activity.")
+            }
+        }
+
+    override fun getPopupDataByItemInfo(itemInfo: ItemInfo): List<PopupData>? {
+        return if (itemInfo.itemType != ITEM_TYPE_APPWIDGET) null
+        else if (itemInfo is LauncherAppWidgetInfo && itemInfo.isReconfigurable) {
+            listOf(PopupDataSource.removePopupData, widgetSettingsPopupData)
+        } else {
+            listOf(PopupDataSource.removePopupData)
+        }
+    }
+}
+
+class FileSystemShortcuts
+@Inject
+constructor(private val renameDialogFactory: HomeScreenFilesRenameDialogFactory) : PopupDataMapper {
+
+    private val openHomeScreenFile =
+        PopupData(
+            iconResId = R.drawable.ic_home_screen_files_context_menu_open_in_app,
+            labelResId = R.string.home_screen_files_context_menu_open_in_app_label,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+            eventId = LauncherEvent.LAUNCHER_HOME_SCREEN_FILES_OPEN_VIA_CONTEXT_MENU,
+        ) { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
+            activityContext.startActivitySafely(view, itemInfo.intent, itemInfo)
+        }
+
+    private val copyFileSystemItem =
+        PopupData(
+            iconResId = R.drawable.ic_home_screen_files_context_menu_copy,
+            labelResId = R.string.home_screen_files_context_menu_copy_label,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+            eventId = LauncherEvent.LAUNCHER_HOME_SCREEN_FILES_COPY_VIA_CONTEXT_MENU,
+        ) { activityContext: ActivityContext, itemInfo: ItemInfo, _: View ->
+            val file = itemInfo.homeScreenFile ?: return@PopupData
+            activityContext
+                .asContext()
+                .getSystemService(ClipboardManager::class.java)
+                ?.setPrimaryClip(
+                    ClipData(/* label= */ "", arrayOf(file.mimeType), ClipData.Item(file.uri))
+                )
+        }
+
+    private val renameFileSystemItem =
+        PopupData(
+            iconResId = R.drawable.ic_home_screen_files_context_menu_rename,
+            labelResId = R.string.home_screen_files_context_menu_rename_label,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+            eventId = LauncherEvent.LAUNCHER_HOME_SCREEN_FILES_RENAME_VIA_CONTEXT_MENU,
+        ) { activityContext: ActivityContext, itemInfo: ItemInfo, _: View ->
+            val file = itemInfo.homeScreenFile ?: return@PopupData
+            renameDialogFactory.create(activityContext, file).show()
+        }
+
+    private val deleteFileSystemItem =
+        PopupData(
+            iconResId = R.drawable.ic_home_screen_files_context_menu_move_to_trash,
+            labelResId =
+                if (HomeScreenFilesUtils.isTrashingEnabled())
+                    R.string.home_screen_files_context_menu_move_to_trash_label
+                else R.string.home_screen_files_context_menu_delete_permanently_label,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
+            eventId = LauncherEvent.LAUNCHER_HOME_SCREEN_FILES_DELETE_VIA_CONTEXT_MENU,
+            popupAction = PopupDataSource.removePopupData.popupAction,
         )
+
+    override fun getPopupDataByItemInfo(itemInfo: ItemInfo): List<PopupData>? {
+        return if (
+            itemInfo.itemType != ITEM_TYPE_FILE_SYSTEM_FILE &&
+                itemInfo.itemType != ITEM_TYPE_FILE_SYSTEM_FOLDER
+        )
+            null
+        else
+            buildList {
+                add(openHomeScreenFile)
+                if (enableHomeScreenFilesCopyPaste()) {
+                    add(copyFileSystemItem)
+                }
+                if (enableHomeScreenFilesRenaming()) {
+                    add(renameFileSystemItem)
+                }
+                add(deleteFileSystemItem)
+            }
+    }
+}
+
+object CustomWidgetSystemShortcuts : PopupDataMapper {
+
+    override fun getPopupDataByItemInfo(itemInfo: ItemInfo): List<PopupData>? =
+        if (itemInfo.itemType == ITEM_TYPE_CUSTOM_APPWIDGET) listOf(PopupDataSource.removePopupData)
+        else null
+}
+
+object UnusedShortcuts {
 
     private val handleAddToHomeScreenFromAllApps =
         { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
@@ -86,67 +229,8 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_plus,
             labelResId = R.string.action_add_to_workspace,
+            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
             popupAction = handleAddToHomeScreenFromAllApps,
-            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
-        )
-
-    // Handles action from tapping widget settings.
-    private val handleWidgetSettings =
-        { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
-            if (view is LauncherAppWidgetHostView) {
-                activityContext.setWaitingForResult(
-                    PendingRequestArgs.forWidgetInfo(
-                        view.appWidgetId,
-                        // Widget add handler is null since we're reconfiguring an existing widget.
-                        /* widgetHandler= */ null,
-                        itemInfo,
-                    )
-                )
-
-                activityContext.appWidgetHolder?.also {
-                    it.startConfigActivity(
-                        ActivityContext.lookupContext(view.context),
-                        view.appWidgetId,
-                        LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET,
-                    )
-                } ?: Log.e(TAG, "appWidgetHolder is null, cannot start config activity.")
-            }
-        }
-
-    // Popup data for widget settings shortcut.
-    val widgetSettingsPopupData =
-        PopupData(
-            iconResId = R.drawable.ic_setting,
-            labelResId = R.string.widget_settings,
-            popupAction = handleWidgetSettings,
-            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
-        )
-
-    // Handles action from tapping widgets shortcut.
-    private val handleWidgets =
-        { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
-            AbstractFloatingView.closeAllOpenViews(activityContext)
-            val widgetsBottomSheet =
-                activityContext
-                    .getLayoutInflater()
-                    .inflate(R.layout.widgets_bottom_sheet, activityContext.getDragLayer(), false)
-                    as WidgetsBottomSheet
-            widgetsBottomSheet.populateAndShow(itemInfo)
-            activityContext.statsLogManager
-                .logger()
-                .withItemInfo(itemInfo)
-                .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_WIDGETS_TAP)
-        }
-
-    // Popup data for widgets shortcut.
-    val widgetsPopupData =
-        PopupData(
-            iconResId =
-                if (Flags.enableLauncherVisualRefresh()) R.drawable.widgets_24px
-                else R.drawable.ic_widget,
-            labelResId = R.string.widget_button_text,
-            popupAction = handleWidgets,
-            category = PopupCategory.SYSTEM_SHORTCUT_FIXED,
         )
 
     // Handle action from tapping app info shortcut.
@@ -164,21 +248,16 @@ class PopupDataSource @Inject constructor() {
                 sourceBounds,
                 options.toBundle(),
             )
-            activityContext.statsLogManager
-                .logger()
-                .withItemInfo(itemInfo)
-                .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP)
         }
 
     // Popup data for app info shortcut.
     val appInfoPopupData =
         PopupData(
-            iconResId =
-                if (Flags.enableLauncherVisualRefresh()) R.drawable.info_24px
-                else R.drawable.ic_info_no_shadow,
+            iconResId = R.drawable.info_24px,
             labelResId = R.string.app_info_drop_target_label,
-            popupAction = handleAppInfo,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            eventId = LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP,
+            popupAction = handleAppInfo,
         )
 
     // Handle action from tapping private profile install shortcut.
@@ -193,10 +272,6 @@ class PopupDataSource @Inject constructor() {
                 )
             activityContext.startActivitySafely(view, intent, itemInfo)
             AbstractFloatingView.closeAllOpenViews(activityContext)
-            activityContext.statsLogManager
-                .logger()
-                .withItemInfo(itemInfo)
-                .log(LauncherEvent.LAUNCHER_PRIVATE_SPACE_INSTALL_SYSTEM_SHORTCUT_TAP)
         }
 
     // Popup data for private profile install shortcut.
@@ -204,8 +279,9 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_remove_no_shadow,
             labelResId = R.string.remove_drop_target_label,
-            popupAction = handlePrivateProfileInstall,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            eventId = LauncherEvent.LAUNCHER_PRIVATE_SPACE_INSTALL_SYSTEM_SHORTCUT_TAP,
+            popupAction = handlePrivateProfileInstall,
         )
 
     // Handles action from tapping install shortcut.
@@ -225,18 +301,14 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_install_no_shadow,
             labelResId = R.string.install_drop_target_label,
-            popupAction = handleInstall,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            popupAction = handleInstall,
         )
 
     // Handles action from tapping "don't suggest app" shortcut.
     private val handleDontSuggestApp =
         { activityContext: ActivityContext, itemInfo: ItemInfo, view: View ->
             dismissTaskMenuView(activityContext)
-            activityContext.statsLogManager
-                .logger()
-                .withItemInfo(itemInfo)
-                .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_DONT_SUGGEST_APP_TAP)
             Snackbar.show(
                 activityContext,
                 view.context.getString(R.string.item_removed),
@@ -256,8 +328,9 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_block_no_shadow,
             labelResId = R.string.dismiss_prediction_label,
-            popupAction = handleDontSuggestApp,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            eventId = LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_DONT_SUGGEST_APP_TAP,
+            popupAction = handleDontSuggestApp,
         )
 
     // Handles action when tapping uninstall app shortcut.
@@ -266,10 +339,7 @@ class PopupDataSource @Inject constructor() {
             dismissTaskMenuView(activityContext)
             val componentName = SecondaryDropTarget.getUninstallTarget(view.context, itemInfo)
             SecondaryDropTarget.performUninstall(view.context, componentName, itemInfo)
-            activityContext.statsLogManager
-                .logger()
-                .withItemInfo(itemInfo)
-                .log(LauncherEvent.LAUNCHER_PRIVATE_SPACE_UNINSTALL_SYSTEM_SHORTCUT_TAP)
+            Unit
         }
 
     // Popup data for uninstall app shortcut.
@@ -277,8 +347,9 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_uninstall_no_shadow,
             labelResId = R.string.uninstall_private_system_shortcut_label,
-            popupAction = handleUninstallApp,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            eventId = LauncherEvent.LAUNCHER_PRIVATE_SPACE_UNINSTALL_SYSTEM_SHORTCUT_TAP,
+            popupAction = handleUninstallApp,
         )
 
     // Handles action when tapping bubble shortcut.
@@ -329,20 +400,17 @@ class PopupDataSource @Inject constructor() {
         PopupData(
             iconResId = R.drawable.ic_bubble_button,
             labelResId = R.string.bubble,
-            popupAction = handleBubbleShortcut,
             category = PopupCategory.SYSTEM_SHORTCUT,
+            popupAction = handleBubbleShortcut,
         )
 
     private fun dismissTaskMenuView(activityContext: ActivityContext) {
-        AbstractFloatingViewHelper()
-            .closeOpenViews(
-                activityContext,
-                true,
-                AbstractFloatingView.TYPE_ALL and AbstractFloatingView.TYPE_REBIND_SAFE.inv(),
-            )
+        AbstractFloatingViewHelper.closeOpenViews(
+            activityContext,
+            true,
+            AbstractFloatingView.TYPE_ALL and AbstractFloatingView.TYPE_REBIND_SAFE.inv(),
+        )
     }
 
-    companion object {
-        private const val TAG = "PopupDataSource"
-    }
+    private const val TAG = "FileSystemShortcuts"
 }

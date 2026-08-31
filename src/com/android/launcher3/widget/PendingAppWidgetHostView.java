@@ -16,25 +16,19 @@
 
 package com.android.launcher3.widget;
 
-import static android.graphics.Paint.ANTI_ALIAS_FLAG;
-import static android.graphics.Paint.DITHER_FLAG;
-import static android.graphics.Paint.FILTER_BITMAP_FLAG;
-
+import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.graphics.PreloadIconDelegate.newPendingIcon;
 import static com.android.launcher3.model.data.LauncherAppWidgetInfo.FLAG_PROVIDER_NOT_READY;
 import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
+import android.animation.ObjectAnimator;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
-import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -67,6 +61,7 @@ import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.Themes;
+import com.android.launcher3.util.ViewEx;
 import com.android.launcher3.widget.ListenableAppWidgetHost.ProviderChangedListener;
 
 import java.util.List;
@@ -81,12 +76,9 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
     private static final int FLAG_DRAW_LABEL = 4;
 
     private static final int DEFERRED_ALPHA = 0x77;
-
+    private static final long PENDING_WIDGET_FADE_OUT_MS = 200L;
     private final Rect mRect = new Rect();
 
-    private final Matrix mMatrix = new Matrix();
-    private final RectF mPreviewBitmapRect = new RectF();
-    private final RectF mCanvasRect = new RectF();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final RunnableList mOnDetachCleanup = new RunnableList();
 
@@ -109,10 +101,9 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
     private final TextPaint mPaint;
 
-    private final Paint mPreviewPaint;
     private Layout mSetupTextLayout;
 
-    @Nullable private Bitmap mPreviewBitmap;
+    @Nullable private Drawable mPreviewDrawable;
 
     public PendingAppWidgetHostView(Context context, LauncherWidgetHolder widgetHolder,
             LauncherAppWidgetInfo info, @Nullable LauncherAppWidgetProviderInfo appWidget) {
@@ -121,9 +112,10 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
     public PendingAppWidgetHostView(Context context, LauncherWidgetHolder widgetHolder,
             LauncherAppWidgetInfo info, @Nullable LauncherAppWidgetProviderInfo appWidget,
-            @Nullable Bitmap previewBitmap) {
+            @Nullable Drawable previewDrawable) {
         this(context, widgetHolder, info, appWidget,
-                context.getResources().getText(R.string.gadget_complete_setup_text), previewBitmap);
+                context.getResources().getText(R.string.gadget_complete_setup_text),
+                previewDrawable);
         super.updateAppWidget(null);
         setOnClickListener(mActivityContext.getItemOnClickListener());
 
@@ -131,7 +123,8 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             info.pendingItemInfo = new PackageItemInfo(info.providerName.getPackageName(),
                     info.user);
             LauncherAppState.getInstance(context).getIconCache()
-                    .updateIconInBackground(this, info.pendingItemInfo, DEFAULT_LOOKUP_FLAG);
+                    .updateIconInBackground(getContext().getMainExecutor(), this,
+                            info.pendingItemInfo, DEFAULT_LOOKUP_FLAG);
         } else {
             reapplyItemInfo(info.pendingItemInfo);
         }
@@ -140,7 +133,7 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
     public PendingAppWidgetHostView(
             Context context, LauncherWidgetHolder widgetHolder,
             int appWidgetId, @NonNull LauncherAppWidgetProviderInfo appWidget) {
-        this(context, widgetHolder, new LauncherAppWidgetInfo(appWidgetId, appWidget.provider),
+        this(context, widgetHolder, new LauncherAppWidgetInfo(appWidgetId, appWidget),
                 appWidget, appWidget.label, null);
         getBackground().mutate().setAlpha(DEFERRED_ALPHA);
 
@@ -151,22 +144,23 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
     }
 
     /**
-     * Set {@link Bitmap} of widget preview and update background drawable. When showing preview
-     * bitmap, we shouldn't draw background.
+     * Updates the background to either a pending widget background drawable or the preview
+     * drawable.
      */
-    public void setPreviewBitmapAndUpdateBackground(@Nullable Bitmap previewBitmap) {
-        setBackgroundResource(previewBitmap != null ? 0 : R.drawable.pending_widget_bg);
-        if (this.mPreviewBitmap == previewBitmap) {
-            return;
+    public void setPreviewDrawableAndUpdateBackground(@Nullable Drawable previewDrawable) {
+        if (shouldShowPendingWidget(previewDrawable)) {
+            setBackgroundResource(R.drawable.pending_widget_bg);
+        } else if (mPreviewDrawable != previewDrawable) {
+            setBackground(previewDrawable);
         }
-        this.mPreviewBitmap = previewBitmap;
+        this.mPreviewDrawable = previewDrawable;
         invalidate();
     }
 
     private PendingAppWidgetHostView(Context context,
             LauncherWidgetHolder widgetHolder, LauncherAppWidgetInfo info,
             LauncherAppWidgetProviderInfo appwidget, CharSequence label,
-            @Nullable Bitmap previewBitmap) {
+            @Nullable Drawable previewDrawable) {
         super(new ContextThemeWrapper(context, R.style.WidgetContainerTheme));
         mWidgetHolder = widgetHolder;
         mAppwidget = appwidget;
@@ -179,12 +173,11 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         mPaint.setColor(Themes.getAttrColor(getContext(), android.R.attr.textColorPrimary));
         mPaint.setTextSize(TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_PX,
-                mActivityContext.getDeviceProfile().getWorkspaceIconProfile().getIconTextSizePx(),
+                mActivityContext.getDeviceProfile().getWorkspaceProfile().getIconTextSizePx(),
                 getResources().getDisplayMetrics()));
-        mPreviewPaint = new Paint(ANTI_ALIAS_FLAG | DITHER_FLAG | FILTER_BITMAP_FLAG);
 
         setWillNotDraw(false);
-        setPreviewBitmapAndUpdateBackground(previewBitmap);
+        setPreviewDrawableAndUpdateBackground(previewDrawable);
     }
 
     @Override
@@ -254,6 +247,23 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             launcher.removeItem(this, info, false  /* deleteFromDb */,
                     "widget removed because of configuration change");
             launcher.bindAppWidget(info);
+            animateShowReinflatedWidget(
+                    launcher.getWorkspace().getWidgetForAppWidgetId(info.appWidgetId));
+
+        }
+    }
+
+    private void animateShowReinflatedWidget(View reInflatedWidget) {
+        if (reInflatedWidget != null) {
+            Drawable snapshot = ViewEx.captureSnapshotAsDrawable(
+                    this, "PendingWidgetFadeOut", getWidth(), getHeight());
+            snapshot.setBounds(0, 0, getWidth(), getHeight());
+            reInflatedWidget.getOverlay().add(snapshot);
+
+            ObjectAnimator anim = ObjectAnimator.ofInt(snapshot, "alpha", 255, 0);
+            anim.setDuration(PENDING_WIDGET_FADE_OUT_MS).addListener(forEndCallback(
+                    () -> reInflatedWidget.getOverlay().remove(snapshot)));
+            anim.start();
         }
     }
 
@@ -402,7 +412,7 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
         int actualIconSize = (int) Math.min(
                 iconSize,
-                grid.getWorkspaceIconProfile().getIconSizePx()
+                grid.getWorkspaceProfile().getIconSizePx()
         );
 
         // Icon top when we do not draw the text
@@ -418,13 +428,13 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
 
             // Extra icon size due to the setting icon
             float minHeightWithText = textHeight + actualIconSize * settingIconScaleFactor
-                    + grid.getWorkspaceIconProfile().getIconDrawablePaddingPx();
+                    + grid.getWorkspaceProfile().getIconDrawablePaddingPx();
 
             if (minHeightWithText < availableHeight) {
                 // We can draw the text as well
                 iconTop = (getHeight()
                         - textHeight
-                        - grid.getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                        - grid.getWorkspaceProfile().getIconDrawablePaddingPx()
                         - actualIconSize) / 2;
 
             } else {
@@ -449,19 +459,13 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             // Set up position for dragging the text
             mRect.left = paddingLeft + minPadding;
             mRect.top = mCenterDrawable.getBounds().bottom
-                    + grid.getWorkspaceIconProfile().getIconDrawablePaddingPx();
+                    + grid.getWorkspaceProfile().getIconDrawablePaddingPx();
         }
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (mPreviewBitmap != null
-                && (mInfo.restoreStatus & LauncherAppWidgetInfo.FLAG_UI_NOT_READY) != 0) {
-            mPreviewBitmapRect.set(0, 0, mPreviewBitmap.getWidth(), mPreviewBitmap.getHeight());
-            mCanvasRect.set(0, 0, getWidth(), getHeight());
-
-            mMatrix.setRectToRect(mPreviewBitmapRect, mCanvasRect, Matrix.ScaleToFit.CENTER);
-            canvas.drawBitmap(mPreviewBitmap, mMatrix, mPreviewPaint);
+        if (!shouldShowPendingWidget(mPreviewDrawable)) {
             return;
         }
         if (mCenterDrawable == null) {
@@ -484,6 +488,11 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
             mSetupTextLayout.draw(canvas);
             canvas.restore();
         }
+    }
+
+    private boolean shouldShowPendingWidget(@Nullable Drawable previewDrawable) {
+        return previewDrawable == null
+                || (mInfo.restoreStatus & LauncherAppWidgetInfo.FLAG_UI_NOT_READY) == 0;
     }
 
     /**

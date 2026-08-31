@@ -83,12 +83,29 @@ public class ActiveGestureProtoLogProxy {
         }
     }
 
-    public static void logAbsSwipeUpHandlerOnRecentsAnimationFinished() {
+    public static void logAbsSwipeUpHandlerOnRecentsAnimationStartTimedOut() {
+        ActiveGestureLog.INSTANCE.addLog(
+                /* event= */ "AbsSwipeUpHandler.onRecentsAnimationStartTimedOut");
+        if (willProtoLog()) {
+            ProtoLog.d(PROTO_LOG_GROUP, "AbsSwipeUpHandler.onRecentsAnimationStartTimedOut");
+        }
+    }
+
+    public static void logRecentsAnimationCallbacksOnRecentsAnimationFinished() {
         ActiveGestureLog.INSTANCE.addLog(
                 /* event= */ "RecentsAnimationCallbacks.onAnimationFinished",
                 ON_FINISH_RECENTS_ANIMATION);
         if (willProtoLog()) {
-            ProtoLog.d(PROTO_LOG_GROUP, "AbsSwipeUpHandler.onAnimationFinished");
+            ProtoLog.d(PROTO_LOG_GROUP, "RecentsAnimationCallbacks.onAnimationFinished");
+        }
+    }
+
+    public static void logRecentsAnimationCallbacksOnAnimationStartTimedOut() {
+        ActiveGestureLog.INSTANCE.addLog(
+                /* event= */ "RecentsAnimationCallbacks.onRecentsAnimationStartTimedOut");
+        if (willProtoLog()) {
+            ProtoLog.d(PROTO_LOG_GROUP,
+                    "RecentsAnimationCallbacks.onRecentsAnimationStartTimedOut");
         }
     }
 
@@ -419,18 +436,6 @@ public class ActiveGestureProtoLogProxy {
         }
     }
 
-    public static void logFinishRunningRecentsAnimation(boolean toHome,
-            @NonNull ActiveGestureLog.CompoundString reason) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "TaskAnimationManager.finishRunningRecentsAnimation: toHome=%b, reason=",
-                toHome).append(reason));
-        if (willProtoLog()) {
-            ProtoLog.d(PROTO_LOG_GROUP,
-                    "TaskAnimationManager.finishRunningRecentsAnimation: toHome=%b, reason=%s",
-                    toHome, reason.toString());
-        }
-    }
-
     public static void logOnRecentsAnimationStartCancelled() {
         ActiveGestureLog.INSTANCE.addLog("RecentsAnimationCallbacks.onAnimationStart (canceled): 0",
                 /* gestureEvent= */ ON_START_RECENTS_ANIMATION);
@@ -635,12 +640,12 @@ public class ActiveGestureProtoLogProxy {
         }
     }
 
-    public static void logQueuingForceFinishRecentsAnimation() {
-        ActiveGestureLog.INSTANCE.addLog("Launcher destroyed while mRecentsAnimationStartPending =="
-                        + " true, queuing a callback to clean the pending animation up on start",
-                /* gestureEvent= */ ON_START_RECENTS_ANIMATION);
-        if (!enableActiveGestureProtoLog() || !isProtoLogInitialized()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG, "Launcher destroyed while mRecentsAnimationStartPending =="
-                + " true, queuing a callback to clean the pending animation up on start");
+    public static void logEarlyExitForCanceledAnimation(@NonNull String startNewTask) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "%s: aborting due to canceled shift animation", startNewTask));
+        if (willProtoLog()) {
+            ProtoLog.d(PROTO_LOG_GROUP,
+                    "%s: aborting due to canceled shift animation", startNewTask);
+        }
     }
 }

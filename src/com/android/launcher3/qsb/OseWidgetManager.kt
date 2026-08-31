@@ -21,11 +21,11 @@ import android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID
 import android.appwidget.AppWidgetProviderInfo
 import android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_SEARCHBOX
 import android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL
+import android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.os.Process.myUserHandle
 import android.util.Log
-import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.BaseActivity
@@ -35,11 +35,10 @@ import com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE
 import com.android.launcher3.R
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.graphics.theme.ThemePreference
 import com.android.launcher3.qsb.OSEManager.Companion.OSE_LOOPER
 import com.android.launcher3.qsb.OSEManager.OSEInfo
-import com.android.launcher3.qsb.QsbAppWidgetHost.Callbacks
 import com.android.launcher3.util.DaggerSingletonTracker
-import com.android.launcher3.util.MutableListenableRef
 import com.android.launcher3.util.PackageUserKey
 import com.android.launcher3.widget.WidgetManagerHelper
 import com.android.launcher3.widget.util.WidgetSizeHandler
@@ -60,42 +59,37 @@ constructor(
     private val sizeHandler: WidgetSizeHandler,
     private val idp: InvariantDeviceProfile,
     tracker: DaggerSingletonTracker,
+    themePreference: ThemePreference,
 ) {
 
-    private val mutableProviderInfo = MutableListenableRef<AppWidgetProviderInfo?>(null)
-    val providerInfo = mutableProviderInfo.asListenable()
+    private val mutableState = QsbAppWidgetHost.MutableState()
 
-    private val mutableViews = MutableListenableRef<RemoteViews?>(null)
-    val views = mutableViews.asListenable()
+    val providerInfo = mutableState.providerInfo.asListenable()
+    val views = mutableState.views.asListenable()
 
     private val executor = OSE_LOOPER
 
     init {
-        widgetHost.setCallbacks(
-            object : Callbacks {
-
-                override fun onProviderChanged(appWidget: AppWidgetProviderInfo?) =
-                    mutableProviderInfo.dispatchValue(appWidget)
-
-                override fun onViewsChanged(views: RemoteViews?) = mutableViews.dispatchValue(views)
-            }
-        )
-        widgetHost.startListening()
-
+        tracker.addCloseable(widgetHost.addCallbacks(mutableState))
         tracker.addCloseable(oseManager.oseInfo.forEach(executor, this::handleOseInfoUpdate))
 
         val idpListener = OnIDPChangeListener { updateWidgetSizeAsync() }
         idp.addOnChangeListener(idpListener)
-        tracker.addCloseable {
-            idp.removeOnChangeListener(idpListener)
-            widgetHost.stopListening()
-        }
+        tracker.addCloseable(themePreference.forEach(executor) { updateWidgetSizeAsync() })
+        tracker.addCloseable { idp.removeOnChangeListener(idpListener) }
     }
 
     private fun handleOseInfoUpdate(info: OSEInfo) {
         // If the package is null, leave it to the current value as the OSEManager
         // may not have initialized yet
-        val providerPkg = info.pkg ?: return
+        val providerPkg =
+            if (info.pkg != null) {
+                info.pkg
+            } else {
+                // When defaultSearchPackage is disabled oseInfo pkg is null.
+                dispatchNullValues()
+                return
+            }
         val searchWidget = findSearchWidgetForPackage(context, providerPkg)
 
         val currentWidgetId = widgetHost.getBoundWidgetId()
@@ -137,13 +131,13 @@ constructor(
     private fun updateWidgetSizeAsync() {
         val widgetId = widgetHost.getActiveWidgetId()
         if (widgetId != INVALID_APPWIDGET_ID) {
-            sizeHandler.updateSizeRangesAsync(widgetId, idp.numColumns, 1, executor)
+            sizeHandler.updateHotseatQsbSizeRangesAsync(widgetId, executor)
         }
     }
 
     private fun dispatchNullValues() {
-        if (mutableProviderInfo.value != null) mutableProviderInfo.dispatchValue(null)
-        if (mutableViews.value != null) mutableViews.dispatchValue(null)
+        if (mutableState.providerInfo.value != null) mutableState.providerInfo.dispatchValue(null)
+        if (mutableState.views.value != null) mutableState.views.dispatchValue(null)
     }
 
     fun startConfigActivity(activity: BaseActivity): Boolean {
@@ -183,9 +177,13 @@ constructor(
                         it.configure == null ||
                             ((it.widgetFeatures and WIDGET_FEATURE_CONFIGURATION_OPTIONAL) != 0)
                     }
-            return allEligibleWidgets.firstOrNull {
-                (it.widgetCategory and WIDGET_CATEGORY_SEARCHBOX) != 0
-            } ?: allEligibleWidgets.firstOrNull()
+            val allSearchBoxWidgets =
+                allEligibleWidgets.filter { (it.widgetCategory and WIDGET_CATEGORY_SEARCHBOX) != 0 }
+            return allSearchBoxWidgets.firstOrNull {
+                // If multiple search box widgets are available, choose the widget that is
+                // not hidden from the picker
+                (it.widgetFeatures and WIDGET_FEATURE_HIDE_FROM_PICKER) == 0
+            } ?: allSearchBoxWidgets.firstOrNull() ?: allEligibleWidgets.firstOrNull()
         }
     }
 }

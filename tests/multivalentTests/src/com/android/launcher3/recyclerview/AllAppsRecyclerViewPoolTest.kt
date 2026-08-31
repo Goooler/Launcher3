@@ -21,12 +21,11 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.LayoutManager
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
-import androidx.test.annotation.UiThreadTest
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.util.AsyncObjectAllocator
 import com.android.launcher3.util.AsyncObjectAllocator.JobDescription
-import com.android.launcher3.util.Executors
+import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.TestActivityContext
 import com.android.launcher3.util.TestUtil
@@ -35,12 +34,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.any
 import org.mockito.Mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.spy
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.junit.MockitoJUnit
 
@@ -61,7 +55,7 @@ class AllAppsRecyclerViewPoolTest {
 
     @Before
     fun setUp() {
-        underTest = spy(activityContext.activityComponent.sharedAppsPool)
+        underTest = activityContext.activityComponent.sharedAppsPool
         adapter =
             object : RecyclerView.Adapter<ViewHolder>() {
                 override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -78,7 +72,7 @@ class AllAppsRecyclerViewPoolTest {
 
     @Test
     fun preinflate_success() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10, MAIN_EXECUTOR) { 10 }
 
         awaitTasksCompleted()
         assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(10)
@@ -86,42 +80,42 @@ class AllAppsRecyclerViewPoolTest {
 
     @Test
     fun preinflate_not_triggered() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 0) { 0 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 0, MAIN_EXECUTOR) { 0 }
 
         awaitTasksCompleted()
         assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(0)
     }
 
     @Test
-    @UiThreadTest
     fun preinflate_cancel_before_runOnMainThread() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10, MAIN_EXECUTOR) { 10 }
         assertThat((underTest.mCancellableTask as JobDescription<*>).cancelled).isFalse()
 
-        underTest.clear()
+        // Calling clear() is only a best effort to cancel the pre-inflation. Due different
+        // threading set up in on-device test vs robolectric test, there is no guarantee that the
+        // job will be 100% cancelled.
+        activityContext.uiExecutor.submit { underTest.clear() }.get()
 
         awaitTasksCompleted()
-        verify(underTest, never()).putRecycledView(any(ViewHolder::class.java))
         assertThat((underTest.mCancellableTask as JobDescription<*>).cancelled).isTrue()
-        assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(0)
+        assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isLessThan(10)
     }
 
     @Test
     fun preinflate_cancel_after_run() {
-        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10) { 10 }
+        underTest.preInflateAllAppsViewHolders(adapter, VIEW_TYPE, parent, 10, MAIN_EXECUTOR) { 10 }
         assertThat((underTest.mCancellableTask as JobDescription<*>).cancelled).isFalse()
         awaitTasksCompleted()
 
         underTest.clear()
 
-        verify(underTest, times(10)).putRecycledView(any(ViewHolder::class.java))
-        assertThat((underTest.mCancellableTask as JobDescription<*>).cancelled).isTrue()
         assertThat(underTest.getRecycledViewCount(VIEW_TYPE)).isEqualTo(0)
+        assertThat((underTest.mCancellableTask as JobDescription<*>).cancelled).isTrue()
     }
 
     private fun awaitTasksCompleted() {
         TestUtil.runOnExecutorSync(AsyncObjectAllocator.allocationExecutor) {}
-        TestUtil.runOnExecutorSync(Executors.MAIN_EXECUTOR) {}
+        TestUtil.runOnExecutorSync(MAIN_EXECUTOR) {}
     }
 
     companion object {

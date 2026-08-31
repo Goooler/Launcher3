@@ -17,31 +17,29 @@
 package com.android.launcher3.dragndrop
 
 import android.view.DragEvent
-import com.android.launcher3.Launcher
-import com.android.launcher3.dagger.LauncherAppComponent
-import com.android.launcher3.util.DaggerSingletonObject
+import androidx.annotation.VisibleForTesting
+import com.android.launcher3.dragndrop.DragController.SystemDragHandler
 
 /** Controller for system-level drag-and-drop. */
-sealed class SystemDragController {
+sealed class SystemDragController : SystemDragHandler {
+
+    /** Return [false] to ignore all system-level drag events. */
+    override fun onDrag(event: DragEvent): Boolean = false
 
     /**
-     * Returns whether a drop of the specified item info should be accepted.
+     * Starts a system-level drag-and-drop sequence.
      *
-     * @param itemInfo The item info for which to determine acceptability.
-     * @return Whether a drop should be accepted.
+     * @param params The parameters to use for the sequence.
+     * @return The drag view for the sequence if started successfully.
      */
-    open fun acceptDrop(itemInfo: SystemDragItemInfo) = false
-
-    /**
-     * Sets the launcher for which to handle system-level drag-and-drop.
-     *
-     * @param launcher The launcher for which to handle system-level drag-and-drop.
-     */
-    open fun setLauncher(launcher: Launcher) {}
+    open fun startDrag(params: SystemDragParams): DragView? = null
 
     companion object {
-        @JvmField
-        val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getSystemDragController)
+        // Used as part of an imperfect proxy to restrict drags from other apps to only those
+        // originating from DocsUI. This should NOT be used to establish trust and any usages should
+        // degrade gracefully if extras matching this prefix are provided from another app.
+        @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+        const val DOCS_UI_EXTRA_PREFIX = "clipper:"
     }
 }
 
@@ -50,50 +48,3 @@ sealed class SystemDragController {
  * com.android.launcher3.Flags.FLAG_ENABLE_SYSTEM_DRAG} is disabled.
  */
 class SystemDragControllerStub : SystemDragController()
-
-/** Factory used to create listeners for system-level drag-and-drop. */
-typealias SystemDragListenerFactory = (@JvmSuppressWildcards Launcher) -> SystemDragListener
-
-/**
- * Production implementation of the controller for system-level drag-and-drop. Injected when {@link
- * com.android.launcher3.Flags.FLAG_ENABLE_SYSTEM_DRAG} is enabled.
- *
- * @param systemDragListenerFactory The factory used to create listeners for system-level
- *   drag-and-drop. A unique listener instance is created per handled drag-and-drop sequence.
- */
-class SystemDragControllerImpl(private val systemDragListenerFactory: SystemDragListenerFactory) :
-    SystemDragController(), DragController.SystemDragHandler {
-
-    private var launcher: Launcher? = null
-    private var systemDragListener: SystemDragListener? = null
-
-    override fun acceptDrop(itemInfo: SystemDragItemInfo) = itemInfo.uriList?.isEmpty() == false
-
-    override fun onDrag(event: DragEvent): Boolean =
-        continueDrag(event) ?: startDrag(event) ?: false
-
-    override fun setLauncher(launcher: Launcher) {
-        if (this.launcher != launcher) {
-            this.launcher?.dragController?.removeSystemDragHandler(this)
-            this.launcher = launcher.also { it.dragController?.addSystemDragHandler(this) }
-        }
-    }
-
-    private fun continueDrag(event: DragEvent): Boolean? = systemDragListener?.onDrag(event)
-
-    private fun startDrag(event: DragEvent): Boolean? =
-        launcher?.run {
-            dragController?.isDragging == false &&
-                event.action == DragEvent.ACTION_DRAG_STARTED &&
-                systemDragListenerFactory(this)
-                    .also { listener ->
-                        systemDragListener = listener
-                        listener.setCleanupCallback {
-                            if (systemDragListener == listener) {
-                                systemDragListener = null
-                            }
-                        }
-                    }
-                    .onDrag(event)
-        }
-}

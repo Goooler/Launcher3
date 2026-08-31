@@ -18,16 +18,26 @@ package com.android.launcher3.dagger
 
 import android.net.Uri
 import com.android.launcher3.util.SettingsCache.NOTIFICATION_BADGING_URI
+import com.android.launcher3.util.SettingsCache.TOUCHPAD_NATURAL_SCROLLING
 import dagger.Module
 import dagger.Provides
 import dagger.multibindings.IntoSet
 import javax.inject.Named
 
 @Module
-class SettingsModule {
+object SettingsModule {
 
     @Provides
     @IntoSet
     @Named("SETTINGS_ENABLED_BY_DEFAULT")
     fun provideNotificationBadgingDefaults(): Uri = NOTIFICATION_BADGING_URI
+
+    @Provides
+    @IntoSet
+    @Named("SETTINGS_ENABLED_BY_DEFAULT")
+    /**
+     * Align touchpad natural scrolling default value to the default value in
+     * [android.hardware.input.InputSettings.useTouchpadNaturalScrolling()].
+     */
+    fun provideTouchpadNaturalScrollingDefaults(): Uri = TOUCHPAD_NATURAL_SCROLLING
 }

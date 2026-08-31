@@ -24,6 +24,7 @@ import com.android.launcher3.Flags.enableReversibleHomeActionCorner
 import com.android.launcher3.concurrent.annotations.LightweightBackground
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.util.ActivityOptionsWrapper
+import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.OverviewCommandHelper
@@ -32,6 +33,7 @@ import com.android.quickstep.OverviewCommandHelper.CommandType.TOGGLE_OVERVIEW_P
 import com.android.quickstep.OverviewComponentObserver
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.TopTaskTracker
+import com.android.quickstep.dagger.SysUIConnectionSingleton
 import com.android.quickstep.util.AnimUtils
 import com.android.quickstep.util.GroupTask
 import com.android.quickstep.util.SingleTask
@@ -44,18 +46,17 @@ import com.android.systemui.shared.system.actioncorner.ActionCornerConstants.OVE
 import com.android.wm.shell.shared.GroupedTaskInfo
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.shared.split.SplitScreenConstants
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
-import dagger.assisted.AssistedInject
 import java.util.concurrent.Executor
 import java.util.function.Predicate
+import javax.inject.Inject
 
 /**
  * Handles actions triggered from action corners that are mapped to specific functionalities.
  * Launcher supports both overview and home actions.
  */
+@SysUIConnectionSingleton
 class ActionCornerHandler
-@AssistedInject
+@Inject
 constructor(
     @ApplicationContext private val context: Context,
     private val overviewComponentObserver: OverviewComponentObserver,
@@ -64,12 +65,8 @@ constructor(
     private val activityManagerWrapper: ActivityManagerWrapper,
     private val desktopState: DesktopState,
     @LightweightBackground private val executor: Executor,
-    @Assisted private val overviewCommandHelper: OverviewCommandHelper,
+    private val overviewCommandHelper: OverviewCommandHelper,
 ) {
-    @AssistedFactory
-    interface Factory {
-        fun create(overviewCommandHelper: OverviewCommandHelper): ActionCornerHandler
-    }
 
     private val displayToPreviousScreenMap = HashMap<Int, PreviousScreen>()
 
@@ -208,7 +205,8 @@ constructor(
         )
 
         val recentsViewContainer = getRecentsViewContainer(displayId) ?: return null
-        val endCallback = AnimUtils.completeRunnableListCallback(callbacks, recentsViewContainer)
+        val endCallback =
+            AnimUtils.completeRunnableListCallback(callbacks, recentsViewContainer, MAIN_EXECUTOR)
         options.setOnAnimationAbortListener(endCallback)
         options.setOnAnimationFinishedListener(endCallback)
         return ActivityOptionsWrapper(options, callbacks).options

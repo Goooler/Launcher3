@@ -27,7 +27,6 @@ import android.view.SurfaceControl.Transaction
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_BACK
-import android.window.DesktopModeFlags
 import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import androidx.core.animation.addListener
@@ -38,7 +37,7 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.launcher3.R
 import com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType
 import com.android.launcher3.desktop.DesktopAppLaunchTransition.Companion.LAUNCH_CHANGE_MODES
-import com.android.launcher3.util.DisplayController
+import com.android.launcher3.display.DisplayController
 import com.android.wm.shell.shared.animation.MinimizeAnimator
 import com.android.wm.shell.shared.animation.WindowAnimator
 
@@ -112,10 +111,7 @@ class DesktopAppLaunchAnimatorHelper(
         }
 
     private fun getTrampolineCloseChange(info: TransitionInfo): Change? {
-        if (
-            info.changes.size < 2 ||
-                !DesktopModeFlags.ENABLE_DESKTOP_TRAMPOLINE_CLOSE_ANIMATION_BUGFIX.isTrue
-        ) {
+        if (info.changes.size < 2) {
             return null
         }
         val openChange =
@@ -161,14 +157,12 @@ class DesktopAppLaunchAnimatorHelper(
             }
         val clipRect = Rect(change.endAbsBounds).apply { offsetTo(0, 0) }
         transaction.setCrop(change.leash, clipRect)
-        val displayContext = displayController.getInfoForDisplay(change.endDisplayId)?.getContext()
+        val displayContext = displayController.getInfoForDisplay(change.endDisplayId)?.context
         val animatorContext = displayContext ?: context
         val taskCornerRadiusInPx =
-            animatorContext.resources
-                .getDimensionPixelSize(
-                    R.dimen.desktop_windowing_freeform_task_rounded_corner_radius
-                )
-                .toFloat()
+            animatorContext.resources.getDimension(
+                R.dimen.desktop_windowing_freeform_task_rounded_corner_radius
+            )
         transaction.setCornerRadius(change.leash, taskCornerRadiusInPx)
         return AnimatorSet().apply {
             interactionJankMonitor.begin(change.leash, context, context.mainThreadHandler, cujType)

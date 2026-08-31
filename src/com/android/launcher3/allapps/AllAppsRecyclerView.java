@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMotionEvent;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import static com.android.launcher3.logger.LauncherAtom.SearchResultContainer;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_PERSONAL_SCROLLED_DOWN;
@@ -32,7 +33,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.InputDevice;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
@@ -41,6 +44,7 @@ import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.constraintlayout.widget.ConstraintSet;
 import androidx.core.util.Consumer;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.ExtendedEditText;
@@ -131,6 +135,42 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
     }
 
     @Override
+    public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (!shouldIgnoreMouseClickAndDrag(event)) {
+            return super.onInterceptTouchEvent(event);
+        }
+
+        if (event.getAction() != MotionEvent.ACTION_DOWN) {
+            MotionEvent cancelEvent = MotionEvent.obtain(event);
+            cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+            super.onInterceptTouchEvent(cancelEvent);
+            cancelEvent.recycle();
+        }
+        // Don't intercept mouse click or drag, so it can be be handled by child views.
+        return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (!shouldIgnoreMouseClickAndDrag(event)) {
+            return super.onTouchEvent(event);
+        }
+        if (event.getAction() != MotionEvent.ACTION_DOWN) {
+            MotionEvent cancelEvent = MotionEvent.obtain(event);
+            cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+            super.onTouchEvent(cancelEvent);
+            cancelEvent.recycle();
+        }
+        // Consume mouse click and drag events to prevent them from propagating to scroll.
+        return true;
+    }
+
+    private boolean shouldIgnoreMouseClickAndDrag(MotionEvent ev) {
+        return Flags.enableCursorDrivenWorkflows() && !isTrackpadMotionEvent(ev)
+                && ev.isFromSource(InputDevice.SOURCE_MOUSE);
+    }
+
+    @Override
     public void onScrollStateChanged(int state) {
         super.onScrollStateChanged(state);
 
@@ -149,6 +189,33 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
                 logCumulativeVerticalScroll();
                 break;
         }
+    }
+
+    @Override
+    public boolean canScrollVertically(int direction) {
+        // direction > 0 checks for scrolling down. Overriding this helps resolve issues where
+        // unmeasured items at the bottom are given a size of 0, underestimating the scroll range.
+        if (direction > 0) {
+            RecyclerView.LayoutManager layoutManager = getLayoutManager();
+            if (layoutManager instanceof LinearLayoutManager linearLayoutManager) {
+                int lastVisiblePosition =
+                        linearLayoutManager.findLastCompletelyVisibleItemPosition();
+                RecyclerView.Adapter<?> adapter = getAdapter();
+                if (lastVisiblePosition != NO_POSITION && adapter != null) {
+                    int targetCountLimit = adapter.getItemCount() - 1;
+                    // If the last item is the unmeasurable decorative footer, ignore it so we don't
+                    // get false positives when we are at the app list's bottom.
+                    if (targetCountLimit >= 0 && adapter.getItemViewType(targetCountLimit)
+                            == BaseAllAppsAdapter.VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO) {
+                        targetCountLimit--;
+                    }
+                    if (lastVisiblePosition < targetCountLimit) {
+                        return true; // There are more apps in the adapter, so we can scroll down.
+                    }
+                }
+            }
+        }
+        return super.canScrollVertically(direction);
     }
 
     @Override

@@ -47,9 +47,10 @@ import com.android.app.animation.Interpolators;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.taskbar.BarsLocationAnimatorHelper;
+import com.android.launcher3.taskbar.TaskbarUiState;
 import com.android.launcher3.taskbar.bubbles.animation.BubbleAnimator;
-import com.android.launcher3.util.DisplayController;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
@@ -134,9 +135,15 @@ public class BubbleBarView extends FrameLayout {
     // The amount the bubbles overlap when they are stacked in the bubble bar
     private final float mIconOverlapAmount;
     // The spacing between the bubbles when bubble bar is expanded
-    private final float mExpandedBarIconsSpacing;
+    private float mExpandedBarIconsSpacing;
     // The spacing between the bubbles and the borders of the bubble bar
     private float mBubbleBarPadding;
+    // The margin between the view bounds of the bubble bar and the visible background rect.
+    // 0 margin means that the background rect will be drawn along the edges of the view bounds.
+    // a non-0 margin is currently only used in persistent taskbar mode, where the spacing around
+    // each bubble has to be large enough for touches, but has to appear small between the bubbles
+    // and the background rect.
+    private float mBackgroundMargin = 0;
     // The size of a bubble in the bar
     private float mIconSize;
     // The scale of bubble icons
@@ -190,6 +197,9 @@ public class BubbleBarView extends FrameLayout {
     private BubbleView mDraggedBubbleView;
     @Nullable
     private BubbleView mDismissedByDragBubbleView;
+
+    @Nullable
+    private TaskbarUiState mTaskbarUiState;
     private float mAlphaDuringDrag = 1f;
 
     /** Additional translation in the y direction that is applied to each bubble */
@@ -233,18 +243,19 @@ public class BubbleBarView extends FrameLayout {
 
         setClipToPadding(false);
 
-        mBubbleBarBackground = new BubbleBarBackground(context, getBubbleBarExpandedHeight());
+        mBubbleBarBackground = new BubbleBarBackground(context, getBubbleBarExpandedHeight(),
+                mBackgroundMargin);
         setBackgroundDrawable(mBubbleBarBackground);
     }
 
+    public void setTaskbarUiState(TaskbarUiState taskbarUiState) {
+        mTaskbarUiState = taskbarUiState;
+        mTaskbarUiState.setBubbleBarExpanded(mIsBarExpanded);
+    }
 
-    /**
-     * Animates icon sizes and spacing between icons and bubble bar borders.
-     *
-     * @param newIconSize         new icon size
-     * @param newBubbleBarPadding spacing between icons and bubble bar borders.
-     */
-    public void animateBubbleBarIconSize(float newIconSize, float newBubbleBarPadding) {
+    /** Animates the bubble bar to new dimensions */
+    public void animateBubbleBarDimensions(float newIconSize, float newBubbleBarPadding,
+            float newSpacing, float newBackgroundMargin) {
         if (!isIconSizeOrPaddingUpdated(newIconSize, newBubbleBarPadding)) {
             return;
         }
@@ -255,13 +266,18 @@ public class BubbleBarView extends FrameLayout {
         scalePaddingAnimator.setDuration(SCALE_ANIMATION_DURATION_MS);
         boolean isPaddingUpdated = isPaddingUpdated(newBubbleBarPadding);
         boolean isIconSizeUpdated = isIconSizeUpdated(newIconSize);
+        boolean isSpacingUpdated = isExpandedSpacingUpdated(newSpacing);
+        boolean isBackgroundMarginUpdated = isBackgroundMarginUpdated(newBackgroundMargin);
         float initialScale = mIconScale;
         float initialPadding = mBubbleBarPadding;
+        float initialSpacing = mExpandedBarIconsSpacing;
+        float initialBgMargin = mBackgroundMargin;
         float targetScale = newIconSize / getScaledIconSize();
 
         addAnimationCallBacks(scalePaddingAnimator,
                 /* onStart= */ null,
-                /* onEnd= */ () -> setIconSizeAndPadding(newIconSize, newBubbleBarPadding),
+                /* onEnd= */ () -> setBubbleBarDimensions(newIconSize, newBubbleBarPadding,
+                        newSpacing, newBackgroundMargin),
                 /* onUpdate= */ animator -> {
                     float transitionProgress = (float) animator.getAnimatedValue();
                     if (isIconSizeUpdated) {
@@ -271,6 +287,14 @@ public class BubbleBarView extends FrameLayout {
                     if (isPaddingUpdated) {
                         mBubbleBarPadding = initialPadding
                                 + (newBubbleBarPadding - initialPadding) * transitionProgress;
+                    }
+                    if (isSpacingUpdated) {
+                        mExpandedBarIconsSpacing = initialSpacing
+                                + (newSpacing - initialSpacing) * transitionProgress;
+                    }
+                    if (isBackgroundMarginUpdated) {
+                        mBackgroundMargin = initialBgMargin
+                                + (newBackgroundMargin - initialBgMargin) * transitionProgress;
                     }
                     updateBubblesLayoutProperties(mBubbleBarLocation);
                     invalidate();
@@ -330,24 +354,20 @@ public class BubbleBarView extends FrameLayout {
         }
     }
 
-    /**
-     * Set the bubble icons size and spacing between the bubbles and the borders of the bubble
-     * bar.
-     */
-    public void setIconSizeAndPaddingForPinning(float newIconSize, float newBubbleBarPadding) {
+    /** Set dimensions for pinned taskbar */
+    public void setDimensionsForPinning(float newIconSize, float newBubbleBarPadding,
+            float newSpacing, float newBackgroundMargin) {
         mBubbleBarPadding = newBubbleBarPadding;
         mIconScale = newIconSize / mIconSize;
+        mExpandedBarIconsSpacing = newSpacing;
+        mBackgroundMargin = newBackgroundMargin;
         updateBubblesLayoutProperties(mBubbleBarLocation);
         invalidate();
     }
 
-    /**
-     * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
-     *
-     * @param newIconSize         new icon size
-     * @param newBubbleBarPadding newBubbleBarPadding between icons and bubble bar borders.
-     */
-    public void setIconSizeAndPadding(float newIconSize, float newBubbleBarPadding) {
+    /** Sets new bubble bar dimensions */
+    public void setBubbleBarDimensions(float newIconSize, float newBubbleBarPadding,
+            float newExpandedSpacing, float newBackgroundMargin) {
         // TODO(b/335457839): handle new bubble animation during the size change
         if (!isIconSizeOrPaddingUpdated(newIconSize, newBubbleBarPadding)) {
             return;
@@ -355,6 +375,8 @@ public class BubbleBarView extends FrameLayout {
         mIconScale = 1f;
         mBubbleBarPadding = newBubbleBarPadding;
         mIconSize = newIconSize;
+        mExpandedBarIconsSpacing = newExpandedSpacing;
+        mBackgroundMargin = newBackgroundMargin;
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View childView = getChildAt(i);
@@ -365,7 +387,7 @@ public class BubbleBarView extends FrameLayout {
             params.width = (int) mIconSize;
             childView.setLayoutParams(params);
         }
-        mBubbleBarBackground.setBackgroundHeight(getBubbleBarHeight());
+        mBubbleBarBackground.setBackgroundHeight(getBubbleBarHeight(), mBackgroundMargin);
         updateLayoutParams();
     }
 
@@ -459,6 +481,9 @@ public class BubbleBarView extends FrameLayout {
         }
         setLayoutParams(lp); // triggers a relayout
         updateBubbleAccessibilityStates();
+        if (mController != null) {
+            mController.onMarginUpdated();
+        }
     }
 
     /**
@@ -712,6 +737,23 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
+     * Returns the expanded start and end bounds with translation that may have been applied.
+     */
+    public int[] computeBubbleBarExpandedLeftRight() {
+        Rect expandedBounds = getBubbleBarBounds();
+        int[] leftRight = new int[2];
+        int restingExpandedWidth = (int) restingExpandedWidth();
+        if (mBubbleBarLocation.isOnLeft(isLayoutRtl())) {
+            leftRight[0] = expandedBounds.left;
+            leftRight[1] = expandedBounds.left + restingExpandedWidth;
+        } else {
+            leftRight[0] = expandedBounds.right - restingExpandedWidth;
+            leftRight[1] = expandedBounds.right;
+        }
+        return leftRight;
+    }
+
+    /**
      * Set bubble bar relative pivot value for X and Y, applied as a fraction of view width/height
      * respectively. If the value is not in range of 0 to 1 it will be normalized.
      *
@@ -878,6 +920,15 @@ public class BubbleBarView extends FrameLayout {
 
     /** Removes the given bubble from the bubble bar. */
     public void removeBubble(View bubble) {
+        removeBubble(bubble, /* onAnimationEndRunnable = */ null);
+    }
+
+    /**
+     * Removes the given bubble from the bubble bar.
+     *
+     * @param onAnimationEndRunnable action to run after the animation is ended.
+     */
+    public void removeBubble(View bubble, @Nullable Runnable onAnimationEndRunnable) {
         if (isExpanded()) {
             final boolean dismissedByDrag = mDraggedBubbleView == bubble;
             if (dismissedByDrag) {
@@ -893,6 +944,9 @@ public class BubbleBarView extends FrameLayout {
                 public void onAnimationEnd() {
                     removeView(bubble);
                     mBubbleAnimator = null;
+                    if (onAnimationEndRunnable != null) {
+                        onAnimationEndRunnable.run();
+                    }
                 }
 
                 @Override
@@ -1028,6 +1082,9 @@ public class BubbleBarView extends FrameLayout {
         }
 
         setLayoutParams(lp);
+        if (mController != null) {
+            mController.onMarginUpdated();
+        }
     }
 
     /**
@@ -1070,13 +1127,29 @@ public class BubbleBarView extends FrameLayout {
         Rect boundsOnScreen = mTempRect;
         getBoundsOnScreen(boundsOnScreen);
 
+        if (boundsOnScreen.height() == 0 || boundsOnScreen.width() == 0) {
+            if (com.android.wm.shell.Flags.fixBubbleBarFlickOnPinningAnimation()) {
+                // if the bubble bar is not yet measured, set its bounds to be the same as the
+                // fullscreen to calculate both vertical margins correctly.
+                boundsOnScreen.set(windowBounds);
+                boundsOnScreen.top = windowBounds.bottom / 2;
+            } else {
+                // if the bubble bar needs to do some measuring return the default margin
+                return mDefaultMargin;
+            }
+        }
+
         // The opposite margin avoids the cutout during a preview of changing the bubble bar
         // location. We flip the coordinates to calculate where the bubble bar will be when it
         // is moved and have the appropriate margin.
         boolean shouldFlipCoordinates = switch (mBubbleBarLocation) {
             case LEFT -> !isLeftSide;
             case RIGHT -> isLeftSide;
-            case DEFAULT -> (isLayoutRtl && isLeftSide) || (!isLayoutRtl && !isLeftSide);
+            case DEFAULT ->
+                // in the default case, if the layout is set to LTR, the bubble bar would be on the
+                // right, so we should flip the coordinates if we're computing for the left side in
+                // LTR, or similarly if we're computing for the right side in RTL.
+                (isLayoutRtl && !isLeftSide) || (!isLayoutRtl && isLeftSide);
         };
 
         if (shouldFlipCoordinates) {
@@ -1092,7 +1165,7 @@ public class BubbleBarView extends FrameLayout {
         if (isLeftSide) {
             int rightMostBound = windowBounds.left;
             for (Rect rect : displayCutoutRects) {
-                if (rect.left < midpoint && Rect.intersects(boundsOnScreen, rect)) {
+                if (rect.left < midpoint && adjustForCutout(boundsOnScreen, rect)) {
                     rightMostBound = Math.max(rightMostBound, rect.right);
                 }
             }
@@ -1100,7 +1173,7 @@ public class BubbleBarView extends FrameLayout {
         } else { // is on the right
             int leftMostBound = windowBounds.right;
             for (Rect rect : displayCutoutRects) {
-                if (rect.right > midpoint && Rect.intersects(boundsOnScreen, rect)) {
+                if (rect.right > midpoint && adjustForCutout(boundsOnScreen, rect)) {
                     leftMostBound = Math.min(leftMostBound, rect.left);
                 }
             }
@@ -1111,6 +1184,21 @@ public class BubbleBarView extends FrameLayout {
             return cutoutMargin + mCutoutPadding;
         }
         return originalMargin;
+    }
+
+    private static boolean adjustForCutout(Rect bubbleBarBounds, Rect cutout) {
+        if (bubbleBarBounds.top > cutout.bottom) {
+            // no need to adjust if the cutout is completely above the bubble bar
+            return false;
+        }
+        // we can't check if the cutout intersects the bubble bar because the bubble bar may be
+        // above it if hotseat was already adjusted for the cutout, so we have to check if there's
+        // an overlap on the x axis
+        return rectsOverlapOnXAxis(bubbleBarBounds, cutout);
+    }
+
+    private static boolean rectsOverlapOnXAxis(Rect a, Rect b) {
+        return a.left < b.right && a.right > b.left;
     }
 
     private DisplayCutout getDisplayCutout() {
@@ -1258,7 +1346,7 @@ public class BubbleBarView extends FrameLayout {
         mBubbleBarBackground.setArrowPosition(arrowPosition);
         mBubbleBarBackground.setArrowHeightFraction(widthState);
         mBubbleBarBackground.setWidth(interpolatedWidth);
-        mBubbleBarBackground.setBackgroundHeight(getBubbleBarExpandedHeight());
+        mBubbleBarBackground.setBackgroundHeight(getBubbleBarExpandedHeight(), mBackgroundMargin);
     }
 
     private float getScaleIconShift() {
@@ -1357,6 +1445,9 @@ public class BubbleBarView extends FrameLayout {
      */
     public void setSelectedBubble(BubbleView view) {
         BubbleView previouslySelectedBubble = mSelectedBubbleView;
+        if (previouslySelectedBubble != null) {
+            previouslySelectedBubble.setSelected(false);
+        }
         mSelectedBubbleView = view;
         mBubbleBarBackground.showArrow(view != null);
 
@@ -1365,6 +1456,7 @@ public class BubbleBarView extends FrameLayout {
             updateArrowForSelected(previouslySelectedBubble != null);
         }
         if (view != null) {
+            view.setSelected(true);
             if (isExpanded()) {
                 view.markSeen();
             } else {
@@ -1484,12 +1576,14 @@ public class BubbleBarView extends FrameLayout {
     private void setExpandedInternal(boolean isBarExpanded, boolean animate) {
         if (mIsBarExpanded == isBarExpanded) return;
         mIsBarExpanded = isBarExpanded;
+        if (mTaskbarUiState != null) {
+            mTaskbarUiState.setBubbleBarExpanded(mIsBarExpanded);
+        }
         updateArrowForSelected(/* shouldAnimate= */ false);
         setOrUnsetClickListener();
         if (animate) {
             mWidthAnimator = createExpansionAnimator(isBarExpanded);
             mWidthAnimator.start();
-            announceExpandedStateChange();
         } else {
             onExpandedChanged();
         }
@@ -1518,15 +1612,20 @@ public class BubbleBarView extends FrameLayout {
      * @return width of the bubble bar in its expanded state, regardless of current width
      */
     public float expandedWidth() {
-        final int childCount = getChildCount();
         final float horizontalPadding = 2 * mBubbleBarPadding;
         if (mBubbleAnimator != null && mBubbleAnimator.isRunning()) {
             return mBubbleAnimator.getExpandedWidth() + horizontalPadding;
         }
+        return restingExpandedWidth();
+    }
+
+    /** Resting expanded bubbles bar with, without expansion animation adjustments */
+    private float restingExpandedWidth() {
+        int childCount = getChildCount();
         // spaces amount is less than child count by 1, or 0 if no child views
         final float totalSpace = Math.max(childCount - 1, 0) * mExpandedBarIconsSpacing;
         final float totalIconSize = childCount * getScaledIconSize();
-        return totalIconSize + totalSpace + horizontalPadding;
+        return totalIconSize + totalSpace + 2 * mBubbleBarPadding;
     }
 
     /**
@@ -1594,6 +1693,25 @@ public class BubbleBarView extends FrameLayout {
         return super.onInterceptTouchEvent(ev);
     }
 
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        // this touch event handler is in place to increase the touch targets around the bubbles for
+        // accessibility
+        if (isExpanded() && !isExpanding()) {
+            float iconAndPadding = mIconSize + mExpandedBarIconsSpacing;
+            // split the bubble bar into horizontal segments where each segment corresponds to a
+            // bubble. segments are 0-indexed from left to right.
+            int segmentIndex = (int) (ev.getX() / iconAndPadding);
+            segmentIndex = Math.max(0, Math.min(getChildCount() - 1, segmentIndex));
+            // if the bubble bar is on the right, the segment index is the same as the bubble index.
+            // if the bubble bar is on the left we need to reverse the index.
+            final boolean onLeft = mBubbleBarLocation.isOnLeft(isLayoutRtl());
+            int bubbleIndex = onLeft ? getChildCount() - 1 - segmentIndex : segmentIndex;
+            return getChildAt(bubbleIndex).dispatchTouchEvent(ev);
+        }
+        return super.onTouchEvent(ev);
+    }
+
     private boolean hasOverflow() {
         // Overflow is always the last bubble
         View lastChild = getChildAt(getChildCount() - 1);
@@ -1653,26 +1771,6 @@ public class BubbleBarView extends FrameLayout {
         setContentDescription(contentDesc);
     }
 
-    private void announceExpandedStateChange() {
-        final CharSequence selectedBubbleContentDesc;
-        if (mSelectedBubbleView != null) {
-            selectedBubbleContentDesc = mSelectedBubbleView.getContentDescription();
-        } else {
-            selectedBubbleContentDesc = getResources().getString(
-                    R.string.bubble_bar_bubble_fallback_description);
-        }
-
-        final String msg;
-        if (mIsBarExpanded) {
-            msg = getResources().getString(R.string.bubble_bar_accessibility_announce_expand,
-                    selectedBubbleContentDesc);
-        } else {
-            msg = getResources().getString(R.string.bubble_bar_accessibility_announce_collapse,
-                    selectedBubbleContentDesc);
-        }
-        announceForAccessibility(msg);
-    }
-
     private boolean isIconSizeOrPaddingUpdated(float newIconSize, float newBubbleBarPadding) {
         return isIconSizeUpdated(newIconSize) || isPaddingUpdated(newBubbleBarPadding);
     }
@@ -1683,6 +1781,14 @@ public class BubbleBarView extends FrameLayout {
 
     private boolean isPaddingUpdated(float newBubbleBarPadding) {
         return Float.compare(mBubbleBarPadding, newBubbleBarPadding) != 0;
+    }
+
+    private boolean isExpandedSpacingUpdated(float newSpacing) {
+        return Float.compare(mExpandedBarIconsSpacing, newSpacing) != 0;
+    }
+
+    private boolean isBackgroundMarginUpdated(float newBackgroundMargin) {
+        return Float.compare(mBackgroundMargin, newBackgroundMargin) != 0;
     }
 
     private void addAnimationCallBacks(@NonNull ValueAnimator animator,
@@ -1844,5 +1950,8 @@ public class BubbleBarView extends FrameLayout {
 
         /** Notifies the controller that bubble bar expanded state changed */
         void onBubbleBarExpandedStateChanged(boolean expanded);
+
+        /** Notifies the controller that the bubble bar margin was updated */
+        void onMarginUpdated();
     }
 }

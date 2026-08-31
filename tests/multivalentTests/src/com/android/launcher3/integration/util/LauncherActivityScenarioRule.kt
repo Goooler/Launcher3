@@ -16,78 +16,47 @@
 
 package com.android.launcher3.integration.util
 
-import android.content.Context
-import android.os.SystemClock
-import android.view.InputDevice
-import android.view.KeyCharacterMap
-import android.view.KeyEvent
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
-import androidx.core.view.children
+import android.content.Intent
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ActivityScenario.ActivityAction
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
-import androidx.test.uiautomator.UiDevice
 import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherState
-import com.android.launcher3.debug.TestEventEmitter.TestEvent
-import com.android.launcher3.integration.events.EventWaiter
-import com.android.launcher3.integration.util.events.ActivityTestEvents.createStateWaiter
-import com.android.launcher3.tapl.TestHelpers
+import com.android.launcher3.testutil.Wait.atMost
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.TestUtil
-import com.android.launcher3.util.Wait.atMost
-import java.util.ArrayDeque
-import java.util.Queue
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import java.util.function.Supplier
-import org.junit.rules.TestRule
-import org.junit.runner.Description
-import org.junit.runners.model.Statement
+import org.junit.rules.ExternalResource
 
-open class LauncherActivityScenarioRule<LAUNCHER_TYPE : Launcher>(
-    val context: Context,
-    val initializeOnStart: Boolean = true,
-) : TestRule {
+open class LauncherActivityScenarioRule<LAUNCHER_TYPE : Launcher> : ExternalResource() {
 
     private var currentScenario: ActivityScenario<LAUNCHER_TYPE>? = null
-
-    @JvmField val uiDevice = UiDevice.getInstance(getInstrumentation())
 
     val activity: ActivityScenario<LAUNCHER_TYPE>
         get() =
             currentScenario
                 ?: ActivityScenario.launch<LAUNCHER_TYPE>(
-                        TestHelpers.getHomeIntentInPackage(context),
+                        Intent(Intent.ACTION_MAIN)
+                            .addCategory(Intent.CATEGORY_HOME)
+                            .setPackage(getInstrumentation().targetContext.packageName)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         null,
                     )
                     .also { currentScenario = it }
 
     fun initializeActivity() {
-        val onLauncherCreateWaiter = EventWaiter(TestEvent.LAUNCHER_ON_CREATE)
-        activity.onActivity { onLauncherCreateWaiter.terminate() }
-        activity.recreate()
+        currentScenario?.recreate()
         activity.moveToState(Lifecycle.State.RESUMED)
-        onLauncherCreateWaiter.waitForSignal()
         TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) {}
         TestUtil.runOnExecutorSync(Executors.UI_HELPER_EXECUTOR) {}
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        getInstrumentation().waitForIdleSync()
     }
 
-    override fun apply(base: Statement, description: Description?): Statement {
-        return object : Statement() {
-            override fun evaluate() {
-                if (initializeOnStart) {
-                    initializeActivity()
-                }
-                base.evaluate()
-                activity.close()
-            }
-        }
+    override fun after() {
+        close()
     }
 
     fun close() {
@@ -104,10 +73,8 @@ open class LauncherActivityScenarioRule<LAUNCHER_TYPE : Launcher>(
         return result.get()
     }
 
-    fun goToState(state: LauncherState) {
-        val stateWaiter = createStateWaiter(state)
-        executeOnLauncher { it.stateManager.goToState(state, 0) }
-        stateWaiter.waitForSignal()
+    fun goToState(state: LauncherState) = executeOnLauncher {
+        it.stateManager.goToState(state, false)
     }
 
     fun <T> getOnceNotNull(message: String, f: Function<LAUNCHER_TYPE, T?>): T? {
@@ -125,39 +92,34 @@ open class LauncherActivityScenarioRule<LAUNCHER_TYPE : Launcher>(
 
     @JvmOverloads
     fun injectKeyEvent(keyCode: Int, actionDown: Boolean, metaState: Int = 0) {
-        uiDevice.waitForIdle()
-        val eventTime = SystemClock.uptimeMillis()
-        val event =
-            KeyEvent(
-                eventTime,
-                eventTime,
-                if (actionDown) KeyEvent.ACTION_DOWN else MotionEvent.ACTION_UP,
-                keyCode,
-                /* repeat= */ 0,
-                metaState,
-                KeyCharacterMap.VIRTUAL_KEYBOARD,
-                /* scancode= */ 0,
-                /* flags= */ 0,
-                InputDevice.SOURCE_KEYBOARD,
-            )
-        executeOnLauncher { it.dispatchKeyEvent(event) }
+        executeOnLauncher {
+            it.dispatchKeyEvent(TestUtil.createKeyEvent(keyCode, metaState, actionDown))
+        }
     }
+
+    protected fun waitForLauncherCondition(message: String, condition: (LAUNCHER_TYPE) -> Boolean) =
+        atMost(message) { getFromLauncher(condition)!! }
+
+    fun waitForResumed() =
+        waitForLauncherCondition("Launcher activity never resumed") { it.hasBeenResumed() }
+
+    fun waitForStopped() =
+        waitForLauncherCondition("Launcher activity never stopped") { !it.isStarted }
 
     fun isInState(state: Supplier<LauncherState>): Boolean =
         getFromLauncher { it.stateManager.state == state.get() }!!
 
-    /**
-     * For the given view, it iterates over all of the child views in a preorder traversal returning
-     * the first match to the filter
-     */
-    fun ViewGroup.searchView(filter: (view: View) -> Boolean): View? {
-        val viewQueue: Queue<View> = ArrayDeque()
-        viewQueue.add(this)
-        while (!viewQueue.isEmpty()) {
-            val view = viewQueue.poll()
-            if (filter(view)) return view
-            if (view is ViewGroup) viewQueue.addAll(view.children)
+    /** Waits until the [condition] is not true */
+    fun waitUntil(message: String, condition: (LAUNCHER_TYPE) -> Boolean) =
+        atMost(message) { getFromLauncher(condition)!! }
+
+    /** Waits until the [condition] is non-null and returns the non-null value */
+    fun <T> waitAndGet(message: String, condition: (LAUNCHER_TYPE) -> T?): T {
+        var result: T? = null
+        atMost(message) {
+            result = getFromLauncher(condition)
+            result != null
         }
-        return null
+        return result!!
     }
 }

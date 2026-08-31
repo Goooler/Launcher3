@@ -16,7 +16,6 @@
 
 package com.android.launcher3.util
 
-import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.Context
 import android.content.ContextParams
@@ -26,8 +25,10 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ProviderInfo
 import android.content.res.Configuration
+import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
 import android.os.IBinder
+import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.provider.Settings.Global
@@ -38,6 +39,8 @@ import android.util.ArrayMap
 import android.view.Display
 import androidx.test.core.app.ApplicationProvider
 import com.android.launcher3.dagger.LauncherBaseAppComponent.Builder
+import com.android.launcher3.util.ContentProviderProxy.ProxyProvider
+import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -67,10 +70,11 @@ class SandboxApplication private constructor(private val base: SandboxApplicatio
     SandboxContext(base), TestRule {
 
     private val mockResolver = MockContentResolver()
-    private val manuallyNamedServices = ArrayMap<Class<*>, String>()
     private val spiedServices = ArrayMap<String, Any>()
+    internal val spiedServicesForChildren = ArrayMap<String, Any>()
+    internal val manuallyNamedServices = ArrayMap<Class<*>, String>()
     private val packageManager = spy(baseContext.packageManager)
-    private val dbDir = File(cacheDir, UUID.randomUUID().toString())
+    private val dbDir = File(cacheDir, UUID.randomUUID().toString()).apply { deleteRecursively() }
 
     private var lockModelThreadOnDestroy = false
 
@@ -107,6 +111,9 @@ class SandboxApplication private constructor(private val base: SandboxApplicatio
 
     override fun getDatabasePath(name: String) = File(dbDir.apply { if (!exists()) mkdirs() }, name)
 
+    override fun deleteDatabase(name: String): Boolean =
+        SQLiteDatabase.deleteDatabase(getDatabasePath(name))
+
     override fun getContentResolver(): ContentResolver = mockResolver
 
     override fun cleanUpObjects() {
@@ -121,20 +128,11 @@ class SandboxApplication private constructor(private val base: SandboxApplicatio
             }
             modelLock.await()
         }
-        if (deleteContents(dbDir)) {
-            dbDir.delete()
-        }
+        dbDir.deleteRecursively()
         super.cleanUpObjects()
         modelRelease.countDown()
-    }
-
-    private fun deleteContents(dir: File): Boolean {
-        var success = true
-        dir.listFiles()?.forEach {
-            if (it.isDirectory) success = success and deleteContents(it)
-            if (!it.delete()) success = false
-        }
-        return success
+        // Wait for all cleanup tasks to complete
+        TestUtil.runOnExecutorSync(MAIN_EXECUTOR) {}
     }
 
     override fun initDaggerComponent(componentBuilder: Builder) {
@@ -176,10 +174,25 @@ class SandboxApplication private constructor(private val base: SandboxApplicatio
         return result
     }
 
-    fun setupProvider(authority: String, provider: ContentProvider) {
+    inline fun <reified T : Any> spyService() = spyService(T::class.java)
+
+    /** Similar to [spyService] but also forces the same spy for child contexts */
+    fun <T> spyServiceForChildren(tClass: Class<T>, provider: (T?) -> T = { spy(it!!) }): T =
+        spyService(tClass, provider).apply {
+            spiedServicesForChildren[getSystemServiceName(tClass)] = this
+        }
+
+    inline fun <reified T : Any> spyServiceForChildren() = spyServiceForChildren(T::class.java)
+
+    fun setupProvider(authority: String, proxy: ProxyProvider) {
         val providerInfo = ProviderInfo()
         providerInfo.authority = authority
         providerInfo.applicationInfo = applicationInfo
+        val provider =
+            object : ContentProviderProxy() {
+                override fun getProxy(ctx: Context) = proxy
+            }
+
         provider.attachInfo(this, providerInfo)
         mockResolver.addProvider(providerInfo.authority, provider)
         doReturn(providerInfo)
@@ -208,6 +221,14 @@ class SandboxApplication private constructor(private val base: SandboxApplicatio
 
 private class SandboxApplicationWrapper(base: Context, var app: Context? = null) :
     ContextWrapper(base) {
+
+    override fun getSystemServiceName(tClass: Class<*>): String? =
+        (app as? SandboxApplication)?.manuallyNamedServices?.get(tClass)
+            ?: super.getSystemServiceName(tClass)
+
+    override fun getSystemService(name: String): Any? =
+        (app as? SandboxApplication)?.spiedServicesForChildren?.get(name)
+            ?: super.getSystemService(name)
 
     override fun getApplicationContext(): Context {
         return checkNotNull(app) { "SandboxApplication accessed before #init() was called." }
@@ -264,7 +285,9 @@ private class SandboxApplicationWrapper(base: Context, var app: Context? = null)
     }
 
     override fun createWindowContext(display: Display, type: Int, options: Bundle?): Context {
-        return SandboxApplicationWrapper(super.createWindowContext(display, type, options), app)
+        return spy(
+            SandboxApplicationWrapper(super.createWindowContext(display, type, options), app)
+        )
     }
 
     override fun createContext(contextParams: ContextParams): Context {
@@ -307,7 +330,7 @@ private class SandboxApplicationWrapper(base: Context, var app: Context? = null)
 private fun Context.checkUnlockedIfCredentialProtectedStorage() {
     if (!isCredentialProtectedStorage) return
     val userManager = checkNotNull(applicationContext.getSystemService(UserManager::class.java))
-    if (!userManager.isUserUnlockingOrUnlocked(UserHandle.myUserId())) {
+    if (!userManager.isUserUnlockingOrUnlocked(Process.myUserHandle())) {
         throw IllegalStateException("Encrypted SharedPreferences accessed while locked")
     }
 }

@@ -21,6 +21,7 @@ import static android.view.KeyEvent.ACTION_UP;
 
 import static com.android.internal.app.AssistUtils.INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS;
 import static com.android.internal.app.AssistUtils.INVOCATION_TYPE_KEY;
+import static com.android.systemui.shared.Flags.cueBarAceMigration;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_A11Y_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_A11Y_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_BACK_BUTTON_LONGPRESS;
@@ -29,6 +30,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_HOME_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_TAP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_MORE_OPTIONS_A11Y_BUTTON_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_OVERVIEW_BUTTON_TAP;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
@@ -36,19 +38,24 @@ import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SY
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 
 import android.app.contextualsearch.ContextualSearchConfig;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.os.UserHandle;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
+import android.view.SoundEffectConstants;
 import android.view.View;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import androidx.annotation.VisibleForTesting;
 
+import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.testing.TestLogging;
@@ -57,6 +64,7 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.systemui.contextualeducation.GestureType;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
@@ -99,6 +107,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
             BUTTON_A11Y,
             BUTTON_QUICK_SETTINGS,
             BUTTON_NOTIFICATIONS,
+            BUTTON_MORE_OPTIONS,
     })
 
     public @interface TaskbarButton {}
@@ -110,7 +119,8 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     static final int BUTTON_A11Y = BUTTON_IME_SWITCH << 1;
     static final int BUTTON_QUICK_SETTINGS = BUTTON_A11Y << 1;
     static final int BUTTON_NOTIFICATIONS = BUTTON_QUICK_SETTINGS << 1;
-    static final int BUTTON_SPACE = BUTTON_NOTIFICATIONS << 1;
+    static final int BUTTON_MORE_OPTIONS = BUTTON_NOTIFICATIONS << 1;
+    static final int BUTTON_SPACE = BUTTON_MORE_OPTIONS << 1;
 
     private static final int SCREEN_UNPIN_COMBO = BUTTON_BACK | BUTTON_RECENTS;
     private int mLongPressedButtons = 0;
@@ -120,6 +130,9 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     private final SystemUiProxy mSystemUiProxy;
     private final Handler mHandler;
     private final ContextualSearchInvoker mContextualSearchInvoker;
+    // The lifecycle of TaskbarNavButtonController for primary display can be as long as TIS, which
+    // is longer than TaskbarActivityContext. Thus we should clear ref of TaskbarControllers which
+    // holds a lot of TaskbarActivityContext lifecycle objs to avoid memory leaks.
     private TaskbarControllers mControllers;
     @Nullable private StatsLogManager mStatsLogManager;
 
@@ -177,6 +190,10 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
             case BUTTON_NOTIFICATIONS:
                 showNotifications();
                 break;
+            case BUTTON_MORE_OPTIONS:
+                logEvent(LAUNCHER_TASKBAR_MORE_OPTIONS_A11Y_BUTTON_TAP);
+                launchAccessibilityShortcutChooser();
+                break;
         }
     }
 
@@ -195,42 +212,50 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
             return false;
         }
 
+        boolean playHapticAndSound = false;
+
         switch (buttonType) {
             case BUTTON_HOME:
                 logEvent(LAUNCHER_TASKBAR_HOME_BUTTON_LONGPRESS);
                 onLongPressHome(view);
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
-                        HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-                return true;
+                playHapticAndSound = true;
+                break;
             case BUTTON_A11Y:
                 logEvent(LAUNCHER_TASKBAR_A11Y_BUTTON_LONGPRESS);
                 notifyA11yClick(true /* longClick */);
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
-                        HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-                return true;
+                playHapticAndSound = true;
+                break;
             case BUTTON_BACK:
                 logEvent(LAUNCHER_TASKBAR_BACK_BUTTON_LONGPRESS);
                 if (backRecentsLongpress(buttonType)) {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
-                            HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+                    playHapticAndSound = true;
                 }
-                return true;
+                break;
             case BUTTON_RECENTS:
                 logEvent(LAUNCHER_TASKBAR_OVERVIEW_BUTTON_LONGPRESS);
                 if (backRecentsLongpress(buttonType)) {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
-                            HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+                    playHapticAndSound = true;
                 }
-                return true;
+                break;
             case BUTTON_IME_SWITCH:
                 logEvent(LAUNCHER_TASKBAR_IME_SWITCHER_BUTTON_LONGPRESS);
                 onImeSwitcherLongPress();
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
-                        HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-                return true;
+                playHapticAndSound = true;
+                break;
+            case BUTTON_MORE_OPTIONS:
+                launchAccessibilityShortcutChooser();
+                playHapticAndSound = true;
+                break;
             default:
                 return false;
         }
+
+        if (playHapticAndSound) {
+            view.playSoundEffect(SoundEffectConstants.CLICK);
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
+                    HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+        }
+        return true;
     }
 
     public @StringRes int getButtonContentDescription(@TaskbarButton int buttonType) {
@@ -249,6 +274,8 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
                 return R.string.taskbar_button_notifications;
             case BUTTON_QUICK_SETTINGS:
                 return R.string.taskbar_button_quick_settings;
+            case BUTTON_MORE_OPTIONS:
+                return R.string.taskbar_button_more_options;
             default:
                 return 0;
         }
@@ -259,6 +286,9 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
      */
     public void onRecentsButtonLayoutChanged(Rect bounds) {
         mSystemUiProxy.notifyRecentsButtonPositionChanged(bounds);
+        if (cueBarAceMigration() && mControllers.cueBarController != null) {
+            mControllers.cueBarController.onRecentsButtonLayoutChanged(bounds);
+        }
     }
 
     private boolean backRecentsLongpress(@TaskbarButton int buttonType) {
@@ -323,6 +353,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
 
     public void onDestroy() {
         mStatsLogManager = null;
+        mControllers = null;
     }
 
     private void logEvent(StatsLogManager.LauncherEvent event) {
@@ -383,6 +414,19 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         mSystemUiProxy.onImeSwitcherLongPress();
     }
 
+    private void launchAccessibilityShortcutChooser() {
+        Intent intent = new Intent(
+                QuickStepContract.ACTION_LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG)
+                .setPackage(QuickStepContract.SYSUI_PACKAGE)
+                .putExtra(QuickStepContract.EXTRA_ACCESSIBILITY_DISPLAY_ID, mDisplayId)
+                .putExtra(
+                        QuickStepContract.EXTRA_ACCESSIBILITY_SHORTCUT_TYPE,
+                        UserShortcutType.SOFTWARE)
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+
+        mControllers.getTaskbarActivityContext().sendBroadcastAsUser(intent, UserHandle.CURRENT);
+    }
+
     private void notifyA11yClick(boolean longClick) {
         if (longClick) {
             mSystemUiProxy.notifyAccessibilityButtonLongClicked();
@@ -422,6 +466,11 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
 
     private void showNotifications() {
         mSystemUiProxy.toggleNotificationPanel();
+    }
+
+    @VisibleForTesting
+    boolean hasControllersSet() {
+        return mControllers != null;
     }
 
     /** Callbacks for navigation buttons on Taskbar. */

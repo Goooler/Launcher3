@@ -29,9 +29,10 @@ import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Bundle
-import android.os.Flags.allowPrivateProfile
 import android.os.IBinder
 import android.os.UserHandle
+import android.view.DragAndDropPermissions
+import android.view.DragEvent
 import android.view.SurfaceControlViewHost
 import android.widget.Toast
 import android.window.RemoteTransition
@@ -68,7 +69,7 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
         }
 
     override fun getAppMarketActivityIntent(packageName: String, user: UserHandle): Intent =
-        if (allowPrivateProfile() && enablePrivateSpace())
+        if (enablePrivateSpace())
             ProxyActivityStarter.getLaunchIntent(
                 mContext,
                 StartActivityParams(null as PendingIntent?, 0).apply {
@@ -89,7 +90,7 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
 
     /** Returns an intent which can be used to open Private Space Settings. */
     override fun getPrivateSpaceSettingsIntent(): Intent? =
-        if (allowPrivateProfile() && enablePrivateSpace())
+        if (enablePrivateSpace())
             ProxyActivityStarter.getLaunchIntent(
                 mContext,
                 StartActivityParams(null as PendingIntent?, 0).apply {
@@ -172,9 +173,6 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
         return StatusBarTouchController(launcher, isEnabledCheck)
     }
 
-    override fun isFileDrawable(shortcutInfo: ShortcutInfo) =
-        shortcutInfo.hasIconFile() || shortcutInfo.hasIconUri()
-
     override fun captureSnapshot(host: SurfaceControlViewHost, width: Int, height: Int): Bitmap =
         ScreenCaptureInternal.captureLayers(
                 ScreenCaptureInternal.LayerCaptureArgs.Builder(host.surfacePackage!!.surfaceControl)
@@ -185,4 +183,7 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
             )
             .asBitmap()
             .copy(Bitmap.Config.ARGB_8888, true)
+
+    override fun requestDragAndDropPermissions(event: DragEvent): DragAndDropPermissions? =
+        DragAndDropPermissions.obtain(event)
 }

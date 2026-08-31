@@ -22,30 +22,33 @@ import com.android.launcher3.model.data.WorkspaceChangeEvent.RemoveEvent
 import com.android.launcher3.model.data.WorkspaceChangeEvent.UpdateEvent
 import com.android.launcher3.model.data.WorkspaceData
 import com.android.launcher3.model.tasks.ModelRepoTestEx.TrackedUpdates
-import com.android.launcher3.util.Executors
+import com.android.launcher3.util.Executors.MODEL_EXECUTOR
 import com.android.launcher3.util.ListenableDiffAwareRef
 import com.android.launcher3.util.ListenableStream
+import com.android.launcher3.util.SafeCloseable
 import com.android.launcher3.util.TestUtil
 import com.google.common.truth.Truth.assertThat
+import java.util.concurrent.ExecutorService
 
-typealias TrackedWorkspaceUpdates = TrackedUpdates<WorkspaceData, WorkspaceChangeEvent?>
+typealias TrackedWorkspaceUpdates = TrackedUpdates<WorkspaceData, WorkspaceChangeEvent>
 
 object ModelRepoTestEx {
 
-    fun <T> ListenableStream<T>.trackUpdate() =
-        mutableListOf<T>().also { updates ->
-            TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) {}
-            forEach(Executors.MODEL_EXECUTOR) { updates.add(it) }
+    fun <T> ListenableStream<T>.trackUpdate(executor: ExecutorService = MODEL_EXECUTOR) =
+        mutableListOf<T>().let { updates ->
+            TestUtil.runOnExecutorSync(executor) {}
+            TrackedChanges(updates, forEach(executor) { updates.add(it) })
         }
 
-    fun <T, R> ListenableDiffAwareRef<T, R>.trackUpdateAndChanges() =
-        TrackedUpdates(updates = trackUpdate(), changes = changes.trackUpdate())
+    fun <T, R> ListenableDiffAwareRef<T, R>.trackUpdateAndChanges(
+        executor: ExecutorService = MODEL_EXECUTOR
+    ) = TrackedUpdates(updates = trackUpdate(executor), changes = changes.trackUpdate(executor))
 
     /** Verifies that the update list contains an update operation, and returns the updated items */
     fun TrackedWorkspaceUpdates.verifyAndGetItemsUpdated(
         updateIndex: Int = 1,
         totalUpdates: Int = 2,
-    ): List<ItemInfo> {
+    ): Set<ItemInfo> {
         assertThat(updates).hasSize(totalUpdates)
         assertThat(changes).hasSize(totalUpdates - 1)
         val updates = changes[updateIndex - 1] as UpdateEvent
@@ -59,5 +62,21 @@ object ModelRepoTestEx {
         assertThat(changes[deleteIndex - 1]).isInstanceOf(RemoveEvent::class.java)
     }
 
-    data class TrackedUpdates<T, R>(val updates: List<T>, val changes: List<R>)
+    data class TrackedUpdates<T, R>(
+        val updates: TrackedChanges<T>,
+        val changes: TrackedChanges<R>,
+    ) {
+        fun end() {
+            updates.end()
+            changes.end()
+        }
+    }
+
+    data class TrackedChanges<T>(
+        private val list: MutableList<T>,
+        private val endAction: SafeCloseable,
+    ) : List<T> by list {
+
+        fun end() = endAction.close()
+    }
 }

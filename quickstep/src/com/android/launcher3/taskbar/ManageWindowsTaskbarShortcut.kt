@@ -20,6 +20,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.MotionEvent
 import android.view.View
+import com.android.internal.jank.Cuj
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
@@ -27,6 +28,7 @@ import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.popup.SystemShortcut
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_MULTI_INSTANCE_MENU_OPEN
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext
+import com.android.launcher3.util.Executors.getTaskbarUiThread
 import com.android.launcher3.util.TouchController
 import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
@@ -34,6 +36,7 @@ import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.util.DesktopTask
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
+import com.android.systemui.shared.system.InteractionJankMonitorWrapper
 import com.android.wm.shell.shared.desktopmode.DesktopTaskToFrontReason
 import com.android.wm.shell.shared.multiinstance.ManageWindowsViewContainer
 
@@ -93,7 +96,6 @@ class ManageWindowsTaskbarShortcut<T>(
      */
     private fun createAndShowTaskShortcutView(tasks: List<Task>, pendingTaskIds: MutableSet<Int>) {
         val taskList = arrayListOf<Pair<Int, Bitmap?>>()
-
         tasks.forEach { task ->
             recentsModel.thumbnailCache.getThumbnailInBackground(task) {
                 thumbnailData: ThumbnailData ->
@@ -104,7 +106,7 @@ class ManageWindowsTaskbarShortcut<T>(
                 }
                 // If the set is empty, all thumbnails have been fetched
                 if (pendingTaskIds.isEmpty() && taskList.isNotEmpty()) {
-                    createAndPositionTaskbarShortcut(taskList)
+                    getTaskbarUiThread().execute { createAndPositionTaskbarShortcut(taskList) }
                 }
             }
         }
@@ -157,6 +159,11 @@ class ManageWindowsTaskbarShortcut<T>(
         )
     }
 
+    fun isMultiInstanceMenuOpen(): Boolean {
+        return ::taskbarShortcutAllWindowsView.isInitialized &&
+            taskbarShortcutAllWindowsView.menuView.scrollableMenuView.isAttachedToWindow
+    }
+
     /** Closes the multi-instance menu if it has been initialized. */
     fun closeMultiInstanceMenu() {
         if (::taskbarShortcutAllWindowsView.isInitialized) {
@@ -188,7 +195,15 @@ class ManageWindowsTaskbarShortcut<T>(
         init {
             createAndShowMenuView(snapshotList, onIconClickListener, onOutsideClickListener)
             taskbarOverlayContext.dragLayer.addTouchController(this)
-            animateOpen()
+            InteractionJankMonitorWrapper.begin(
+                originalView,
+                Cuj.CUJ_DESKTOP_MODE_TASKBAR_MULTI_INSTANCE_MENU_OPEN,
+            )
+            animateOpen {
+                InteractionJankMonitorWrapper.end(
+                    Cuj.CUJ_DESKTOP_MODE_TASKBAR_MULTI_INSTANCE_MENU_OPEN
+                )
+            }
         }
 
         /** Adds the carousel menu to the taskbar overlay drag layer */

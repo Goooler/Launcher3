@@ -32,6 +32,7 @@ import android.widget.ImageView;
 
 import androidx.constraintlayout.widget.ConstraintLayout;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.DotRenderer.IconShapeInfo;
@@ -57,6 +58,7 @@ public class BubbleView extends ConstraintLayout {
     private float mDragTranslationX;
     private float mOffsetX;
 
+    @Nullable
     private DotRenderer mDotRenderer;
     private final DotRenderer.DrawParams mDrawParams;
     private int mDotColor;
@@ -73,7 +75,7 @@ public class BubbleView extends ConstraintLayout {
     private BubbleBarItem mBubble;
     private boolean mIsOverflow;
 
-    private Bitmap mIcon;
+    private boolean mSelected;
 
     @Nullable
     private Controller mController;
@@ -120,6 +122,13 @@ public class BubbleView extends ConstraintLayout {
         mBubbleSize = updatedBubbleSize;
         if (mBubble == null || mBubble instanceof BubbleBarOverflow) return;
         mDotRenderer = new DotRenderer(mBubbleSize);
+    }
+
+    /**
+     * Mark this bubble as the selected bubble.
+     */
+    public void setSelected(boolean selected) {
+        mSelected = selected;
     }
 
     /**
@@ -173,23 +182,32 @@ public class BubbleView extends ConstraintLayout {
         mDrawParams.iconBounds = mTempBounds;
         mDrawParams.scale = mDotScale;
 
-        mDotRenderer.draw(canvas, mDrawParams);
+        if (mDotRenderer != null) {
+            mDotRenderer.draw(canvas, mDrawParams);
+        }
     }
 
     @Override
     public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfoInternal(info);
-        info.addAction(AccessibilityNodeInfo.ACTION_COLLAPSE);
-        if (mBubble instanceof BubbleBarBubble) {
-            info.addAction(AccessibilityNodeInfo.ACTION_DISMISS);
+        if (mSelected) {
+            info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE);
+        } else {
+            info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND);
         }
-        if (mController != null) {
-            if (mController.getBubbleBarLocation().isOnLeft(isLayoutRtl())) {
-                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_right,
-                        getResources().getString(R.string.bubble_bar_action_move_right)));
-            } else {
-                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_left,
-                        getResources().getString(R.string.bubble_bar_action_move_left)));
+        if (mBubble instanceof BubbleBarBubble) {
+            // These actions only apply to bubbles
+            info.addAction(AccessibilityNodeInfo.ACTION_DISMISS);
+            if (mController != null) {
+                final AccessibilityNodeInfo.AccessibilityAction action;
+                if (mController.getBubbleBarLocation().isOnLeft(isLayoutRtl())) {
+                    action = new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_right,
+                            getResources().getString(R.string.bubble_bar_action_move_right));
+                } else {
+                    action = new AccessibilityNodeInfo.AccessibilityAction(R.id.action_move_left,
+                            getResources().getString(R.string.bubble_bar_action_move_left));
+                }
+                info.addAction(action);
             }
         }
     }
@@ -205,6 +223,12 @@ public class BubbleView extends ConstraintLayout {
             }
             return true;
         }
+        if (action == AccessibilityNodeInfo.ACTION_EXPAND) {
+            if (mController != null) {
+                mController.expand(this);
+            }
+            return true;
+        }
         if (action == AccessibilityNodeInfo.ACTION_DISMISS) {
             if (mController != null) {
                 mController.dismiss(this);
@@ -216,26 +240,28 @@ public class BubbleView extends ConstraintLayout {
                 mController.updateBubbleBarLocation(BubbleBarLocation.LEFT,
                         BubbleBarLocation.UpdateSource.A11Y_ACTION_BUBBLE);
             }
+            return true;
         }
         if (action == R.id.action_move_right) {
             if (mController != null) {
                 mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT,
                         BubbleBarLocation.UpdateSource.A11Y_ACTION_BUBBLE);
             }
+            return true;
         }
         return false;
     }
 
-    void setController(@Nullable Controller controller) {
+    @VisibleForTesting
+    public void setController(@Nullable Controller controller) {
         mController = controller;
     }
 
     /** Sets the bubble being rendered in this view. */
     public void setBubble(BubbleBarBubble bubble) {
         mBubble = bubble;
-        mIcon = bubble.getIcon();
-        updateBubbleIcon();
-        if (bubble.getInfo().showAppBadge()) {
+        bubble.getIcon().setOnImageView(mBubbleIcon);
+        if (!bubble.getInfo().isApp()) {
             mAppIcon.setImageDrawable(bubble.getBadge().newIcon(getContext()));
         } else {
             mAppIcon.setVisibility(GONE);
@@ -248,14 +274,15 @@ public class BubbleView extends ConstraintLayout {
         }
         String appName = bubble.getInfo().getAppName();
         if (!TextUtils.isEmpty(appName)) {
-            contentDesc = getResources().getString(R.string.bubble_bar_bubble_description,
-                    contentDesc, appName);
+            if (bubble.getInfo().isChat()) {
+                contentDesc = getResources().getString(
+                        R.string.bubble_bar_bubble_description,
+                        contentDesc, appName);
+            } else {
+                contentDesc = appName;
+            }
         }
         setContentDescription(contentDesc);
-    }
-
-    private void updateBubbleIcon() {
-        mBubbleIcon.setImageBitmap(mIcon);
     }
 
     /**
@@ -267,8 +294,7 @@ public class BubbleView extends ConstraintLayout {
     public void setOverflow(BubbleBarOverflow overflow, Bitmap bitmap) {
         mBubble = overflow;
         mIsOverflow = true;
-        mIcon = bitmap;
-        updateBubbleIcon();
+        mBubbleIcon.setImageBitmap(bitmap);
         mAppIcon.setVisibility(GONE); // Overflow doesn't show the app badge
         setContentDescription(getResources().getString(R.string.bubble_bar_overflow_description));
     }
@@ -466,6 +492,9 @@ public class BubbleView extends ConstraintLayout {
 
         /** This bubble should be dismissed */
         void dismiss(BubbleView bubble);
+
+        /** Select the given bubble */
+        void expand(BubbleView bubble);
 
         /** Collapse the bubble bar */
         void collapse();

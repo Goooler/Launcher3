@@ -18,10 +18,11 @@ package com.android.launcher3
 
 import android.animation.AnimatorSet
 import android.view.View
-import android.window.RemoteTransition
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import com.android.app.animation.Interpolators
+import com.android.launcher3.Flags.enableTaskbarUiThread
+import com.android.launcher3.Flags.enableUnfoldStateAnimation
 import com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_ALIGNMENT
 import com.android.launcher3.logging.InstanceId
 import com.android.launcher3.logging.StatsLogManager
@@ -30,22 +31,37 @@ import com.android.launcher3.statemanager.StateManager.StateListener
 import com.android.launcher3.taskbar.TaskbarInteractor
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.uioverrides.QuickstepLauncher
+import com.android.launcher3.util.Executors.IMMEDIATE_EXECUTOR
+import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.SafeCloseable
+import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.util.ScalingWorkspaceRevealAnim
-import com.android.quickstep.util.SplitTask
-import com.android.quickstep.views.RecentsViewContainer
 import com.android.systemui.animation.ViewRootSync.synchronizeNextDraw
+import com.android.systemui.unfold.UnfoldTransitionProgressProvider
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import java.util.concurrent.Executor
 import javax.annotation.concurrent.ThreadSafe
 
 /** Expose [QuickstepLauncher] APIs to taskbar rendered on per-window UI thread. */
 @ThreadSafe
-class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: Executor) {
+class LauncherInteractor(private val launcher: QuickstepLauncher) : ActivityInteractor(launcher) {
+
+    val executor: Executor = if (enableTaskbarUiThread()) MAIN_EXECUTOR else IMMEDIATE_EXECUTOR
+
+    val launcherUiState: LauncherUiState = launcher.launcherUiState
+
+    val homeVisibilityState by lazy { SystemUiProxy.INSTANCE[launcher].homeVisibilityState }
 
     private var hotseatTranslationXAnimation: AnimatorSet? = null
 
-    @AnyThread fun getLauncherAsRecentViewContainer(): RecentsViewContainer = launcher
+    @Override
+    override fun getUnfoldTransitionProvider(): UnfoldTransitionProgressProvider? {
+        return if (!enableUnfoldStateAnimation()) {
+            launcher.unfoldTransitionProgressProvider
+        } else {
+            super.getUnfoldTransitionProvider()
+        }
+    }
 
     @AnyThread
     fun startScalingWorkspaceRevealAnim(playAlphaReveal: Boolean = true, playBlur: Boolean = true) {
@@ -64,6 +80,8 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
             updateHotseatAndQsbTranslationXInternal(targetValue, animate, isQsbInline)
         }
     }
+
+    @AnyThread fun isPostbootDialogVisible() = launcher.isShowingPostBootLoaderDialog
 
     /** Used to translate hotseat and QSB to make room for bubbles. */
     @MainThread
@@ -105,14 +123,14 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
 
     @AnyThread
     fun synchronizeNextDraw(view: View) {
-        executor.execute { synchronizeNextDraw(launcher.hotseat, view, Runnable {}) }
+        synchronizeNextDraw(launcher.hotseat, view, Runnable {})
     }
 
     @AnyThread
     fun setHotseatIconsAlpha(alpha: Float, @Hotseat.HotseatQsbAlphaId channelId: Int) {
         executor.execute {
             if (channelId == ALPHA_CHANNEL_TASKBAR_ALIGNMENT) {
-                launcher.getLauncherUiState().setTaskbarAlignmentChannelAlpha(alpha)
+                launcher.launcherUiState.taskbarAlignmentChannelAlpha = alpha
             }
             launcher.hotseat.setIconsAlpha(alpha, channelId)
         }
@@ -124,15 +142,18 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
     }
 
     @AnyThread
-    fun addStateListener(listener: StateListener<LauncherState>): SafeCloseable {
+    fun addStateListener(
+        listener: StateListener<LauncherState>,
+        runListenerExecutor: Executor,
+    ): SafeCloseable {
         val wrapperListener =
             object : StateListener<LauncherState>, SafeCloseable {
                 override fun onStateTransitionStart(toState: LauncherState?) {
-                    executor.execute { listener.onStateTransitionStart(toState) }
+                    runListenerExecutor.execute { listener.onStateTransitionStart(toState) }
                 }
 
                 override fun onStateTransitionComplete(finalState: LauncherState?) {
-                    executor.execute { listener.onStateTransitionComplete(finalState) }
+                    runListenerExecutor.execute { listener.onStateTransitionComplete(finalState) }
                 }
 
                 override fun close() {
@@ -154,20 +175,6 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
     }
 
     @AnyThread
-    fun postAdjustHotseatForBubbleBar(
-        isBubbleBarVisible: Boolean,
-        isTaskbarUiControllersSet: Boolean,
-    ) {
-        executor.execute {
-            launcher.hotseat.let {
-                if (isBubbleBarVisible && isTaskbarUiControllersSet) {
-                    it.post { it.adjustForBubbleBar(true) }
-                }
-            }
-        }
-    }
-
-    @AnyThread
     fun logAppLaunch(statsLogManager: StatsLogManager, info: ItemInfo, instanceId: InstanceId) {
         executor.execute { launcher.logAppLaunch(statsLogManager, info, instanceId) }
     }
@@ -178,8 +185,13 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
     }
 
     @AnyThread
-    fun launchSplitTasks(splitTask: SplitTask, remoteTransition: RemoteTransition?) {
-        executor.execute { launcher.launchSplitTasks(splitTask, remoteTransition) }
+    fun onTaskbarAllAppsClosed() {
+        executor.execute {
+            if (launcher.isResumed && launcher.stateManager.state == LauncherState.ALL_APPS) {
+                // TODO(b/414847564) - Connect swipe-to-close to state transition.
+                launcher.stateManager.goToState(LauncherState.NORMAL, /* animate= */ true)
+            }
+        }
     }
 
     @AnyThread
@@ -196,59 +208,10 @@ class LauncherInteractor(private val launcher: QuickstepLauncher, val executor: 
         }
     }
 
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.isResumed()"),
-    )
-    @MainThread
-    fun isResumed() = launcher.isResumed
+    @AnyThread
+    fun closeOpenViews() {
+        executor.execute { launcher.closeOpenViews() }
+    }
 
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.isResumed()"),
-    )
-    @MainThread
-    fun hasBeenResumed() = launcher.hasBeenResumed()
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.isTopResumedActivityRef.value()"),
-    )
-    @MainThread
-    fun isTopResumedActivity() = launcher.isTopResumedActivity
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.deviceProfileRef.value()"),
-    )
-    @MainThread
-    fun getDeviceProfile(): DeviceProfile = launcher.deviceProfile
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.isSplitSelectionActiveRef.value()"),
-    )
-    @MainThread
-    fun isSplitSelectActive() = launcher.isSplitSelectionActive
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.isOverlayShownRef.value()"),
-    )
-    @MainThread
-    fun isOverlayShown() = launcher.workspace.isOverlayShown
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.launcherStateRef.value()"),
-    )
-    @MainThread
-    fun getState(): LauncherState = launcher.stateManager.state
-
-    @Deprecated(
-        "Should be removed once we turned on [refactorTaskbarUiState()] flag",
-        ReplaceWith("LauncherUiState.taskbarAlignmentChannelAlphaRef.value()"),
-    )
-    fun getTaskbarAlignmentChannelAlpha() =
-        launcher.hotseat.getIconsAlpha(ALPHA_CHANNEL_TASKBAR_ALIGNMENT).value
+    @AnyThread fun isSplitSelectActive() = launcher.isSplitSelectionActive
 }

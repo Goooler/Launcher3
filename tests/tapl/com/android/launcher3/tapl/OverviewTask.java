@@ -124,22 +124,12 @@ public final class OverviewTask {
 
     /**
      * Returns the task snapshot (thumbnail) for the given `OverviewTaskContainer`.
-     * If there are no `taskContentView`'s, then the `enableRefactorTaskContentView` feature flag is
-     * off, in that case fallback to the `snapshotViewRes` id.
      */
     private UiObject2 getTaskSnapshot(OverviewTaskContainer overviewTaskContainer) {
         UiObject2 taskContentView = mTask.findObject(
                 mLauncher.getOverviewObjectSelector(overviewTaskContainer.taskContentViewRes));
-        if (taskContentView != null) {
-            BySelector snapshotSelector = mLauncher.getOverviewObjectSelector("snapshot");
-            UiObject2 snapshot = mTask.findObject(snapshotSelector);
-            if (snapshot != null) {
-                return snapshot;
-            }
-        }
-
-        return mTask.findObject(
-                mLauncher.getOverviewObjectSelector(overviewTaskContainer.snapshotViewRes));
+        BySelector snapshotSelector = mLauncher.getOverviewObjectSelector("snapshot");
+        return mTask.findObject(snapshotSelector);
     }
 
     /**
@@ -274,10 +264,9 @@ public final class OverviewTask {
             verifyActiveContainer();
             final boolean isDesktopTask = mType == TaskViewType.DESKTOP;
             final boolean hasDesktopTasks = hasDesktopTasks();
-            final int deskId = isDesktopTask ? getDeskId() : -1;
 
             mLauncher.executeAndWaitForLauncherStop(
-                    () -> mLauncher.clickLauncherObject(mTask),
+                    () -> mTask.click(),
                     "clicking an overview task");
             if (mOverview.getContainerType()
                     == LauncherInstrumentation.ContainerType.SPLIT_SCREEN_SELECT) {
@@ -314,9 +303,6 @@ public final class OverviewTask {
                                         LauncherInstrumentation.WAIT_TIME_MS,
                                         LauncherInstrumentation.DEFAULT_POLL_INTERVAL));
                         }
-                        mLauncher.assertEquals(
-                                "Active desk ID doesn't match opened task's desk ID",
-                                deskId, mLauncher.getActiveDeskId());
                     }
                 }
                 return new LaunchedAppState(mLauncher, isDesktopTask);
@@ -345,8 +331,7 @@ public final class OverviewTask {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "want to tap the task menu")) {
-            mLauncher.clickLauncherObject(
-                    mLauncher.waitForObjectInContainer(mTask, task.iconAppRes));
+            mLauncher.waitForObjectInContainer(mTask, task.iconAppRes).click();
 
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                     "tapped the task menu")) {
@@ -356,20 +341,18 @@ public final class OverviewTask {
     }
 
     /** Returns the number of the thumbnail views in the desktop task view tile. */
-    public int getDesktopThumbnailViewCount() {
+    private int getDesktopThumbnailViewCount() {
         mLauncher.assertTrue("Current task is not desktop task", isDesktop());
-        String thumbnailSelector = ":id/" + DESKTOP.snapshotViewRes;
+        String thumbnailSelector = ":id/snapshot";
         return mLauncher.waitForObjectsInContainer(mTask,
                 By.res(getOverviewPackageName() + thumbnailSelector)).size();
     }
 
     /**
      * Closes the Task of [activityName] from the desktop task view tile.
-     * Returns void here since after the close operation, we can either end up staying in overview,
-     * or going to the home screen (if all tasks are closed).
      * @param activityName activity name to be used to find the thumbnail.
      */
-    public void tapCloseDesktopThumbnailView(String activityName) {
+    public OverviewTask tapCloseDesktopThumbnailView(String activityName) {
         mLauncher.assertTrue("Current task is not desktop task", isDesktop());
 
         int thumbnailViewCount = getDesktopThumbnailViewCount();
@@ -380,25 +363,20 @@ public final class OverviewTask {
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "wanted to tap the close button")) {
             UiObject2 thumbnailViewHeader = getDesktopThumbnailViewHeader(activityName);
-            final Runnable clickClose = () -> mLauncher.clickLauncherObject(
-                    mLauncher.waitForObjectInContainer(
-                            thumbnailViewHeader, DESKTOP_TASK_THUMBNAIL_VIEW_HEADER_CLOSE_BUTTON));
-
+            mLauncher.waitForObjectInContainer(
+                    thumbnailViewHeader, DESKTOP_TASK_THUMBNAIL_VIEW_HEADER_CLOSE_BUTTON).click();
             if (thumbnailViewCount > 1) {
                 // There still should be other thumbnail views in the desktop task view, check its
                 // count.
-                clickClose.run();
                 int newThumbnailViewCount = getDesktopThumbnailViewCount();
                 mLauncher.assertEquals("Had " + thumbnailViewCount + " thumbnail views "
                                 + "before, now have "
                                 + newThumbnailViewCount + " thumbnail views after clicking close. ",
                         thumbnailViewCount - 1, newThumbnailViewCount);
             } else {
-                // State change from Overview to Home screen.
-                mLauncher.runToState(clickClose, NORMAL_STATE_ORDINAL,
-                        "clicking to close one thumbnail view and going to home");
-                new Workspace(mLauncher);
+                mLauncher.waitUntilOverviewObjectGone(":id/snapshot");
             }
+            return new OverviewTask(mLauncher, mTask, mOverview);
         }
     }
 
@@ -416,7 +394,7 @@ public final class OverviewTask {
             UiObject2 thumbnailView = getDesktopThumbnailView(activityName);
             mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, TASK_START_EVENT_DESKTOP);
             mLauncher.executeAndWaitForLauncherStop(
-                    () -> mLauncher.clickLauncherObject(thumbnailView),
+                    thumbnailView::click,
                     "clicking on a desktop thumbnail view");
             return new LaunchedAppState(mLauncher, /* inDesktopMode= */ true);
         }
@@ -457,9 +435,7 @@ public final class OverviewTask {
     private UiObject2 getDesktopThumbnailView(String activityName) {
         mLauncher.assertTrue("Current task is not a desktop task.", isDesktop());
 
-        // We use the snapshotViewRes for the desktop container (`snapshot`) as the identifier
-        // for individual thumbnail views within the desktop tile.
-        String thumbnailSelector = ":id/" + DESKTOP.snapshotViewRes;
+        String thumbnailSelector = ":id/snapshot";
         UiObject2 activityThumbnail = mLauncher.waitForObjectBySelector(
                 By.res(getOverviewPackageName() + thumbnailSelector)
                         .descContains(activityName));
@@ -549,25 +525,19 @@ public final class OverviewTask {
      */
     public enum OverviewTaskContainer {
         // The main task when the task is not split.
-        DEFAULT("task_content_view", "snapshot", "icon"),
+        DEFAULT("task_content_view", "icon"),
         // The first task in split task.
-        SPLIT_TOP_OR_LEFT("task_content_view", "snapshot", "icon"),
+        SPLIT_TOP_OR_LEFT("task_content_view", "icon"),
         // The second task in split task.
-        SPLIT_BOTTOM_OR_RIGHT("bottomright_task_content_view", "bottomright_snapshot",
-                "bottomRight_icon"),
+        SPLIT_BOTTOM_OR_RIGHT("bottomright_task_content_view", "bottomRight_icon"),
         // The desktop task.
-        DESKTOP("background", "snapshot", "icon");
+        DESKTOP("background", "icon");
 
         public final String taskContentViewRes;
-        // TODO (b/409248525) Delete `snapshotViewRes` when cleaning up
-        //  enableRefactorTaskContentView flag.
-        public final String snapshotViewRes;
         public final String iconAppRes;
 
-        OverviewTaskContainer(String taskContentViewRes, String snapshotViewRes,
-                String iconAppRes) {
+        OverviewTaskContainer(String taskContentViewRes, String iconAppRes) {
             this.taskContentViewRes = taskContentViewRes;
-            this.snapshotViewRes = snapshotViewRes;
             this.iconAppRes = iconAppRes;
         }
     }

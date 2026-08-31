@@ -23,6 +23,7 @@ import com.android.launcher3.celllayout.CellPosMapper
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.icons.IconCache
 import com.android.launcher3.model.BgDataModel.FixedContainerItems
+import com.android.launcher3.model.BgDataModel.ModificationSource.ModelTask
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
@@ -39,6 +40,7 @@ constructor(
     val dataModel: BgDataModel,
     val allAppsList: AllAppsList,
     val model: LauncherModel,
+    val modelWriterFactory: ModelWriterFactory,
 ) {
 
     private val uiExecutor = MAIN_EXECUTOR
@@ -54,7 +56,14 @@ constructor(
      * Updates from model task, do not deal with icon position in hotseat. Also no need to verify
      * changes as the ModelTasks always push the changes to callbacks
      */
-    fun getModelWriter() = model.getWriter(false /* verifyChanges */, CellPosMapper.DEFAULT, null)
+    fun getModelWriter(): IModelWriter =
+        modelWriterFactory.create(
+            verifyChanges = false,
+            CellPosMapper.DEFAULT,
+            modificationSource = ModelTask,
+            // TODO: (b/455016031) - Remove owner from ModelWriter
+            owner = null,
+        )
 
     fun bindUpdatedWorkspaceItems(allUpdates: Collection<ItemInfo>) {
         // Bind workspace items

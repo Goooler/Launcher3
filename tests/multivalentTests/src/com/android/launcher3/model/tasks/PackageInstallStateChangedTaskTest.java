@@ -37,6 +37,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.Flags;
+import com.android.launcher3.UtilitiesKt;
 import com.android.launcher3.model.TestableModelState;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -45,7 +46,6 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LauncherLayoutBuilder;
-import com.android.launcher3.util.LayoutResource;
 import com.android.launcher3.util.ModelTestExtensions;
 import com.android.launcher3.util.SandboxApplication;
 import com.android.launcher3.util.rule.InstallerSessionRule;
@@ -70,7 +70,6 @@ public class PackageInstallStateChangedTaskTest {
 
     @Rule public SandboxApplication mContext = new SandboxApplication().withModelDependency();
     @Rule public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
-    @Rule public LayoutResource mLayout = new LayoutResource(mContext);
     @Rule public InstallerSessionRule mInstallerSessionRule = new InstallerSessionRule();
 
     private final List<AppInfo> mIncrementalUpdates = new ArrayList<>();
@@ -99,7 +98,7 @@ public class PackageInstallStateChangedTaskTest {
                 .atWorkspace(0, 0, 10).putApp(PENDING_APP_2, TEST_ACTIVITY3);           // 10
 
         mDownloadingApps = IntSet.wrap(4, 5, 6, 7, 8, 9, 10);
-        mLayout.set(builder);
+        ModelTestExtensions.setModelLayout(mContext, builder);
         assertTrue(mModelState.model.isModelLoaded());
         assertEquals(10, countPersistedModelItems(mModelState.dataModel.itemsIdMap));
 
@@ -154,7 +153,7 @@ public class PackageInstallStateChangedTaskTest {
     private void verifyProgressUpdate(int progress, int... idsUpdated) {
         IntSet updates = IntSet.wrap(idsUpdated);
         for (ItemInfo info : mModelState.dataModel.itemsIdMap) {
-            if (info.id < 0 || !ModelTestExtensions.isPersistedModelItem(info)) continue;
+            if (info.id < 0 || !UtilitiesKt.isPersistedModelItem(info)) continue;
             int expectedProgress = updates.contains(info.id) ? progress
                     : (mDownloadingApps.contains(info.id) ? 0 : 100);
             if (info instanceof WorkspaceItemInfo wi) {

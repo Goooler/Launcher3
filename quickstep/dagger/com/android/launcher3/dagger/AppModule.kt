@@ -19,9 +19,9 @@ package com.android.launcher3.dagger
 import com.android.launcher3.MainProcessInitializer
 import com.android.launcher3.model.ModelDelegate
 import com.android.launcher3.model.QuickstepModelDelegate
-import com.android.launcher3.testing.TestInformationHandler
+import com.android.launcher3.util.BaseDefaultsValueProvider
+import com.android.launcher3.util.DefaultsValueProvider
 import com.android.quickstep.QuickstepProcessInitializer
-import com.android.quickstep.QuickstepTestInformationHandler
 import dagger.Binds
 import dagger.Module
 
@@ -35,12 +35,14 @@ abstract class AppModule {
     @Binds abstract fun bindModelDelegate(impl: QuickstepModelDelegate): ModelDelegate
 
     @Binds
+    abstract fun bindBaseDefaultsValueProvider(
+        impl: BaseDefaultsValueProvider
+    ): DefaultsValueProvider
+
+    @Binds
     abstract fun bindMainProcessInitializer(
         impl: QuickstepProcessInitializer
     ): MainProcessInitializer
-
-    @Binds
-    abstract fun bindTestInformationHandler(
-        impl: QuickstepTestInformationHandler
-    ): TestInformationHandler
 }
+
+@Module abstract class ProductionAppModule

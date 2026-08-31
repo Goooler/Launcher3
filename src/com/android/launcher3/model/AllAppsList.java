@@ -32,6 +32,7 @@ import androidx.annotation.NonNull;
 
 import com.android.launcher3.AppFilter;
 import com.android.launcher3.Flags;
+import com.android.launcher3.automation.AutomationRepository;
 import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.icons.IconCache;
@@ -51,7 +52,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -229,9 +229,9 @@ public class AllAppsList {
     }
 
     /**
-     * Updates the disabled flags of apps matching {@param matcher} based on {@param op}.
+     * Updates the runtime flags of apps matching {@param matcher} based on {@param op}.
      */
-    public void updateDisabledFlags(Predicate<ItemInfo> matcher, FlagOp op) {
+    public void updateRuntimeFlags(Predicate<ItemInfo> matcher, FlagOp op) {
         final List<AppInfo> data = this.data;
         for (int i = data.size() - 1; i >= 0; i--) {
             AppInfo info = data.get(i);
@@ -252,22 +252,19 @@ public class AllAppsList {
         }
     }
 
-    /**
-     * Add and remove icons for this package which has been updated.
-     * @param outRemovedComponents any component removed as a result of this update will
-     *                            be added to this set
-     */
+    /** Add and remove icons for this package which has been updated. */
     public List<LauncherActivityInfo> updatePackage(
-            Context context, String packageName, UserHandle user,
-            Set<ComponentName> outRemovedComponents) {
+            Context context, String packageName, UserHandle user) {
         final ApiWrapper apiWrapper = ApiWrapper.INSTANCE.get(context);
         final UserCache userCache = UserCache.getInstance(context);
         final PackageManagerHelper pmHelper = PackageManagerHelper.INSTANCE.get(context);
+        final AutomationRepository automationRepo = AutomationRepository.INSTANCE.get(context);
         final List<LauncherActivityInfo> matches = context.getSystemService(LauncherApps.class)
                 .getActivityList(packageName, user);
 
         Map<ComponentName, LauncherActivityInfo> activityMap = matches.stream().collect(
-                Collectors.toMap(LauncherActivityInfo::getComponentName, lai -> lai));
+                Collectors.toMap(LauncherActivityInfo::getComponentName, lai -> lai,
+                    (existing, replacement) -> existing));
 
         Iterator<AppInfo> iterator = data.iterator();
         while (iterator.hasNext()) {
@@ -279,7 +276,6 @@ public class AllAppsList {
                 if (lai == null) {
                     // Remove any component which is no longer in the list
                     mIconCache.remove(cn, user);
-                    outRemovedComponents.add(cn);
                     iterator.remove();
                     if (DEBUG) {
                         Log.w(TAG, "updatePackage: removing unavailable component, cn=" + cn
@@ -290,7 +286,7 @@ public class AllAppsList {
                     mIconCache.getTitleAndIcon(appInfo, lai, DEFAULT_LOOKUP_FLAG);
                     appInfo.sectionName = mIndex.computeSectionName(appInfo.title);
                     AppInfo.updateRuntimeFlagsForActivityTarget(appInfo, lai,
-                            userCache.getUserInfo(user), apiWrapper, pmHelper);
+                            userCache.getUserInfo(user), apiWrapper, pmHelper, automationRepo);
                 }
                 mDataChanged = true;
             }

@@ -23,10 +23,11 @@ import android.content.Context
 import android.graphics.Rect
 import android.os.Bundle
 import android.util.SizeF
+import com.android.launcher3.DeviceProfile
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
-import com.android.launcher3.dagger.LauncherComponentProvider.get
+import com.android.launcher3.graphics.theme.ThemePreference
 import com.android.launcher3.util.Executors
 import java.util.concurrent.Executor
 import javax.inject.Inject
@@ -37,6 +38,7 @@ open class WidgetSizeHandler
 constructor(
     @ApplicationContext private val context: Context,
     private val idp: InvariantDeviceProfile,
+    private val themePreference: ThemePreference,
 ) {
 
     /**
@@ -56,27 +58,55 @@ constructor(
         spanY: Int,
         executor: Executor = Executors.UI_HELPER_EXECUTOR,
     ) {
+        updateSizeRangesAsyncInternal(widgetId, executor) { getWidgetSizeOptions(spanX, spanY) }
+    }
+
+    @JvmOverloads
+    open fun updateHotseatQsbSizeRangesAsync(
+        widgetId: Int,
+        executor: Executor = Executors.UI_HELPER_EXECUTOR,
+    ) {
+        updateSizeRangesAsyncInternal(widgetId, executor) {
+            getHotseatQsbSizeOptions().apply {
+                putBoolean(
+                    MONO_THEME_ENABLED,
+                    ThemePreference.MONO_THEME_VALUE == themePreference.value,
+                )
+                // Used to disable the preview when qsb is masked in extreme battery saver mode.
+                putBoolean(USE_DISABLED_PREVIEW_WHEN_MASKED, true)
+            }
+        }
+    }
+
+    private inline fun updateSizeRangesAsyncInternal(
+        widgetId: Int,
+        executor: Executor = Executors.UI_HELPER_EXECUTOR,
+        crossinline widgetSizeOptionsProvider: () -> Bundle,
+    ) {
         if (widgetId <= 0) return
         executor.execute {
             val widgetManager = AppWidgetManager.getInstance(context)
-            val sizeOptions = getWidgetSizeOptions(spanX, spanY)
+            if (widgetManager.getAppWidgetInfo(widgetId) == null) {
+                return@execute
+            }
+            val sizeOptions = widgetSizeOptionsProvider.invoke()
+            val widgetOptions = widgetManager.getAppWidgetOptions(widgetId)
             if (
-                sizeOptions.getWidgetSizeList() !=
-                    widgetManager.getAppWidgetOptions(widgetId).getWidgetSizeList()
+                (sizeOptions.getWidgetSizeList() != widgetOptions.getWidgetSizeList()) ||
+                    (sizeOptions.getBoolean(MONO_THEME_ENABLED) !=
+                        widgetOptions.getBoolean(MONO_THEME_ENABLED)) ||
+                    (sizeOptions.getBoolean(USE_DISABLED_PREVIEW_WHEN_MASKED) !=
+                        widgetOptions.getBoolean(USE_DISABLED_PREVIEW_WHEN_MASKED))
             )
                 widgetManager.updateAppWidgetOptions(widgetId, sizeOptions)
         }
     }
 
-    /** Returns the bundle to be used as the default options for a widget with provided size. */
-    fun getWidgetSizeOptions(spanX: Int, spanY: Int): Bundle {
-        val density = context.resources.displayMetrics.density
+    private inline fun getWidgetSizeOptionsInternal(
+        widgetSizeFromProfile: (DeviceProfile) -> SizeF
+    ): Bundle {
         val paddedSizes =
-            idp.supportedProfiles.mapTo(ArrayList()) {
-                val widgetSizePx = WidgetSizes.getWidgetSizePx(it, spanX, spanY)
-                SizeF(widgetSizePx.width / density, widgetSizePx.height / density)
-            }
-
+            idp.supportedProfiles.mapTo(ArrayList()) { widgetSizeFromProfile.invoke(it) }
         val rect = getMinMaxSizes(paddedSizes)
         val options = Bundle()
         options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, rect.left)
@@ -87,7 +117,27 @@ constructor(
         return options
     }
 
+    /** Returns the bundle to be used as the default options for a widget with provided size. */
+    fun getWidgetSizeOptions(spanX: Int, spanY: Int): Bundle {
+        return getWidgetSizeOptionsInternal { profile ->
+            val density = context.resources.displayMetrics.density
+            val widgetSizePx = WidgetSizes.getWidgetSizePx(profile, spanX, spanY)
+            SizeF(widgetSizePx.width / density, widgetSizePx.height / density)
+        }
+    }
+
+    /** Returns the bundle to be used as the default options for a QSB widget in hotseat. */
+    private fun getHotseatQsbSizeOptions(): Bundle {
+        return getWidgetSizeOptionsInternal { profile ->
+            val density = context.resources.displayMetrics.density
+            val widgetSizePx = WidgetSizes.getWidgetSizePx(profile, idp.numColumns, 1)
+            SizeF(widgetSizePx.width / density, profile.getHotseatProfile().qsbHeight / density)
+        }
+    }
+
     companion object {
+        const val MONO_THEME_ENABLED = "monoThemeEnabled"
+        const val USE_DISABLED_PREVIEW_WHEN_MASKED = "useDisabledPreviewWhenMasked"
 
         fun Bundle.getWidgetSizeList() = getParcelableArrayList<SizeF>(OPTION_APPWIDGET_SIZES)
 

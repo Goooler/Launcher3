@@ -19,6 +19,7 @@ package com.android.launcher3.dragndrop
 import android.net.Uri
 import android.view.DragAndDropPermissions
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SYSTEM_DRAG
+import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 
 /**
@@ -27,13 +28,69 @@ import com.android.launcher3.model.data.WorkspaceItemInfo
  */
 class SystemDragItemInfo : WorkspaceItemInfo() {
 
-    /** The permissions for the URIs that were dropped in a system-level drag-and-drop sequence. */
-    var permissions: DragAndDropPermissions? = null
+    /**
+     * The payload that was dropped in a system-level drag-and-drop sequence. Note that state is
+     * shared across shallowly copied instances.
+     */
+    var payload: Payload
+        get() = payloadBackingField.value
+        set(value) {
+            payloadBackingField.value = value
+        }
 
-    /** The list of URIs that were dropped in a system-level drag-and-drop sequence. */
-    var uriList: List<Uri>? = null
+    /**
+     * The backing field for the payload that was dropped in a system-level drag-and-drop sequence.
+     * Note that a backing field is used to allow for shared state across shallowly copied
+     * instances. This is important because payload is not populated until drop but the drag
+     * controller caches a shallow copy of drag info during drag start.
+     */
+    private var payloadBackingField = Reference<Payload>(EmptyPayload)
 
     init {
         itemType = ITEM_TYPE_SYSTEM_DRAG
     }
+
+    override fun clone(): WorkspaceItemInfo =
+        SystemDragItemInfo().apply { copyFrom(this@SystemDragItemInfo) }
+
+    override fun copyFrom(itemInfo: ItemInfo): Unit =
+        super.copyFrom(itemInfo).apply {
+            payloadBackingField =
+                (itemInfo as? SystemDragItemInfo)?.payloadBackingField?.copy()
+                    ?: Reference(EmptyPayload)
+        }
+
+    override fun makeShallowCopy(): ItemInfo =
+        SystemDragItemInfo().apply {
+            copyFrom(this@SystemDragItemInfo)
+            payloadBackingField = this@SystemDragItemInfo.payloadBackingField
+        }
+
+    /** Represents a payload that was dropped in a system-level drag-and-drop sequence. */
+    sealed class Payload {
+        /** Returns whether a payload is suitable to be accepted during drop handling. */
+        abstract fun isAcceptable(): Boolean
+    }
+
+    /** Represents an empty payload that was dropped in a system-level drag-and-drop sequence. */
+    data object EmptyPayload : Payload() {
+        override fun isAcceptable(): Boolean = false
+    }
+
+    /**
+     * Represents a payload of URIs that were dropped in a system-level drag-and-drop sequence.
+     *
+     * @param permissions The permissions for the URIs that were dropped.
+     * @param uriList The list of URIs that were dropped.
+     */
+    data class UriListPayload(val permissions: DragAndDropPermissions?, val uriList: List<Uri>?) :
+        Payload() {
+        // NOTE: Permissions must be obtained in order to accept a system-level drop of URIs. If
+        // permissions are not checked, a bad actor could piggy-back on the permissions that
+        // Launcher already has.
+        override fun isAcceptable(): Boolean = permissions != null && uriList?.isNotEmpty() == true
+    }
+
+    /** Similar to [java.util.concurrent.atomic.AtomicReference] but w/o concurrency guarantees. */
+    private data class Reference<T>(var value: T)
 }

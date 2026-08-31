@@ -42,6 +42,7 @@ import com.android.launcher3.LauncherState.OVERVIEW
 import com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT
 import com.android.launcher3.QuickstepTransitionManager
 import com.android.launcher3.anim.SpringAnimationBuilder
+import com.android.launcher3.display.DisplayController
 import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.BaseState
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
@@ -60,9 +61,9 @@ import com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE
 import com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE
 import com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_SCALE
 import com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE
-import com.android.launcher3.taskbar.customization.TaskbarFeatureEvaluator
-import com.android.launcher3.util.DisplayController
+import com.android.launcher3.touch.AllAppsSwipeController
 import com.android.launcher3.util.NavigationMode
+import com.android.quickstep.split.SplitAnimationTimings
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.RecentsViewContainer
 import kotlin.math.max
@@ -70,10 +71,11 @@ import kotlin.math.min
 
 open class RecentsAtomicAnimationFactory<CONTAINER, STATE_TYPE : BaseState<STATE_TYPE>>(
     protected val container: CONTAINER
-) : AtomicAnimationFactory<STATE_TYPE>(MY_ANIM_COUNT) where
-CONTAINER : Context,
-CONTAINER : RecentsViewContainer,
-CONTAINER : StatefulContainer<STATE_TYPE> {
+) : AtomicAnimationFactory<STATE_TYPE>(MY_ANIM_COUNT)
+    where
+        CONTAINER : Context,
+        CONTAINER : RecentsViewContainer,
+        CONTAINER : StatefulContainer<STATE_TYPE> {
 
     override fun createStateElementAnimation(index: Int, vararg values: Float): Animator =
         when (index) {
@@ -162,7 +164,7 @@ CONTAINER : StatefulContainer<STATE_TYPE> {
             config.duration = max(config.duration, scrollDuration.toLong())
 
             // Sync scroll so that it ends before or at the same time as the taskbar animation.
-            if (container.deviceProfile.isTaskbarPresent) {
+            if (container.deviceProfile.deviceProperties.taskbarConfiguration.isTaskbarPresent) {
                 config.duration =
                     min(
                         config.duration,
@@ -182,17 +184,13 @@ CONTAINER : StatefulContainer<STATE_TYPE> {
 
     protected open fun getHintToNormalAnimationDuration(toState: STATE_TYPE) = -1
 
-    protected open fun applyAllAppsToNormalConfig(config: StateAnimationConfig) {}
-
-    protected open fun applyNormalToAllAppsAnimConfig(config: StateAnimationConfig) {}
-
     override fun prepareForAtomicAnimation(
         fromState: STATE_TYPE,
         toState: STATE_TYPE,
         config: StateAnimationConfig,
     ) {
         val overview = container.getOverviewPanel<RecentsView<CONTAINER, STATE_TYPE>>()
-        val isPinnedTaskbar = TaskbarFeatureEvaluator.INSTANCE.get(container).isPinned
+        val isPinnedTaskbar = container.activityComponent.getTaskbarFeatureEvaluator().isPinned
         val isThreeButton =
             (DisplayController.getNavigationMode(container) == NavigationMode.THREE_BUTTONS)
         if ((fromState == OVERVIEW || fromState == OVERVIEW_SPLIT_SELECT) && toState == NORMAL) {
@@ -243,12 +241,12 @@ CONTAINER : StatefulContainer<STATE_TYPE> {
             config.duration =
                 max(config.duration, getHintToNormalAnimationDuration(toState).toLong())
         } else if (fromState == ALL_APPS && toState == NORMAL) {
-            applyAllAppsToNormalConfig(config)
+            AllAppsSwipeController.applyAllAppsToNormalConfig(config)
         } else if (fromState == NORMAL && toState == ALL_APPS) {
-            applyNormalToAllAppsAnimConfig(config)
+            AllAppsSwipeController.applyNormalToAllAppsAnimConfig(config)
         } else if (fromState == OVERVIEW && toState == OVERVIEW_SPLIT_SELECT) {
             val timings =
-                if (container.deviceProfile.deviceProperties.isTablet)
+                if (container.deviceProfile.deviceProperties.isLargeScreen)
                     SplitAnimationTimings.TABLET_OVERVIEW_TO_SPLIT
                 else SplitAnimationTimings.PHONE_OVERVIEW_TO_SPLIT
             config.setInterpolator(

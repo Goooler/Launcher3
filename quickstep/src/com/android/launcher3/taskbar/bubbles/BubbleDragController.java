@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.taskbar.bubbles;
 
+import static com.android.launcher3.taskbar.TaskbarActivityContext.TASKBAR_WINDOW_FULLSCREEN_BUBBLE_DRAG;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Point;
@@ -44,6 +46,7 @@ import com.android.wm.shell.shared.bubbles.DragZoneFactory.SplitScreenModeChecke
 import com.android.wm.shell.shared.bubbles.DraggedObject;
 import com.android.wm.shell.shared.bubbles.DropTargetManager;
 import com.android.wm.shell.shared.bubbles.DropTargetManager.DragZoneChangedListener;
+import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
 
 /**
  * Controls bubble bar drag interactions.
@@ -158,12 +161,9 @@ public class BubbleDragController {
      */
     @SuppressLint("ClickableViewAccessibility")
     public void setupBubbleView(@NonNull BubbleView bubbleView) {
-        if (!(bubbleView.getBubble() instanceof BubbleBarBubble)) {
-            // Don't setup dragging for overflow bubble view
-            return;
-        }
+        final boolean draggable = bubbleView.getBubble() instanceof BubbleBarBubble;
 
-        bubbleView.setOnTouchListener(new BubbleTouchListener() {
+        bubbleView.setOnTouchListener(new BubbleTouchListener(draggable) {
 
             @Override
             void onDragStart() {
@@ -229,12 +229,11 @@ public class BubbleDragController {
     @SuppressLint("ClickableViewAccessibility")
     public void setupBubbleBarView(@NonNull BubbleBarView bubbleBarView) {
         PointF initialRelativePivot = new PointF();
-        bubbleBarView.setOnTouchListener(new BubbleTouchListener() {
+        bubbleBarView.setOnTouchListener(new BubbleTouchListener(/* draggable= */ true) {
 
             @Override
-            protected boolean onTouchDown(@NonNull View view, @NonNull MotionEvent event) {
-                if (bubbleBarView.isExpanded()) return false;
-                return super.onTouchDown(view, event);
+            protected boolean skip() {
+                return bubbleBarView.isExpanded() && !bubbleBarView.isExpanding();
             }
 
             @Override
@@ -341,6 +340,7 @@ public class BubbleDragController {
             CANCELLED
         }
 
+        private final boolean mDraggable;
         private final PointF mTouchDownLocation = new PointF();
         private final PointF mViewInitialPosition = new PointF();
         private final VelocityTracker mVelocityTracker = VelocityTracker.obtain();
@@ -350,6 +350,15 @@ public class BubbleDragController {
         private BubbleDragAnimator mAnimator;
         @Nullable
         private Runnable mLongClickRunnable;
+
+        BubbleTouchListener(boolean draggable) {
+            mDraggable = draggable;
+        }
+
+        /** Whether this touch listener should skip handling the current event. */
+        protected boolean skip() {
+            return false;
+        }
 
         /**
          * Called when the dragging interaction has started
@@ -398,10 +407,14 @@ public class BubbleDragController {
         @Override
         @SuppressLint("ClickableViewAccessibility")
         public boolean onTouch(@NonNull View view, @NonNull MotionEvent event) {
+            if (skip()) {
+                return false;
+            }
             updateVelocity(event);
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    return onTouchDown(view, event);
+                    onTouchDown(view, event);
+                    break;
                 case MotionEvent.ACTION_MOVE:
                     onTouchMove(view, event);
                     break;
@@ -420,16 +433,17 @@ public class BubbleDragController {
          *
          * @param view  the view that received the event
          * @param event the motion event
-         * @return true if the gesture should be intercepted and handled, false otherwise. Note if
-         * the false is returned subsequent events in the gesture won't get reported.
          */
-        protected boolean onTouchDown(@NonNull View view, @NonNull MotionEvent event) {
+        protected void onTouchDown(@NonNull View view, @NonNull MotionEvent event) {
+            BubbleLog.d("BubbleDragController.onTouchDown() x=%f,y=%f,state=%s",
+                    event.getRawX(), event.getRawY(), mState.toString());
             mState = State.TOUCHED;
             mTouchSlop = ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
             mTouchDownLocation.set(event.getRawX(), event.getRawY());
             mViewInitialPosition.set(view.getTranslationX(), view.getTranslationY());
-            setupLongClickHandler(view);
-            return true;
+            if (mDraggable) {
+                setupLongClickHandler(view);
+            }
         }
 
         /**
@@ -465,6 +479,8 @@ public class BubbleDragController {
          * @param event the motion event
          */
         protected void onTouchUp(@NonNull View view, @NonNull MotionEvent event) {
+            BubbleLog.d("BubbleDragController.onTouchUp() x=%f,y=%f,state=%s",
+                    event.getRawX(), event.getRawY(), mState.toString());
             switch (mState) {
                 case TOUCHED:
                     view.performClick();
@@ -486,6 +502,8 @@ public class BubbleDragController {
          * @param event the motion event
          */
         protected void onTouchCancel(@NonNull View view, @NonNull MotionEvent event) {
+            BubbleLog.d("BubbleDragController.onTouchCancel() x=%f,y=%f,state=%s",
+                    event.getRawX(), event.getRawY(), mState.toString());
             if (mState == State.DRAGGING) {
                 stopDragging(view, event);
             } else {
@@ -496,7 +514,7 @@ public class BubbleDragController {
         private void startDragging(@NonNull View view) {
             onDragStart();
             BubbleDragController.this.setIsDragging(true);
-            mActivity.setTaskbarWindowFullscreen(true);
+            mActivity.setTaskbarWindowFullscreen(true, TASKBAR_WINDOW_FULLSCREEN_BUBBLE_DRAG);
             mAnimator = new BubbleDragAnimator(view);
             mAnimator.animateFocused();
             mBubbleDismissController.setupDismissView(view, mAnimator);
@@ -522,7 +540,7 @@ public class BubbleDragController {
         private void stopDragging(@NonNull View view, @NonNull MotionEvent event) {
             BubbleDragController.this.setIsDragging(false);
             Runnable onComplete = () -> {
-                mActivity.setTaskbarWindowFullscreen(false);
+                mActivity.setTaskbarWindowFullscreen(false, TASKBAR_WINDOW_FULLSCREEN_BUBBLE_DRAG);
                 cleanUp(view);
                 onDragEnd(event.getRawX(), event.getRawY());
             };

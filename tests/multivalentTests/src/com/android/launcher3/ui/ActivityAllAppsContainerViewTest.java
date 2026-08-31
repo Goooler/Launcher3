@@ -21,7 +21,6 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -42,6 +41,7 @@ import com.android.launcher3.util.TestActivityContext;
 import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.util.rule.MockUsersRule;
 import com.android.launcher3.util.rule.MockUsersRule.MockUser;
+import com.android.users.UserType;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -54,12 +54,12 @@ import org.mockito.junit.MockitoRule;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
-@MockUser(userType = UserIconInfo.TYPE_MAIN)
-@MockUser(userType = UserIconInfo.TYPE_WORK)
+@MockUser(userType = UserType.MAIN)
+@MockUser(userType = UserType.WORK)
 public class ActivityAllAppsContainerViewTest {
 
     @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
-    @Rule public SandboxApplication app = spy(new SandboxApplication().withModelDependency());
+    @Rule public SandboxApplication app = new SandboxApplication().withModelDependency();
     @Rule public MockUsersRule mockUserRule = new MockUsersRule(app);
     @Rule public TestActivityContext mContext = new TestActivityContext(app);
 

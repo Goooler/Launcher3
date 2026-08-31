@@ -22,21 +22,30 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Bitmap
+import android.graphics.Bitmap.Config
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.ColorDrawable
 import android.os.Process
 import android.os.UserHandle
-import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
 import android.view.Display.DEFAULT_DISPLAY
 import androidx.test.annotation.UiThreadTest
 import com.android.internal.R
+import com.android.internal.policy.DesktopModeCompatPolicy
 import com.android.launcher3.BubbleTextView.RunningAppState
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.Flags
+import com.android.launcher3.Flags.enableTaskbarUiThread
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION
+import com.android.launcher3.deviceprofile.DeviceProperties
+import com.android.launcher3.deviceprofile.TaskbarConfiguration
 import com.android.launcher3.graphics.ThemeManager
+import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.IconShape
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.AppPairInfo
@@ -44,33 +53,40 @@ import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.TaskItemInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.taskbar.TaskbarRecentAppsController.TaskState
+import com.android.launcher3.util.Executors.getTaskbarUiThread
 import com.android.launcher3.util.LauncherMultivalentJUnit
+import com.android.launcher3.util.ListenableStream
 import com.android.launcher3.util.MutableListenableRef
+import com.android.launcher3.util.SafeCloseable
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RecentsModel.RecentTasksChangedListener
 import com.android.quickstep.TaskIconCache
+import com.android.quickstep.TaskIconCache.GetTaskBitmapInfoCallback
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
 import com.android.quickstep.util.SingleTask
 import com.android.quickstep.util.SplitTask
+import com.android.quickstep.util.TaskVisualsChangeListener
 import com.android.systemui.shared.recents.model.Task
-import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.shared.split.SplitBounds
 import com.android.wm.shell.shared.split.SplitScreenConstants
 import com.google.common.truth.Truth.assertThat
 import java.util.function.Consumer
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
+import org.mockito.kotlin.same
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -94,10 +110,15 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
     @Mock private lateinit var mockIconCache: TaskIconCache
     @Mock private lateinit var mockRecentsModel: RecentsModel
+    @Mock private lateinit var mockTaskChangesListenable: ListenableStream<Void?>
+    @Mock private lateinit var mockTaskChangesSafeClosable: SafeCloseable
     @Mock private lateinit var mockThemeManager: ThemeManager
     @Mock private lateinit var mockContext: Context
     @Mock private lateinit var mockResources: Resources
     @Mock private lateinit var mockDeviceProfile: DeviceProfile
+    @Mock private lateinit var mockDeviceProperties: DeviceProperties
+    @Mock private lateinit var mockDeviceTaskbarConfiguration: TaskbarConfiguration
+    @Mock private lateinit var mockDesktopModeCompatPolicy: DesktopModeCompatPolicy
 
     private var taskListChangeId: Int = 1
 
@@ -105,9 +126,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     private lateinit var myUserHandle: UserHandle
     private val USER_HANDLE_1 = UserHandle.of(1)
     private val USER_HANDLE_2 = UserHandle.of(2)
+    private val iconShapeData = MutableListenableRef(IconShape.EMPTY)
 
     private var canShowRunningAndRecentAppsAtInit = true
     private var recentTasksChangedListener: RecentTasksChangedListener? = null
+    private var recentTasksChangedCallback: ((Void?) -> Unit)? = null
+    private var taskVisualsChangeListener: TaskVisualsChangeListener? = null
 
     val recentShownTasks: List<Task>
         get() = recentAppsController.shownTasks.flatMap { it.tasks }
@@ -121,17 +145,49 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         whenever(mockContext.getResources()).thenReturn(mockResources)
         whenever(mockResources.getBoolean(R.bool.config_isDesktopModeSupported)).thenReturn(true)
         whenever(taskbarActivityContext.deviceProfile).thenReturn(mockDeviceProfile)
-        mockDeviceProfile.isTaskbarPresent = true
+        whenever(mockDeviceProfile.deviceProperties).thenReturn(mockDeviceProperties)
+        whenever(mockDeviceProperties.taskbarConfiguration)
+            .thenReturn(mockDeviceTaskbarConfiguration)
+        whenever(mockDeviceTaskbarConfiguration.isTaskbarPresent).thenReturn(true)
 
         whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
+
+        val taskVisualsChangeListenerCaptor = argumentCaptor<TaskVisualsChangeListener>()
+        whenever(
+                mockRecentsModel.addThumbnailChangeListener(
+                    taskVisualsChangeListenerCaptor.capture()
+                )
+            )
+            .then { taskVisualsChangeListener = taskVisualsChangeListenerCaptor.lastValue }
+        whenever(mockRecentsModel.removeThumbnailChangeListener(any())).then {
+            taskVisualsChangeListener = null
+        }
+
+        whenever(mockIconCache.getBitmapInfoInBackground(any(), any(), any())).thenAnswer {
+            it.getArgument<GetTaskBitmapInfoCallback>(2)
+                .onBitmapInfoReceived(BITMAP_INFO_1, TASK_DESCRIPTION, TASK_TITLE)
+            null
+        }
         whenever(mockRecentsModel.unregisterRecentTasksChangedListener(any())).then {
             recentTasksChangedListener = null
             it
         }
-        whenever(mockThemeManager.iconShapeData).thenReturn(MutableListenableRef(IconShape.EMPTY))
+        whenever(mockRecentsModel.tasksChanges).thenReturn(mockTaskChangesListenable)
+        whenever(mockTaskChangesListenable.forEach(any(), any()))
+            .thenReturn(mockTaskChangesSafeClosable)
+        whenever(mockTaskChangesSafeClosable.close()).then {
+            recentTasksChangedCallback = null
+            it
+        }
+        whenever(mockThemeManager.iconShapeData).thenReturn(iconShapeData)
         whenever(taskbarDesktopModeController.isLauncherAnimationRunning).thenReturn(false)
         recentAppsController =
-            TaskbarRecentAppsController(mockContext, mockRecentsModel, mockThemeManager)
+            TaskbarRecentAppsController(
+                mockContext,
+                mockRecentsModel,
+                mockThemeManager,
+                mockDesktopModeCompatPolicy,
+            )
         recentAppsController.canShowRunningApps = canShowRunningAndRecentAppsAtInit
         recentAppsController.canShowRecentApps = canShowRunningAndRecentAppsAtInit
 
@@ -147,16 +203,29 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         recentAppsController.init(taskbarControllers, emptyList())
         taskbarControllers.onPostInit()
 
-        recentTasksChangedListener =
-            if (canShowRunningAndRecentAppsAtInit) {
-                val listenerCaptor = ArgumentCaptor.forClass(RecentTasksChangedListener::class.java)
-                verify(mockRecentsModel)
-                    .registerRecentTasksChangedListener(listenerCaptor.capture())
-                listenerCaptor.value
-            } else {
-                verify(mockRecentsModel, never()).registerRecentTasksChangedListener(any())
-                null
-            }
+        if (enableTaskbarUiThread()) {
+            recentTasksChangedCallback =
+                if (canShowRunningAndRecentAppsAtInit) {
+                    val listenerCaptor = argumentCaptor<(Void?) -> Unit>()
+                    verify(mockTaskChangesListenable)
+                        .forEach(same(getTaskbarUiThread()), listenerCaptor.capture())
+                    listenerCaptor.lastValue
+                } else {
+                    verify(mockTaskChangesListenable, never()).forEach(any(), any())
+                    null
+                }
+        } else {
+            recentTasksChangedListener =
+                if (canShowRunningAndRecentAppsAtInit) {
+                    val listenerCaptor = argumentCaptor<RecentTasksChangedListener>()
+                    verify(mockRecentsModel)
+                        .registerRecentTasksChangedListener(listenerCaptor.capture())
+                    listenerCaptor.lastValue
+                } else {
+                    verify(mockRecentsModel, never()).registerRecentTasksChangedListener(any())
+                    null
+                }
+        }
 
         // Make sure updateHotseatItemInfos() is called after commitRunningAppsToUI()
         whenever(taskbarViewController.commitRunningAppsToUI()).then {
@@ -193,8 +262,28 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_TASKBAR_RECENT_TASKS_THROTTLE_BUGFIX)
     fun recentTasksChanged_duringGetTasksLoading_dontCallGetTasks() {
+        assumeTrue("Only run this test if enableTaskbarUiThread() is on", enableTaskbarUiThread())
+        // getTasks() should have been called once from init().
+        verify(mockRecentsModel, times(1)).getTasks(any(), any<Consumer<List<GroupTask>>>())
+        // Override the mock answer for getTasks() so it doesn't call the callback immediately.
+        doAnswer { taskListChangeId }
+            .whenever(mockRecentsModel)
+            .getTasks(any(), any<Consumer<List<GroupTask>>>())
+        recentTasksChangedCallback?.invoke(null)
+        waitForTaskbarUiThreadSync()
+        // By not invoking the callback passed to getTasks() we here emulate getTasks() loading.
+
+        recentTasksChangedCallback?.invoke(null)
+        waitForTaskbarUiThreadSync()
+
+        // getTasks() is only called two times overall (init + once more).
+        verify(mockRecentsModel, times(2)).getTasks(any(), any<Consumer<List<GroupTask>>>())
+    }
+
+    @Test
+    fun recentTasksChanged_duringGetTasksLoading_dontCallGetTasks_disableFlags_taskbarUiThread() {
+        assumeFalse("Only run this test if enableTaskbarUiThread() is off", enableTaskbarUiThread())
         // getTasks() should have been called once from init().
         verify(mockRecentsModel, times(1)).getTasks(any(), any<Consumer<List<GroupTask>>>())
         // Override the mock answer for getTasks() so it doesn't call the callback immediately.
@@ -211,8 +300,31 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_TASKBAR_RECENT_TASKS_THROTTLE_BUGFIX)
     fun recentTasksChanged_duringGetTasksLoading_getTasksCalledWhenLoadingDone() {
+        assumeTrue("Only run this test if enableTaskbarUiThread() is on", enableTaskbarUiThread())
+        val callbackCaptor = argumentCaptor<Consumer<List<GroupTask>>>()
+        // getTasks() should have been called once from init().
+        verify(mockRecentsModel, times(1)).getTasks(any(), callbackCaptor.capture())
+        // Override the mock answer for getTasks() so it doesn't call the callback immediately.
+        doAnswer { taskListChangeId }
+            .whenever(mockRecentsModel)
+            .getTasks(any(), any<Consumer<List<GroupTask>>>())
+        recentTasksChangedCallback?.invoke(null)
+        waitForTaskbarUiThreadSync()
+        // By not invoking the callback passed to getTasks() we here emulate getTasks() loading.
+
+        recentTasksChangedCallback?.invoke(null)
+        waitForTaskbarUiThreadSync()
+        callbackCaptor.lastValue.accept(emptyList())
+        waitForTaskbarUiThreadSync()
+
+        // getTasks() is called again now that the first getTasks() call finished.
+        verify(mockRecentsModel, times(3)).getTasks(any(), any<Consumer<List<GroupTask>>>())
+    }
+
+    @Test
+    fun recentTasksChanged_duringGetTasksLoading_getTasksCalledWhenLoadingDone_legacy() {
+        assumeFalse("Only run this test if enableTaskbarUiThread() is off", enableTaskbarUiThread())
         val callbackCaptor = argumentCaptor<Consumer<List<GroupTask>>>()
         // getTasks() should have been called once from init().
         verify(mockRecentsModel, times(1)).getTasks(any(), callbackCaptor.capture())
@@ -231,66 +343,28 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_TASKBAR_RECENT_TASKS_THROTTLE_BUGFIX)
-    fun recentTasksChanged_duringGetTasksLoading_flagDisabled_callGetTasks() {
-        // getTasks() should have been called once from init().
-        verify(mockRecentsModel, times(1)).getTasks(any(), any<Consumer<List<GroupTask>>>())
-        // Override the mock answer for getTasks() so it doesn't call the callback immediately.
-        doAnswer { taskListChangeId }
-            .whenever(mockRecentsModel)
-            .getTasks(any(), any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener?.onRecentTasksChanged()
-        // By not invoking the callback passed to getTasks() we here emulate getTasks() loading.
-
-        recentTasksChangedListener?.onRecentTasksChanged()
-
-        // getTasks() is called once per onRecentTasksChanged() invocation (and once at init)
-        verify(mockRecentsModel, times(3)).getTasks(any(), any<Consumer<List<GroupTask>>>())
-    }
-
-    @Test
-    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_TASKBAR_RECENT_TASKS_THROTTLE_BUGFIX)
-    fun recentTasksChanged_duringGetTasksLoading_flagDisabled_getTasksNotCalledWhenLoadingDone() {
-        val callbackCaptor = argumentCaptor<Consumer<List<GroupTask>>>()
-        // getTasks() should have been called once from init().
-        verify(mockRecentsModel, times(1)).getTasks(any(), callbackCaptor.capture())
-        // Override the mock answer for getTasks() so it doesn't call the callback immediately.
-        doAnswer { taskListChangeId }
-            .whenever(mockRecentsModel)
-            .getTasks(any(), any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener?.onRecentTasksChanged()
-        recentTasksChangedListener?.onRecentTasksChanged()
-        verify(mockRecentsModel, times(3)).getTasks(any(), any<Consumer<List<GroupTask>>>())
-
-        callbackCaptor.lastValue.accept(emptyList())
-
-        // getTasks() is called once per onRecentTasksChanged() invocation (and once at init)
-        verify(mockRecentsModel, times(3)).getTasks(any(), any<Consumer<List<GroupTask>>>())
-    }
-
-    @Test
-    fun getDesktopItemState_nullItemInfo_returnsNotRunning() {
+    fun getTaskbarItemState_nullItemInfo_returnsNotRunning() {
         setInDesktopMode(true)
-        val taskState = recentAppsController.getDesktopItemState(/* itemInfo= */ null)
+        val taskState = recentAppsController.getTaskbarItemState(/* itemInfo= */ null)
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.NOT_RUNNING))
     }
 
     @Test
-    fun getDesktopItemState_noItemPackage_returnsNotRunning() {
+    fun getTaskbarItemState_noItemPackage_returnsNotRunning() {
         setInDesktopMode(true)
-        val taskState = recentAppsController.getDesktopItemState(ItemInfo())
+        val taskState = recentAppsController.getTaskbarItemState(ItemInfo())
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.NOT_RUNNING))
     }
 
     @Test
-    fun getDesktopItemState_noMatchingTasks_returnsNotRunning() {
+    fun getTaskbarItemState_noMatchingTasks_returnsNotRunning() {
         setInDesktopMode(true)
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("package"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("package"))
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.NOT_RUNNING))
     }
 
     @Test
-    fun getDesktopItemState_matchingVisibleTask_returnsVisible() {
+    fun getTaskbarItemState_matchingVisibleTask_returnsVisible() {
         setInDesktopMode(true)
         val visibleTask =
             PerDisplayRunningApps(
@@ -299,13 +373,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             )
         updateRecentTasks(runningTasks = listOf(visibleTask), recentTaskPackages = emptyList())
 
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("visiblePackage"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("visiblePackage"))
 
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.RUNNING, taskId = 1))
     }
 
     @Test
-    fun getDesktopItemState_matchingVisibleTaskOnSecondaryDisplay_returnsVisible() {
+    fun getTaskbarItemState_matchingVisibleTaskOnSecondaryDisplay_returnsVisible() {
         setInDesktopMode(true)
         val visibleTask1 =
             PerDisplayRunningApps(
@@ -322,13 +396,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = emptyList(),
         )
 
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("visiblePackage2"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("visiblePackage2"))
 
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.RUNNING, taskId = 2))
     }
 
     @Test
-    fun getDesktopItemState_matchingMinimizedTask_returnsMinimized() {
+    fun getTaskbarItemState_matchingMinimizedTask_returnsMinimized() {
         setInDesktopMode(true)
         val minimizedTask =
             PerDisplayRunningApps(
@@ -339,13 +413,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             )
         updateRecentTasks(runningTasks = listOf(minimizedTask), recentTaskPackages = emptyList())
 
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("minimizedPackage"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("minimizedPackage"))
 
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.MINIMIZED, taskId = 1))
     }
 
     @Test
-    fun getDesktopItemState_matchingMinimizedTaskOnSecondaryDisplay_returnsVisible() {
+    fun getTaskbarItemState_matchingMinimizedTaskOnSecondaryDisplay_returnsVisible() {
         setInDesktopMode(true)
         val visibleTask1 =
             PerDisplayRunningApps(
@@ -364,13 +438,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = emptyList(),
         )
 
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("visiblePackage2"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("visiblePackage2"))
 
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.MINIMIZED, taskId = 2))
     }
 
     @Test
-    fun getDesktopItemState_matchingMinimizedAndRunningTask_returnsVisible() {
+    fun getTaskbarItemState_matchingMinimizedAndRunningTask_returnsVisible() {
         setInDesktopMode(true)
         updateRecentTasks(
             runningTasks =
@@ -386,12 +460,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = emptyList(),
         )
 
-        val taskState = recentAppsController.getDesktopItemState(createItemInfo("package"))
+        val taskState = recentAppsController.getTaskbarItemState(createItemInfo("package"))
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.RUNNING, taskId = 2))
     }
 
     @Test
-    fun getDesktopItemState_noMatchingUserId_returnsNotRunning() {
+    fun getTaskbarItemState_noMatchingUserId_returnsNotRunning() {
         setInDesktopMode(true)
         updateRecentTasks(
             runningTasks =
@@ -408,8 +482,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         )
 
         val taskState =
-            recentAppsController.getDesktopItemState(createItemInfo("package", USER_HANDLE_2))
-
+            recentAppsController.getTaskbarItemState(createItemInfo("package", USER_HANDLE_2))
         assertThat(taskState).isEqualTo(TaskState(RunningAppState.NOT_RUNNING))
     }
 
@@ -485,6 +558,46 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
         assertThat(recentAppsController.getRunningAppState(taskId = 3))
             .isEqualTo(RunningAppState.RUNNING)
+    }
+
+    @Test
+    fun isReplacingPredictions_inDesktopMode_canShowRunningApps_returnsTrue() {
+        // In desktop mode, if we can show running apps, we should replace predictions.
+        setInDesktopMode(true)
+        recentAppsController.canShowRunningApps = true
+        recentAppsController.canShowRecentApps = false
+
+        assertThat(recentAppsController.isReplacingPredictions).isTrue()
+    }
+
+    @Test
+    fun isReplacingPredictions_inDesktopMode_cannotShowRunningApps_returnsFalse() {
+        // In desktop mode, if we can't show running apps, we should not replace predictions.
+        setInDesktopMode(true)
+        recentAppsController.canShowRunningApps = false
+        recentAppsController.canShowRecentApps = true
+
+        assertThat(recentAppsController.isReplacingPredictions).isFalse()
+    }
+
+    @Test
+    fun isReplacingPredictions_notInDesktopMode_canShowRecentApps_returnsTrue() {
+        // Outside of desktop mode, if we can show recent apps, we should replace predictions.
+        setInDesktopMode(false)
+        recentAppsController.canShowRunningApps = false
+        recentAppsController.canShowRecentApps = true
+
+        assertThat(recentAppsController.isReplacingPredictions).isTrue()
+    }
+
+    @Test
+    fun isReplacingPredictions_notInDesktopMode_cannotShowRecentApps_returnsFalse() {
+        // Outside of desktop mode, if we can't show recent apps, we should not replace predictions.
+        setInDesktopMode(false)
+        recentAppsController.canShowRunningApps = true
+        recentAppsController.canShowRecentApps = false
+
+        assertThat(recentAppsController.isReplacingPredictions).isFalse()
     }
 
     @Test
@@ -596,6 +709,113 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
+    fun updateHotseatItemInfos_filterOutItemsMarkedForDeletion() {
+        recentAppsController.canShowRunningApps = true
+        setInDesktopMode(true)
+
+        val initialHotseatItems =
+            prepareHotseatAndRunningAndRecentApps(
+                hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+                runningTasks = emptyList(),
+                recentTaskPackages = emptyList(),
+            )
+        assertThat(initialHotseatItems.size).isEqualTo(2)
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, true))
+            .isTrue()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(1)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isFalse()
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, false))
+            .isTrue()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(2)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isTrue()
+    }
+
+    @Test
+    fun updateHotseatItemInfos_itemMarkedForDeletionReaddedAfterDeletion() {
+        recentAppsController.canShowRunningApps = true
+        setInDesktopMode(true)
+
+        val initialHotseatItems =
+            prepareHotseatAndRunningAndRecentApps(
+                hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+                runningTasks = emptyList(),
+                recentTaskPackages = emptyList(),
+            )
+        assertThat(initialHotseatItems.size).isEqualTo(2)
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, true))
+            .isTrue()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(1)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isFalse()
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, false))
+            .isTrue()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems.sliceArray(0..0))
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(1)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isFalse()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(2)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isTrue()
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, false))
+            .isFalse()
+    }
+
+    @Test
+    fun updateHotseatItemInfos_itemWithRunningTaskMarkedForDeletion() {
+        setInDesktopMode(true)
+
+        val initialHotseatItems =
+            prepareHotseatAndRunningAndRecentApps(
+                hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+                runningTasks =
+                    listOf(
+                        createTask(id = 1, HOTSEAT_PACKAGE_1),
+                        createTask(id = 2, HOTSEAT_PACKAGE_2),
+                    ),
+                recentTaskPackages = emptyList(),
+            )
+
+        assertThat(initialHotseatItems.size).isEqualTo(2)
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, true))
+            .isTrue()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(1)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isFalse()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems.sliceArray(0..0))
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(1)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isFalse()
+
+        recentAppsController.updateHotseatItemInfos(initialHotseatItems)
+        assertThat(recentAppsController.shownHotseatItems.size).isEqualTo(2)
+        assertThat(recentAppsController.shownHotseatItems.contains(initialHotseatItems[1]!!))
+            .isTrue()
+
+        assertThat(recentAppsController.setItemMarkedForDeletion(initialHotseatItems[1]!!, false))
+            .isFalse()
+    }
+
+    @Test
     fun onRecentTasksChanged_cantShowRunning_inDesktopMode_shownTasks_returnsEmptyList() {
         recentAppsController.canShowRunningApps = false
         setInDesktopMode(true)
@@ -651,6 +871,47 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
+    fun onRecentTasksChanged_inDesktopMode_onlyDesktopTasksConsideredRunning() {
+        setInDesktopMode(true)
+        val desktopTask = createTask(id = 1, RUNNING_APP_PACKAGE_1)
+        val singleTask = SingleTask(createTask(id = 2, RECENT_PACKAGE_1))
+        val splitTask =
+            SplitTask(
+                createTask(id = 3, "split1"),
+                createTask(id = 4, "split2"),
+                SplitBounds(Rect(), Rect(), 3, 4, SplitScreenConstants.SNAP_TO_2_50_50)
+            )
+
+        val allTasks =
+            arrayListOf(
+                DesktopTask(0, DEFAULT_DISPLAY, arrayListOf(desktopTask)),
+                singleTask,
+                splitTask
+            )
+
+        doAnswer {
+                val callback: Consumer<ArrayList<GroupTask>> = it.getArgument(1)
+                callback.accept(allTasks)
+                taskListChangeId
+            }
+            .whenever(mockRecentsModel)
+            .getTasks(any(), any<Consumer<List<GroupTask>>>())
+
+        if (enableTaskbarUiThread()) {
+            recentTasksChangedCallback?.invoke(null)
+            waitForTaskbarUiThreadSync()
+        } else {
+            recentTasksChangedListener?.onRecentTasksChanged()
+        }
+
+        // Only the task from DesktopTask should be in runningTaskIds
+        assertThat(recentAppsController.runningTaskIds).containsExactly(1)
+        // And only that task should be shown
+        assertThat(recentShownTasks).hasSize(1)
+        assertThat(recentShownTasks[0].key.id).isEqualTo(1)
+    }
+
+    @Test
     fun onRecentTasksChanged_inDesktopMode_shownTasks_returnsRunningTasks() {
         setInDesktopMode(true)
         val task1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
@@ -678,7 +939,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    fun onRecentTasksChanged_inDesktopMode_getRunningApps_returnsAllDesktopTasks() {
+    fun onRecentTasksChanged_inDesktopMode_getRunningApps_returnsAllTaskbarRunningTasks() {
         setInDesktopMode(true)
         val task1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
         val task2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
@@ -729,7 +990,6 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     @Test
     fun minimizedTaskIds_multipleDesktopsEnabled_returnsMinimizedTasks() {
         setInDesktopMode(true)
-        whenever(DesktopModeStatus.enableMultipleDesktops(mockContext)).thenReturn(true)
 
         val task1Minimized =
             createTask(id = 1, RUNNING_APP_PACKAGE_1, isMinimized = true, isVisible = false)
@@ -744,25 +1004,6 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.minimizedTaskIds).containsExactly(1, 3)
-    }
-
-    @Test
-    fun minimizedTaskIds_multipleDesktopsDisabled_returnsInvisibleTasks() {
-        setInDesktopMode(true)
-        whenever(DesktopModeStatus.enableMultipleDesktops(mockContext)).thenReturn(false)
-        val task1Invisible =
-            createTask(id = 1, RUNNING_APP_PACKAGE_1, isMinimized = true, isVisible = false)
-        val task2InVisible =
-            createTask(id = 2, RUNNING_APP_PACKAGE_2, isMinimized = false, isVisible = false)
-        val task3Invisible =
-            createTask(id = 3, RUNNING_APP_PACKAGE_3, isMinimized = true, isVisible = false)
-        val runningTasks = listOf(task1Invisible, task2InVisible, task3Invisible)
-        prepareHotseatAndRunningAndRecentApps(
-            hotseatPackages = emptyList(),
-            runningTasks = runningTasks,
-            recentTaskPackages = emptyList(),
-        )
-        assertThat(recentAppsController.minimizedTaskIds).containsExactly(1, 2, 3)
     }
 
     @Test
@@ -915,7 +1156,29 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    fun onRecentTasksChanged_enterDesktopMode_shownTasks_onlyIncludesRunningTasks() {
+    fun onRecentTasksChanged_enterDesktopMode_shownTasks_onlyIncludesRunningTasks_enableFlags_taskbarUiThread() {
+        assumeTrue("Only run this test if enableTaskbarUiThread() is on", enableTaskbarUiThread())
+        setInDesktopMode(false)
+        val runningTask1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
+        val runningTask2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
+        val recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = listOf(runningTask1, runningTask2),
+            recentTaskPackages = recentTaskPackages,
+        )
+
+        setInDesktopMode(true)
+        recentTasksChangedCallback!!.invoke(null)
+        waitForTaskbarUiThreadSync()
+        val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
+        assertThat(shownPackages).containsExactly(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2)
+    }
+
+    @Test
+    fun onRecentTasksChanged_enterDesktopMode_shownTasks_onlyIncludesRunningTasks_disableFlags_taskbarUiThread() {
+        assumeFalse("Only run this test if enableTaskbarUiThread() is off", enableTaskbarUiThread())
         setInDesktopMode(false)
         val runningTask1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
         val runningTask2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
@@ -934,7 +1197,29 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    fun onRecentTasksChanged_exitDesktopMode_shownTasks_onlyIncludesRecentTasks() {
+    fun onRecentTasksChanged_exitDesktopMode_shownTasks_onlyIncludesRecentTasks_enableFlag_taskbarUiThread() {
+        assumeTrue("Only run this test if enableTaskbarUiThread() is on", enableTaskbarUiThread())
+        setInDesktopMode(true)
+        val runningTask1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
+        val runningTask2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
+        val recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = listOf(runningTask1, runningTask2),
+            recentTaskPackages = recentTaskPackages,
+        )
+        setInDesktopMode(false)
+        recentTasksChangedCallback!!.invoke(null)
+        waitForTaskbarUiThreadSync()
+        val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
+        // Don't expect RECENT_PACKAGE_3 because it is currently running.
+        val expectedPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+        assertThat(shownPackages).containsExactlyElementsIn(expectedPackages)
+    }
+
+    @Test
+    fun onRecentTasksChanged_exitDesktopMode_shownTasks_onlyIncludesRecentTasks_disableFlag_taskbarUiThread() {
+        assumeFalse("Only run this test if enableTaskbarUiThread() is off", enableTaskbarUiThread())
         setInDesktopMode(true)
         val runningTask1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
         val runningTask2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
@@ -1244,6 +1529,26 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
+    fun onRecentTasksChanged_notInDesktopMode_addTask_existingTaskInstanceReused() {
+        setInDesktopMode(false)
+
+        // Initial task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_3),
+        )
+        val task1 = recentAppsController.shownTasks.first().tasks.first()
+
+        // New task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
+        )
+        val task2 = recentAppsController.shownTasks.first().tasks.first()
+        assertThat(task1).isSameInstanceAs(task2)
+    }
+
+    @Test
     fun hasSingleTask_noTargetPackage_returnsFalse() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
@@ -1299,13 +1604,137 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
+    fun getNonDesktopTask_nullItemInfo_returnsNull() {
+        // No setup needed, just call with null
+        assertThat(recentAppsController.getNonDesktopTask(null)).isNull()
+    }
+
+    @Test
+    fun getNonDesktopTask_itemInfoWithNoPackage_returnsNull() {
+        // No setup needed, just call with empty ItemInfo
+        assertThat(recentAppsController.getNonDesktopTask(ItemInfo())).isNull()
+    }
+
+    @Test
+    fun getNonDesktopTask_noRecentTasks_returnsNull() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = emptyList(),
+            recentTaskPackages = emptyList(),
+        )
+        val itemInfo = createItemInfo(RECENT_PACKAGE_1)
+        assertThat(recentAppsController.getNonDesktopTask(itemInfo)).isNull()
+    }
+
+    @Test
+    fun getNonDesktopTask_onlyDesktopTasks_returnsNull() {
+        val desktopTask = createTask(id = 1, RECENT_PACKAGE_1)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = listOf(desktopTask),
+            recentTaskPackages = emptyList(),
+        )
+        val itemInfo = createItemInfo(RECENT_PACKAGE_1)
+        assertThat(recentAppsController.getNonDesktopTask(itemInfo)).isNull()
+    }
+
+    @Test
+    fun getNonDesktopTask_matchingSingleTask_returnsTask() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
+        )
+        val itemInfo = createItemInfo(RECENT_PACKAGE_1)
+        val task = recentAppsController.getNonDesktopTask(itemInfo)
+        assertThat(task).isNotNull()
+        assertThat(task!!.key.packageName).isEqualTo(RECENT_PACKAGE_1)
+    }
+
+    @Test
+    fun getNonDesktopTask_matchingSplitTask_returnsTask() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_SPLIT_PACKAGES_1, RECENT_PACKAGE_1),
+        )
+        // RECENT_SPLIT_PACKAGES_1 is "split1_split2"
+        val itemInfo = createItemInfo("split1")
+        val task = recentAppsController.getNonDesktopTask(itemInfo)
+        assertThat(task).isNotNull()
+        assertThat(task!!.key.packageName).isEqualTo("split1")
+    }
+
+    @Test
+    fun getNonDesktopTask_noMatchingTask_returnsNull() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1),
+        )
+        val itemInfo = createItemInfo(RECENT_PACKAGE_2)
+        assertThat(recentAppsController.getNonDesktopTask(itemInfo)).isNull()
+    }
+
+    @Test
+    fun getNonDesktopTask_matchingPackageDifferentUser_returnsNull() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1),
+        )
+        // RECENT_PACKAGE_1 is created with myUserHandle
+        val itemInfo = createItemInfo(RECENT_PACKAGE_1, USER_HANDLE_1)
+        assertThat(recentAppsController.getNonDesktopTask(itemInfo)).isNull()
+    }
+
+    @Test
+    fun getRunningTaskWithId_taskExists_returnsTask() {
+        setInDesktopMode(true)
+        val task1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
+        val task2 = createTask(id = 2, RUNNING_APP_PACKAGE_2)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = listOf(task1, task2),
+            recentTaskPackages = emptyList(),
+        )
+
+        val result = recentAppsController.getRunningTaskWithId(2)
+
+        assertThat(result).isSameInstanceAs(task2)
+    }
+
+    @Test
+    fun getRunningTaskWithId_taskDoesNotExist_returnsNull() {
+        setInDesktopMode(true)
+        val task1 = createTask(id = 1, RUNNING_APP_PACKAGE_1)
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = emptyList(),
+            runningTasks = listOf(task1),
+            recentTaskPackages = emptyList(),
+        )
+
+        val result = recentAppsController.getRunningTaskWithId(99)
+
+        assertThat(result).isNull()
+    }
+
+    @Test
     fun onRecentTasksChanged_inDesktopMode_transparentTask_isFilteredOut() {
         setInDesktopMode(true)
         val transparentTask = createTask(id = 1, "transparentPackage")
-        transparentTask.key.isTopActivityTransparent = true
+        transparentTask.key.numActivities = 1
         transparentTask.key.isActivityStackTransparent = true
         transparentTask.key.windowingMode = WINDOWING_MODE_FULLSCREEN
         val regularTask = createTask(id = 2, RUNNING_APP_PACKAGE_1)
+        whenever(
+                mockDesktopModeCompatPolicy.isTransparentOverlay(
+                    transparentTask.key.isActivityStackTransparent,
+                    transparentTask.key.numActivities,
+                    transparentTask.key.windowingMode,
+                )
+            )
+            .thenReturn(true)
 
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
@@ -1319,63 +1748,139 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     @Test
-    fun multiInstanceApp_onDifferentDesktops_hotseatIconPointsToActiveDesktopInstance() {
-        setInDesktopMode(true)
-        whenever(DesktopModeStatus.enableMultipleDesktops(mockContext)).thenReturn(true)
+    fun fetchIcons_addTask_onlyUpdatesNewTask() {
+        setInDesktopMode(false)
 
-        val hotseatPackage = HOTSEAT_PACKAGE_1
-        // Create two instances of the same app
-        val taskOnDesk1 = createTask(id = 101, packageName = hotseatPackage, lastActiveTime = 1000L)
-        val taskOnDesk2 = createTask(id = 102, packageName = hotseatPackage, lastActiveTime = 2000L)
-        assertThat(taskOnDesk1.key.id).isNotEqualTo(taskOnDesk2.key.id)
+        // Initial task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_3),
+        )
+        waitForTaskbarUiThreadSync()
+        val task1 = recentAppsController.shownTasks.first().tasks.first()
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task1), any())
 
-        val desktopTask1 =
-            DesktopTask(
-                deskId = 1,
-                desktopDisplayId = DEFAULT_DISPLAY,
-                tasks = arrayListOf(taskOnDesk1),
-            )
-        val desktopTask2 =
-            DesktopTask(
-                deskId = 2,
-                desktopDisplayId = DEFAULT_DISPLAY,
-                tasks = arrayListOf(taskOnDesk2),
-            )
-        val allTasks = listOf(desktopTask2, desktopTask1)
-
-        val hotseatItems =
-            createHotseatItemsFromPackageUsers(listOf(PackageUser(hotseatPackage, myUserHandle)))
-                .toTypedArray()
-        recentAppsController.updateHotseatItemInfos(hotseatItems as Array<ItemInfo?>)
-
-        // Phase 1: Make desktop 1 active and verify the hotseat item points to the task on desk #1
-        whenever(taskbarControllers.taskbarDesktopModeController.getActiveDeskId).thenReturn(1)
-        updateTasks(allTasks)
-        var taskItemInfo = recentAppsController.shownHotseatItems[0] as TaskItemInfo
-        assertThat(taskItemInfo.taskId).isEqualTo(taskOnDesk1.key.id)
-        verify(taskbarViewController, times(1)).commitRunningAppsToUI()
-
-        // Phase 2: Switch to desktop 2 and verify the hotseat item now points to the task desk #2
-        whenever(taskbarControllers.taskbarDesktopModeController.getActiveDeskId).thenReturn(2)
-        updateTasks(allTasks)
-        taskItemInfo = recentAppsController.shownHotseatItems[0] as TaskItemInfo
-        assertThat(taskItemInfo.taskId).isEqualTo(taskOnDesk2.key.id)
-        verify(taskbarViewController, times(2)).commitRunningAppsToUI()
+        // New task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
+        )
+        waitForTaskbarUiThreadSync()
+        val task2 = recentAppsController.shownTasks.last().tasks.first()
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task2), any())
+        // Not updated again.
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task1), any())
     }
 
-    /**
-     * Updates the mock RecentsModel with the provided list of tasks, simulating a refresh by
-     * configuring the mock and notifying listeners.
-     */
-    private fun updateTasks(tasks: List<GroupTask>) {
-        doAnswer {
-                val callback: Consumer<ArrayList<GroupTask>> = it.getArgument(1)
-                callback.accept(ArrayList(tasks))
-                taskListChangeId
-            }
-            .whenever(mockRecentsModel)
-            .getTasks(any(), any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener?.onRecentTasksChanged()
+    @Test
+    fun fetchIcons_addTask_infoChangedForExistingTask_updatesInfoForExistingTask() {
+        setInDesktopMode(false)
+
+        // Initial task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_3),
+        )
+        val task1 = recentAppsController.shownTasks.first().tasks.first()
+
+        // Update info for task.
+        whenever(mockIconCache.getBitmapInfoInBackground(eq(task1), any(), any())).thenAnswer {
+            it.getArgument<GetTaskBitmapInfoCallback>(2)
+                .onBitmapInfoReceived(BITMAP_INFO_2, TASK_DESCRIPTION, TASK_TITLE)
+            null
+        }
+
+        // New task.
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
+        )
+
+        // Updated twice in total.
+        waitForTaskbarUiThreadSync()
+        verify(taskbarViewController, times(2)).onTaskUpdated(eq(task1), any())
+    }
+
+    @Test
+    fun themeChanged_forceUpdatesExistingTaskIcon() {
+        setInDesktopMode(false)
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_3),
+        )
+        val task = recentAppsController.shownTasks.first().tasks.first()
+
+        val themeChangeListenerCaptor = argumentCaptor<ThemeManager.ThemeChangeListener>()
+        verify(mockThemeManager).addChangeListener(themeChangeListenerCaptor.capture())
+        themeChangeListenerCaptor.lastValue.onThemeChanged()
+
+        waitForTaskbarUiThreadSync()
+        // Called second time due to theme change.
+        verify(taskbarViewController, times(2)).onTaskUpdated(eq(task), any())
+    }
+
+    @Test
+    fun iconShapeChanged_forceUpdatesExistingTaskIcon() {
+        setInDesktopMode(false)
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_3),
+        )
+        val task = recentAppsController.shownTasks.first().tasks.first()
+
+        iconShapeData.dispatchValue(
+            IconShape(
+                100,
+                AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
+                    .apply { setBounds(0, 0, 50, 100) }
+                    .iconMask,
+                Bitmap.createBitmap(1, 1, Config.ARGB_8888).apply { eraseColor(Color.BLACK) },
+            )
+        )
+
+        waitForTaskbarUiThreadSync()
+        // Called second time due to icon shape change.
+        verify(taskbarViewController, times(2)).onTaskUpdated(eq(task), any())
+    }
+
+    @Test
+    fun onTaskIconChanged_updatesExistingTaskIcon() {
+        setInDesktopMode(false)
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
+        )
+        waitForTaskbarUiThreadSync()
+        val task = recentAppsController.shownTasks.first().tasks.first()
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task), any())
+
+        taskVisualsChangeListener?.onTaskIconChanged(
+            task.key.packageName,
+            UserHandle.of(task.key.userId),
+        )
+        waitForTaskbarUiThreadSync()
+        verify(taskbarViewController, times(2)).onTaskUpdated(eq(task), any())
+    }
+
+    @Test
+    fun onTaskIconChanged_differentUser_ignoresIconUpdate() {
+        setInDesktopMode(false)
+        updateRecentTasks(
+            runningTasks = emptyList(),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
+        )
+        waitForTaskbarUiThreadSync()
+        val task = recentAppsController.shownTasks.first().tasks.first()
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task), any())
+
+        // Trigger icon change for different user.
+        taskVisualsChangeListener?.onTaskIconChanged(
+            task.key.packageName,
+            UserHandle.of(task.key.userId + 1),
+        )
+        waitForTaskbarUiThreadSync()
+        // Icon not updated for actual user.
+        verify(taskbarViewController, times(1)).onTaskUpdated(eq(task), any())
     }
 
     private fun prepareHotseatAndRunningAndRecentApps(
@@ -1421,7 +1926,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             }
             .whenever(mockRecentsModel)
             .getTasks(any(), any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener?.onRecentTasksChanged()
+        if (enableTaskbarUiThread()) {
+            recentTasksChangedCallback?.invoke(null)
+            waitForTaskbarUiThreadSync()
+        } else {
+            recentTasksChangedListener?.onRecentTasksChanged()
+        }
     }
 
     private fun createHotseatItemsFromPackageUsers(
@@ -1486,7 +1996,6 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         isVisible: Boolean = true,
         localUserHandle: UserHandle? = null,
         isMinimized: Boolean = false,
-        lastActiveTime: Long = 0L,
     ): Task {
         return Task(
                 Task.TaskKey(
@@ -1495,7 +2004,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                     Intent().apply { `package` = packageName },
                     ComponentName(packageName, "TestActivity"),
                     localUserHandle?.identifier ?: myUserHandle.identifier,
-                    lastActiveTime,
+                    0,
                 )
             )
             .apply {
@@ -1524,6 +2033,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     private val GroupTask.packageNames: List<String>
         get() = tasks.map { task -> task.key.packageName }
 
+    private fun waitForTaskbarUiThreadSync() {
+        if (enableTaskbarUiThread()) {
+            getTaskbarUiThread().submit {}.get()
+        }
+    }
+
     private companion object {
         const val HOTSEAT_PACKAGE_1 = "hotseat1"
         const val HOTSEAT_PACKAGE_2 = "hotseat2"
@@ -1537,6 +2052,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         const val RECENT_SPLIT_PACKAGES_1 = "split1_split2"
         const val RECENT_SPLIT_PACKAGES_1_REVERSED = "split1_split2"
         const val RECENT_SPLIT_PACKAGES_2 = "split3_split4"
+
+        const val TASK_TITLE = "title"
+        const val TASK_DESCRIPTION = "description"
+
+        val BITMAP_INFO_1 = BitmapInfo.fromBitmap(Bitmap.createBitmap(100, 100, Config.ARGB_8888))
+        val BITMAP_INFO_2 = BitmapInfo.fromBitmap(Bitmap.createBitmap(200, 200, Config.ARGB_8888))
     }
 
     data class PackageUser(val packageName: String, val userHandle: UserHandle)

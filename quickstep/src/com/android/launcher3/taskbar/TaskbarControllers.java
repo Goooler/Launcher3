@@ -70,14 +70,16 @@ public class TaskbarControllers {
     public final Optional<BubbleControllers> bubbleControllers;
     public final TaskbarDesktopModeController taskbarDesktopModeController;
     public final TaskbarHandoffController taskbarHandoffController;
+    public final CueBarController cueBarController;
     public final NudgeController nudgeController;
     public final NudgeViewController nudgeViewController;
+    public final TaskbarViewDragDropController taskbarViewDragDropController;
 
     @Nullable private LoggableTaskbarController[] mControllersToLog = null;
     @Nullable private BackgroundRendererController[] mBackgroundRendererControllers = null;
 
     /** Do not store this controller, as it may change at runtime. */
-    @NonNull public TaskbarUIController uiController = TaskbarUIController.DEFAULT;
+    @NonNull public volatile TaskbarUIController uiController = TaskbarUIController.DEFAULT;
 
     private boolean mAreAllControllersInitialized;
     private final List<Runnable> mPostInitCallbacks = new ArrayList<>();
@@ -121,9 +123,11 @@ public class TaskbarControllers {
             TaskbarPinningController taskbarPinningController,
             Optional<BubbleControllers> bubbleControllers,
             TaskbarDesktopModeController taskbarDesktopModeController,
+            CueBarController cueBarController,
             NudgeController nudgeController,
             NudgeViewController nudgeViewController,
-            TaskbarHandoffController taskbarHandoffController) {
+            TaskbarHandoffController taskbarHandoffController,
+            TaskbarViewDragDropController taskbarViewDragDropController) {
         this.taskbarActivityContext = taskbarActivityContext;
         this.taskbarDragController = taskbarDragController;
         this.navButtonController = navButtonController;
@@ -151,9 +155,11 @@ public class TaskbarControllers {
         this.taskbarPinningController = taskbarPinningController;
         this.bubbleControllers = bubbleControllers;
         this.taskbarDesktopModeController = taskbarDesktopModeController;
+        this.cueBarController = cueBarController;
         this.nudgeController = nudgeController;
         this.nudgeViewController = nudgeViewController;
         this.taskbarHandoffController = taskbarHandoffController;
+        this.taskbarViewDragDropController = taskbarViewDragDropController;
     }
 
     /**
@@ -162,7 +168,7 @@ public class TaskbarControllers {
      * in constructors for now, as some controllers may still be waiting for init().
      */
     public void init(@NonNull TaskbarSharedState sharedState, AnimatorSet startAnimation,
-            TaskbarUiState taskbarUiState) {
+            TaskbarUiState taskbarUiState, boolean userUnlocked) {
         mAreAllControllersInitialized = false;
         mSharedState = sharedState;
 
@@ -188,12 +194,13 @@ public class TaskbarControllers {
         voiceInteractionWindowController.init(this);
         taskbarRecentAppsController.init(this, sharedState.recentTasksBeforeTaskbarRecreate);
         taskbarTranslationController.init(this);
-        taskbarEduTooltipController.init(this, taskbarUiState);
+        taskbarEduTooltipController.init(this, taskbarUiState, userUnlocked);
         keyboardQuickSwitchController.init(this);
         taskbarPinningController.init(this, mSharedState);
         taskbarDesktopModeController.init(this, mSharedState, taskbarUiState);
         nudgeController.init(this);
-        taskbarHandoffController.init();
+        taskbarHandoffController.init(this);
+        cueBarController.init(this);
 
         mControllersToLog = new LoggableTaskbarController[] {
                 taskbarDragController, navButtonController, navbarButtonsViewController,
@@ -204,7 +211,7 @@ public class TaskbarControllers {
                 voiceInteractionWindowController, taskbarRecentAppsController,
                 taskbarTranslationController, taskbarEduTooltipController,
                 keyboardQuickSwitchController, taskbarPinningController,
-                nudgeController
+                nudgeController, cueBarController
         };
         mBackgroundRendererControllers = new BackgroundRendererController[] {
                 taskbarDragLayerController, taskbarScrimViewController,
@@ -283,8 +290,10 @@ public class TaskbarControllers {
         rotationButtonController.onDestroy();
         taskbarDragLayerController.onDestroy();
         taskbarUnfoldAnimationController.onDestroy();
+        taskbarEduTooltipController.onDestroy();
         taskbarViewController.onDestroy();
         stashedHandleViewController.onDestroy();
+        cueBarController.onDestroy();
         nudgeViewController.onDestroy();
         taskbarAutohideSuspendController.onDestroy();
         taskbarPopupController.onDestroy();
@@ -298,6 +307,7 @@ public class TaskbarControllers {
         keyboardQuickSwitchController.onDestroy();
         taskbarStashController.onDestroy();
         taskbarHandoffController.onDestroy();
+        taskbarScrimViewController.onDestroy();
         bubbleControllers.ifPresent(controllers -> controllers.onDestroy());
         taskbarDesktopModeController.onDestroy();
         mControllersToLog = null;

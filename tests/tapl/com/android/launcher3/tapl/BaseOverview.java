@@ -20,8 +20,8 @@ import static android.view.KeyEvent.KEYCODE_ESCAPE;
 
 import static com.android.launcher3.tapl.LauncherInstrumentation.DEFAULT_POLL_INTERVAL;
 import static com.android.launcher3.tapl.LauncherInstrumentation.TASKBAR_RES_ID;
-import static com.android.launcher3.tapl.LauncherInstrumentation.eventListToString;
 import static com.android.launcher3.tapl.LauncherInstrumentation.WAIT_TIME_MS;
+import static com.android.launcher3.tapl.LauncherInstrumentation.eventListToString;
 import static com.android.launcher3.tapl.LauncherInstrumentation.log;
 import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
@@ -165,14 +165,14 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     /**
      * Flings to the 1st (right-most) task in Overview.
      */
-    private OverviewTask flingToFirstTask() {
+    public BaseOverview flingToFirstTask() {
         UiObject2 rightMostTask = getRightMostTaskOnScreen();
         while (rightMostTask != null && !isFirstTask(rightMostTask)) {
             flingBackwardImpl();
             rightMostTask = getRightMostTaskOnScreen();
         }
         mLauncher.assertNotNull("Unable to find the rightmost task", rightMostTask);
-        return new OverviewTask(mLauncher, rightMostTask, this);
+        return new BaseOverview(mLauncher);
     }
 
     private boolean isFirstTask(@NonNull UiObject2 task) {
@@ -194,15 +194,15 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             final BySelector clearAllSelector = mLauncher.getOverviewObjectSelector("clear_all");
             flingForwardUntilClearAllVisibleImpl();
 
-            final Runnable clickClearAll = () -> mLauncher.clickLauncherObject(
+            final Runnable clickClearAll = () ->
                     mLauncher.waitForObjectInContainer(verifyActiveContainer(),
-                            clearAllSelector));
+                            clearAllSelector).click();
 
             if (mLauncher.isInDesktopFirstMode()) {
                 // In desktop-first mode clear-all does not go to a home
                 mLauncher.executeAndWaitForEvent(clickClearAll,
                         event -> TestProtocol.DISMISS_ANIMATION_ENDS_MESSAGE
-                                .equals(event.getClassName().toString()),
+                                .equals(event.getClassName()),
                         () -> "'Clear All' didn't complete",
                         "clicking 'Clear All'");
             } else {
@@ -285,10 +285,10 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
                         "Need to have at least 2 tasks");
             }
 
-            OverviewTask currentTask = flingToFirstTask();
+            final UiObject2 currentTask = flingToFirstTask().getRightMostTaskOnScreen();
 
             mLauncher.runToState(
-                    () -> mLauncher.touchOutsideContainer(currentTask.getUiObject(),
+                    () -> mLauncher.touchOutsideContainer(currentTask,
                             /* tapRight= */ true,
                             /* halfwayToEdge= */ false),
                     NORMAL_STATE_ORDINAL,
@@ -310,9 +310,9 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
                         "Need to have at least 2 tasks");
             }
 
-            OverviewTask currentTask = flingToFirstTask();
+            final UiObject2 currentTask = flingToFirstTask().getRightMostTaskOnScreen();
 
-            mLauncher.touchOutsideContainer(currentTask.getUiObject(),
+            mLauncher.touchOutsideContainer(currentTask,
                     /* tapRight= */ false,
                     /* halfwayToEdge= */ false);
         }
@@ -517,16 +517,16 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "want to click add desktop button")) {
-            flingToFirstTask();
+            final BaseOverview overview = flingToFirstTask();
             try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
                     "scrolled to add desktop button")) {
-                int desktopTasksCount = getDesktopTasksCount();
-                mLauncher.clickLauncherObject(mLauncher
-                        .waitForOverviewObject("add_desktop_button"));
+                int desktopTasksCount = overview.getDesktopTasksCount();
+                mLauncher.waitForOverviewObject("add_desktop_button").click();
                 mLauncher.assertTrue("Failed to verify the num of desks, expected num is: "
-                        + (desktopTasksCount + 1) + ", but get: " + getDesktopTasksCount(),
-                        mLauncher.waitAndGet(() -> getDesktopTasksCount() == desktopTasksCount + 1,
-                        WAIT_TIME_MS, DEFAULT_POLL_INTERVAL));
+                        + (desktopTasksCount + 1) + ", but get: " + overview.getDesktopTasksCount(),
+                        mLauncher.waitAndGet(() ->
+                                        overview.getDesktopTasksCount() == desktopTasksCount + 1,
+                                WAIT_TIME_MS, DEFAULT_POLL_INTERVAL));
                 return new BaseOverview(mLauncher);
             }
         }
@@ -571,7 +571,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             return false;
         }
         boolean isTablet = mLauncher.isTablet();
-        if (isTablet && mLauncher.isGridOnlyOverviewEnabled()) {
+        if (isTablet) {
             testLogD(TAG, "Not expecting an actions bar: device is tablet with grid-only Overview");
             return false;
         }
@@ -621,8 +621,24 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
      * Presses the enter key to launch the focused task
      * <p>
      * If no task is focused, this will fail.
+     *
+     * @param expectedPackageName the package name of the expected launched app
      */
     public LaunchedAppState launchFocusedTaskByEnterKey(@NonNull String expectedPackageName) {
+        return launchFocusedTaskByEnterKey(expectedPackageName, null);
+    }
+
+    /**
+     * Presses the enter key to launch the focused task
+     * <p>
+     * If no task is focused, this will fail.
+     *
+     * @param expectedPackageName the package name of the expected launched app
+     * @param expectedVisibleText the uniquely identifying text expected to be visible in the
+     *                            launched app
+     */
+    public LaunchedAppState launchFocusedTaskByEnterKey(
+            @NonNull String expectedPackageName, @Nullable String expectedVisibleText) {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
             mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_ENTER_UP);
             mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, TASK_START_EVENT);
@@ -632,7 +648,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
                             "Failed to press enter",
                             mLauncher.getDevice().pressKeyCode(KeyEvent.KEYCODE_ENTER)),
                     "pressing enter");
-            mLauncher.assertAppLaunched(expectedPackageName);
+            mLauncher.assertAppLaunched(expectedPackageName, expectedVisibleText);
 
             try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                     "pressed enter")) {
@@ -660,8 +676,8 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
 
     protected boolean isAddDesktopButtonExpected() {
         UiObject2 rightMostTask = getRightMostTaskOnScreen();
-        return mLauncher.areMultiDesksFlagsEnabled() && rightMostTask != null
-                && isFirstTask(rightMostTask);
+        return mLauncher.isDesktopModeSupported() && rightMostTask != null
+                && isFirstTask(rightMostTask) && mLauncher.canCreateDesks();
     }
 
     /**

@@ -16,18 +16,21 @@
 
 package com.android.launcher3.taskbar.rules
 
-import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
+import android.view.Display.DEFAULT_DISPLAY
+import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
+import com.android.launcher3.display.DisplayController
+import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnTaskbarUiThreadSync
 import com.android.launcher3.taskbar.customization.TaskbarFeatureEvaluator
-import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode
-import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
-import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.NavigationMode
+import com.android.launcher3.util.RoboApiWrapper.convertToSpy
 import com.android.launcher3.util.TaskbarModeUtil
+import com.android.launcher3.util.launcheremulator.TestWindowManagerProxy
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.spy
+import org.mockito.kotlin.mockingDetails
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.whenever
 
@@ -49,6 +52,7 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
         TRANSIENT,
         PINNED,
         THREE_BUTTONS,
+        DESKTOP_TASKBAR,
     }
 
     /** Overrides Taskbar [mode] for a test. */
@@ -63,35 +67,38 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
             override fun evaluate() {
                 val mode = taskbarMode.mode
 
-                getInstrumentation().runOnMainSync {
+                runOnTaskbarUiThreadSync {
                     TaskbarModeUtil.INSTANCE[context]?.stub {
                         doReturn(
                                 when (mode) {
                                     Mode.TRANSIENT -> false
                                     Mode.PINNED -> true
                                     Mode.THREE_BUTTONS -> false
+                                    Mode.DESKTOP_TASKBAR -> true
                                 }
                             )
                             .whenever(it)
-                            .isPinned
+                            .isPinned(any())
 
                         doReturn(
                                 when (mode) {
                                     Mode.TRANSIENT -> true
                                     Mode.PINNED -> false
                                     Mode.THREE_BUTTONS -> false
+                                    Mode.DESKTOP_TASKBAR -> false
                                 }
                             )
                             .whenever(it)
-                            .isTransient
+                            .isTransient(any())
                     }
 
-                    TaskbarFeatureEvaluator.INSTANCE[context]?.stub {
+                    TaskbarFeatureEvaluator.INSTANCE[context][context.displayId]?.stub {
                         doReturn(
                                 when (mode) {
                                     Mode.TRANSIENT -> false
                                     Mode.PINNED -> true
                                     Mode.THREE_BUTTONS -> false
+                                    Mode.DESKTOP_TASKBAR -> true
                                 }
                             )
                             .whenever(it)
@@ -102,6 +109,7 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
                                     Mode.TRANSIENT -> true
                                     Mode.PINNED -> false
                                     Mode.THREE_BUTTONS -> false
+                                    Mode.DESKTOP_TASKBAR -> false
                                 }
                             )
                             .whenever(it)
@@ -112,6 +120,7 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
                                     Mode.TRANSIENT -> false
                                     Mode.PINNED -> true
                                     Mode.THREE_BUTTONS -> true
+                                    Mode.DESKTOP_TASKBAR -> true
                                 }
                             )
                             .whenever(it)
@@ -119,21 +128,31 @@ class TaskbarModeRule(private val context: TaskbarWindowSandboxContext) : TestRu
                     }
                 }
 
-                getInstrumentation().runOnMainSync {
-                    DisplayController.INSTANCE[context].let {
-                        if (it is DisplayControllerSpy) {
-                            it.infoModifier = { info ->
-                                spy(info) {
-                                    on { navigationMode } doReturn
-                                        when (mode) {
-                                            Mode.TRANSIENT,
-                                            Mode.PINNED -> NavigationMode.NO_BUTTON
-                                            Mode.THREE_BUTTONS -> NavigationMode.THREE_BUTTONS
-                                        }
-                                }
-                            }
+                runOnTaskbarUiThreadSync {
+                    val navMode =
+                        when (mode) {
+                            Mode.TRANSIENT,
+                            Mode.PINNED,
+                            Mode.DESKTOP_TASKBAR -> NavigationMode.NO_BUTTON
+
+                            Mode.THREE_BUTTONS -> NavigationMode.THREE_BUTTONS
                         }
+                    val wmProxy = context.appComponent.wmProxy
+                    if (wmProxy is TestWindowManagerProxy) {
+                        wmProxy.setNavigationMode(navMode)
+                        wmProxy.setShowDesktopTaskbarForFreeformDisplay(
+                            mode == Mode.DESKTOP_TASKBAR
+                        )
+                    } else {
+                        if (!mockingDetails(wmProxy).run { isMock || isSpy }) {
+                            wmProxy.convertToSpy()
+                        }
+                        doReturn(navMode).whenever(wmProxy).getNavigationMode(any())
+                        doReturn(mode == Mode.DESKTOP_TASKBAR)
+                            .whenever(wmProxy)
+                            .showDesktopTaskbarForFreeformDisplay(any())
                     }
+                    context.appComponent.displayController.notifyConfigChange(DEFAULT_DISPLAY)
                 }
 
                 base.evaluate()

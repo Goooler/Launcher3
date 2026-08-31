@@ -25,7 +25,6 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.BaseActivity.INVISIBLE_ALL;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_PENDING_FLAGS;
 import static com.android.launcher3.BaseActivity.PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION;
-import static com.android.launcher3.Flags.enableOverviewBackgroundWallpaperBlur;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -38,6 +37,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.IRemoteAnimationFinishedCallback;
@@ -64,9 +64,10 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.display.DisplayController;
+import com.android.launcher3.remoteanimations.RemoteAnimationCoordinateTransfer;
 import com.android.launcher3.taskbar.TaskbarInteractor;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
-import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.quickstep.util.BackAnimState;
@@ -335,7 +336,9 @@ public class LauncherBackAnimationController {
         mStartRect.set(mBackTarget.windowConfiguration.getMaxBounds());
 
         // inset bottom in case of taskbar being present
-        if (mLauncher.getDeviceProfile().isTaskbarPresent
+        if (mLauncher.getDeviceProfile().getDeviceProperties()
+                .getTaskbarConfiguration()
+                .isTaskbarPresent()
                 || DisplayController.getNavigationMode(mLauncher) == NavigationMode.NO_BUTTON) {
             mStartRect.inset(0, 0, 0, mBackTarget.contentInsets.bottom);
         }
@@ -384,7 +387,7 @@ public class LauncherBackAnimationController {
         mScrimLayer = new SurfaceControl.Builder()
                 .setName("Back to launcher background scrim")
                 .setCallsite("LauncherBackAnimationController")
-                .setColorLayer()
+                .setEffectLayer()
                 .setParent(parent)
                 .setOpaque(false)
                 .setHidden(false)
@@ -454,7 +457,12 @@ public class LauncherBackAnimationController {
     }
 
     private void setBlur(int blurRadius) {
-        mTransaction.setBackgroundBlurRadius(mScrimLayer, blurRadius);
+        if (Settings.Global.getInt(mLauncher.getContentResolver(),
+                Settings.Global.DISABLE_WINDOW_BLURS, 0) == 1) {
+            mTransaction.setBackgroundBlurRadius(mScrimLayer, 0);
+        } else {
+            mTransaction.setBackgroundBlurRadius(mScrimLayer, blurRadius);
+        }
     }
 
     /** Transform the target window to match the target rect. */
@@ -490,7 +498,11 @@ public class LauncherBackAnimationController {
         // TODO: Catch the moment when launcher becomes visible after the top app un-occludes
         //  launcher and start animating afterwards. Currently we occasionally get a flicker from
         //  animating when launcher is still invisible.
-        if (mLauncher.hasSomeInvisibleFlag(PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION)) {
+        boolean shouldMoveToRestState =
+                mLauncher.hasSomeInvisibleFlag(PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION)
+                || (Flags.moveToRestStateForBackgroundApp()
+                        && mLauncher.isInState(LauncherState.BACKGROUND_APP));
+        if (shouldMoveToRestState) {
             mLauncher.addForceInvisibleFlag(INVISIBLE_BY_PENDING_FLAGS);
             mLauncher.getStateManager().moveToRestState();
         }
@@ -504,8 +516,8 @@ public class LauncherBackAnimationController {
         float cornerRadius = Utilities.mapRange(
                 mBackProgress, mWindowScaleStartCornerRadius, mWindowScaleEndCornerRadius);
         final RectF resolveRectF = new RectF();
-        mQuickstepTransitionManager.transferRectToTargetCoordinate(
-                mBackTarget, mCurrentRect, true, resolveRectF);
+        new RemoteAnimationCoordinateTransfer(mLauncher)
+                .transferRectToOwnerSurface(mBackTarget, mCurrentRect, resolveRectF);
 
         BackAnimState backAnim =
                 mQuickstepTransitionManager.createWallpaperOpenAnimations(
@@ -596,12 +608,8 @@ public class LauncherBackAnimationController {
                 : 0;
         mWindowScaleStartCornerRadius = QuickStepContract.getWindowCornerRadius(mLauncher);
         mStatusBarHeight = SystemBarUtils.getStatusBarHeight(mLauncher);
-        if (Flags.allAppsBlur() || enableOverviewBackgroundWallpaperBlur()) {
-            mMaxBlurRadius = mLauncher.getResources().getDimensionPixelSize(
-                    R.dimen.max_depth_blur_radius_enhanced);
-        } else {
-            mMaxBlurRadius = mLauncher.getResources().getInteger(R.integer.max_depth_blur_radius);
-        }
+        mMaxBlurRadius = mLauncher.getResources().getDimensionPixelSize(
+            R.dimen.max_depth_blur_radius_enhanced);
     }
 
     /**

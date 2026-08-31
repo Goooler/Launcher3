@@ -42,8 +42,8 @@ public class AllAppsState extends LauncherState {
     @Override
     public int getTransitionDuration(ActivityContext context, boolean isToState) {
         return isToState
-                ? context.getDeviceProfile().allAppsOpenDuration
-                : context.getDeviceProfile().allAppsCloseDuration;
+                ? context.getDeviceProfile().getAllAppsProfile().getOpenDuration()
+                : context.getDeviceProfile().getAllAppsProfile().getCloseDuration();
     }
 
     @Override
@@ -64,7 +64,7 @@ public class AllAppsState extends LauncherState {
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         return new ScaleAndTranslation(
-                launcher.getDeviceProfile().mWorkspaceProfile.getWorkspaceContentScale(),
+                launcher.getDeviceProfile().getWorkspaceProfile().getWorkspaceContentScale(),
                 NO_OFFSET,
                 NO_OFFSET
         );
@@ -72,13 +72,13 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getHotseatScaleAndTranslation(Launcher launcher) {
-        if (launcher.getDeviceProfile().getDeviceProperties().isTablet()) {
+        if (launcher.getDeviceProfile().getDeviceProperties().isLargeScreen()) {
             return getWorkspaceScaleAndTranslation(launcher);
         } else {
             ScaleAndTranslation overviewScaleAndTranslation = LauncherState.OVERVIEW
                     .getWorkspaceScaleAndTranslation(launcher);
             return new ScaleAndTranslation(
-                    launcher.getDeviceProfile().mWorkspaceProfile.getWorkspaceContentScale(),
+                    launcher.getDeviceProfile().getWorkspaceProfile().getWorkspaceContentScale(),
                     overviewScaleAndTranslation.translationX,
                     overviewScaleAndTranslation.translationY
             );
@@ -91,7 +91,7 @@ public class AllAppsState extends LauncherState {
         return new PageAlphaProvider(DECELERATE) {
             @Override
             public float getPageAlpha(int pageIndex) {
-                return launcher.getDeviceProfile().getDeviceProperties().isTablet()
+                return launcher.getDeviceProfile().getDeviceProperties().isLargeScreen()
                         ? superPageAlphaProvider.getPageAlpha(pageIndex)
                         : 0;
             }
@@ -106,9 +106,10 @@ public class AllAppsState extends LauncherState {
     @Override
     public ScrimColors getWorkspaceScrimColor(Launcher launcher) {
         return new ScrimColors(
-                /* backgroundColor */ launcher.getDeviceProfile().getDeviceProperties().isTablet()
-                ? launcher.getResources().getColor(R.color.widgets_picker_scrim)
-                : Themes.getAttrColor(launcher, R.attr.allAppsScrimColor),
+                /* backgroundColor */
+                launcher.getDeviceProfile().getDeviceProperties().isLargeScreen()
+                        ? launcher.getResources().getColor(R.color.widgets_picker_scrim)
+                        : Themes.getAttrColor(launcher, R.attr.allAppsScrimColor),
                 /* foregroundColor */ Color.TRANSPARENT);
     }
 }

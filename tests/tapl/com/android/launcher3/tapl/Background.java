@@ -139,7 +139,7 @@ public abstract class Background extends LauncherInstrumentation.VisibleContaine
                                                         != TaskViewType.DESKTOP)
                                                 .allMatch(t -> t.getVisibleBounds().right
                                                         < centerTask.getVisibleBounds().left));
-                                if (!mLauncher.areMultiDesksFlagsEnabled()) {
+                                if (!mLauncher.isDesktopModeSupported()) {
                                     mLauncher.assertTrue(
                                             "DesktopTask(s) found to the left of the swiped task",
                                             tasks.stream()
@@ -198,6 +198,7 @@ public abstract class Background extends LauncherInstrumentation.VisibleContaine
                 downTime,
                 downTime,
                 ZERO_BUTTON_SWIPE_UP_GESTURE_DURATION,
+                /* isDecelerating= */ true,
                 start,
                 end,
                 LauncherInstrumentation.GestureScope.EXPECT_PILFER);
@@ -288,7 +289,7 @@ public abstract class Background extends LauncherInstrumentation.VisibleContaine
     }
 
     protected String getSwipeHeightRequestName() {
-        return TestProtocol.REQUEST_BACKGROUND_TO_OVERVIEW_SWIPE_HEIGHT;
+        return TestProtocol.REQUEST_SWIPE_TO_OVERVIEW_HEIGHT;
     }
 
     protected int getSwipeStartX() {

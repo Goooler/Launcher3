@@ -20,13 +20,11 @@ import android.database.sqlite.SQLiteDatabase
 import android.graphics.Point
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.android.launcher3.Flags
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherSettings
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME
 import com.android.launcher3.LauncherSettings.Favorites.TMP_TABLE
-import com.android.launcher3.Utilities.qsbOnFirstScreen
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.logging.FileLog
 import com.android.launcher3.logging.StatsLogManager
@@ -66,7 +64,6 @@ constructor(
         destDeviceState: DeviceGridState,
         target: DatabaseHelper,
         source: SQLiteDatabase,
-        isDestNewDb: Boolean,
         modelDelegate: ModelDelegate,
     ) {
 
@@ -79,11 +76,11 @@ constructor(
         FileLog.d(
             TAG,
             "Begin grid migration. isAfterRestore: $isAfterRestore\nsrcDeviceState: " +
-                "$srcDeviceState\ndestDeviceState: $destDeviceState\nisDestNewDb: $isDestNewDb",
+                "$srcDeviceState\ndestDeviceState: $destDeviceState",
         )
 
         val shouldMigrateToStrtictlyTallerGrid =
-            shouldMigrateToStrictlyTallerGrid(isDestNewDb, srcDeviceState, destDeviceState)
+            shouldMigrateToStrictlyTallerGrid(srcDeviceState, destDeviceState)
         if (shouldMigrateToStrtictlyTallerGrid) {
             copyTable(source, TABLE_NAME, target.writableDatabase, TABLE_NAME, context)
         } else {
@@ -97,21 +94,21 @@ constructor(
                 // down.
                 if (shouldMigrateToStrtictlyTallerGrid) {
                     Log.d(TAG, "Migrating to strictly taller grid")
-                    if (Flags.oneGridSpecs()) {
-                        shiftWorkspaceByXCells(
-                            target.writableDatabase,
-                            (destDeviceState.rows - srcDeviceState.rows),
-                            TABLE_NAME,
-                        )
-                    }
+                    shiftWorkspaceByXCells(
+                        target.writableDatabase,
+                        (destDeviceState.rows - srcDeviceState.rows),
+                        TABLE_NAME,
+                    )
+
                     // Save current configuration, so that the migration does not run again.
                     destDeviceState.writeToPrefs(context)
                     t.commit()
 
                     if (isOneGridMigration(srcDeviceState, destDeviceState)) {
                         statsLogManager.logger().log(LAUNCHER_ROW_SHIFT_ONE_GRID_MIGRATION)
+                    } else {
+                        statsLogManager.logger().log(LAUNCHER_ROW_SHIFT_GRID_MIGRATION)
                     }
-                    statsLogManager.logger().log(LAUNCHER_ROW_SHIFT_GRID_MIGRATION)
 
                     return
                 }
@@ -142,11 +139,11 @@ constructor(
 
                 dropTable(t.db, TMP_TABLE)
                 t.commit()
-
                 if (isOneGridMigration(srcDeviceState, destDeviceState)) {
                     statsLogManager.logger().log(LAUNCHER_STANDARD_ONE_GRID_MIGRATION)
+                } else {
+                    statsLogManager.logger().log(LAUNCHER_STANDARD_GRID_MIGRATION)
                 }
-                statsLogManager.logger().log(LAUNCHER_STANDARD_GRID_MIGRATION)
             }
         } catch (e: Exception) {
             FileLog.e(TAG, "Error during grid migration", e)
@@ -398,12 +395,10 @@ constructor(
 
     /** Only migrate the grid in this manner if the target grid is taller and not wider. */
     private fun shouldMigrateToStrictlyTallerGrid(
-        isDestNewDb: Boolean,
         srcDeviceState: DeviceGridState,
         destDeviceState: DeviceGridState,
     ): Boolean {
-        return (Flags.oneGridSpecs() || isDestNewDb) &&
-            srcDeviceState.columns == destDeviceState.columns &&
+        return srcDeviceState.columns == destDeviceState.columns &&
             srcDeviceState.rows < destDeviceState.rows
     }
 
@@ -508,22 +503,15 @@ constructor(
         val itemsToPlace = WorkspaceItemsToPlace(sortedItemsToPlace, mutableListOf())
         val occupied = GridOccupancy(trgX, trgY)
         val trg = Point(trgX, trgY)
-        val next: Point =
-            if (screenId == 0 && qsbOnFirstScreen()) {
-                Point(0, 1 /* smartspace */)
-            } else {
-                Point(0, 0)
-            }
+        val next = Point(0, 0)
         if (existedEntries != null) {
             for (entry in existedEntries) {
                 occupied.markCells(entry, true)
             }
         }
-        if (Flags.injectableModelItems()) {
-            extraItemsProvider.get().forEach {
-                if (it.container == Favorites.CONTAINER_DESKTOP && it.screenId == screenId) {
-                    occupied.markCells(it, true)
-                }
+        extraItemsProvider.get().forEach {
+            if (it.container == Favorites.CONTAINER_DESKTOP && it.screenId == screenId) {
+                occupied.markCells(it, true)
             }
         }
 

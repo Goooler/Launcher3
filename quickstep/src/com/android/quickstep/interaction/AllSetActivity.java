@@ -20,7 +20,6 @@ import static android.view.View.VISIBLE;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
 
-import static com.android.app.animation.Interpolators.ACCELERATE;
 import static com.android.app.animation.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.app.animation.Interpolators.clampToProgress;
@@ -28,6 +27,7 @@ import static com.android.launcher3.Utilities.mapBoundToRange;
 import static com.android.launcher3.Utilities.mapRange;
 import static com.android.launcher3.Utilities.mapToRange;
 import static com.android.launcher3.taskbar.StashedHandleViewController.ALPHA_INDEX_ALL_SET_TRANSITION;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.RecentsAnimationDeviceState.RESET_TO_DEFAULT_GESTURAL_HEIGHT;
 import static com.android.quickstep.views.WallpaperScreenshotClipView.CLIP_ANIM_DURATION;
@@ -71,35 +71,37 @@ import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.ColorUtils;
 
+import com.android.launcher3.AsyncAnimatorPlaybackController;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.RemoveAnimationSettingsTracker;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
-import com.android.launcher3.anim.AnimatorPlaybackController;
-import com.android.launcher3.taskbar.StashedHandleViewController;
-import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.taskbar.TaskbarActivityContext.UIControllerChangeListener;
+import com.android.launcher3.dagger.LauncherComponentProvider;
+import com.android.launcher3.taskbar.StashedHandleViewControllerProxy;
 import com.android.launcher3.taskbar.TaskbarManager;
-import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.RunnableList;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.OverviewComponentObserver;
 import com.android.quickstep.OverviewComponentObserver.OverviewChangeListener;
-import com.android.quickstep.TouchInteractionService.TISBinder;
+import com.android.quickstep.RecentsAnimationDeviceState;
+import com.android.quickstep.sysuiconnection.SysUIConnectionTracker;
 import com.android.quickstep.util.ActivityPreloadUtil;
 import com.android.quickstep.util.LottieAnimationColorUtils;
-import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.WallpaperScreenshotClipView;
 import com.android.wm.shell.shared.TypefaceUtils.FontFamily;
 
 import com.airbnb.lottie.LottieAnimationView;
+
+import kotlin.Unit;
 
 import java.net.URISyntaxException;
 import java.util.Map;
@@ -108,7 +110,7 @@ import java.util.Map;
  * A page shows after SUW flow to hint users to swipe up from the bottom of the screen to go home
  * for the gestural system navigation.
  */
-public class AllSetActivity extends Activity implements UIControllerChangeListener {
+public class AllSetActivity extends Activity {
 
     public static final float ALL_SET_SWIPE_THRESHOLD_FOR_WORKSPACE_ANIM = 0.95f;
     // The fade-out happens in the last 65% of the animation.
@@ -147,14 +149,18 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     private static final String KEY_BACKGROUND_ANIMATION_TOGGLED_ON =
             "background_animation_toggled_on";
 
-    private boolean mIsTablet;
+    private boolean mIsLargeScreen;
 
-    private final AnimatedFloat mSwipeProgress = new AnimatedFloat(this::onSwipeProgressUpdate);
+    @VisibleForTesting
+    final AnimatedFloat mSwipeProgress = new AnimatedFloat(this::onSwipeProgressUpdate);
 
     private final InvariantDeviceProfile.OnIDPChangeListener mOnIDPChangeListener =
             modelPropertiesChanged -> updateTextForNavigationMode();
 
-    private TISBindHelper mTISBindHelper;
+    private RecentsAnimationDeviceState mDeviceState;
+    private SysUIConnectionTracker mSysUIConnectionTracker;
+    @Nullable private StashedHandleViewControllerProxy mStashedHandleViewControllerProxy;
+    private final RunnableList mSysUIConnectionCleanup = new RunnableList();
 
     private BgDrawable mBackground;
     private View mRootView;
@@ -164,7 +170,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     private LottieAnimationView mAnimatedBackground;
     private Animator.AnimatorListener mBackgroundAnimatorListener;
 
-    private AnimatorPlaybackController mLauncherStartAnim = null;
+    @Nullable private AsyncAnimatorPlaybackController mLauncherStartAnim = null;
 
     // Auto play background animation by default
     private boolean mBackgroundAnimationToggledOn = true;
@@ -175,6 +181,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     @Nullable private AnimatorSet mExpressiveAnimSet;
     @Nullable private WallpaperScreenshotClipView mWallpaperClipPath;
 
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         String SUWTheme = SystemProperties.get(SUW_THEME_SYSTEM_PROPERTY, "");
@@ -183,7 +190,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
         if (mIsExpressiveThemeEnabledInSUW) setTheme(R.style.AllSetTheme_Expressive);
 
         super.onCreate(savedInstanceState);
-        mIsTablet = getDP().getDeviceProperties().isTablet()
+        mIsLargeScreen = getDP().getDeviceProperties().isLargeScreen()
                     && !getDP().getDeviceProperties().isTwoPanels();
         boolean isDarkTheme =
                 (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
@@ -196,7 +203,9 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
         initializeCommonViewsAndListeners();
         configureSystemUI(isDarkTheme);
 
-        mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
+        mDeviceState = LauncherComponentProvider.get(this)
+                .getRecentsAnimationDeviceStateRepository().get(getDisplayId());
+        mSysUIConnectionTracker = SysUIConnectionTracker.get(this);
         mVibrator = getSystemService(Vibrator.class);
         getIDP().addOnChangeListener(mOnIDPChangeListener);
         OverviewComponentObserver.INSTANCE.get(this)
@@ -285,7 +294,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
             mBackgroundAnimationToggledOn = !mBackgroundAnimationToggledOn;
             maybeResumeOrPauseBackgroundAnimation();
         });
-        setUpBackgroundAnimation(getDP().getDeviceProperties().isTablet());
+        setUpBackgroundAnimation(getDP().getDeviceProperties().isLargeScreen());
     }
 
     private void setupExpressiveTheme() {
@@ -309,7 +318,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
                 Typeface.create(FontFamily.GSF_HEADLINE_SMALL_EMPHASIZED.getValue(),
                         Typeface.NORMAL));
 
-        if (mIsExpressiveThemeEnabledInSUW && Flags.enableNewAllSetAnimation()) {
+        if (mIsExpressiveThemeEnabledInSUW) {
             mWallpaperClipPath = findViewById(R.id.wallpaper_clip_path);
             mWallpaperClipPath.setVisibility(VISIBLE);
 
@@ -355,7 +364,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     }
 
     private AnimatorSet buildExpressiveAnimatorSet() {
-        if (!mIsExpressiveThemeEnabledInSUW || !Flags.enableNewAllSetAnimation()) {
+        if (!mIsExpressiveThemeEnabledInSUW) {
             return null;
         }
 
@@ -370,9 +379,9 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
             public void onAnimationUpdate(ValueAnimator animation) {
                 float transY = (float) animation.getAnimatedValue();
                 mWallpaperClipPath.setClipTranslationY(transY, animation.getAnimatedFraction());
-                StashedHandleViewController controller = getStashedHandleViewController();
-                if (controller != null) {
-                    controller.setTranslationYForSwipe(transY);
+                StashedHandleViewControllerProxy proxy = mStashedHandleViewControllerProxy;
+                if (proxy != null) {
+                    proxy.setTranslationYForSwipe(transY);
                 }
             }
         });
@@ -397,11 +406,9 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
             public void onAnimationUpdate(ValueAnimator valueAnimator) {
                 float alpha = (float) valueAnimator.getAnimatedValue();
                 mHintView.setAlpha(alpha);
-                StashedHandleViewController controller = getStashedHandleViewController();
-                if (controller != null) {
-                    controller.getStashedHandleAlpha()
-                            .get(ALPHA_INDEX_ALL_SET_TRANSITION)
-                            .setValue(alpha);
+                StashedHandleViewControllerProxy proxy = mStashedHandleViewControllerProxy;
+                if (proxy != null) {
+                    proxy.setStashedHandleAlpha(ALPHA_INDEX_ALL_SET_TRANSITION, alpha);
                 }
             }
         });
@@ -414,27 +421,14 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
         as.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                StashedHandleViewController controller = getStashedHandleViewController();
-                if (controller != null) {
-                    controller.setTranslationYForSwipe(0);
-                    controller.getStashedHandleAlpha()
-                            .get(ALPHA_INDEX_ALL_SET_TRANSITION)
-                            .setValue(1f);
+                StashedHandleViewControllerProxy proxy = mStashedHandleViewControllerProxy;
+                if (proxy != null) {
+                    proxy.setTranslationYForSwipe(0);
+                    proxy.setStashedHandleAlpha(ALPHA_INDEX_ALL_SET_TRANSITION, 1f);
                 }
             }
         });
         return as;
-    }
-
-    private @Nullable StashedHandleViewController getStashedHandleViewController() {
-        if (mTISBindHelper != null) {
-            TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-            if (taskbarManager != null) {
-                return taskbarManager.getCurrentActivityContext()
-                        .getControllers().stashedHandleViewController;
-            }
-        }
-        return null;
     }
 
     @Override
@@ -454,7 +448,10 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     }
 
     private void updateTextForNavigationMode() {
-        boolean isGestureMode = getDP().getDeviceProperties().isGestureMode();
+        boolean isGestureMode = getDP()
+                .getDeviceProperties()
+                .getDeviceConfiguration()
+                .isGestureMode();
         int hintTextResId;
         String subtitleText = null;
 
@@ -462,7 +459,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
             hintTextResId = isGestureMode
                     ? R.string.allset_hint_expressive
                     : R.string.allset_button_hint_expressive;
-            String deviceName = getString(mIsTablet
+            String deviceName = getString(mIsLargeScreen
                     ? R.string.allset_device_type_tablet
                     : R.string.allset_device_type_phone);
             int subtitleFormatResId = isGestureMode
@@ -538,68 +535,50 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
         mAnimatedBackground.addAnimatorListener(mBackgroundAnimatorListener);
     }
 
-    private void setSetupUIVisible(boolean visible) {
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager == null) return;
-        taskbarManager.setSetupUIVisible(visible);
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
         maybeResumeOrPauseBackgroundAnimation();
-        TISBinder binder = mTISBindHelper.getBinder();
-        if (binder != null) {
-            setSetupUIVisible(true);
-            binder.setSwipeUpProxy(this::createSwipeUpProxy);
-        }
+        if (mDeviceState != null) mDeviceState.setSwipeUpProxy(this::createSwipeUpProxy);
         if (mIsExpressiveThemeEnabledInSUW) {
             getWindow().setBackgroundBlurRadius(WALLPAPER_BLUR_RADIUS);
-            if (Flags.enableNewAllSetAnimation() && binder != null) {
-                int height = getWindowManager().getCurrentWindowMetrics().getBounds().height();
-                binder.setGesturalHeight((int) (height * GESTURE_HEIGHT_RATIO_OF_WINDOW_HEIGHT));
-            }
-        }
-        setUIControllerChangeListener(this);
-    }
-
-    private void onTISConnected(TISBinder binder) {
-        setSetupUIVisible(isResumed());
-        binder.setSwipeUpProxy(isResumed() ? this::createSwipeUpProxy : null);
-        if (mIsExpressiveThemeEnabledInSUW && Flags.enableNewAllSetAnimation() && isResumed()) {
             int height = getWindowManager().getCurrentWindowMetrics().getBounds().height();
-            binder.setGesturalHeight((int) (height * GESTURE_HEIGHT_RATIO_OF_WINDOW_HEIGHT));
-        }
-
-        setUIControllerChangeListener(this);
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager != null) {
-            // Initial call
-            onUIControllerChanged(
-                    taskbarManager.getUIControllerForDisplay(taskbarManager.getPrimaryDisplayId()));
-        }
-    }
-
-    private void setUIControllerChangeListener(UIControllerChangeListener listener) {
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager != null) {
-            TaskbarActivityContext context = taskbarManager.getCurrentActivityContext();
-            if (context != null) {
-                context.setUIControllerChangeListener(listener);
+            if (mDeviceState != null) {
+                mDeviceState.setGesturalHeight(
+                        (int) (height * GESTURE_HEIGHT_RATIO_OF_WINDOW_HEIGHT));
             }
         }
+
+        mSysUIConnectionCleanup.executeAllAndClear();
+        var connCleanup = mSysUIConnectionTracker.getActiveComponent().forEach(
+                Executors.getTaskbarUiThread(), conn -> {
+                    if (conn == null) return null;
+                    var tb = conn.getTaskbarManager();
+                    var startHandleProxy = tb.getStashedHandleViewController();
+                    var displayStream = tb.getPrimaryDisplayUiControllerStream();
+
+                    MAIN_EXECUTOR.execute(() -> {
+                        mStashedHandleViewControllerProxy = startHandleProxy;
+                        tb.setSetupUIVisible(isResumed());
+
+                        var displayCleanup = displayStream.forEach(
+                                MAIN_EXECUTOR, c -> onUiControllerChanged(tb));
+                        mSysUIConnectionCleanup.add(displayCleanup::close);
+                        onUiControllerChanged(tb);
+
+                    });
+                    return null;
+                });
+        mSysUIConnectionCleanup.add(connCleanup::close);
     }
 
-    @Override
-    public void onUIControllerChanged(TaskbarUIController uiController) {
-        TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
-        if (taskbarManager != null) {
-            mLauncherStartAnim = taskbarManager.createLauncherStartFromSuwAnim(MAX_SWIPE_DURATION);
-            if (mWallpaperClipPath != null) {
-                mWallpaperClipPath.setForceFallbackAnimation(
-                        taskbarManager.shouldForceAllSetFallbackAnimation());
-            }
+    private Unit onUiControllerChanged(@NonNull TaskbarManager taskbarManager) {
+        mLauncherStartAnim = taskbarManager.createLauncherStartFromSuwAnim(MAX_SWIPE_DURATION);
+        if (mWallpaperClipPath != null) {
+            mWallpaperClipPath.setForceFallbackAnimation(
+                    taskbarManager.shouldForceAllSetFallbackAnimation());
         }
+        return Unit.INSTANCE;
     }
 
     private void onOverviewTargetChange(boolean isHomeAndOverviewSame) {
@@ -615,17 +594,19 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
             finishAndRemoveTask();
             dispatchLauncherAnimStartEnd();
         }
-        setUIControllerChangeListener(null);
+        mSysUIConnectionCleanup.executeAllAndClear();
     }
 
     private void clearBinderOverride() {
-        TISBinder binder = mTISBindHelper.getBinder();
-        if (binder != null) {
-            setSetupUIVisible(false);
-            binder.setSwipeUpProxy(null);
-            if (mIsExpressiveThemeEnabledInSUW && Flags.enableNewAllSetAnimation()) {
-                binder.setGesturalHeight(RESET_TO_DEFAULT_GESTURAL_HEIGHT);
+        if (mDeviceState != null) {
+            mDeviceState.setSwipeUpProxy(null);
+            if (mIsExpressiveThemeEnabledInSUW) {
+                mDeviceState.setGesturalHeight(RESET_TO_DEFAULT_GESTURAL_HEIGHT);
             }
+        }
+        var conn = mSysUIConnectionTracker.getActiveComponent().getValue();
+        if (conn != null) {
+            conn.getTaskbarManager().setSetupUIVisible(false);
         }
     }
 
@@ -646,8 +627,7 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
     protected void onDestroy() {
         super.onDestroy();
         getIDP().removeOnChangeListener(mOnIDPChangeListener);
-        setUIControllerChangeListener(null);
-        mTISBindHelper.onDestroy();
+        mSysUIConnectionCleanup.executeAllAndDestroy();
         clearBinderOverride();
         if (mBackgroundAnimatorListener != null) {
             mAnimatedBackground.removeAnimatorListener(mBackgroundAnimatorListener);
@@ -690,9 +670,6 @@ public class AllSetActivity extends Activity implements UIControllerChangeListen
 
     private void onSwipeProgressUpdate() {
         if (mIsExpressiveThemeEnabledInSUW) {
-            getWindow().setBackgroundBlurRadius((int) mapBoundToRange(
-                    mSwipeProgress.value, 0, HINT_BOTTOM_FACTOR, WALLPAPER_BLUR_RADIUS, 0,
-                    ACCELERATE));
             if (mExpressiveAnimSet != null) {
                 long progress = (long) mapToRange(
                         mSwipeProgress.value, 0, 1, 0, CLIP_ANIM_DURATION, LINEAR);

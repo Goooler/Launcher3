@@ -29,23 +29,24 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT
+import com.android.launcher3.UtilitiesKt.isPersistedModelItem
 import com.android.launcher3.icons.BitmapRenderer.createSoftwareBitmap
 import com.android.launcher3.icons.cache.CacheLookupFlag.Companion.DEFAULT_LOOKUP_FLAG
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.shortcuts.ShortcutKey
 import com.android.launcher3.util.Executors
+import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.LauncherLayoutBuilder
 import com.android.launcher3.util.LauncherModelHelper.SHORTCUT_ID
 import com.android.launcher3.util.LauncherModelHelper.TEST_PACKAGE
-import com.android.launcher3.util.LayoutResource
-import com.android.launcher3.util.ModelTestExtensions.isPersistedModelItem
 import com.android.launcher3.util.ModelTestExtensions.loadModelSync
+import com.android.launcher3.util.ModelTestExtensions.setModelLayout
 import com.android.launcher3.util.RoboApiWrapper
 import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.TestUtil
-import com.android.launcher3.util.UserIconInfo
 import com.android.launcher3.util.rule.MockUsersRule
 import com.android.launcher3.util.rule.MockUsersRule.MockUser
+import com.android.users.UserType
 import java.util.concurrent.CountDownLatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,14 +66,13 @@ class ShortcutIconTest {
     @get:Rule val mockitoRule = MockitoJUnit.rule()
     @get:Rule val setFlagsRule: SetFlagsRule = SetFlagsRule()
     @get:Rule val app = SandboxApplication().withModelDependency()
-    @get:Rule val layoutResource = LayoutResource(app)
     @get:Rule val shortcutAccessRule = RoboApiWrapper.grantShortcutsPermissionRule()
     @get:Rule val mockUsers = MockUsersRule(app)
 
     val state: TestableModelState by lazy { app.appComponent.testableModelState }
 
     @Test
-    @MockUser(userType = UserIconInfo.TYPE_MAIN)
+    @MockUser(userType = UserType.MAIN)
     fun shortcut_icon_retained_even_after_system_error() {
         // Setup mock LauncherApps to return a valid drawable
         val iconBitmap = createSoftwareBitmap(200, 200) { it.drawColor(Color.GREEN) }
@@ -96,17 +96,18 @@ class ShortcutIconTest {
             .whenever(la)
             .getShortcuts(any(), any())
 
-        layoutResource.set(
+        app.setModelLayout(
             LauncherLayoutBuilder().atHotseat(0).putShortcut(TEST_PACKAGE, SHORTCUT_ID)
         )
         state.model.loadModelSync()
-        state.model.forceReload()
         state.model.loadModelSync()
         verifyIconHasIcon()
 
         // Ensure that the icon is saved in the main DB
         TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) {
-            state.model.getWriter(false, null, null).updateItemInDatabase(getPinnedInfo())
+            state.model.enqueueModelUpdateTask { taskController, _, _ ->
+                taskController.getModelWriter().updateItemInDatabase(getPinnedInfo())
+            }
         }
 
         // Make the system fail to load shortcut icons
@@ -117,7 +118,6 @@ class ShortcutIconTest {
             state.iconCache.getUpdateHandler()
             state.iconCache.removeIconsForPkg(TEST_PACKAGE, Process.myUserHandle())
         }
-        state.model.forceReload()
         state.model.loadModelSync()
         verifyIconHasIcon()
 
@@ -128,6 +128,7 @@ class ShortcutIconTest {
         }
         val updateLock = CountDownLatch(1)
         state.iconCache.updateIconInBackground(
+            MAIN_EXECUTOR,
             { updateLock.countDown() },
             getPinnedInfo(),
             DEFAULT_LOOKUP_FLAG.withThemeIcon(),
