@@ -16,7 +16,7 @@ lottie = "6.6.2"
 protobuf = "4.29.3"
 dagger = "2.51.1"
 guava = "33.4.0-android"
-compose-bom = "2024.12.01"
+compose-bom = "2026.08.00"
 robolectric = "4.14.1"
 
 [libraries]
