@@ -171,6 +171,14 @@ allprojects {
             implementation libs.protobuf.javalite
         }
     }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'androidx.core' && details.requested.name == 'core' && (details.requested.version == null || details.requested.version.isEmpty())) {
+                details.useVersion(libs.versions.androidx.core.get())
+            }
+        }
+    }
 }
 
 dependencies {
