@@ -6,6 +6,7 @@ plugins {
     alias libs.plugins.android.application
     alias libs.plugins.android.library apply false
     alias libs.plugins.kotlin.android
+    alias libs.plugins.kotlin.kapt
     alias libs.plugins.protobuf
 }
 
@@ -73,7 +74,7 @@ android {
     sourceSets {
         main {
             res.srcDirs = ['res']
-            java.srcDirs = ['src', 'src_plugins', 'dagger/src']
+            java.srcDirs = ['src', 'src_plugins', 'dagger/src', 'modules/appfunctions/src']
             manifest.srcFile 'AndroidManifest-common.xml'
             proto {
                 srcDirs = ['protos/', 'protos_overrides/']
@@ -208,6 +209,9 @@ dependencies {
     implementation libs.androidx.window
     implementation libs.material
     implementation libs.lottie
+    implementation libs.dagger
+    kapt libs.dagger.compiler
+    implementation libs.kotlinx.coroutines.android
 
     implementation project(':IconLoader')
     implementation project(':SharedLibWrapper')
