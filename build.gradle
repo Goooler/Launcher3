@@ -3,7 +3,6 @@ import com.android.build.gradle.api.AndroidBasePlugin
 plugins {
     alias libs.plugins.android.application
     alias libs.plugins.android.library apply false
-    alias libs.plugins.kotlin.android
     alias libs.plugins.protobuf
 }
 
