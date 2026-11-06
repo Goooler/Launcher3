@@ -10,6 +10,7 @@ final String ANDROID_TOP = "${rootDir}/../../.."
 final String FRAMEWORK_PREBUILTS_DIR = "${ANDROID_TOP}/prebuilts/framework_intermediates/"
 
 android {
+    compileSdk 35
     namespace 'com.android.launcher3'
 
     defaultConfig {
