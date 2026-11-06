@@ -28,6 +28,10 @@ dependencyResolutionManagement {
 include ':IconLoader'
 project(':IconLoader').projectDir = new File(rootDir, 'systemui/iconloaderlib')
 
+// Required by iconloaderlib for Android user-type badge support.
+include ':UserTypeLib'
+project(':UserTypeLib').projectDir = new File(rootDir, 'systemui/usertypelib')
+
 // TODO: handle these dummy projects.
 include ':SharedLibWrapper'
 include ':NexusLauncher:Flags'

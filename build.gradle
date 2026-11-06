@@ -3,7 +3,6 @@ import com.android.build.gradle.api.AndroidBasePlugin
 plugins {
     alias libs.plugins.android.application
     alias libs.plugins.android.library apply false
-    alias libs.plugins.kotlin.android
     alias libs.plugins.protobuf
 }
 
@@ -11,6 +10,7 @@ final String ANDROID_TOP = "${rootDir}/../../.."
 final String FRAMEWORK_PREBUILTS_DIR = "${ANDROID_TOP}/prebuilts/framework_intermediates/"
 
 android {
+    compileSdk 35
     namespace 'com.android.launcher3'
 
     defaultConfig {
@@ -46,12 +46,6 @@ android {
         }
     }
 
-    // Disable release builds for now
-    android.variantFilter { variant ->
-        if (variant.buildType.name.endsWith('release')) {
-            variant.setIgnore(true)
-        }
-    }
 
     sourceSets {
         main {
@@ -108,6 +102,13 @@ android {
             java.srcDirs = ['quickstep/src', 'quickstep/recents_ui_overrides/src']
             manifest.srcFile "quickstep/AndroidManifest.xml"
         }
+    }
+}
+
+// Disable release variants while keeping debug builds available.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
+        variantBuilder.enable = false
     }
 }
 
