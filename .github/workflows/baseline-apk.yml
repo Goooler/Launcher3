@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - build/baseline-apk
-    paths:
-      - ".github/workflows/baseline-apk.yml"
-      - "**"
   workflow_dispatch:
 
 permissions:
@@ -34,28 +31,28 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Inspect AOSP build prerequisites
+      - name: Inspect Android SDK and AOSP prerequisites
         working-directory: android/packages/apps/Launcher3
         shell: bash
         run: |
           echo "Launcher3 source revision: ${GITHUB_SHA}"
+          echo "Java:"
+          java -version
+          echo "Android SDK: ${ANDROID_HOME:-not set}"
+          echo "SDK tools:"
+          command -v sdkmanager || true
           echo "SystemUI submodule:"
           git submodule status
           echo "Expected AOSP framework prebuilts:"
-          ls -la ../../../../prebuilts/framework_intermediates 2>/dev/null || true
-          echo "Quickstep shared library:"
-          ls -la ../../../../prebuilts/framework_intermediates/quickstep/libs/sysui_shared.jar 2>/dev/null || true
+          ls -la ../../../prebuilts/framework_intermediates 2>/dev/null || true
           echo "Plugin core library:"
-          ls -la ../../../../prebuilts/framework_intermediates/libs/plugin_core.jar 2>/dev/null || true
+          ls -la ../../../prebuilts/framework_intermediates/libs/plugin_core.jar 2>/dev/null || true
 
       - name: Build baseline AOSP launcher without Quickstep
         working-directory: android/packages/apps/Launcher3
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon --stacktrace assembleAospWithoutQuickstepDebug
+          ./gradlew --no-daemon --console=plain --stacktrace assembleAospWithoutQuickstepDebug
 
       - name: Verify APK output
         working-directory: android/packages/apps/Launcher3
