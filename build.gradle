@@ -46,12 +46,6 @@ android {
         }
     }
 
-    // Disable release builds for now
-    android.variantFilter { variant ->
-        if (variant.buildType.name.endsWith('release')) {
-            variant.setIgnore(true)
-        }
-    }
 
     sourceSets {
         main {
@@ -108,6 +102,13 @@ android {
             java.srcDirs = ['quickstep/src', 'quickstep/recents_ui_overrides/src']
             manifest.srcFile "quickstep/AndroidManifest.xml"
         }
+    }
+}
+
+// Disable release variants while keeping debug builds available.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
+        variantBuilder.enable = false
     }
 }
 
