@@ -39,6 +39,8 @@ jobs:
           echo "Java:"
           java -version
           echo "Android SDK: ${ANDROID_HOME:-not set}"
+          echo "SDK platforms:"
+          ls -la "${ANDROID_HOME:-/usr/local/lib/android/sdk}/platforms" 2>/dev/null || true
           echo "SDK tools:"
           command -v sdkmanager || true
           echo "SystemUI submodule:"
